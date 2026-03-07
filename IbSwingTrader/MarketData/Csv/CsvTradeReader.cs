@@ -28,18 +28,18 @@ namespace IbSwingTrader.MarketData.Csv
 
                 try
                 {
-                    var ticker = parts[0];
+                    var ticker = parts[2];
 
-                    var entryDate = parts[1];
-                    var entryTime = parts[2];
-                    var entryPrice = parts[3];
+                    var entryDate = parts[3];
+                    var entryTime = parts[4];
+                    var entryPrice = parts[6];
 
-                    var exitDate = parts[4];
-                    var exitTime = parts[5];
-                    var exitPrice = parts[6];
+                    var exitDate = parts[14];
+                    var exitTime = parts[15];
+                    var exitPrice = parts[17];
 
-                    var profitPercent = parts[7];
-                    var holdDays = parts[8];
+                    var profitPercent = parts[1];
+                    var holdDays = parts[0];
 
                     var entryDateTime = DateTime.Parse($"{entryDate} {entryTime}");
                     var exitDateTime = DateTime.Parse($"{exitDate} {exitTime}");
