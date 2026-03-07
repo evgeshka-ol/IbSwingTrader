@@ -1,10 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.Interfaces
 {
-    internal interface IMarketDataProvider
+    public interface IMarketDataProvider
     {
+        Task<List<Candle>> GetCandles(
+            string ticker,
+            Timeframe timeframe,
+            DateTime endTimeUtc,
+            int bars);
     }
 }
