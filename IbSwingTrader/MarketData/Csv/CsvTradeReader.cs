@@ -1,93 +1,106 @@
-﻿using System.Globalization;
-using IbSwingTrader.Models;
+﻿using IbSwingTrader.Models;
+using System.Globalization;
 
-namespace IbSwingTrader.MarketData.Csv
+namespace IbSwingTrader.MarketData.Csv;
+
+public static class CsvTradeReader
 {
-    public class CsvTradeReader
+    private static readonly TimeZoneInfo NewYorkTimeZone =
+        TimeZoneInfo.FindSystemTimeZoneById(
+            OperatingSystem.IsWindows()
+                ? "Eastern Standard Time"
+                : "America/New_York");
+
+    public static List<TradeRecord> Read(string path)
     {
-        public static List<TradeRecord> Read(string path)
+        if (!File.Exists(path))
+            throw new Exception($"CSV file not found: {path}");
+
+        var trades = new List<TradeRecord>();
+        var lines = File.ReadAllLines(path);
+
+        if (lines.Length <= 1)
+            throw new Exception("CSV file is empty");
+
+        for (int i = 1; i < lines.Length; i++)
         {
-            if (!File.Exists(path))
-                throw new Exception($"CSV file not found: {path}");
+            var line = lines[i];
 
-            var trades = new List<TradeRecord>();
-            var lines = File.ReadAllLines(path);
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
 
-            if (lines.Length <= 1)
-                throw new Exception("CSV file is empty");
+            var parts = line.Split(';');
 
-            for (int i = 1; i < lines.Length; i++)
+            if (parts.Length < 18)
+                continue;
+
+            if (string.IsNullOrEmpty(parts[0]) || string.IsNullOrEmpty(parts[2]))
+                continue;
+
+            try
             {
-                var line = lines[i];
+                var ticker = parts[2].Trim();
 
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
+                var entryDate = parts[3].Trim();
+                var entryTime = parts[4].Trim();
+                var entryPrice = ParseMoney(parts[6]);
 
-                var parts = line.Split(';');
-                if (string.IsNullOrEmpty(parts[0]) || string.IsNullOrEmpty(parts[2])) continue;
+                var exitDate = parts[14].Trim();
+                var exitTime = parts[15].Trim();
+                var exitPrice = ParseMoney(parts[17]);
 
-                try
+                var profitPercent = ParsePercent(parts[1]);
+                var holdDays = int.Parse(parts[0]);
+
+                var entryLocal = DateTime.ParseExact(
+                    $"{entryDate} {entryTime}",
+                    "dd.MM.yyyy H:mm:ss",
+                    CultureInfo.InvariantCulture);
+
+                var exitLocal = DateTime.ParseExact(
+                    $"{exitDate} {exitTime}",
+                    "dd.MM.yyyy H:mm:ss",
+                    CultureInfo.InvariantCulture);
+
+                var entryUtc = TimeZoneInfo.ConvertTimeToUtc(entryLocal, NewYorkTimeZone);
+                var exitUtc = TimeZoneInfo.ConvertTimeToUtc(exitLocal, NewYorkTimeZone);
+
+                var trade = new TradeRecord
                 {
-                    var ticker = parts[2];
+                    Ticker = ticker,
 
-                    var entryDate = parts[3].Trim();
-                    var entryTime = parts[4].Trim();
-                    var entryPrice = ParseMoney(parts[6]);
+                    EntryTimeUtc = entryUtc,
+                    EntryPrice = entryPrice,
 
-                    var exitDate = parts[14].Trim();
-                    var exitTime = parts[15].Trim();
-                    var exitPrice = ParseMoney(parts[17]);
+                    ExitTimeUtc = exitUtc,
+                    ExitPrice = exitPrice,
 
-                    var profitPercent = ParsePercent(parts[1]);
-                    var holdDays = int.Parse(parts[0]);
+                    ProfitPercent = profitPercent,
+                    HoldDays = holdDays
+                };
 
-                    var entryDateTime = DateTime.ParseExact(
-                        $"{entryDate} {entryTime}",
-                        "dd.MM.yyyy H:mm:ss",
-                        CultureInfo.InvariantCulture);
-
-                    var exitDateTime = DateTime.ParseExact(
-                        $"{exitDate} {exitTime}",
-                        "dd.MM.yyyy H:mm:ss",
-                        CultureInfo.InvariantCulture);
-
-                    var trade = new TradeRecord
-                    {
-                        Ticker = ticker,
-
-                        EntryTime = entryDateTime,
-                        EntryPrice = entryPrice,
-
-                        ExitTime = exitDateTime,
-                        ExitPrice = exitPrice,
-
-                        ProfitPercent = profitPercent,
-                        HoldDays = holdDays
-                    };
-
-                    trades.Add(trade);
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"CSV parse error at line {i + 1}: {ex.Message}");
-                }
+                trades.Add(trade);
             }
-
-            return trades;
+            catch (Exception ex)
+            {
+                throw new Exception($"CSV parse error at line {i + 1}: {ex.Message}");
+            }
         }
 
-        private static decimal ParseMoney(string value)
-        {
-            value = value.Replace("$", "").Trim();
-            value = value.Replace(",", ".");
-            return decimal.Parse(value, CultureInfo.InvariantCulture);
-        }
+        return trades;
+    }
 
-        private static decimal ParsePercent(string value)
-        {
-            value = value.Replace("%", "").Trim();
-            value = value.Replace(",", ".");
-            return decimal.Parse(value, CultureInfo.InvariantCulture);
-        }
+    private static decimal ParseMoney(string value)
+    {
+        value = value.Replace("$", "").Trim();
+        value = value.Replace(",", ".");
+        return decimal.Parse(value, CultureInfo.InvariantCulture);
+    }
+
+    private static decimal ParsePercent(string value)
+    {
+        value = value.Replace("%", "").Trim();
+        value = value.Replace(",", ".");
+        return decimal.Parse(value, CultureInfo.InvariantCulture);
     }
 }
