@@ -11,7 +11,6 @@ namespace IbSwingTrader.MarketData.Csv
                 throw new Exception($"CSV file not found: {path}");
 
             var trades = new List<TradeRecord>();
-
             var lines = File.ReadAllLines(path);
 
             if (lines.Length <= 1)
@@ -32,31 +31,37 @@ namespace IbSwingTrader.MarketData.Csv
 
                     var entryDate = parts[3];
                     var entryTime = parts[4];
-                    var entryPrice = parts[6];
+                    var entryPrice = ParseMoney(parts[6]);
 
                     var exitDate = parts[14];
                     var exitTime = parts[15];
-                    var exitPrice = parts[17];
+                    var exitPrice = ParseMoney(parts[17]);
 
-                    var profitPercent = parts[1];
-                    var holdDays = parts[0];
+                    var profitPercent = ParsePercent(parts[1]);
+                    var holdDays = int.Parse(parts[0]);
 
-                    var entryDateTime = DateTime.Parse($"{entryDate} {entryTime}");
-                    var exitDateTime = DateTime.Parse($"{exitDate} {exitTime}");
+                    var entryDateTime = DateTime.ParseExact(
+                        $"{entryDate} {entryTime}",
+                        "dd.MM.yyyy H:mm:ss",
+                        CultureInfo.InvariantCulture);
+
+                    var exitDateTime = DateTime.ParseExact(
+                        $"{exitDate} {exitTime}",
+                        "dd.MM.yyyy H:mm:ss",
+                        CultureInfo.InvariantCulture);
 
                     var trade = new TradeRecord
                     {
                         Ticker = ticker,
 
                         EntryTime = entryDateTime,
-                        EntryPrice = decimal.Parse(entryPrice, CultureInfo.InvariantCulture),
+                        EntryPrice = entryPrice,
 
                         ExitTime = exitDateTime,
-                        ExitPrice = decimal.Parse(exitPrice, CultureInfo.InvariantCulture),
+                        ExitPrice = exitPrice,
 
-                        ProfitPercent = ParsePercent(profitPercent),
-
-                        HoldDays = int.Parse(holdDays)
+                        ProfitPercent = profitPercent,
+                        HoldDays = holdDays
                     };
 
                     trades.Add(trade);
@@ -70,9 +75,17 @@ namespace IbSwingTrader.MarketData.Csv
             return trades;
         }
 
+        private static decimal ParseMoney(string value)
+        {
+            value = value.Replace("$", "").Trim();
+            value = value.Replace(",", ".");
+            return decimal.Parse(value, CultureInfo.InvariantCulture);
+        }
+
         private static decimal ParsePercent(string value)
         {
             value = value.Replace("%", "").Trim();
+            value = value.Replace(",", ".");
             return decimal.Parse(value, CultureInfo.InvariantCulture);
         }
     }
