@@ -41,4 +41,23 @@ public static class TimeframeExtensions
             _ => throw new ArgumentOutOfRangeException(nameof(tf), tf, "Unsupported timeframe")
         };
     }
+
+    public static TimeSpan ToTimeSpan(this Timeframe tf)
+    {
+        return tf switch
+        {
+            Timeframe.M1 => TimeSpan.FromMinutes(1),
+            Timeframe.M5 => TimeSpan.FromMinutes(5),
+            Timeframe.M15 => TimeSpan.FromMinutes(15),
+            Timeframe.M30 => TimeSpan.FromMinutes(30),
+
+            Timeframe.H1 => TimeSpan.FromHours(1),
+            Timeframe.H4 => TimeSpan.FromHours(4),
+
+            Timeframe.D1 => TimeSpan.FromDays(1),
+            Timeframe.W1 => TimeSpan.FromDays(7),
+
+            _ => throw new ArgumentOutOfRangeException(nameof(tf), tf, "Unsupported timeframe")
+        };
+    }
 }
