@@ -24,17 +24,18 @@ namespace IbSwingTrader.MarketData.Csv
                     continue;
 
                 var parts = line.Split(';');
+                if (string.IsNullOrEmpty(parts[0]) || string.IsNullOrEmpty(parts[2])) continue;
 
                 try
                 {
                     var ticker = parts[2];
 
-                    var entryDate = parts[3];
-                    var entryTime = parts[4];
+                    var entryDate = parts[3].Trim();
+                    var entryTime = parts[4].Trim();
                     var entryPrice = ParseMoney(parts[6]);
 
-                    var exitDate = parts[14];
-                    var exitTime = parts[15];
+                    var exitDate = parts[14].Trim();
+                    var exitTime = parts[15].Trim();
                     var exitPrice = ParseMoney(parts[17]);
 
                     var profitPercent = ParsePercent(parts[1]);
