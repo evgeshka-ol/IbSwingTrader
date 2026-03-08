@@ -1,43 +1,66 @@
 ﻿using IbSwingTrader.MarketData.Csv;
-using System.Text.Json;
-
-Console.WriteLine("IbSwingTrader");
+using IbSwingTrader.MarketData.IB;
 
 if (args.Length == 0)
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("IbSwingTrader <csvFilePath>");
+    Console.WriteLine("  parse-csv <file>");
+    Console.WriteLine("  connect");
     return;
 }
 
-var file = args[0];
+var command = args[0];
 
-try
+switch (command)
 {
-    var trades = CsvTradeReader.Read(file);
+    case "parse-csv":
+        RunCsvParser(args);
+        break;
 
-    Console.WriteLine($"Trades loaded: {trades.Count}");
+    case "connect":
+        RunTwsConnection();
+        break;
 
-    if (trades.Count == 0)
+    default:
+        Console.WriteLine("Unknown command");
+        break;
+}
+
+static void RunCsvParser(string[] args)
+{
+    if (args.Length < 2)
     {
-        Console.WriteLine("No trades found");
+        Console.WriteLine("CSV file path required");
         return;
     }
 
-    var firstTrade = trades[0];
+    var path = args[1];
 
-    var json = JsonSerializer.Serialize(
-        firstTrade,
-        new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+    var trades = CsvTradeReader.Read(path);
 
-    Console.WriteLine("First trade parsed:");
-    Console.WriteLine(json);
+    Console.WriteLine($"Trades loaded: {trades.Count}");
+
+    if (trades.Count > 0)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            trades[0],
+            new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+        Console.WriteLine("First trade parsed:");
+        Console.WriteLine(json);
+    }
 }
-catch (Exception ex)
+
+static void RunTwsConnection()
 {
-    Console.WriteLine("Error:");
-    Console.WriteLine(ex.Message);
+    var tws = new TwsConnection();
+
+    tws.Connect();
+
+    Console.WriteLine("Connected: " + tws.IsConnected);
+
+    Console.ReadLine();
 }
