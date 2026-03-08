@@ -64,7 +64,10 @@ namespace IbSwingTrader.MarketData.IB
         public void nextValidId(int orderId)
         {
             Console.WriteLine($"Connected to TWS. Next OrderId: {orderId}");
-        }
+ 
+            // test connection by requesting current time
+            _client.reqCurrentTime();
+       }
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
@@ -73,7 +76,8 @@ namespace IbSwingTrader.MarketData.IB
 
         public void currentTime(long time)
         {
-            // ignore
+            var dt = DateTimeOffset.FromUnixTimeSeconds(time);
+            Console.WriteLine($"Server time: {dt}");
         }
 
         public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
