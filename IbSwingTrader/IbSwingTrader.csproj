@@ -9,7 +9,12 @@
 
   <ItemGroup>
     <Reference Include="CSharpAPI">
-      <HintPath>..\IbApi\IBApi.dll</HintPath>
+      <HintPath>..\IbApi\CSharpAPI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Google.Protobuf">
+      <HintPath>..\IbApi\Google.Protobuf.dll</HintPath>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
 
