@@ -15,7 +15,7 @@ namespace IbSwingTrader.MarketData.IB
             _client = new EClientSocket(this, _signal);
         }
 
-        public void Connect(string host = "127.0.0.1", int port = 7497, int clientId = 1)
+        public void Connect(string host = "127.0.0.1", int port = 7496, int clientId = 1)
         {
             _client.eConnect(host, port, clientId);
 
@@ -39,7 +39,7 @@ namespace IbSwingTrader.MarketData.IB
 
         public EClientSocket Client => _client;
 
-        // ---- минимальные методы EWrapper ----
+        // ---- EWrapper methods ----
 
         public void error(Exception e)
         {
