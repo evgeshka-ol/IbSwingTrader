@@ -14,6 +14,6 @@
 
         public decimal Close { get; set; }
 
-        public long Volume { get; set; }
+        public decimal Volume { get; set; }
     }
 }
