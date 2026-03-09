@@ -1,10 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using IBApi;
 
-namespace IbSwingTrader.Data.IB
+namespace IbSwingTrader.MarketData.IB
 {
-    internal interface IBContractFactory
+    public static class TwsContractFactory
     {
+        public static Contract CreateStock(string ticker)
+        {
+            return new Contract
+            {
+                Symbol = ticker,
+                SecType = "STK",
+                Exchange = "SMART",
+                Currency = "USD"
+            };
+        }
+
+        public static Contract CreateIndex(string ticker)
+        {
+            return new Contract
+            {
+                Symbol = ticker,
+                SecType = "IND",
+                Exchange = "CBOE",
+                Currency = "USD"
+            };
+        }
     }
 }
