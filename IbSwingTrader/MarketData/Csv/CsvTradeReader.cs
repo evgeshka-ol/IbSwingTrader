@@ -87,7 +87,9 @@ public static class CsvTradeReader
             }
         }
 
-        return trades;
+        return [.. trades
+            .OrderBy(t => t.Ticker)
+            .ThenBy(t => t.EntryTimeUtc)];
     }
 
     private static decimal ParseMoney(string value)
