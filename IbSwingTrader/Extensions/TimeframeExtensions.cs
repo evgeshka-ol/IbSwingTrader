@@ -22,18 +22,15 @@ public static class TimeframeExtensions
 
     public static string ToIBDuration(this Timeframe tf, int bars)
     {
-        if (bars <= 0)
-            throw new ArgumentException("Bars must be greater than zero", nameof(bars));
-
         return tf switch
         {
-            Timeframe.M1 => $"{bars} M",
-            Timeframe.M5 => $"{bars * 5} M",
-            Timeframe.M15 => $"{bars * 15} M",
-            Timeframe.M30 => $"{bars * 30} M",
+            Timeframe.M1 => $"{bars * 60} S",
+            Timeframe.M5 => $"{bars * 5 * 60} S",
+            Timeframe.M15 => $"{bars * 15 * 60} S",
+            Timeframe.M30 => $"{bars * 30 * 60} S",
 
-            Timeframe.H1 => $"{bars} H",
-            Timeframe.H4 => $"{bars * 4} H",
+            Timeframe.H1 => $"{bars * 3600} S",
+            Timeframe.H4 => $"{bars * 4 * 3600} S",
 
             Timeframe.D1 => $"{bars} D",
             Timeframe.W1 => $"{bars} W",
