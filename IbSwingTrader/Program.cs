@@ -1,5 +1,6 @@
 ﻿using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
+using IbSwingTrader.Models;
 
 if (args.Length == 0)
 {
@@ -18,7 +19,7 @@ switch (command)
         break;
 
     case "connect":
-        RunTwsConnection();
+        await RunTwsConnection();
         break;
 
     default:
@@ -54,13 +55,33 @@ static void RunCsvParser(string[] args)
     }
 }
 
-static void RunTwsConnection()
+static async Task RunTwsConnection()
 {
     var tws = new TwsConnection();
 
     tws.Connect();
 
     Console.WriteLine("Connected: " + tws.IsConnected);
+
+    // создаём провайдер
+    var marketData = new TwsMarketDataProvider(tws.Client);
+
+    // дать TWS время установить соединение
+    await Task.Delay(2000);
+
+    var candles = await marketData.GetCandles(
+        "AAPL",
+        Timeframe.M5,
+        DateTime.UtcNow,
+        10);
+
+    Console.WriteLine($"Candles received: {candles.Count}");
+
+    foreach (var c in candles)
+    {
+        Console.WriteLine(
+            $"{c.Time:HH:mm} O:{c.Open} H:{c.High} L:{c.Low} C:{c.Close} V:{c.Volume}");
+    }
 
     Console.ReadLine();
 }
