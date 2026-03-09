@@ -1,56 +1,46 @@
-﻿using IBApi;
+﻿using System.Collections.Concurrent;
+using IBApi;
 using IBApi.protobuf;
-using Contract = IBApi.Contract;
-using Order = IBApi.Order;
+using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
     public class TwsConnection : EWrapper
     {
-        private readonly EReaderSignal _signal;
-        private readonly EClientSocket _client;
+        private readonly EReaderMonitorSignal _signal;
         private EReader? _reader;
-
+        private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
         public TwsConnection()
         {
             _signal = new EReaderMonitorSignal();
-            _client = new EClientSocket(this, _signal);
+            Client = new EClientSocket(this, _signal);
         }
 
         public void Connect(string host = "127.0.0.1", int port = 7496, int clientId = 1)
         {
-            _client.eConnect(host, port, clientId);
+            Client.eConnect(host, port, clientId);
 
-            if (!_client.IsConnected())
+            if (!Client.IsConnected())
                 throw new Exception("Failed to connect to TWS");
 
-            _reader = new EReader(_client, _signal);
+            _reader = new EReader(Client, _signal);
             _reader.Start();
 
             new Thread(() =>
             {
-                while (_client.IsConnected())
+                while (Client.IsConnected())
                 {
                     _signal.waitForSignal();
                     _reader.processMsgs();
                 }
-            }).Start();
+            })
+            { IsBackground = true }.Start();
         }
 
-        public bool IsConnected => _client.IsConnected();
+        public bool IsConnected => Client.IsConnected();
 
-        public EClientSocket Client => _client;
-
-        private Contract CreateStock(string symbol)
-        {
-            return new Contract
-            {
-                Symbol = symbol,
-                SecType = "STK",
-                Exchange = "SMART",
-                Currency = "USD"
-            };
-        }
+        public EClientSocket Client { get; }
 
         // ---- EWrapper methods ----
 
@@ -78,9 +68,19 @@ namespace IbSwingTrader.MarketData.IB
         {
             Console.WriteLine($"Connected to TWS. Next OrderId: {orderId}");
 
-            _client.reqCurrentTime();
+            Client.reqCurrentTime();
 
-            _client.reqHistoricalData(2, CreateStock("RIVN"), "", "30 D", "4 hours", "TRADES", 1, 1, false, null);
+            Client.reqHistoricalData(
+                2,
+                TwsContractFactory.CreateStock("RIVN"),
+                "",
+                "30 D",
+                "4 hours",
+                "TRADES",
+                1,
+                1,
+                false,
+                null);
         }
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
@@ -221,7 +221,21 @@ namespace IbSwingTrader.MarketData.IB
 
         public void historicalData(int reqId, Bar bar)
         {
-            Console.WriteLine($"{bar.Time} O:{bar.Open} H:{bar.High} L:{bar.Low} C:{bar.Close} V:{bar.Volume}");
+            Console.WriteLine($"bar {bar.Time}");
+            if (!_buffers.TryGetValue(reqId, out var list))
+                return;
+
+            var candle = new Candle
+            {
+                Time = DateTime.Parse(bar.Time),
+                Open = (decimal)bar.Open,
+                High = (decimal)bar.High,
+                Low = (decimal)bar.Low,
+                Close = (decimal)bar.Close,
+                Volume = bar.Volume
+            };
+
+            list.Add(candle);
         }
 
         public void historicalDataUpdate(int reqId, Bar bar)
@@ -231,7 +245,14 @@ namespace IbSwingTrader.MarketData.IB
 
         public void historicalDataEnd(int reqId, string start, string end)
         {
-            // ignore
+            if (!_requests.TryRemove(reqId, out var tcs))
+                return;
+
+            var candles = _buffers.TryRemove(reqId, out var list)
+                ? list
+                : [];
+
+            tcs.SetResult(candles);
         }
 
         public void marketDataType(int reqId, int marketDataType)
