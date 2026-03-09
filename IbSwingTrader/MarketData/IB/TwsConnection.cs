@@ -96,16 +96,17 @@ namespace IbSwingTrader.MarketData.IB
 
         public void error(string str)
         {
-            Console.WriteLine($"IB ERROR STRING: {str}");
+            Console.WriteLine($"IB ERROR SHORT: {str}");
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            Console.WriteLine($"IB ERROR id={id} code={errorCode} msg={errorMsg}");
+            Console.WriteLine($"IB ERROR LONG id={id} code={errorCode} msg={errorMsg}");
         }
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
+            Console.WriteLine($"IB ERROR VERY LONG id={id} time={errorTime} code={errorCode} msg={errorMsg} details={advancedOrderRejectJson}");
             // ignore
         }
 
