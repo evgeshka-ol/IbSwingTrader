@@ -1,5 +1,7 @@
 ﻿using IBApi;
 using IBApi.protobuf;
+using Contract = IBApi.Contract;
+using Order = IBApi.Order;
 
 namespace IbSwingTrader.MarketData.IB
 {
@@ -39,6 +41,17 @@ namespace IbSwingTrader.MarketData.IB
 
         public EClientSocket Client => _client;
 
+        private Contract CreateStock(string symbol)
+        {
+            return new Contract
+            {
+                Symbol = symbol,
+                SecType = "STK",
+                Exchange = "SMART",
+                Currency = "USD"
+            };
+        }
+
         // ---- EWrapper methods ----
 
         public void error(Exception e)
@@ -64,10 +77,11 @@ namespace IbSwingTrader.MarketData.IB
         public void nextValidId(int orderId)
         {
             Console.WriteLine($"Connected to TWS. Next OrderId: {orderId}");
- 
-            // test connection by requesting current time
+
             _client.reqCurrentTime();
-       }
+
+            _client.reqHistoricalData(2, CreateStock("RIVN"), "", "30 D", "4 hours", "TRADES", 1, 1, false, null);
+        }
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
@@ -207,7 +221,7 @@ namespace IbSwingTrader.MarketData.IB
 
         public void historicalData(int reqId, Bar bar)
         {
-            // ignore
+            Console.WriteLine($"{bar.Time} O:{bar.Open} H:{bar.High} L:{bar.Low} C:{bar.Close} V:{bar.Volume}");
         }
 
         public void historicalDataUpdate(int reqId, Bar bar)
