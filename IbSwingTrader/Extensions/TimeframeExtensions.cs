@@ -29,8 +29,9 @@ public static class TimeframeExtensions
             Timeframe.M15 => $"{bars * 15 * 60} S",
             Timeframe.M30 => $"{bars * 30 * 60} S",
 
-            Timeframe.H1 => $"{bars * 3600} S",
-            Timeframe.H4 => $"{bars * 4 * 3600} S",
+            // для часов используем дни
+            Timeframe.H1 => $"{Math.Max(1, bars / 24)} D",
+            Timeframe.H4 => $"{Math.Max(1, bars / 6)} D",
 
             Timeframe.D1 => $"{bars} D",
             Timeframe.W1 => $"{bars} W",
