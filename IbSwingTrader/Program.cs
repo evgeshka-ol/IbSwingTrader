@@ -1,6 +1,14 @@
-﻿using IbSwingTrader.MarketData.Csv;
+﻿using System.Globalization;
+using System.Text.Json;
+using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
+
+// Cache JsonSerializerOptions to avoid creating new instance for every serialization
+var jsonOptions = new JsonSerializerOptions
+{
+    WriteIndented = true
+};
 
 if (args.Length == 0)
 {
@@ -27,7 +35,7 @@ switch (command)
         break;
 }
 
-static void RunCsvParser(string[] args)
+void RunCsvParser(string[] args)
 {
     if (args.Length < 2)
     {
@@ -38,17 +46,22 @@ static void RunCsvParser(string[] args)
     var path = args[1];
 
     var trades = CsvTradeReader.Read(path);
+    using var writer = new StreamWriter("trades_sorted.csv");
+
+    writer.WriteLine("Ticker,EntryTimeUtc,ExitTimeUtc");
+
+    foreach (var t in trades)
+    {
+        writer.WriteLine($"{t.Ticker},{t.EntryTimeUtc:yyyy-MM-dd HH:mm:ss},{t.ExitTimeUtc:yyyy-MM-dd HH:mm:ss}");
+    }
 
     Console.WriteLine($"Trades loaded: {trades.Count}");
 
     if (trades.Count > 0)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(
+        var json = JsonSerializer.Serialize(
             trades[0],
-            new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            jsonOptions);
 
         Console.WriteLine("First trade parsed:");
         Console.WriteLine(json);
