@@ -2,7 +2,8 @@
   "profiles": {
     "IbSwingTrader": {
       "commandName": "Project",
-      "commandLineArgs": "connect"
+      "commandLineArgs": "parse-csv trades.csv",
+      "workingDirectory": "C:\\Git_Home\\IbSwingTrader\\Data"
     }
   }
 }
