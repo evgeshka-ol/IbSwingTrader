@@ -63,12 +63,10 @@ static async Task RunTwsConnection()
 
     Console.WriteLine("Connected: " + tws.IsConnected);
 
-    // создаём провайдер
-    var marketData = new TwsMarketDataProvider(tws.Client);
+    // ждём готовность API
+    await tws.Ready.Task;
 
-    // дать TWS время установить соединение
-    await Task.Delay(2000);
-
+    var marketData = new TwsMarketDataProvider(tws);
     var candles = await marketData.GetCandles(
         "AAPL",
         Timeframe.M5,
@@ -79,8 +77,7 @@ static async Task RunTwsConnection()
 
     foreach (var c in candles)
     {
-        Console.WriteLine(
-            $"{c.Time:HH:mm} O:{c.Open} H:{c.High} L:{c.Low} C:{c.Close} V:{c.Volume}");
+        Console.WriteLine($"{c.Time:HH:mm} O:{c.Open} H:{c.High} L:{c.Low} C:{c.Close} V:{c.Volume}");
     }
 
     Console.ReadLine();

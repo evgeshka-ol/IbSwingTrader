@@ -1,6 +1,8 @@
 ﻿using System.Collections.Concurrent;
+using System.Globalization;
 using IBApi;
 using IBApi.protobuf;
+using IbSwingTrader.Extensions;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
@@ -11,6 +13,9 @@ namespace IbSwingTrader.MarketData.IB
         private EReader? _reader;
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
+
+        private int _nextRequestId = 1;
+
         public TwsConnection()
         {
             _signal = new EReaderMonitorSignal();
@@ -42,21 +47,66 @@ namespace IbSwingTrader.MarketData.IB
 
         public EClientSocket Client { get; }
 
+        public TaskCompletionSource<bool> Ready { get; } = new();
+
+        public Task<List<Candle>> RequestHistoricalData(
+            string ticker,
+            Timeframe timeframe,
+            DateTime endTimeUtc,
+            int bars)
+        {
+            Console.WriteLine("GetCandles called");
+
+            var reqId = Interlocked.Increment(ref _nextRequestId);
+
+            Console.WriteLine($"Sending reqHistoricalData for ticker {ticker}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
+            Console.WriteLine($"time frame: {timeframe}, IB format: {timeframe.ToIBBarSize()}");
+
+            var contract = TwsContractFactory.CreateStock(ticker);
+
+            var tcs = new TaskCompletionSource<List<Candle>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _buffers[reqId] = [];
+            _requests[reqId] = tcs;
+
+            Client.reqHistoricalData(
+                reqId,
+                contract,
+                endTimeUtc.ToIbEndTime(),
+                timeframe.ToIBDuration(bars),
+                timeframe.ToIBBarSize(),
+                "TRADES",
+                0,   // ✅ extended hours
+                1,
+                false,
+                null);
+
+            Console.WriteLine($"REQ {reqId} waiting for candles");
+
+            return tcs.Task;
+        }
+
         // ---- EWrapper methods ----
 
         public void error(Exception e)
         {
-            Console.WriteLine("Error: " + e.Message);
+            Console.WriteLine($"IB EXCEPTION: {e}");
         }
 
         public void error(string str)
         {
-            Console.WriteLine("Error: " + str);
+            Console.WriteLine($"IB ERROR STRING: {str}");
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            Console.WriteLine($"IB Error {errorCode}: {errorMsg}");
+            Console.WriteLine($"IB ERROR id={id} code={errorCode} msg={errorMsg}");
+        }
+
+        public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
+        {
+            // ignore
         }
 
         public void connectionClosed()
@@ -67,25 +117,8 @@ namespace IbSwingTrader.MarketData.IB
         public void nextValidId(int orderId)
         {
             Console.WriteLine($"Connected to TWS. Next OrderId: {orderId}");
-
             Client.reqCurrentTime();
-
-            Client.reqHistoricalData(
-                2,
-                TwsContractFactory.CreateStock("RIVN"),
-                "",
-                "30 D",
-                "4 hours",
-                "TRADES",
-                1,
-                1,
-                false,
-                null);
-        }
-
-        public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
-        {
-            // ignore
+            Ready.TrySetResult(true);
         }
 
         public void currentTime(long time)
@@ -222,12 +255,13 @@ namespace IbSwingTrader.MarketData.IB
         public void historicalData(int reqId, Bar bar)
         {
             Console.WriteLine($"bar {bar.Time}");
+
             if (!_buffers.TryGetValue(reqId, out var list))
                 return;
 
             var candle = new Candle
             {
-                Time = DateTime.Parse(bar.Time),
+                Time = TwsTimeParser.ParseToUtc(bar.Time),
                 Open = (decimal)bar.Open,
                 High = (decimal)bar.High,
                 Low = (decimal)bar.Low,
@@ -253,6 +287,7 @@ namespace IbSwingTrader.MarketData.IB
                 : [];
 
             tcs.SetResult(candles);
+            Console.WriteLine($"END {reqId}");
         }
 
         public void marketDataType(int reqId, int marketDataType)
