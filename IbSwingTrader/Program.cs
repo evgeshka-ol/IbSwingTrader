@@ -1,20 +1,12 @@
-﻿using System.Globalization;
-using System.Text.Json;
-using IbSwingTrader.MarketData.Csv;
+﻿using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
-
-// Cache JsonSerializerOptions to avoid creating new instance for every serialization
-var jsonOptions = new JsonSerializerOptions
-{
-    WriteIndented = true
-};
 
 if (args.Length == 0)
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  parse-csv <file>");
-    Console.WriteLine("  connect");
+    Console.WriteLine("  build-dataset <trades.csv> <dataset.csv>");
+    Console.WriteLine("  get-candidates");
     return;
 }
 
@@ -22,12 +14,12 @@ var command = args[0];
 
 switch (command)
 {
-    case "parse-csv":
-        RunCsvParser(args);
+    case "build-dataset":
+        await RunBuildDataset(args);
         break;
 
-    case "connect":
-        await RunTwsConnection();
+    case "get-candidates":
+        await RunGetCandidates();
         break;
 
     default:
@@ -35,63 +27,72 @@ switch (command)
         break;
 }
 
-void RunCsvParser(string[] args)
+async Task RunBuildDataset(string[] args)
 {
-    if (args.Length < 2)
+    if (args.Length < 3)
     {
-        Console.WriteLine("CSV file path required");
+        Console.WriteLine("Usage: build-dataset <trades.csv> <dataset.csv>");
         return;
     }
 
-    var path = args[1];
+    var tradesPath = args[1];
+    var datasetPath = args[2];
 
-    var trades = CsvTradeReader.Read(path);
-    using var writer = new StreamWriter("trades_sorted.csv");
+    var trades = CsvTradeReader.Read(tradesPath);
 
-    writer.WriteLine("Ticker,EntryTimeUtc,ExitTimeUtc");
-
-    foreach (var t in trades)
+    if (trades.Count == 0)
     {
-        writer.WriteLine($"{t.Ticker},{t.EntryTimeUtc:yyyy-MM-dd HH:mm:ss},{t.ExitTimeUtc:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine("No trades found");
+        return;
     }
 
-    Console.WriteLine($"Trades loaded: {trades.Count}");
+    var ticker = trades
+        .GroupBy(t => t.Ticker)
+        .Select(g => new
+        {
+            Ticker = g.Key,
+            Range = g.Max(x => x.ExitTimeUtc) - g.Min(x => x.EntryTimeUtc)
+        })
+        .OrderByDescending(x => x.Range)
+        .First()
+        .Ticker;
 
-    if (trades.Count > 0)
-    {
-        var json = JsonSerializer.Serialize(
-            trades[0],
-            jsonOptions);
+    var tickerTrades = trades.Where(t => t.Ticker == ticker).ToList();
 
-        Console.WriteLine("First trade parsed:");
-        Console.WriteLine(json);
-    }
-}
+    var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
+    var latest = tickerTrades.Max(t => t.ExitTimeUtc);
 
-static async Task RunTwsConnection()
-{
+    var start = earliest.AddDays(-20);
+
+    Console.WriteLine($"Ticker: {ticker}");
+    Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+
     var tws = new TwsConnection();
-
     tws.Connect();
 
-    Console.WriteLine("Connected: " + tws.IsConnected);
-
-    // ждём готовность API
     await tws.Ready.Task;
 
     var marketData = new TwsMarketDataProvider(tws);
-    var candles = await marketData.GetCandles(
-        "AAPL",
-        Timeframe.M5,
-        DateTime.UtcNow,
-        10);
 
-    Console.WriteLine($"Candles received: {candles.Count}");
+    var candles = await marketData.GetCandles(
+        ticker,
+        Timeframe.H4,
+        latest,
+        2000);
+
+    using var writer = new StreamWriter(datasetPath);
+
+    writer.WriteLine("Ticker;TimeUtc;Open;High;Low;Close;Volume");
 
     foreach (var c in candles)
     {
-        Console.WriteLine($"{c.Time:HH:mm} O:{c.Open} H:{c.High} L:{c.Low} C:{c.Close} V:{c.Volume}");
+        writer.WriteLine($"{ticker};{c.Time:yyyy-MM-dd HH:mm:ss};{c.Open};{c.High};{c.Low};{c.Close};{c.Volume}");
     }
 
-    Console.ReadLine();
+    Console.WriteLine($"Dataset saved: {datasetPath}");
+}
+
+async Task RunGetCandidates()
+{
+    Console.WriteLine("Candidate search not implemented yet");
 }
