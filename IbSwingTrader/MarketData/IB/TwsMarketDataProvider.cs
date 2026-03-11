@@ -49,9 +49,26 @@ namespace IbSwingTrader.MarketData.IB
                 await Task.Delay(300);
             }
 
-            return [.. result
+            var candles = result
                 .Where(c => c.Time >= start && c.Time <= end)
-                .OrderBy(c => c.Time)];
+                .GroupBy(c => c.Time)            // remove duplicates
+                .Select(g => g.First())
+                .OrderBy(c => c.Time)
+                .ToList();
+
+            Console.WriteLine($"Total candles: {candles.Count}");
+
+            for (int i = 1; i < candles.Count; i++)
+            {
+                var diff = candles[i].Time - candles[i - 1].Time;
+
+                if (diff > TimeSpan.FromHours(8))
+                {
+                    Console.WriteLine($"Gap detected: {candles[i - 1].Time} -> {candles[i].Time}");
+                }
+            }
+
+            return candles;
         }
     }
 }
