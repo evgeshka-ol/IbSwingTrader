@@ -9,5 +9,11 @@ namespace IbSwingTrader.MarketData.Interfaces
             Timeframe timeframe,
             DateTime endTimeUtc,
             int bars);
+
+        Task<List<Candle>> GetHistoricalRange(
+           string ticker,
+           Timeframe timeframe,
+           DateTime start,
+           DateTime end);
     }
 }

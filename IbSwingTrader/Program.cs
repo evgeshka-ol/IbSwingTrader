@@ -74,11 +74,11 @@ async Task RunBuildDataset(string[] args)
 
     var marketData = new TwsMarketDataProvider(tws);
 
-    var candles = await marketData.GetCandles(
+    var candles = await marketData.GetHistoricalRange(
         ticker,
         Timeframe.H4,
-        latest,
-        2000);
+        start,
+        latest);
 
     using var writer = new StreamWriter(datasetPath);
 
