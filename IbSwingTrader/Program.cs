@@ -89,7 +89,7 @@ async Task RunBuildDataset(string[] args)
     writer.WriteLine(
         "Ticker;EntryTimeUtc;EntryPrice;ExitTimeUtc;ExitPrice;ProfitPercent;HoldDays;IsRealTrade;" +
         "Pullback5d;Pullback10d;VolumeRatio20;TrendPosition;" +
-        "FutureHigh1d;FutureLow1d;FutureHigh2d;FutureLow2d;Target10pct1d;Target10pct2d");
+        "FutureHigh1d;FutureLow1d;FutureHigh2d;FutureLow2d;MaxReturn1d;MaxReturn2d;MaxDrawdown1d;MaxDrawdown2d;Target10pct1d;Target10pct2d");
 
     foreach (var r in rows)
     {
@@ -110,6 +110,10 @@ async Task RunBuildDataset(string[] args)
             $"{r.FutureLow1d};" +
             $"{r.FutureHigh2d};" +
             $"{r.FutureLow2d};" +
+            $"{r.MaxReturn1d};" +
+            $"{r.MaxReturn2d};" +
+            $"{r.MaxDrawdown1d};" +
+            $"{r.MaxDrawdown2d};" +
             $"{r.Target10pct1d};" +
             $"{r.Target10pct2d}");
     }
