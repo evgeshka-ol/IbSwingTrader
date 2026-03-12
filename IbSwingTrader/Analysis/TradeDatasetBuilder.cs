@@ -48,13 +48,24 @@ namespace IbSwingTrader.Analysis
 
         private static int FindEntryBarIndex(List<Candle> candles, DateTime entryTime)
         {
-            for (int i = 0; i < candles.Count; i++)
+            int left = 0;
+            int right = candles.Count - 1;
+
+            while (left <= right)
             {
-                if (candles[i].Time >= entryTime)
-                    return i;
+                int mid = (left + right) / 2;
+
+                if (candles[mid].Time < entryTime)
+                {
+                    left = mid + 1;
+                }
+                else
+                {
+                    right = mid - 1;
+                }
             }
 
-            return -1;
+            return left;
         }
 
         private static void CalculateFeatures(
