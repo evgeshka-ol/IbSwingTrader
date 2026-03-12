@@ -81,13 +81,12 @@ async Task RunBuildDataset(string[] args)
         start,
         latest);
 
-    var builder = new TradeDatasetBuilder();
-    var rows = builder.Build(tickerTrades, candles);
+    var rows = TradeDatasetBuilder.Build(tickerTrades, candles);
 
     using var writer = new StreamWriter(datasetPath);
 
     writer.WriteLine(
-        "Ticker;EntryTimeUtc;EntryPrice;ExitTimeUtc;ExitPrice;ProfitPercent;HoldDays;IsRealTrade;" +
+        "Ticker;EntryShiftBars;EntryTimeUtc;EntryPrice;ExitTimeUtc;ExitPrice;ProfitPercent;HoldDays;IsRealTrade;" +
         "Pullback5d;Pullback10d;VolumeRatio20;TrendPosition;" +
         "FutureHigh1d;FutureLow1d;FutureHigh2d;FutureLow2d;MaxReturn1d;MaxReturn2d;MaxDrawdown1d;MaxDrawdown2d;Target10pct1d;Target10pct2d");
 
@@ -95,6 +94,7 @@ async Task RunBuildDataset(string[] args)
     {
         writer.WriteLine(
             $"{r.Ticker};" +
+            $"{r.EntryShiftBars};" +
             $"{r.EntryTimeUtc:yyyy-MM-dd HH:mm:ss};" +
             $"{r.EntryPrice};" +
             $"{r.ExitTimeUtc:yyyy-MM-dd HH:mm:ss};" +

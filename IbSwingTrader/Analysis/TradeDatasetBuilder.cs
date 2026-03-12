@@ -2,9 +2,9 @@
 
 namespace IbSwingTrader.Analysis
 {
-    public class TradeDatasetBuilder
+    public static class TradeDatasetBuilder
     {
-        public List<TradeDatasetRow> Build(
+        public static List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
             List<Candle> candles)
         {
@@ -14,36 +14,82 @@ namespace IbSwingTrader.Analysis
             {
                 var trade = trades[t];
 
-                var entryIndex = FindEntryBarIndex(candles, trade.EntryTimeUtc);
+                var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
-                if (entryIndex < 50)
+                if (entryIndexReal < 50)
                     continue;
 
-                if (entryIndex >= candles.Count - 12)
+                if (entryIndexReal >= candles.Count - 12)
                     continue;
 
-                var row = new TradeDatasetRow
+                int[] shifts = { -3, -2, -1, 0, 1, 2, 3 };
+
+                var candlePriceReal = candles[entryIndexReal].Close;
+                var splitFactor = DetectSplitFactor(trade.EntryPrice, candlePriceReal);
+
+                foreach (var shift in shifts)
                 {
-                    Ticker = trade.Ticker,
-                    EntryTimeUtc = trade.EntryTimeUtc,
-                    EntryPrice = trade.EntryPrice,
+                    int entryIndex = entryIndexReal + shift;
 
-                    ExitTimeUtc = trade.ExitTimeUtc,
-                    ExitPrice = trade.ExitPrice,
+                    if (entryIndex < 50)
+                        continue;
 
-                    ProfitPercent = trade.ProfitPercent,
-                    HoldDays = trade.HoldDays,
+                    if (entryIndex >= candles.Count - 12)
+                        continue;
 
-                    IsRealTrade = true
-                };
+                    var entryTime = candles[entryIndex].Time;
 
-                CalculateFeatures(row, candles, entryIndex);
-                CalculateFuture(row, candles, entryIndex);
+                    if (entryTime.Date >= trade.ExitTimeUtc.Date)
+                        continue;
 
-                rows.Add(row);
+                    decimal entryPrice = shift == 0
+                        ? trade.EntryPrice / splitFactor
+                        : candles[entryIndex].Close;
+
+                    decimal exitPrice = trade.ExitPrice / splitFactor;
+
+                    var row = new TradeDatasetRow
+                    {
+                        Ticker = trade.Ticker,
+
+                        EntryTimeUtc = entryTime,
+                        EntryPrice = entryPrice,
+
+                        ExitTimeUtc = trade.ExitTimeUtc,
+                        ExitPrice = exitPrice,
+
+                        ProfitPercent =
+                            (exitPrice - entryPrice) / entryPrice * 100m,
+
+                        HoldDays = (trade.ExitTimeUtc.Date - entryTime.Date).Days,
+
+                        IsRealTrade = shift == 0,
+                        EntryShiftBars = shift
+                    };
+
+                    CalculateFeatures(row, candles, entryIndex);
+                    CalculateFuture(row, candles, entryIndex);
+
+                    rows.Add(row);
+                }
             }
 
             return rows;
+        }
+
+        private static decimal DetectSplitFactor(decimal tradePrice, decimal candlePrice)
+        {
+            if (candlePrice <= 0)
+                return 1m;
+
+            var ratio = tradePrice / candlePrice;
+            var rounded = Math.Round(ratio);
+
+            if (rounded >= 2 && rounded <= 20 &&
+                Math.Abs(ratio - rounded) < 0.2m)
+                return rounded;
+
+            return 1m;
         }
 
         private static int FindEntryBarIndex(List<Candle> candles, DateTime entryTime)
