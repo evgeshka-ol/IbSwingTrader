@@ -1,4 +1,5 @@
-﻿using IbSwingTrader.MarketData.Csv;
+﻿using IbSwingTrader.Analysis;
+using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
 
@@ -80,13 +81,37 @@ async Task RunBuildDataset(string[] args)
         start,
         latest);
 
+    var builder = new TradeDatasetBuilder();
+    var rows = builder.Build(tickerTrades, candles);
+
     using var writer = new StreamWriter(datasetPath);
 
-    writer.WriteLine("Ticker;TimeUtc;Open;High;Low;Close;Volume");
+    writer.WriteLine(
+        "Ticker;EntryTimeUtc;EntryPrice;ExitTimeUtc;ExitPrice;ProfitPercent;HoldDays;IsRealTrade;" +
+        "Pullback5d;Pullback10d;VolumeRatio20;TrendPosition;" +
+        "FutureHigh1d;FutureLow1d;FutureHigh2d;FutureLow2d;Target10pct1d;Target10pct2d");
 
-    foreach (var c in candles)
+    foreach (var r in rows)
     {
-        writer.WriteLine($"{ticker};{c.Time:yyyy-MM-dd HH:mm:ss};{c.Open};{c.High};{c.Low};{c.Close};{c.Volume}");
+        writer.WriteLine(
+            $"{r.Ticker};" +
+            $"{r.EntryTimeUtc:yyyy-MM-dd HH:mm:ss};" +
+            $"{r.EntryPrice};" +
+            $"{r.ExitTimeUtc:yyyy-MM-dd HH:mm:ss};" +
+            $"{r.ExitPrice};" +
+            $"{r.ProfitPercent};" +
+            $"{r.HoldDays};" +
+            $"{r.IsRealTrade};" +
+            $"{r.Pullback5d};" +
+            $"{r.Pullback10d};" +
+            $"{r.VolumeRatio20};" +
+            $"{r.TrendPosition};" +
+            $"{r.FutureHigh1d};" +
+            $"{r.FutureLow1d};" +
+            $"{r.FutureHigh2d};" +
+            $"{r.FutureLow2d};" +
+            $"{r.Target10pct1d};" +
+            $"{r.Target10pct2d}");
     }
 
     Console.WriteLine($"Dataset saved: {datasetPath}");
