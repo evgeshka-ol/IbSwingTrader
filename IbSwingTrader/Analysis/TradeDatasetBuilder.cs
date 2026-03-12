@@ -96,6 +96,7 @@ namespace IbSwingTrader.Analysis
             var low1 = decimal.MaxValue;
             var low2 = decimal.MaxValue;
 
+            // 1 день = 6 баров
             for (int k = 1; k <= 6; k++)
             {
                 var c = candles[i + k];
@@ -104,6 +105,7 @@ namespace IbSwingTrader.Analysis
                 low1 = Math.Min(low1, c.Low);
             }
 
+            // 2 дня = 12 баров
             for (int k = 1; k <= 12; k++)
             {
                 var c = candles[i + k];
@@ -117,6 +119,12 @@ namespace IbSwingTrader.Analysis
 
             row.FutureHigh2d = high2;
             row.FutureLow2d = low2;
+
+            row.MaxReturn1d = (high1 - entry) / entry;
+            row.MaxReturn2d = (high2 - entry) / entry;
+
+            row.MaxDrawdown1d = (low1 - entry) / entry;
+            row.MaxDrawdown2d = (low2 - entry) / entry;
 
             row.Target10pct1d = high1 >= entry * 1.10m;
             row.Target10pct2d = high2 >= entry * 1.10m;
