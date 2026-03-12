@@ -125,16 +125,19 @@ namespace IbSwingTrader.Analysis
         private static decimal CalcPullback(List<Candle> candles, int i, int days)
         {
             int bars = days * 6;
-            var highest = decimal.MinValue;
 
-            for (int k = i - bars; k < i; k++)
+            int start = Math.Max(0, i - bars);
+
+            decimal highest = decimal.MinValue;
+
+            for (int k = start; k < i; k++)
             {
                 highest = Math.Max(highest, candles[k].High);
             }
 
             var close = candles[i - 1].Close;
 
-            return (close - highest) / highest * 100.0m;
+            return (close - highest) / highest * 100m;
         }
 
         private static decimal CalcVolumeRatio(List<Candle> candles, int i, int length)
