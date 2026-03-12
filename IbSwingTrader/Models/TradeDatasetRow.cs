@@ -32,5 +32,11 @@
         // --- targets ---
         public bool Target10pct1d { get; set; }
         public bool Target10pct2d { get; set; }
+
+        public decimal MaxReturn1d { get; set; }
+        public decimal MaxReturn2d { get; set; }
+
+        public decimal MaxDrawdown1d { get; set; }
+        public decimal MaxDrawdown2d { get; set; }
     }
 }
