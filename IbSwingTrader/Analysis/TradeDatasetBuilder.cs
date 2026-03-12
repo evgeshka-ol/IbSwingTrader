@@ -53,7 +53,7 @@ namespace IbSwingTrader.Analysis
 
             while (left <= right)
             {
-                int mid = (left + right) / 2;
+                int mid = left + ((right - left) >> 1);
 
                 if (candles[mid].Time < entryTime)
                 {
