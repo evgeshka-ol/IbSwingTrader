@@ -4,6 +4,8 @@
     {
         public bool IsRealTrade { get; set; }
 
+        public int EntryShiftBars { get; set; }
+
         // --- 4H indicators ---
         public decimal Pullback5d { get; set; }
         public decimal Pullback10d { get; set; }
