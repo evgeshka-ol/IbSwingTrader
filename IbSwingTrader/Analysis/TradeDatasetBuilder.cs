@@ -57,7 +57,7 @@ namespace IbSwingTrader.Analysis
             return -1;
         }
 
-        private void CalculateFeatures(
+        private static void CalculateFeatures(
             TradeDatasetRow row,
             List<Candle> candles,
             int i)
@@ -72,7 +72,7 @@ namespace IbSwingTrader.Analysis
             row.TrendPosition = CalcTrendPosition(candles, i, 50);
         }
 
-        private void CalculateFuture(
+        private static void CalculateFuture(
             TradeDatasetRow row,
             List<Candle> candles,
             int i)
