@@ -4,6 +4,11 @@ using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
 
+Dictionary<string, string> TickerAliases = new()
+{
+    { "NYCB", "FLG" }
+};
+
 var services = ConfigureServices();
 
 if (args.Length == 0)
@@ -77,9 +82,7 @@ async Task RunBuildDataset(string[] args, Services services)
     var tasks = new List<Task<List<TradeDatasetRow>>>();
 
     foreach (var g in grouped)
-    {
         tasks.Add(ProcessTicker(g));
-    }
 
     var results = await Task.WhenAll(tasks);
 
@@ -98,7 +101,15 @@ async Task RunBuildDataset(string[] args, Services services)
 
         try
         {
-            var ticker = g.Key;
+            var originalTicker = g.Key;
+            var ticker = originalTicker;
+
+            if (TickerAliases.TryGetValue(ticker, out var mapped))
+            {
+                Console.WriteLine($"Ticker remapped: {ticker} → {mapped}");
+                ticker = mapped;
+            }
+
             var tickerTrades = g.ToList();
 
             var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
@@ -107,7 +118,7 @@ async Task RunBuildDataset(string[] args, Services services)
             var start = earliest.AddDays(-20);
 
             Console.WriteLine();
-            Console.WriteLine($"Ticker: {ticker}");
+            Console.WriteLine($"Ticker: {originalTicker}");
             Console.WriteLine($"Trades: {tickerTrades.Count}");
             Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
 
@@ -115,16 +126,28 @@ async Task RunBuildDataset(string[] args, Services services)
 
             try
             {
-                candles = await marketData.GetHistoricalRange(
+                var candleTask = marketData.GetHistoricalRange(
                     ticker,
                     Timeframe.H4,
                     start,
                     latest);
+
+                var completed = await Task.WhenAny(
+                    candleTask,
+                    Task.Delay(TimeSpan.FromSeconds(15)));
+
+                if (completed != candleTask)
+                {
+                    Console.WriteLine($"Timeout loading candles for {ticker}");
+                    return [];
+                }
+
+                candles = await candleTask;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to load candles for {ticker}: {ex.Message}");
-                return new List<TradeDatasetRow>();
+                return [];
             }
 
             if (candles == null || candles.Count == 0)
