@@ -4,6 +4,8 @@
     {
         public string Ticker { get; set; } = "";
 
+        public DateTime EntryDate => EntryTimeUtc.Date;
+
         public DateTime EntryTimeUtc { get; set; }
         public decimal EntryPrice { get; set; }
 

@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Reflection;
 using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.Csv
@@ -9,7 +10,20 @@ namespace IbSwingTrader.MarketData.Csv
         {
             using var writer = new StreamWriter(path);
 
-            var props = typeof(T).GetProperties();
+            var type = typeof(T);
+
+            var baseProps = type.BaseType?
+                .GetProperties()
+                .OrderBy(p => p.MetadataToken)
+                ?? Enumerable.Empty<PropertyInfo>();
+
+            var ownProps = type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .OrderBy(p => p.MetadataToken);
+
+            var props = baseProps
+                .Concat(ownProps)
+                .ToArray();
 
             writer.WriteLine(string.Join(",", props.Select(p => p.Name)));
 
@@ -26,7 +40,12 @@ namespace IbSwingTrader.MarketData.Csv
                         return d.ToString("F6", CultureInfo.InvariantCulture);
 
                     if (value is DateTime dt)
+                    {
+                        if (p.Name.EndsWith("Date"))
+                            return dt.ToString("yyyy-MM-dd");
+
                         return dt.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
 
                     return value.ToString();
                 });
