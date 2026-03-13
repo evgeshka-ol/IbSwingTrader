@@ -39,6 +39,9 @@ public static class CsvTradeReader
 
             try
             {
+                var last = parts[^1].Trim();
+                var isShort = last == "1";
+
                 var ticker = parts[2].Trim().ToUpperInvariant();
 
                 var entryDate = parts[3].Trim();
@@ -68,6 +71,7 @@ public static class CsvTradeReader
                 var trade = new TradeRecord
                 {
                     Ticker = ticker,
+                    IsShort = isShort,
 
                     EntryTimeUtc = entryUtc,
                     EntryPrice = entryPrice,

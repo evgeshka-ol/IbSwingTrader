@@ -1,4 +1,6 @@
-﻿using IbSwingTrader.Interfaces;
+﻿using System.Diagnostics;
+using System.Drawing;
+using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Analysis
@@ -52,6 +54,7 @@ namespace IbSwingTrader.Analysis
                         : candles[entryIndex].Close;
 
                     decimal exitPrice = trade.ExitPrice / splitFactor;
+                    decimal side = trade.IsShort ? -1m : 1m;
 
                     var row = new TradeDatasetRow
                     {
@@ -63,8 +66,7 @@ namespace IbSwingTrader.Analysis
                         ExitTimeUtc = trade.ExitTimeUtc,
                         ExitPrice = exitPrice,
 
-                        ProfitPercent =
-                            (exitPrice - entryPrice) / entryPrice * 100m,
+                        ProfitPercent = side * (exitPrice - entryPrice) / entryPrice * 100m,
 
                         HoldDays = (trade.ExitTimeUtc.Date - entryTime.Date).Days,
 
@@ -169,8 +171,6 @@ namespace IbSwingTrader.Analysis
             int end1d = entryIndex + barsPerDay;
             int end2d = entryIndex + barsPerDay * 2;
 
-            var entryPrice = row.EntryPrice;
-
             decimal high1d = decimal.MinValue;
             decimal low1d = decimal.MaxValue;
 
@@ -197,11 +197,27 @@ namespace IbSwingTrader.Analysis
             row.FutureHigh2d = high2d;
             row.FutureLow2d = low2d;
 
-            decimal maxRet1 = (high1d - entryPrice) / entryPrice * 100m;
-            decimal maxRet2 = (high2d - entryPrice) / entryPrice * 100m;
+            decimal maxRet1;
+            decimal maxRet2;
+            decimal dd1;
+            decimal dd2;
 
-            decimal dd1 = (low1d - entryPrice) / entryPrice * 100m;
-            decimal dd2 = (low2d - entryPrice) / entryPrice * 100m;
+            if (row.IsShort)
+            {
+                maxRet1 = (row.EntryPrice - low1d) / row.EntryPrice * 100m;
+                maxRet2 = (row.EntryPrice - low2d) / row.EntryPrice * 100m;
+
+                dd1 = (row.EntryPrice - high1d) / row.EntryPrice * 100m;
+                dd2 = (row.EntryPrice - high2d) / row.EntryPrice * 100m;
+            }
+            else
+            {
+                maxRet1 = (high1d - row.EntryPrice) / row.EntryPrice * 100m;
+                maxRet2 = (high2d - row.EntryPrice) / row.EntryPrice * 100m;
+
+                dd1 = (low1d - row.EntryPrice) / row.EntryPrice * 100m;
+                dd2 = (low2d - row.EntryPrice) / row.EntryPrice * 100m;
+            }
 
             // защита от bad candles / splits
             maxRet1 = Math.Clamp(maxRet1, -100m, 300m);

@@ -3,6 +3,7 @@
     public class TradeRecord
     {
         public string Ticker { get; set; } = "";
+        public bool IsShort { get; set; }
 
         public DateTime EntryDate => EntryTimeUtc.Date;
 
