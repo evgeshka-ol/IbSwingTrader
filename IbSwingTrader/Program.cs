@@ -1,10 +1,12 @@
 ﻿using IBApi;
 using IbSwingTrader.Analysis;
 using IbSwingTrader.Infrastructure.Bootstrap;
-using IbSwingTrader.Logging;
+using IbSwingTrader.Infrastructure.Historical;
+using IbSwingTrader.Infrastructure.Logging;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
+using IbSwingTrader.Services;
 
 Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
 {
@@ -12,6 +14,7 @@ Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
 };
 
 var services = ConfigureServices();
+
 if (args.Length == 0)
 {
     services.Logger.Info("Usage:");
@@ -42,6 +45,19 @@ static Services ConfigureServices()
     var logger = new SimpleLogger();
     var connection = new TwsConnection(logger);
 
+    var provider = new TwsMarketDataProvider(connection, logger);
+
+    var throttler = new HistoricalRequestThrottler(3, 250);
+    var cache = new HistoricalCache("cache");
+    var retryPolicy = new HistoricalRetryPolicy();
+
+    var historicalService = new HistoricalDataService(
+        provider,
+        throttler,
+        cache,
+        retryPolicy,
+        logger);
+
     return new Services
     {
         Logger = logger,
@@ -49,7 +65,7 @@ static Services ConfigureServices()
         DatasetBuilder = new TradeDatasetBuilder(),
         CsvWriter = new CsvDatasetWriter(),
         ContractResolver = new TwsContractResolver(connection),
-        MarketDataProvider = new TwsMarketDataProvider(connection, logger)
+        HistoricalService = historicalService
     };
 }
 
@@ -80,20 +96,22 @@ async Task RunBuildDataset(string[] args, Services services)
     services.Logger.Info($"Tickers found: {grouped.Count}");
 
     services.Connection.Connect();
-
     await services.Connection.Ready.Task;
 
     var semaphore = new SemaphoreSlim(3);
+
     var tasks = new List<Task<List<TradeDatasetRow>>>();
 
     foreach (var g in grouped)
         tasks.Add(ProcessTicker(g));
 
     var results = await Task.WhenAll(tasks);
+
     var allRows = results.SelectMany(r => r).ToList();
 
     services.Logger.EmptyLine();
     services.Logger.Info($"Total dataset rows: {allRows.Count}");
+
     services.CsvWriter.Write(datasetPath, allRows);
 
     services.Logger.Info($"Dataset saved: {datasetPath}");
@@ -142,11 +160,12 @@ async Task RunBuildDataset(string[] args, Services services)
                 return [];
             }
 
-            List<Candle> candles;
+            List<Candle>? candles;
 
             try
             {
-                candles = await services.MarketDataProvider.GetHistoricalRange(
+                candles = await services.HistoricalService.GetCandlesRange(
+                    requestTicker,
                     contract,
                     Timeframe.H4,
                     start,
@@ -158,7 +177,7 @@ async Task RunBuildDataset(string[] args, Services services)
                 return [];
             }
 
-            if (candles.Count == 0)
+            if (candles == null || candles.Count == 0)
             {
                 services.Logger.Info($"Skipping {originalTicker} — no market data");
                 return [];

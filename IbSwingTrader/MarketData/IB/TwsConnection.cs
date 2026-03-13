@@ -7,7 +7,7 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsConnection : EWrapper
+    public class TwsConnection : EWrapper, ITwsConnection
     {
         private readonly ILogger _logger;
         private readonly EReaderMonitorSignal _signal;

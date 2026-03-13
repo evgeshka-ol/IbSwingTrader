@@ -4,9 +4,9 @@ using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsContractResolver(TwsConnection tws) : IContractResolver
+    public class TwsContractResolver(ITwsConnection tws) : IContractResolver
     {
-        private readonly TwsConnection _tws = tws;
+        private readonly ITwsConnection _tws = tws;
 
         private readonly ConcurrentDictionary<string, Contract> _cache = new();
 

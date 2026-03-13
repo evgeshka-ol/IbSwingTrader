@@ -4,9 +4,9 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsMarketDataProvider(TwsConnection tws, ILogger logger) : IMarketDataProvider
+    public class TwsMarketDataProvider(ITwsConnection tws, ILogger logger) : IMarketDataProvider
     {
-        private readonly TwsConnection _tws = tws;
+        private readonly ITwsConnection _tws = tws;
         private readonly ILogger _logger = logger;
 
         public Task<List<Candle>> GetCandles(
