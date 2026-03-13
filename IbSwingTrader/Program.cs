@@ -136,7 +136,7 @@ async Task RunBuildDataset(string[] args, Services services)
             var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
             var latest = tickerTrades.Max(t => t.ExitTimeUtc);
 
-            var start = earliest.AddDays(-60);
+            var start = earliest.AddDays(-120);
 
             services.Logger.EmptyLine();
             services.Logger.Info($"Ticker: {originalTicker}");
