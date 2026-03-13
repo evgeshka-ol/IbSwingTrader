@@ -20,11 +20,10 @@ namespace IbSwingTrader.Analysis
                 var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
                 // нужен warmup для индикаторов
-                if (entryIndexReal < 30)
+                if (entryIndexReal < 60)
                     continue;
 
-                // нужен хотя бы 1 будущий бар
-                if (entryIndexReal >= candles.Count - 2)
+                if (entryIndexReal >= candles.Count - 20)
                     continue;
 
                 var candlePriceReal = candles[entryIndexReal].Close;
@@ -34,19 +33,17 @@ namespace IbSwingTrader.Analysis
                 {
                     int entryIndex = entryIndexReal + shift;
 
-                    if (entryIndex < 30)
+                    if (entryIndex < 60)
                         continue;
 
-                    if (entryIndex >= candles.Count - 2)
+                    if (entryIndex >= candles.Count - 20)
                         continue;
 
                     var entryTime = candles[entryIndex].Time;
 
-                    // synthetic entry не должен быть после exit
                     if (entryTime >= trade.ExitTimeUtc)
                         continue;
 
-                    // synthetic entry не должен быть слишком близко к exit
                     if ((trade.ExitTimeUtc - entryTime).TotalHours < 4)
                         continue;
 
@@ -75,7 +72,10 @@ namespace IbSwingTrader.Analysis
                         EntryShiftBars = shift
                     };
 
+                    // FEATURES
                     CalculateFeatures(row, candles, entryIndex);
+
+                    // TARGET требует future
                     if (!HasFutureBars(candles, entryIndex))
                         continue;
 
@@ -111,13 +111,9 @@ namespace IbSwingTrader.Analysis
                 int mid = left + ((right - left) >> 1);
 
                 if (candles[mid].Time < entryTime)
-                {
                     left = mid + 1;
-                }
                 else
-                {
                     right = mid - 1;
-                }
             }
 
             return left;
@@ -149,14 +145,22 @@ namespace IbSwingTrader.Analysis
         {
             int bars = days * 6;
 
-            int start = Math.Max(0, i - bars);
+            int start = i - bars;
+            if (start < 0)
+                start = 0;
 
             decimal highest = decimal.MinValue;
 
             for (int k = start; k < i; k++)
             {
-                highest = Math.Max(highest, candles[k].High);
+                var h = candles[k].High;
+
+                if (h > highest)
+                    highest = h;
             }
+
+            if (highest <= 0)
+                return 0;
 
             var close = candles[i - 1].Close;
 
@@ -165,10 +169,18 @@ namespace IbSwingTrader.Analysis
 
         private static decimal CalcVolumeRatio(List<Candle> candles, int i, int length)
         {
+            int start = i - length;
+
+            if (start < 0)
+                return 1;
+
             decimal sum = 0;
 
-            for (int k = i - length; k < i; k++)
+            for (int k = start; k < i; k++)
                 sum += candles[k].Volume;
+
+            if (sum == 0)
+                return 1;
 
             var avg = sum / length;
 
@@ -177,14 +189,22 @@ namespace IbSwingTrader.Analysis
 
         private static decimal CalcTrendPosition(List<Candle> candles, int i, int length)
         {
+            int start = i - length;
+
+            if (start < 0)
+                return 1;
+
             decimal sum = 0;
 
-            for (int k = i - length; k < i; k++)
+            for (int k = start; k < i; k++)
                 sum += candles[k].Close;
 
-            var ema = sum / length;
+            var ma = sum / length;
 
-            return candles[i - 1].Close / ema;
+            if (ma == 0)
+                return 1;
+
+            return candles[i - 1].Close / ma;
         }
     }
 }
