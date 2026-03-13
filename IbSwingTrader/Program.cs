@@ -1,7 +1,10 @@
 ﻿using IbSwingTrader.Analysis;
+using IbSwingTrader.Bootstrap;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
+
+var services = ConfigureServices();
 
 if (args.Length == 0)
 {
@@ -16,7 +19,7 @@ var command = args[0];
 switch (command)
 {
     case "build-dataset":
-        await RunBuildDataset(args);
+        await RunBuildDataset(args, services);
         break;
 
     case "get-candidates":
@@ -28,7 +31,16 @@ switch (command)
         break;
 }
 
-async Task RunBuildDataset(string[] args)
+static Services ConfigureServices()
+{
+    return new Services
+    {
+        DatasetBuilder = new TradeDatasetBuilder(),
+        CsvWriter = new CsvDatasetWriter()
+    };
+}
+
+async Task RunBuildDataset(string[] args, Services services)
 {
     if (args.Length < 3)
     {
@@ -58,7 +70,9 @@ async Task RunBuildDataset(string[] args)
         .First()
         .Ticker;
 
-    var tickerTrades = trades.Where(t => t.Ticker == ticker).ToList();
+    var tickerTrades = trades
+        .Where(t => t.Ticker == ticker)
+        .ToList();
 
     var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
     var latest = tickerTrades.Max(t => t.ExitTimeUtc);
@@ -81,43 +95,9 @@ async Task RunBuildDataset(string[] args)
         start,
         latest);
 
-    var builder = new TradeDatasetBuilder();
-    var rows = builder.Build(tickerTrades, candles);
+    var rows = services.DatasetBuilder.Build(tickerTrades, candles);
 
-    using var writer = new StreamWriter(datasetPath);
-
-    writer.WriteLine(
-        "Ticker;EntryShiftBars;EntryTimeUtc;EntryPrice;ExitTimeUtc;ExitPrice;ProfitPercent;HoldDays;IsRealTrade;" +
-        "Pullback5d;Pullback10d;VolumeRatio20;TrendPosition;" +
-        "FutureHigh1d;FutureLow1d;FutureHigh2d;FutureLow2d;MaxReturn1d;MaxReturn2d;MaxDrawdown1d;MaxDrawdown2d;Target10pct1d;Target10pct2d");
-
-    foreach (var r in rows)
-    {
-        writer.WriteLine(
-            $"{r.Ticker};" +
-            $"{r.EntryShiftBars};" +
-            $"{r.EntryTimeUtc:yyyy-MM-dd HH:mm:ss};" +
-            $"{r.EntryPrice};" +
-            $"{r.ExitTimeUtc:yyyy-MM-dd HH:mm:ss};" +
-            $"{r.ExitPrice};" +
-            $"{r.ProfitPercent};" +
-            $"{r.HoldDays};" +
-            $"{r.IsRealTrade};" +
-            $"{r.Pullback5d};" +
-            $"{r.Pullback10d};" +
-            $"{r.VolumeRatio20};" +
-            $"{r.TrendPosition};" +
-            $"{r.FutureHigh1d};" +
-            $"{r.FutureLow1d};" +
-            $"{r.FutureHigh2d};" +
-            $"{r.FutureLow2d};" +
-            $"{r.MaxReturn1d};" +
-            $"{r.MaxReturn2d};" +
-            $"{r.MaxDrawdown1d};" +
-            $"{r.MaxDrawdown2d};" +
-            $"{r.Target10pct1d};" +
-            $"{r.Target10pct2d}");
-    }
+    services.CsvWriter.Write(datasetPath, rows);
 
     Console.WriteLine($"Dataset saved: {datasetPath}");
 }
