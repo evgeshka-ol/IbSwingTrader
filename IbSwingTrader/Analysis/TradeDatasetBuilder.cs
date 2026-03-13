@@ -19,7 +19,7 @@ namespace IbSwingTrader.Analysis
 
                 var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
-                // индикаторы требуют некоторую историю
+                // нужен warmup для индикаторов
                 if (entryIndexReal < 30)
                     continue;
 
@@ -43,7 +43,11 @@ namespace IbSwingTrader.Analysis
                     var entryTime = candles[entryIndex].Time;
 
                     // synthetic entry не должен быть после exit
-                    if (entryTime.Date >= trade.ExitTimeUtc.Date)
+                    if (entryTime >= trade.ExitTimeUtc)
+                        continue;
+
+                    // synthetic entry не должен быть слишком близко к exit
+                    if ((trade.ExitTimeUtc - entryTime).TotalHours < 4)
                         continue;
 
                     decimal entryPrice = shift == 0
@@ -72,7 +76,8 @@ namespace IbSwingTrader.Analysis
                     };
 
                     CalculateFeatures(row, candles, entryIndex);
-                    CalculateFuture(row, candles, entryIndex);
+                    if (!HasFutureBars(candles, entryIndex))
+                        continue;
 
                     rows.Add(row);
                 }
@@ -131,51 +136,13 @@ namespace IbSwingTrader.Analysis
             row.TrendPosition = CalcTrendPosition(candles, i, 50);
         }
 
-        private static void CalculateFuture(
-            TradeDatasetRow row,
+        private static bool HasFutureBars(
             List<Candle> candles,
             int i)
         {
-            var entry = row.EntryPrice;
+            const int futureBars = 12;
 
-            var high1 = decimal.MinValue;
-            var high2 = decimal.MinValue;
-
-            var low1 = decimal.MaxValue;
-            var low2 = decimal.MaxValue;
-
-            // 1 день = 6 баров
-            for (int k = 1; k <= 6; k++)
-            {
-                var c = candles[i + k];
-
-                high1 = Math.Max(high1, c.High);
-                low1 = Math.Min(low1, c.Low);
-            }
-
-            // 2 дня = 12 баров
-            for (int k = 1; k <= 12; k++)
-            {
-                var c = candles[i + k];
-
-                high2 = Math.Max(high2, c.High);
-                low2 = Math.Min(low2, c.Low);
-            }
-
-            row.FutureHigh1d = high1;
-            row.FutureLow1d = low1;
-
-            row.FutureHigh2d = high2;
-            row.FutureLow2d = low2;
-
-            row.MaxReturn1d = (high1 - entry) / entry;
-            row.MaxReturn2d = (high2 - entry) / entry;
-
-            row.MaxDrawdown1d = (low1 - entry) / entry;
-            row.MaxDrawdown2d = (low2 - entry) / entry;
-
-            row.Target10pct1d = high1 >= entry * 1.10m;
-            row.Target10pct2d = high2 >= entry * 1.10m;
+            return i + futureBars < candles.Count;
         }
 
         private static decimal CalcPullback(List<Candle> candles, int i, int days)
