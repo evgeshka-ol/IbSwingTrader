@@ -56,7 +56,7 @@ namespace IbSwingTrader.MarketData.IB
 
         public TaskCompletionSource<bool> Ready { get; } = new();
 
-        public Task<List<Candle>> RequestHistoricalData(
+        public async Task<List<Candle>> RequestHistoricalData(
             IBApi.Contract contract,
             Timeframe timeframe,
             DateTime endTimeUtc,
@@ -78,7 +78,7 @@ namespace IbSwingTrader.MarketData.IB
             while (!_ibConnected)
             {
                 _logger.Info("Waiting for IB reconnect...");
-                Task.Delay(1000);
+                await Task.Delay(1000);
             }
 
             Client.reqHistoricalData(
@@ -88,14 +88,28 @@ namespace IbSwingTrader.MarketData.IB
                 timeframe.ToIBDuration(bars),
                 timeframe.ToIBBarSize(),
                 "TRADES",
-                0,   // extended hours
+                0,
                 1,
                 false,
                 null);
 
             _logger.Info($"REQ {reqId} waiting for candles");
 
-            return tcs.Task;
+            var completed = await Task.WhenAny(
+                tcs.Task,
+                Task.Delay(TimeSpan.FromSeconds(30)));
+
+            if (completed != tcs.Task)
+            {
+                _logger.Error($"REQ {reqId} TIMEOUT");
+
+                _buffers.TryRemove(reqId, out _);
+                _requests.TryRemove(reqId, out _);
+
+                return [];
+            }
+
+            return await tcs.Task;
         }
 
         public Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
@@ -131,7 +145,9 @@ namespace IbSwingTrader.MarketData.IB
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
-            _logger.Error($"IB ERROR VERY LONG id={id} time={errorTime} code={errorCode} msg={errorMsg} details={advancedOrderRejectJson}");
+            var details = string.IsNullOrWhiteSpace(advancedOrderRejectJson) ? string.Empty : $" details={advancedOrderRejectJson}";
+            var header = "IB VERY LONG ERROR";
+            var isError = true;
             switch (errorCode)
             {
                 case 1100:
@@ -144,7 +160,18 @@ namespace IbSwingTrader.MarketData.IB
                     _ibConnected = true;
                     _logger.Info("IB connection restored");
                     break;
+                case 2104:
+                case 2106:
+                case 2158:
+                    isError = false;
+                    header = "IB VERY LONG INFO";
+                    break;
             }
+
+            if (isError)
+                _logger.Error($"{header} id={id} time={errorTime} code={errorCode} msg={errorMsg}{details}");
+            else
+                _logger.Info($"{header} id={id} time={errorTime} code={errorCode} msg={errorMsg}{details}");
 
             if (errorCode == 200)
             {

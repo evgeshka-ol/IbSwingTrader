@@ -39,7 +39,7 @@ switch (command)
 
 static Services ConfigureServices()
 {
-    var logger = new SimpleLogger("agent.log");
+    var logger = new SimpleLogger();
     var connection = new TwsConnection(logger);
 
     return new Services
