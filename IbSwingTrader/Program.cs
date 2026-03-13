@@ -64,7 +64,7 @@ static Services ConfigureServices()
         Connection = connection,
         DatasetBuilder = new TradeDatasetBuilder(),
         CsvWriter = new CsvDatasetWriter(),
-        ContractResolver = new TwsContractResolver(connection),
+        ContractResolver = new TwsContractResolver(connection, logger),
         HistoricalService = historicalService
     };
 }

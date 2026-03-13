@@ -4,10 +4,10 @@ using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsContractResolver(ITwsConnection tws) : IContractResolver
+    public class TwsContractResolver(ITwsConnection tws, ILogger logger) : IContractResolver
     {
         private readonly ITwsConnection _tws = tws;
-
+        private readonly ILogger _logger = logger;
         private readonly ConcurrentDictionary<string, Contract> _cache = new();
 
         public async Task<Contract> ResolveStockAsync(string ticker)
@@ -17,20 +17,49 @@ namespace IbSwingTrader.MarketData.IB
             if (_cache.TryGetValue(ticker, out var cached))
                 return cached;
 
-            var request = new Contract
+            var attempts = new[]
             {
-                Symbol = ticker,
-                SecType = "STK",
-                Exchange = "SMART",
-                Currency = "USD"
+                new Contract
+                {
+                    Symbol = ticker,
+                    SecType = "STK",
+                    Exchange = "SMART",
+                    Currency = "USD"
+                },
+
+                new Contract
+                {
+                    Symbol = ticker,
+                    SecType = "STK",
+                    Exchange = "SMART",
+                    PrimaryExch = "NASDAQ",
+                    Currency = "USD"
+                },
+
+                new Contract
+                {
+                    Symbol = ticker,
+                    SecType = "STK",
+                    Exchange = "NASDAQ",
+                    Currency = "USD"
+                }
             };
 
-            var details = await _tws.GetContractDetails(request);
+            foreach (var request in attempts)
+            {
+                var details = await _tws.GetContractDetails(request);
 
-            var contract = (details.FirstOrDefault()?.Contract) ?? throw new Exception($"Contract not found for {ticker}");
-            _cache[ticker] = contract;
+                var contract = details.FirstOrDefault()?.Contract;
+                _logger.Debug($"Contract resolved for {ticker} via {request.Exchange}/{request.PrimaryExch}");
 
-            return contract;
+                if (contract != null)
+                {
+                    _cache[ticker] = contract;
+                    return contract;
+                }
+            }
+
+            throw new Exception($"Contract not found for {ticker}");
         }
     }
 }
