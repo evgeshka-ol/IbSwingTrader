@@ -1,5 +1,4 @@
-﻿using System.Text;
-using IbSwingTrader.Interfaces;
+﻿using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.Logging
 {
@@ -7,12 +6,12 @@ namespace IbSwingTrader.Logging
     public class SimpleLogger : ILogger
     {
         private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd}.log";
-        private static readonly object _lock = new();
+        private static readonly Lock _lock = new();
 
         public SimpleLogger()
         {
             var dir = Path.GetDirectoryName(_filePath);
-            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+            if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
         }
 

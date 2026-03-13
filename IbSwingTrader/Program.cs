@@ -92,6 +92,7 @@ async Task RunBuildDataset(string[] args, Services services)
     var results = await Task.WhenAll(tasks);
     var allRows = results.SelectMany(r => r).ToList();
 
+    services.Logger.EmptyLine();
     services.Logger.Info($"Total dataset rows: {allRows.Count}");
     services.CsvWriter.Write(datasetPath, allRows);
 
