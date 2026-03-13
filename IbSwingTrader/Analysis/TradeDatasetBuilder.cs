@@ -5,6 +5,8 @@ namespace IbSwingTrader.Analysis
 {
     public class TradeDatasetBuilder : ITradeDatasetBuilder
     {
+        private static readonly int[] EntryShifts = { -12, -9, -6, -3, 0 };
+
         public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
             List<Candle> candles)
@@ -17,29 +19,30 @@ namespace IbSwingTrader.Analysis
 
                 var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
-                if (entryIndexReal < 50)
+                // индикаторы требуют некоторую историю
+                if (entryIndexReal < 30)
                     continue;
 
-                if (entryIndexReal >= candles.Count - 12)
+                // нужен хотя бы 1 будущий бар
+                if (entryIndexReal >= candles.Count - 2)
                     continue;
-
-                int[] shifts = { -3, -2, -1, 0, 1, 2, 3 };
 
                 var candlePriceReal = candles[entryIndexReal].Close;
                 var splitFactor = DetectSplitFactor(trade.EntryPrice, candlePriceReal);
 
-                foreach (var shift in shifts)
+                foreach (var shift in EntryShifts)
                 {
                     int entryIndex = entryIndexReal + shift;
 
-                    if (entryIndex < 50)
+                    if (entryIndex < 30)
                         continue;
 
-                    if (entryIndex >= candles.Count - 12)
+                    if (entryIndex >= candles.Count - 2)
                         continue;
 
                     var entryTime = candles[entryIndex].Time;
 
+                    // synthetic entry не должен быть после exit
                     if (entryTime.Date >= trade.ExitTimeUtc.Date)
                         continue;
 
