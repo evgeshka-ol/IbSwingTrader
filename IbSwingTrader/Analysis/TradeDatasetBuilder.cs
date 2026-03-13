@@ -78,6 +78,7 @@ namespace IbSwingTrader.Analysis
                     // TARGET требует future
                     if (!HasFutureBars(candles, entryIndex))
                         continue;
+                    CalculateFutureStats(row, candles, entryIndex);
 
                     rows.Add(row);
                 }
@@ -149,6 +150,51 @@ namespace IbSwingTrader.Analysis
             const int futureBars = 12;
 
             return i + futureBars < candles.Count;
+        }
+
+        private static void CalculateFutureStats(
+            TradeDatasetRow row,
+            List<Candle> candles,
+            int entryIndex)
+        {
+            const int barsPerDay = 6;
+
+            int end1d = entryIndex + barsPerDay;
+            int end2d = entryIndex + barsPerDay * 2;
+
+            var entryPrice = row.EntryPrice;
+
+            decimal high1d = decimal.MinValue;
+            decimal low1d = decimal.MaxValue;
+
+            decimal high2d = decimal.MinValue;
+            decimal low2d = decimal.MaxValue;
+
+            for (int k = entryIndex + 1; k <= end2d; k++)
+            {
+                var c = candles[k];
+
+                if (k <= end1d)
+                {
+                    high1d = Math.Max(high1d, c.High);
+                    low1d = Math.Min(low1d, c.Low);
+                }
+
+                high2d = Math.Max(high2d, c.High);
+                low2d = Math.Min(low2d, c.Low);
+            }
+
+            row.FutureHigh1d = high1d;
+            row.FutureLow1d = low1d;
+
+            row.FutureHigh2d = high2d;
+            row.FutureLow2d = low2d;
+
+            row.MaxReturn1d = (high1d - entryPrice) / entryPrice * 100m;
+            row.MaxReturn2d = (high2d - entryPrice) / entryPrice * 100m;
+
+            row.MaxDrawdown1d = (low1d - entryPrice) / entryPrice * 100m;
+            row.MaxDrawdown2d = (low2d - entryPrice) / entryPrice * 100m;
         }
 
         private static decimal CalcBBPosition(List<Candle> candles, int i)
