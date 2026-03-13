@@ -59,28 +59,12 @@ async Task RunBuildDataset(string[] args, Services services)
         return;
     }
 
-    var ticker = trades
+    var grouped = trades
         .GroupBy(t => t.Ticker)
-        .Select(g => new
-        {
-            Ticker = g.Key,
-            Range = g.Max(x => x.ExitTimeUtc) - g.Min(x => x.EntryTimeUtc)
-        })
-        .OrderByDescending(x => x.Range)
-        .First()
-        .Ticker;
-
-    var tickerTrades = trades
-        .Where(t => t.Ticker == ticker)
+        .OrderBy(g => g.Key)
         .ToList();
 
-    var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
-    var latest = tickerTrades.Max(t => t.ExitTimeUtc);
-
-    var start = earliest.AddDays(-20);
-
-    Console.WriteLine($"Ticker: {ticker}");
-    Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+    Console.WriteLine($"Tickers: {grouped.Count}");
 
     var tws = new TwsConnection();
     tws.Connect();
@@ -89,15 +73,56 @@ async Task RunBuildDataset(string[] args, Services services)
 
     var marketData = new TwsMarketDataProvider(tws);
 
-    var candles = await marketData.GetHistoricalRange(
-        ticker,
-        Timeframe.H4,
-        start,
-        latest);
+    var allRows = new List<TradeDatasetRow>();
 
-    var rows = services.DatasetBuilder.Build(tickerTrades, candles);
+    foreach (var g in grouped)
+    {
+        var ticker = g.Key;
+        var tickerTrades = g.ToList();
 
-    services.CsvWriter.Write(datasetPath, rows);
+        var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
+        var latest = tickerTrades.Max(t => t.ExitTimeUtc);
+
+        var start = earliest.AddDays(-20);
+
+        Console.WriteLine();
+        Console.WriteLine($"Ticker: {ticker}");
+        Console.WriteLine($"Trades: {tickerTrades.Count}");
+        Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+
+        try
+        {
+            var candles = await marketData.GetHistoricalRange(
+                ticker,
+                Timeframe.H4,
+                start,
+                latest);
+
+            if (candles.Count == 0)
+            {
+                Console.WriteLine("No candles received");
+                continue;
+            }
+
+            var rows = services.DatasetBuilder.Build(tickerTrades, candles);
+
+            Console.WriteLine($"Dataset rows: {rows.Count}");
+
+            allRows.AddRange(rows);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to process {ticker}: {ex.Message}");
+        }
+
+        // защита от pacing violation IBKR
+        await Task.Delay(500);
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"Total dataset rows: {allRows.Count}");
+
+    services.CsvWriter.Write(datasetPath, allRows);
 
     Console.WriteLine($"Dataset saved: {datasetPath}");
 }
