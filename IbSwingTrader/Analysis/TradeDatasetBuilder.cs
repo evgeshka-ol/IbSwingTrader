@@ -120,8 +120,6 @@ namespace IbSwingTrader.Analysis
             List<Candle> candles,
             int i)
         {
-            var prev = candles[i - 1];
-
             row.Pullback5d = CalcPullback(candles, i, 5);
             row.Pullback10d = CalcPullback(candles, i, 10);
 

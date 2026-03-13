@@ -4,9 +4,10 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsMarketDataProvider(TwsConnection tws) : IMarketDataProvider
+    public class TwsMarketDataProvider(TwsConnection tws, ILogger logger) : IMarketDataProvider
     {
         private readonly TwsConnection _tws = tws;
+        private readonly ILogger _logger = logger;
 
         public Task<List<Candle>> GetCandles(
             Contract contract,
@@ -57,7 +58,7 @@ namespace IbSwingTrader.MarketData.IB
                 .OrderBy(c => c.Time)
                 .ToList();
 
-            Console.WriteLine($"Total candles: {candles.Count}");
+            _logger.Debug($"Total candles: {candles.Count}");
 
             for (int i = 1; i < candles.Count; i++)
             {
@@ -65,7 +66,7 @@ namespace IbSwingTrader.MarketData.IB
 
                 if (diff > TimeSpan.FromHours(8))
                 {
-                    Console.WriteLine($"Gap detected: {candles[i - 1].Time} -> {candles[i].Time}");
+                    _logger.Debug($"Gap detected: {candles[i - 1].Time} -> {candles[i].Time}");
                 }
             }
 

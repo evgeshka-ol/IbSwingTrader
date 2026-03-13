@@ -2,12 +2,14 @@
 using IBApi;
 using IBApi.protobuf;
 using IbSwingTrader.Extensions;
+using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
     public class TwsConnection : EWrapper
     {
+        private readonly ILogger _logger;
         private readonly EReaderMonitorSignal _signal;
         private EReader? _reader;
 
@@ -18,9 +20,11 @@ namespace IbSwingTrader.MarketData.IB
         private readonly Dictionary<int, List<ContractDetails>> _contractResults = [];
 
         private int _nextRequestId = 1;
+        private volatile bool _ibConnected = true;
 
-        public TwsConnection()
+        public TwsConnection(ILogger logger)
         {
+            _logger = logger;
             _signal = new EReaderMonitorSignal();
             Client = new EClientSocket(this, _signal);
         }
@@ -58,18 +62,24 @@ namespace IbSwingTrader.MarketData.IB
             DateTime endTimeUtc,
             int bars)
         {
-            Console.WriteLine("GetCandles called");
+            _logger.Info("GetCandles called");
 
             var reqId = Interlocked.Increment(ref _nextRequestId);
 
-            Console.WriteLine($"Sending reqHistoricalData for contract {contract.Symbol}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
-            Console.WriteLine($"time frame: {timeframe}, IB format: {timeframe.ToIBBarSize()}");
+            _logger.Info($"Sending reqHistoricalData for contract {contract.Symbol}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
+            _logger.Info($"time frame: {timeframe}, IB format: {timeframe.ToIBBarSize()}");
 
             var tcs = new TaskCompletionSource<List<Candle>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
             _buffers[reqId] = [];
             _requests[reqId] = tcs;
+
+            while (!_ibConnected)
+            {
+                _logger.Info("Waiting for IB reconnect...");
+                Task.Delay(1000);
+            }
 
             Client.reqHistoricalData(
                 reqId,
@@ -83,7 +93,7 @@ namespace IbSwingTrader.MarketData.IB
                 false,
                 null);
 
-            Console.WriteLine($"REQ {reqId} waiting for candles");
+            _logger.Info($"REQ {reqId} waiting for candles");
 
             return tcs.Task;
         }
@@ -106,22 +116,36 @@ namespace IbSwingTrader.MarketData.IB
 
         public void error(Exception e)
         {
-            Console.WriteLine($"IB EXCEPTION: {e}");
+            _logger.Error($"IB EXCEPTION: {e}");
         }
 
         public void error(string str)
         {
-            Console.WriteLine($"IB ERROR SHORT: {str}");
+            _logger.Error($"IB ERROR SHORT: {str}");
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            Console.WriteLine($"IB ERROR LONG id={id} code={errorCode} msg={errorMsg}");
+            _logger.Error($"IB ERROR LONG id={id} code={errorCode} msg={errorMsg}");
         }
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
-            Console.WriteLine($"IB ERROR VERY LONG id={id} time={errorTime} code={errorCode} msg={errorMsg} details={advancedOrderRejectJson}");
+            _logger.Error($"IB ERROR VERY LONG id={id} time={errorTime} code={errorCode} msg={errorMsg} details={advancedOrderRejectJson}");
+            switch (errorCode)
+            {
+                case 1100:
+                    _ibConnected = false;
+                    _logger.Error("IB connection lost");
+                    break;
+
+                case 1101:
+                case 1102:
+                    _ibConnected = true;
+                    _logger.Info("IB connection restored");
+                    break;
+            }
+
             if (errorCode == 200)
             {
                 if (_contractRequests.TryGetValue(id, out var tcs))
@@ -133,12 +157,12 @@ namespace IbSwingTrader.MarketData.IB
 
         public void connectionClosed()
         {
-            Console.WriteLine("TWS connection closed");
+            _logger.Info("TWS connection closed");
         }
 
         public void nextValidId(int orderId)
         {
-            Console.WriteLine($"Connected to TWS. Next OrderId: {orderId}");
+            _logger.Info($"Connected to TWS. Next OrderId: {orderId}");
             Client.reqCurrentTime();
             Ready.TrySetResult(true);
         }
@@ -146,7 +170,7 @@ namespace IbSwingTrader.MarketData.IB
         public void currentTime(long time)
         {
             var dt = DateTimeOffset.FromUnixTimeSeconds(time);
-            Console.WriteLine($"Server time: {dt}");
+            _logger.Info($"Server time: {dt}");
         }
 
         public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
@@ -289,7 +313,7 @@ namespace IbSwingTrader.MarketData.IB
 
         public void historicalData(int reqId, Bar bar)
         {
-            Console.WriteLine($"bar {bar.Time}");
+            _logger.Debug($"bar {bar.Time}");
 
             if (!_buffers.TryGetValue(reqId, out var list))
                 return;
@@ -322,7 +346,7 @@ namespace IbSwingTrader.MarketData.IB
                 : [];
 
             tcs.SetResult(candles);
-            Console.WriteLine($"END {reqId}");
+            _logger.Info($"END {reqId}");
         }
 
         public void marketDataType(int reqId, int marketDataType)

@@ -1,6 +1,7 @@
 ﻿using IBApi;
 using IbSwingTrader.Analysis;
 using IbSwingTrader.Bootstrap;
+using IbSwingTrader.Logging;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
@@ -10,16 +11,16 @@ Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
     ["NYCB"] = "FLG"
 };
 
+var services = ConfigureServices();
 if (args.Length == 0)
 {
-    Console.WriteLine("Usage:");
-    Console.WriteLine("  build-dataset <trades.csv> <dataset.csv>");
-    Console.WriteLine("  get-candidates");
+    services.Logger.Info("Usage:");
+    services.Logger.Info("  build-dataset <trades.csv> <dataset.csv>");
+    services.Logger.Info("  get-candidates");
     return;
 }
 
 var command = args[0];
-var services = ConfigureServices();
 
 switch (command)
 {
@@ -32,20 +33,23 @@ switch (command)
         break;
 
     default:
-        Console.WriteLine("Unknown command");
+        services.Logger.Error("Unknown command");
         break;
 }
 
 static Services ConfigureServices()
 {
-    var connection = new TwsConnection();
+    var logger = new SimpleLogger("agent.log");
+    var connection = new TwsConnection(logger);
 
     return new Services
     {
+        Logger = logger,
         Connection = connection,
         DatasetBuilder = new TradeDatasetBuilder(),
         CsvWriter = new CsvDatasetWriter(),
-        ContractResolver = new TwsContractResolver(connection)
+        ContractResolver = new TwsContractResolver(connection),
+        MarketDataProvider = new TwsMarketDataProvider(connection, logger)
     };
 }
 
@@ -53,7 +57,7 @@ async Task RunBuildDataset(string[] args, Services services)
 {
     if (args.Length < 3)
     {
-        Console.WriteLine("Usage: build-dataset <trades.csv> <dataset.csv>");
+        services.Logger.Info("Usage: build-dataset <trades.csv> <dataset.csv>");
         return;
     }
 
@@ -64,7 +68,7 @@ async Task RunBuildDataset(string[] args, Services services)
 
     if (trades.Count == 0)
     {
-        Console.WriteLine("No trades found");
+        services.Logger.Error("No trades found");
         return;
     }
 
@@ -73,12 +77,11 @@ async Task RunBuildDataset(string[] args, Services services)
         .OrderBy(g => g.Key)
         .ToList();
 
-    Console.WriteLine($"Tickers found: {grouped.Count}");
+    services.Logger.Info($"Tickers found: {grouped.Count}");
 
     services.Connection.Connect();
 
     await services.Connection.Ready.Task;
-    var marketData = new TwsMarketDataProvider(services.Connection);
 
     var semaphore = new SemaphoreSlim(4);
     var tasks = new List<Task<List<TradeDatasetRow>>>();
@@ -87,15 +90,12 @@ async Task RunBuildDataset(string[] args, Services services)
         tasks.Add(ProcessTicker(g));
 
     var results = await Task.WhenAll(tasks);
-
     var allRows = results.SelectMany(r => r).ToList();
 
-    Console.WriteLine();
-    Console.WriteLine($"Total dataset rows: {allRows.Count}");
-
+    services.Logger.Info($"Total dataset rows: {allRows.Count}");
     services.CsvWriter.Write(datasetPath, allRows);
 
-    Console.WriteLine($"Dataset saved: {datasetPath}");
+    services.Logger.Info($"Dataset saved: {datasetPath}");
 
     async Task<List<TradeDatasetRow>> ProcessTicker(IGrouping<string, TradeRecord> g)
     {
@@ -108,7 +108,7 @@ async Task RunBuildDataset(string[] args, Services services)
 
             if (TickerAliases.TryGetValue(originalTicker, out var mapped))
             {
-                Console.WriteLine($"Ticker remapped: {originalTicker} → {mapped}");
+                services.Logger.Info($"Ticker remapped: {originalTicker} → {mapped}");
                 requestTicker = mapped;
             }
 
@@ -119,10 +119,10 @@ async Task RunBuildDataset(string[] args, Services services)
 
             var start = earliest.AddDays(-60);
 
-            Console.WriteLine();
-            Console.WriteLine($"Ticker: {originalTicker}");
-            Console.WriteLine($"Trades: {tickerTrades.Count}");
-            Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+            services.Logger.EmptyLine();
+            services.Logger.Info($"Ticker: {originalTicker}");
+            services.Logger.Info($"Trades: {tickerTrades.Count}");
+            services.Logger.Info($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
 
             Contract contract;
 
@@ -130,14 +130,14 @@ async Task RunBuildDataset(string[] args, Services services)
             {
                 contract = await services.ContractResolver.ResolveStockAsync(requestTicker);
 
-                Console.WriteLine(
+                services.Logger.Info(
                     $"Resolved contract: {contract.Symbol} " +
                     $"conId={contract.ConId} " +
                     $"exchange={contract.Exchange}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to resolve contract for {requestTicker}: {ex.Message}");
+                services.Logger.Error($"Failed to resolve contract for {requestTicker}: {ex.Message}");
                 return [];
             }
 
@@ -145,7 +145,7 @@ async Task RunBuildDataset(string[] args, Services services)
 
             try
             {
-                candles = await marketData.GetHistoricalRange(
+                candles = await services.MarketDataProvider.GetHistoricalRange(
                     contract,
                     Timeframe.H4,
                     start,
@@ -153,19 +153,19 @@ async Task RunBuildDataset(string[] args, Services services)
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load candles for {requestTicker}: {ex.Message}");
+                services.Logger.Error($"Failed to load candles for {requestTicker}: {ex.Message}");
                 return [];
             }
 
             if (candles.Count == 0)
             {
-                Console.WriteLine($"Skipping {originalTicker} — no market data");
+                services.Logger.Info($"Skipping {originalTicker} — no market data");
                 return [];
             }
 
             var rows = services.DatasetBuilder.Build(tickerTrades, candles);
 
-            Console.WriteLine($"Rows built for {originalTicker}: {rows.Count}");
+            services.Logger.Info($"Rows built for {originalTicker}: {rows.Count}");
 
             return rows;
         }
@@ -178,5 +178,5 @@ async Task RunBuildDataset(string[] args, Services services)
 
 async Task RunGetCandidates()
 {
-    Console.WriteLine("Candidate search not implemented yet");
+    services.Logger.Info("Candidate search not implemented yet");
 }
