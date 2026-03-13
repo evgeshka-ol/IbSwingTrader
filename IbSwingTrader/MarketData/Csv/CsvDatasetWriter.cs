@@ -1,5 +1,5 @@
 ﻿using System.Globalization;
-using IbSwingTrader.MarketData.Interfaces;
+using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.Csv
 {

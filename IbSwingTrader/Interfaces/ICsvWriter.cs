@@ -1,4 +1,4 @@
-﻿namespace IbSwingTrader.MarketData.Interfaces
+﻿namespace IbSwingTrader.Interfaces
 {
     public interface ICsvWriter
     {

@@ -1,4 +1,4 @@
-﻿using IbSwingTrader.MarketData.Interfaces;
+﻿using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
