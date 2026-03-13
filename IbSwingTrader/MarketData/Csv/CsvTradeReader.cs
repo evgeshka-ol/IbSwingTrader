@@ -39,7 +39,7 @@ public static class CsvTradeReader
 
             try
             {
-                var ticker = parts[2].Trim();
+                var ticker = parts[2].Trim().ToUpperInvariant();
 
                 var entryDate = parts[3].Trim();
                 var entryTime = parts[4].Trim();

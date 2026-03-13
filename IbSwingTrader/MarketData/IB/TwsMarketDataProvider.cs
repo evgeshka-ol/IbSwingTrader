@@ -1,4 +1,5 @@
-﻿using IbSwingTrader.Interfaces;
+﻿using IBApi;
+using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
@@ -8,20 +9,20 @@ namespace IbSwingTrader.MarketData.IB
         private readonly TwsConnection _tws = tws;
 
         public Task<List<Candle>> GetCandles(
-            string ticker,
+            Contract contract,
             Timeframe timeframe,
             DateTime endTimeUtc,
             int bars)
         {
             return _tws.RequestHistoricalData(
-                ticker,
+                contract,
                 timeframe,
                 endTimeUtc,
                 bars);
         }
 
         public async Task<List<Candle>> GetHistoricalRange(
-           string ticker,
+           Contract contract,
            Timeframe timeframe,
            DateTime start,
            DateTime end)
@@ -33,7 +34,7 @@ namespace IbSwingTrader.MarketData.IB
             while (cursor > start)
             {
                 var chunk = await GetCandles(
-                    ticker,
+                    contract,
                     timeframe,
                     cursor,
                     300 * 6);

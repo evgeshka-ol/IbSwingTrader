@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Globalization;
 using IBApi;
 using IBApi.protobuf;
 using IbSwingTrader.Extensions;
@@ -11,8 +10,12 @@ namespace IbSwingTrader.MarketData.IB
     {
         private readonly EReaderMonitorSignal _signal;
         private EReader? _reader;
+
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
+
+        private readonly Dictionary<int, TaskCompletionSource<List<ContractDetails>>> _contractRequests = new();
+        private readonly Dictionary<int, List<ContractDetails>> _contractResults = [];
 
         private int _nextRequestId = 1;
 
@@ -50,7 +53,7 @@ namespace IbSwingTrader.MarketData.IB
         public TaskCompletionSource<bool> Ready { get; } = new();
 
         public Task<List<Candle>> RequestHistoricalData(
-            string ticker,
+            IBApi.Contract contract,
             Timeframe timeframe,
             DateTime endTimeUtc,
             int bars)
@@ -59,10 +62,8 @@ namespace IbSwingTrader.MarketData.IB
 
             var reqId = Interlocked.Increment(ref _nextRequestId);
 
-            Console.WriteLine($"Sending reqHistoricalData for ticker {ticker}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
+            Console.WriteLine($"Sending reqHistoricalData for contract {contract.Symbol}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
             Console.WriteLine($"time frame: {timeframe}, IB format: {timeframe.ToIBBarSize()}");
-
-            var contract = TwsContractFactory.CreateStock(ticker);
 
             var tcs = new TaskCompletionSource<List<Candle>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -77,12 +78,26 @@ namespace IbSwingTrader.MarketData.IB
                 timeframe.ToIBDuration(bars),
                 timeframe.ToIBBarSize(),
                 "TRADES",
-                0,   // ✅ extended hours
+                0,   // extended hours
                 1,
                 false,
                 null);
 
             Console.WriteLine($"REQ {reqId} waiting for candles");
+
+            return tcs.Task;
+        }
+
+        public Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
+        {
+            var requestId = Interlocked.Increment(ref _nextRequestId);
+
+            var tcs = new TaskCompletionSource<List<ContractDetails>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _contractRequests[requestId] = tcs;
+
+            Client.reqContractDetails(requestId, contract);
 
             return tcs.Task;
         }
@@ -107,7 +122,13 @@ namespace IbSwingTrader.MarketData.IB
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
             Console.WriteLine($"IB ERROR VERY LONG id={id} time={errorTime} code={errorCode} msg={errorMsg} details={advancedOrderRejectJson}");
-            // ignore
+            if (errorCode == 200)
+            {
+                if (_contractRequests.TryGetValue(id, out var tcs))
+                {
+                    tcs.SetException(new Exception($"Contract not found: {errorMsg}"));
+                }
+            }
         }
 
         public void connectionClosed()
@@ -225,12 +246,25 @@ namespace IbSwingTrader.MarketData.IB
 
         public void contractDetails(int reqId, ContractDetails contractDetails)
         {
-            // ignore
+            if (!_contractResults.ContainsKey(reqId))
+                _contractResults[reqId] = [];
+
+            _contractResults[reqId].Add(contractDetails);
         }
 
         public void contractDetailsEnd(int reqId)
         {
-            // ignore
+            if (_contractRequests.TryGetValue(reqId, out var tcs))
+            {
+                var result = _contractResults.TryGetValue(reqId, out var list)
+                    ? list
+                    : [];
+
+                tcs.SetResult(result);
+
+                _contractRequests.Remove(reqId);
+                _contractResults.Remove(reqId);
+            }
         }
 
         public void execDetails(int reqId, IBApi.Contract contract, IBApi.Execution execution)

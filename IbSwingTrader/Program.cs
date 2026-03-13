@@ -1,15 +1,14 @@
-﻿using IbSwingTrader.Analysis;
+﻿using IBApi;
+using IbSwingTrader.Analysis;
 using IbSwingTrader.Bootstrap;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
 
-Dictionary<string, string> TickerAliases = new()
+Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
 {
-    { "NYCB", "FLG" }
+    ["NYCB"] = "FLG"
 };
-
-var services = ConfigureServices();
 
 if (args.Length == 0)
 {
@@ -20,6 +19,7 @@ if (args.Length == 0)
 }
 
 var command = args[0];
+var services = ConfigureServices();
 
 switch (command)
 {
@@ -38,10 +38,14 @@ switch (command)
 
 static Services ConfigureServices()
 {
+    var connection = new TwsConnection();
+
     return new Services
     {
+        Connection = connection,
         DatasetBuilder = new TradeDatasetBuilder(),
-        CsvWriter = new CsvDatasetWriter()
+        CsvWriter = new CsvDatasetWriter(),
+        ContractResolver = new TwsContractResolver(connection)
     };
 }
 
@@ -71,12 +75,10 @@ async Task RunBuildDataset(string[] args, Services services)
 
     Console.WriteLine($"Tickers found: {grouped.Count}");
 
-    var tws = new TwsConnection();
-    tws.Connect();
+    services.Connection.Connect();
 
-    await tws.Ready.Task;
-
-    var marketData = new TwsMarketDataProvider(tws);
+    await services.Connection.Ready.Task;
+    var marketData = new TwsMarketDataProvider(services.Connection);
 
     var semaphore = new SemaphoreSlim(4);
     var tasks = new List<Task<List<TradeDatasetRow>>>();
@@ -101,13 +103,13 @@ async Task RunBuildDataset(string[] args, Services services)
 
         try
         {
-            var originalTicker = g.Key;
-            var ticker = originalTicker;
+            var originalTicker = g.Key.Trim().ToUpperInvariant();
+            var requestTicker = originalTicker;
 
-            if (TickerAliases.TryGetValue(ticker, out var mapped))
+            if (TickerAliases.TryGetValue(originalTicker, out var mapped))
             {
-                Console.WriteLine($"Ticker remapped: {ticker} → {mapped}");
-                ticker = mapped;
+                Console.WriteLine($"Ticker remapped: {originalTicker} → {mapped}");
+                requestTicker = mapped;
             }
 
             var tickerTrades = g.ToList();
@@ -115,50 +117,55 @@ async Task RunBuildDataset(string[] args, Services services)
             var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
             var latest = tickerTrades.Max(t => t.ExitTimeUtc);
 
-            var start = earliest.AddDays(-20);
+            var start = earliest.AddDays(-60);
 
             Console.WriteLine();
             Console.WriteLine($"Ticker: {originalTicker}");
             Console.WriteLine($"Trades: {tickerTrades.Count}");
             Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
 
+            Contract contract;
+
+            try
+            {
+                contract = await services.ContractResolver.ResolveStockAsync(requestTicker);
+
+                Console.WriteLine(
+                    $"Resolved contract: {contract.Symbol} " +
+                    $"conId={contract.ConId} " +
+                    $"exchange={contract.Exchange}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to resolve contract for {requestTicker}: {ex.Message}");
+                return [];
+            }
+
             List<Candle> candles;
 
             try
             {
-                var candleTask = marketData.GetHistoricalRange(
-                    ticker,
+                candles = await marketData.GetHistoricalRange(
+                    contract,
                     Timeframe.H4,
                     start,
                     latest);
-
-                var completed = await Task.WhenAny(
-                    candleTask,
-                    Task.Delay(TimeSpan.FromSeconds(15)));
-
-                if (completed != candleTask)
-                {
-                    Console.WriteLine($"Timeout loading candles for {ticker}");
-                    return [];
-                }
-
-                candles = await candleTask;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load candles for {ticker}: {ex.Message}");
+                Console.WriteLine($"Failed to load candles for {requestTicker}: {ex.Message}");
                 return [];
             }
 
-            if (candles == null || candles.Count == 0)
+            if (candles.Count == 0)
             {
-                Console.WriteLine($"Skipping {ticker} — no market data");
+                Console.WriteLine($"Skipping {originalTicker} — no market data");
                 return [];
             }
 
             var rows = services.DatasetBuilder.Build(tickerTrades, candles);
 
-            Console.WriteLine($"Rows built: {rows.Count}");
+            Console.WriteLine($"Rows built for {originalTicker}: {rows.Count}");
 
             return rows;
         }
