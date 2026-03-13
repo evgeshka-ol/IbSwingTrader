@@ -1,8 +1,7 @@
 ﻿using IbSwingTrader.Interfaces;
 
-namespace IbSwingTrader.Logging
+namespace IbSwingTrader.Infrastructure.Logging
 {
-
     public class SimpleLogger : ILogger
     {
         private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd}.log";
@@ -16,7 +15,13 @@ namespace IbSwingTrader.Logging
         }
 
         public void EmptyLine()
-            => Write("EMPTY-LINE");
+        {
+            lock (_lock)
+            {
+                Console.WriteLine();
+                File.AppendAllText(_filePath, Environment.NewLine);
+            }
+        }
 
         public void Info(string message)
             => Write("INFO", message, ConsoleColor.DarkGray);
@@ -27,26 +32,22 @@ namespace IbSwingTrader.Logging
         public void Error(string message)
             => Write("ERROR", message, ConsoleColor.Red);
 
-        private static void Write(string level, string? message = null, ConsoleColor? color = null)
+        private static void Write(string level, string message, ConsoleColor? color = null)
         {
             var time = DateTime.UtcNow.ToString("HH:mm:ss");
             var line = $"{time} [{level}] | {message}";
 
             lock (_lock)
             {
-                var oldColor = Console.ForegroundColor;
-
-                if (color != null)
+                if (color.HasValue)
                 {
+                    var oldColor = Console.ForegroundColor;
                     Console.ForegroundColor = color.Value;
                     Console.WriteLine(line);
                     Console.ForegroundColor = oldColor;
                 }
 
-                if (message == null && level == "EMPTY-LINE")
-                    File.AppendText(_filePath).WriteLine();
-                else
-                    File.AppendAllText(_filePath, $"{DateTime.UtcNow:O} {line}{Environment.NewLine}");
+                File.AppendAllText(_filePath, $"{DateTime.UtcNow:O} {line}{Environment.NewLine}");
             }
         }
     }

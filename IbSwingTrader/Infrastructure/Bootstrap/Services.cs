@@ -1,7 +1,7 @@
 ﻿using IbSwingTrader.Interfaces;
 using IbSwingTrader.MarketData.IB;
 
-namespace IbSwingTrader.Bootstrap
+namespace IbSwingTrader.Infrastructure.Bootstrap
 {
     public class Services
     {

@@ -1,6 +1,6 @@
 ﻿using IBApi;
 using IbSwingTrader.Analysis;
-using IbSwingTrader.Bootstrap;
+using IbSwingTrader.Infrastructure.Bootstrap;
 using IbSwingTrader.Logging;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
@@ -83,7 +83,7 @@ async Task RunBuildDataset(string[] args, Services services)
 
     await services.Connection.Ready.Task;
 
-    var semaphore = new SemaphoreSlim(4);
+    var semaphore = new SemaphoreSlim(3);
     var tasks = new List<Task<List<TradeDatasetRow>>>();
 
     foreach (var g in grouped)
