@@ -1,10 +1,11 @@
-﻿using IbSwingTrader.Models;
+﻿using IbSwingTrader.MarketData.Interfaces;
+using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Analysis
 {
-    public static class TradeDatasetBuilder
+    public class TradeDatasetBuilder : ITradeDatasetBuilder
     {
-        public static List<TradeDatasetRow> Build(
+        public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
             List<Candle> candles)
         {

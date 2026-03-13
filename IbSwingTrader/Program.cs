@@ -81,7 +81,8 @@ async Task RunBuildDataset(string[] args)
         start,
         latest);
 
-    var rows = TradeDatasetBuilder.Build(tickerTrades, candles);
+    var builder = new TradeDatasetBuilder();
+    var rows = builder.Build(tickerTrades, candles);
 
     using var writer = new StreamWriter(datasetPath);
 
