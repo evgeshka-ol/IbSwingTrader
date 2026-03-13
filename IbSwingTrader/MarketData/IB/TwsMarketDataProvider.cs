@@ -60,14 +60,30 @@ namespace IbSwingTrader.MarketData.IB
 
             _logger.Debug($"Total candles: {candles.Count}");
 
+            int gaps = 0;
+            DateTime? firstGapStart = null;
+            DateTime? lastGapEnd = null;
+
             for (int i = 1; i < candles.Count; i++)
             {
                 var diff = candles[i].Time - candles[i - 1].Time;
 
                 if (diff > TimeSpan.FromHours(8))
                 {
-                    _logger.Debug($"Gap detected: {candles[i - 1].Time} -> {candles[i].Time}");
+                    gaps++;
+
+                    if (firstGapStart == null)
+                        firstGapStart = candles[i - 1].Time;
+
+                    lastGapEnd = candles[i].Time;
                 }
+            }
+
+            if (gaps > 0)
+            {
+                _logger.Debug(
+                    $"Gaps detected: {gaps} " +
+                    $"({firstGapStart:yyyy-MM-dd HH:mm} -> {lastGapEnd:yyyy-MM-dd HH:mm})");
             }
 
             return candles;
