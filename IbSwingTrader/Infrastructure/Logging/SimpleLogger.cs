@@ -4,7 +4,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 {
     public class SimpleLogger : ILogger
     {
-        private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd}.log";
+        private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd_HHmm}.log";
         private static readonly Lock _lock = new();
 
         public SimpleLogger()
