@@ -515,11 +515,11 @@ namespace IbSwingTrader.Analysis
         private static decimal CalcCandidateScore(TradeDatasetRow row)
         {
             decimal score =
-                  (-row.Pullback10d * 0.35m)
-                + (row.VolumeRatio20 * 0.25m)
-                + ((0.08m - row.ATRRatio) * 100m * 0.2m)
-                + ((1m - row.TrendPosition) * 100m * 0.1m)
-                + (row.MACDHist * 0.1m);
+                (-row.DistanceTo20dHigh * 0.35m)
+                + (-row.Pullback10d * 0.25m)
+                + (row.VolumeRatio20 * 0.15m)
+                + ((0.08m - row.ATRRatio) * 100 * 0.15m)
+                + ((1 - row.TrendPosition) * 100 * 0.1m);
 
             return score;
         }
