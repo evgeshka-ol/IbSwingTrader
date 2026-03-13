@@ -176,12 +176,12 @@ namespace IbSwingTrader.Analysis
 
                 if (k <= end1d)
                 {
-                    high1d = Math.Max(high1d, c.High);
-                    low1d = Math.Min(low1d, c.Low);
+                    if (c.High > high1d) high1d = c.High;
+                    if (c.Low < low1d) low1d = c.Low;
                 }
 
-                high2d = Math.Max(high2d, c.High);
-                low2d = Math.Min(low2d, c.Low);
+                if (c.High > high2d) high2d = c.High;
+                if (c.Low < low2d) low2d = c.Low;
             }
 
             row.FutureHigh1d = high1d;
@@ -190,11 +190,27 @@ namespace IbSwingTrader.Analysis
             row.FutureHigh2d = high2d;
             row.FutureLow2d = low2d;
 
-            row.MaxReturn1d = (high1d - entryPrice) / entryPrice * 100m;
-            row.MaxReturn2d = (high2d - entryPrice) / entryPrice * 100m;
+            decimal maxRet1 = (high1d - entryPrice) / entryPrice * 100m;
+            decimal maxRet2 = (high2d - entryPrice) / entryPrice * 100m;
 
-            row.MaxDrawdown1d = (low1d - entryPrice) / entryPrice * 100m;
-            row.MaxDrawdown2d = (low2d - entryPrice) / entryPrice * 100m;
+            decimal dd1 = (low1d - entryPrice) / entryPrice * 100m;
+            decimal dd2 = (low2d - entryPrice) / entryPrice * 100m;
+
+            // защита от bad candles / splits
+            maxRet1 = Math.Clamp(maxRet1, -100m, 300m);
+            maxRet2 = Math.Clamp(maxRet2, -100m, 300m);
+            dd1 = Math.Clamp(dd1, -100m, 100m);
+            dd2 = Math.Clamp(dd2, -100m, 100m);
+
+            row.MaxReturn1d = maxRet1;
+            row.MaxReturn2d = maxRet2;
+
+            row.MaxDrawdown1d = dd1;
+            row.MaxDrawdown2d = dd2;
+
+            // targets
+            row.Target10pct1d = row.MaxReturn1d >= 10m;
+            row.Target10pct2d = row.MaxReturn2d >= 10m;
         }
 
         private static decimal CalcBBPosition(List<Candle> candles, int i)
@@ -290,28 +306,35 @@ namespace IbSwingTrader.Analysis
 
         private static decimal CalcMACDHist(List<Candle> candles, int i)
         {
-            var ema12 = CalcEMA(candles, i, 12);
-            var ema26 = CalcEMA(candles, i, 26);
+            const int fast = 12;
+            const int slow = 26;
+            const int signalLen = 9;
 
-            var macd = ema12 - ema26;
+            decimal multiplierFast = 2m / (fast + 1);
+            decimal multiplierSlow = 2m / (slow + 1);
 
-            var signal = macd; // упрощение
+            decimal emaFast = candles[i - fast].Close;
+            decimal emaSlow = candles[i - slow].Close;
 
-            return macd - signal;
-        }
+            List<decimal> macdSeries = new();
 
-        private static decimal CalcEMA(List<Candle> candles, int i, int length)
-        {
-            decimal multiplier = 2m / (length + 1);
-
-            decimal ema = candles[i - length].Close;
-
-            for (int k = i - length + 1; k < i; k++)
+            for (int k = i - slow + 1; k < i; k++)
             {
-                ema = ((candles[k].Close - ema) * multiplier) + ema;
+                emaFast = ((candles[k].Close - emaFast) * multiplierFast) + emaFast;
+                emaSlow = ((candles[k].Close - emaSlow) * multiplierSlow) + emaSlow;
+
+                macdSeries.Add(emaFast - emaSlow);
             }
 
-            return ema;
+            decimal multiplierSignal = 2m / (signalLen + 1);
+            decimal signal = macdSeries[0];
+
+            for (int k = 1; k < macdSeries.Count; k++)
+                signal = ((macdSeries[k] - signal) * multiplierSignal) + signal;
+
+            var macd = macdSeries[^1];
+
+            return macd - signal;
         }
 
         private static decimal CalcDailyTrendPosition(List<Candle> candles, int i)
