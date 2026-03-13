@@ -64,7 +64,7 @@ async Task RunBuildDataset(string[] args, Services services)
         .OrderBy(g => g.Key)
         .ToList();
 
-    Console.WriteLine($"Tickers: {grouped.Count}");
+    Console.WriteLine($"Tickers found: {grouped.Count}");
 
     var tws = new TwsConnection();
     tws.Connect();
@@ -73,51 +73,17 @@ async Task RunBuildDataset(string[] args, Services services)
 
     var marketData = new TwsMarketDataProvider(tws);
 
-    var allRows = new List<TradeDatasetRow>();
+    var semaphore = new SemaphoreSlim(4);
+    var tasks = new List<Task<List<TradeDatasetRow>>>();
 
     foreach (var g in grouped)
     {
-        var ticker = g.Key;
-        var tickerTrades = g.ToList();
-
-        var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
-        var latest = tickerTrades.Max(t => t.ExitTimeUtc);
-
-        var start = earliest.AddDays(-20);
-
-        Console.WriteLine();
-        Console.WriteLine($"Ticker: {ticker}");
-        Console.WriteLine($"Trades: {tickerTrades.Count}");
-        Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
-
-        try
-        {
-            var candles = await marketData.GetHistoricalRange(
-                ticker,
-                Timeframe.H4,
-                start,
-                latest);
-
-            if (candles.Count == 0)
-            {
-                Console.WriteLine("No candles received");
-                continue;
-            }
-
-            var rows = services.DatasetBuilder.Build(tickerTrades, candles);
-
-            Console.WriteLine($"Dataset rows: {rows.Count}");
-
-            allRows.AddRange(rows);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to process {ticker}: {ex.Message}");
-        }
-
-        // защита от pacing violation IBKR
-        await Task.Delay(500);
+        tasks.Add(ProcessTicker(g));
     }
+
+    var results = await Task.WhenAll(tasks);
+
+    var allRows = results.SelectMany(r => r).ToList();
 
     Console.WriteLine();
     Console.WriteLine($"Total dataset rows: {allRows.Count}");
@@ -125,6 +91,59 @@ async Task RunBuildDataset(string[] args, Services services)
     services.CsvWriter.Write(datasetPath, allRows);
 
     Console.WriteLine($"Dataset saved: {datasetPath}");
+
+    async Task<List<TradeDatasetRow>> ProcessTicker(IGrouping<string, TradeRecord> g)
+    {
+        await semaphore.WaitAsync();
+
+        try
+        {
+            var ticker = g.Key;
+            var tickerTrades = g.ToList();
+
+            var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
+            var latest = tickerTrades.Max(t => t.ExitTimeUtc);
+
+            var start = earliest.AddDays(-20);
+
+            Console.WriteLine();
+            Console.WriteLine($"Ticker: {ticker}");
+            Console.WriteLine($"Trades: {tickerTrades.Count}");
+            Console.WriteLine($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+
+            List<Candle> candles;
+
+            try
+            {
+                candles = await marketData.GetHistoricalRange(
+                    ticker,
+                    Timeframe.H4,
+                    start,
+                    latest);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load candles for {ticker}: {ex.Message}");
+                return new List<TradeDatasetRow>();
+            }
+
+            if (candles == null || candles.Count == 0)
+            {
+                Console.WriteLine($"Skipping {ticker} — no market data");
+                return [];
+            }
+
+            var rows = services.DatasetBuilder.Build(tickerTrades, candles);
+
+            Console.WriteLine($"Rows built: {rows.Count}");
+
+            return rows;
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
 }
 
 async Task RunGetCandidates()
