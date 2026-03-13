@@ -141,6 +141,13 @@ namespace IbSwingTrader.Analysis
             row.DailyRSI14 = CalcRSI(candles, i);
 
             row.WeeklyTrendPosition = CalcWeeklyTrendPosition(candles, i);
+
+            // новые признаки
+            row.DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, i);
+            row.DistanceTo52wHigh = CalcDistanceTo52wHigh(candles, i);
+
+            // scoring
+            row.CandidateScore = CalcCandidateScore(row);
         }
 
         private static bool HasFutureBars(
@@ -451,6 +458,70 @@ namespace IbSwingTrader.Analysis
                 return 1;
 
             return candles[i - 1].Close / ma;
+        }
+
+        private static decimal CalcDistanceTo20dHigh(List<Candle> candles, int i)
+        {
+            int bars = 20 * 6;
+
+            int start = i - bars;
+            if (start < 0)
+                start = 0;
+
+            decimal highest = decimal.MinValue;
+
+            for (int k = start; k < i; k++)
+            {
+                var h = candles[k].High;
+
+                if (h > highest)
+                    highest = h;
+            }
+
+            if (highest <= 0)
+                return 0;
+
+            var close = candles[i - 1].Close;
+
+            return (close - highest) / highest * 100m;
+        }
+
+        private static decimal CalcDistanceTo52wHigh(List<Candle> candles, int i)
+        {
+            int bars = 252 * 6;
+
+            int start = i - bars;
+            if (start < 0)
+                start = 0;
+
+            decimal highest = decimal.MinValue;
+
+            for (int k = start; k < i; k++)
+            {
+                var h = candles[k].High;
+
+                if (h > highest)
+                    highest = h;
+            }
+
+            if (highest <= 0)
+                return 0;
+
+            var close = candles[i - 1].Close;
+
+            return (close - highest) / highest * 100m;
+        }
+
+        private static decimal CalcCandidateScore(TradeDatasetRow row)
+        {
+            decimal score =
+                  (-row.Pullback10d * 0.35m)
+                + (row.VolumeRatio20 * 0.25m)
+                + ((0.08m - row.ATRRatio) * 100m * 0.2m)
+                + ((1m - row.TrendPosition) * 100m * 0.1m)
+                + (row.MACDHist * 0.1m);
+
+            return score;
         }
     }
 }

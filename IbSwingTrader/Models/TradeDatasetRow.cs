@@ -40,5 +40,11 @@
         // --- targets ---
         public bool Target10pct1d { get; set; }
         public bool Target10pct2d { get; set; }
+
+        public decimal DistanceTo20dHigh { get; internal set; }
+        public decimal DistanceTo52wHigh { get; internal set; }
+
+        // scoring
+        public decimal CandidateScore { get; internal set; }
     }
 }
