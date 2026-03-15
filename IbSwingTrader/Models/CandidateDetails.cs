@@ -13,5 +13,7 @@
         public decimal ATRRatio { get; set; }
 
         public decimal TrendPosition { get; set; }
+
+        public DateTime ScanTime { get; set; }
     }
 }
