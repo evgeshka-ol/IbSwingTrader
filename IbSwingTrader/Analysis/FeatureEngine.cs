@@ -5,18 +5,17 @@ namespace IbSwingTrader.Analysis
 {
     public class FeatureEngine : IFeatureEngine
     {
-        public FeatureSet Calculate(List<Candle> candles)
+        public FeatureSet Calculate(List<Candle> candles, int index)
         {
-            int i = candles.Count;
-
             return new FeatureSet
             {
-                Pullback10d = CalcPullback(candles, i, 10),
-                DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, i),
-                DistanceTo52wHigh = CalcDistanceTo52wHigh(candles, i),
-                VolumeRatio20 = CalcVolumeRatio(candles, i, 20),
-                ATRRatio = CalcATRRatio(candles, i),
-                TrendPosition = CalcTrendPosition(candles, i, 50)
+                Pullback5d = CalcPullback(candles, index, 5),
+                Pullback10d = CalcPullback(candles, index, 10),
+                DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, index),
+                DistanceTo52wHigh = CalcDistanceTo52wHigh(candles, index),
+                VolumeRatio20 = CalcVolumeRatio(candles, index, 20),
+                ATRRatio = CalcATRRatio(candles, index),
+                TrendPosition = CalcTrendPosition(candles, index, 50)
             };
         }
 

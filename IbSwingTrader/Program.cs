@@ -59,11 +59,14 @@ static Services ConfigureServices()
         retryPolicy,
         logger);
 
+    var featureEngine = new FeatureEngine();
+    var candidateScore = new CandidateScore();
+
     return new Services
     {
         Logger = logger,
         Connection = connection,
-        DatasetBuilder = new TradeDatasetBuilder(),
+        DatasetBuilder = new TradeDatasetBuilder(featureEngine, candidateScore),
         CsvWriter = new CsvDatasetWriter(),
         ContractResolver = new TwsContractResolver(connection, logger),
         HistoricalService = historicalService,

@@ -2,6 +2,7 @@
 {
     public class FeatureSet
     {
+        public decimal Pullback5d { get; set; }
         public decimal Pullback10d { get; set; }
         public decimal DistanceTo20dHigh { get; set; }
         public decimal DistanceTo52wHigh { get; set; }

@@ -5,9 +5,12 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Analysis
 {
-    public class TradeDatasetBuilder : ITradeDatasetBuilder
+    public class TradeDatasetBuilder(IFeatureEngine featureEngine, ICandidateScore candidateScore) : ITradeDatasetBuilder
     {
         private static readonly int[] EntryShifts = { -12, -9, -6, -3, 0 };
+
+        private readonly IFeatureEngine _featureEngine = featureEngine;
+        private readonly ICandidateScore _candidateScore = candidateScore;
 
         public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
@@ -122,20 +125,22 @@ namespace IbSwingTrader.Analysis
             return left;
         }
 
-        private static void CalculateFeatures(
+        private void CalculateFeatures(
             TradeDatasetRow row,
             List<Candle> candles,
             int i)
         {
-            row.Pullback5d = CalcPullback(candles, i, 5);
-            row.Pullback10d = CalcPullback(candles, i, 10);
+            var featureSet = _featureEngine.Calculate(candles, i);
 
-            row.VolumeRatio20 = CalcVolumeRatio(candles, i, 20);
-            row.TrendPosition = CalcTrendPosition(candles, i, 50);
+            row.Pullback5d = featureSet.Pullback5d;
+            row.Pullback10d = featureSet.Pullback10d;
+
+            row.VolumeRatio20 = featureSet.VolumeRatio20;
+            row.TrendPosition = featureSet.TrendPosition;
 
             row.BBPosition = CalcBBPosition(candles, i);
             row.RSI14 = CalcRSI(candles, i);
-            row.ATRRatio = CalcATRRatio(candles, i);
+            row.ATRRatio = featureSet.ATRRatio;
             row.MACDHist = CalcMACDHist(candles, i);
 
             row.DailyTrendPosition = CalcDailyTrendPosition(candles, i);
@@ -145,11 +150,11 @@ namespace IbSwingTrader.Analysis
             row.WeeklyTrendPosition = CalcWeeklyTrendPosition(candles, i);
 
             // новые признаки
-            row.DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, i);
-            row.DistanceTo52wHigh = CalcDistanceTo52wHigh(candles, i);
+            row.DistanceTo20dHigh = featureSet.DistanceTo20dHigh;
+            row.DistanceTo52wHigh = featureSet.DistanceTo52wHigh;
 
             // scoring
-            row.CandidateScore = CalcCandidateScore(row);
+            row.CandidateScore = _candidateScore.Calculate(featureSet);
         }
 
         private static bool HasFutureBars(
@@ -293,40 +298,6 @@ namespace IbSwingTrader.Analysis
             return 100 - (100 / (1 + rs));
         }
 
-        private static decimal CalcATRRatio(List<Candle> candles, int i)
-        {
-            const int length = 14;
-
-            if (i < length + 1)
-                return 0;
-
-            decimal atr = 0;
-
-            for (int k = i - length; k < i; k++)
-            {
-                var high = candles[k].High;
-                var low = candles[k].Low;
-                var prevClose = candles[k - 1].Close;
-
-                var tr1 = high - low;
-                var tr2 = Math.Abs(high - prevClose);
-                var tr3 = Math.Abs(low - prevClose);
-
-                var tr = Math.Max(tr1, Math.Max(tr2, tr3));
-
-                atr += tr;
-            }
-
-            atr /= length;
-
-            var close = candles[i - 1].Close;
-
-            if (close == 0)
-                return 0;
-
-            return atr / close;
-        }
-
         private static decimal CalcMACDHist(List<Candle> candles, int i)
         {
             const int fast = 12;
@@ -408,136 +379,6 @@ namespace IbSwingTrader.Analysis
             var sma = sum / count;
 
             return candles[i - 1].Close / sma;
-        }
-
-        private static decimal CalcPullback(List<Candle> candles, int i, int days)
-        {
-            int bars = days * 6;
-
-            int start = i - bars;
-            if (start < 0)
-                start = 0;
-
-            decimal highest = decimal.MinValue;
-
-            for (int k = start; k < i; k++)
-            {
-                var h = candles[k].High;
-
-                if (h > highest)
-                    highest = h;
-            }
-
-            if (highest <= 0)
-                return 0;
-
-            var close = candles[i - 1].Close;
-
-            return (close - highest) / highest * 100m;
-        }
-
-        private static decimal CalcVolumeRatio(List<Candle> candles, int i, int length)
-        {
-            int start = i - length;
-
-            if (start < 0)
-                return 1;
-
-            decimal sum = 0;
-
-            for (int k = start; k < i; k++)
-                sum += candles[k].Volume;
-
-            if (sum == 0)
-                return 1;
-
-            var avg = sum / length;
-
-            return candles[i - 1].Volume / avg;
-        }
-
-        private static decimal CalcTrendPosition(List<Candle> candles, int i, int length)
-        {
-            int start = i - length;
-
-            if (start < 0)
-                return 1;
-
-            decimal sum = 0;
-
-            for (int k = start; k < i; k++)
-                sum += candles[k].Close;
-
-            var ma = sum / length;
-
-            if (ma == 0)
-                return 1;
-
-            return candles[i - 1].Close / ma;
-        }
-
-        private static decimal CalcDistanceTo20dHigh(List<Candle> candles, int i)
-        {
-            int bars = 20 * 6;
-
-            int start = i - bars;
-            if (start < 0)
-                start = 0;
-
-            decimal highest = decimal.MinValue;
-
-            for (int k = start; k < i; k++)
-            {
-                var h = candles[k].High;
-
-                if (h > highest)
-                    highest = h;
-            }
-
-            if (highest <= 0)
-                return 0;
-
-            var close = candles[i - 1].Close;
-
-            return (close - highest) / highest * 100m;
-        }
-
-        private static decimal CalcDistanceTo52wHigh(List<Candle> candles, int i)
-        {
-            int bars = 252 * 6;
-
-            int start = i - bars;
-            if (start < 0)
-                start = 0;
-
-            decimal highest = decimal.MinValue;
-
-            for (int k = start; k < i; k++)
-            {
-                var h = candles[k].High;
-
-                if (h > highest)
-                    highest = h;
-            }
-
-            if (highest <= 0)
-                return 0;
-
-            var close = candles[i - 1].Close;
-
-            return (close - highest) / highest * 100m;
-        }
-
-        private static decimal CalcCandidateScore(TradeDatasetRow row)
-        {
-            decimal score =
-                (-row.DistanceTo20dHigh * 0.35m)
-                + (-row.Pullback10d * 0.25m)
-                + (row.VolumeRatio20 * 0.15m)
-                + ((0.08m - row.ATRRatio) * 100 * 0.15m)
-                + ((1 - row.TrendPosition) * 100 * 0.1m);
-
-            return score;
         }
     }
 }

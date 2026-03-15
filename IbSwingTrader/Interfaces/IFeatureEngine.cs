@@ -4,6 +4,8 @@ namespace IbSwingTrader.Interfaces
 {
     public interface IFeatureEngine
     {
-        FeatureSet Calculate(List<Candle> candles);
+        FeatureSet Calculate(
+            List<Candle> candles,
+            int index);
     }
 }
