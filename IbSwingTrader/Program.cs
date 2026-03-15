@@ -7,6 +7,7 @@ using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
 using IbSwingTrader.Services;
+using IbSwingTrader.Services.CandidateFiltering;
 
 Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
 {
@@ -65,7 +66,8 @@ static Services ConfigureServices()
         DatasetBuilder = new TradeDatasetBuilder(),
         CsvWriter = new CsvDatasetWriter(),
         ContractResolver = new TwsContractResolver(connection, logger),
-        HistoricalService = historicalService
+        HistoricalService = historicalService,
+        StockPreFilter = new StockPreFilter()
     };
 }
 

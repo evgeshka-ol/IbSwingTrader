@@ -10,5 +10,6 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
         public required ICsvWriter CsvWriter { get; init; }
         public required IContractResolver ContractResolver { get; init; }
         public required IHistoricalDataService HistoricalService { get; init; }
+        public required IStockPreFilter StockPreFilter { get; init; }
     }
 }
