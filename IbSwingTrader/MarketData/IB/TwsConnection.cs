@@ -24,7 +24,9 @@ namespace IbSwingTrader.MarketData.IB
         private readonly ConcurrentDictionary<int, List<StockInfo>> _scannerResults = new();
 
         private int _nextRequestId = 1;
-        private volatile bool _ibConnected = true;
+        private volatile bool _ibConnected = false;
+
+        private TaskCompletionSource<string>? _scannerParametersTcs;
 
         public TwsConnection(ITextLogger logger)
         {
@@ -58,7 +60,7 @@ namespace IbSwingTrader.MarketData.IB
 
         public EClientSocket Client { get; }
 
-        public TaskCompletionSource<bool> Ready { get; } = new();
+        public TaskCompletionSource<bool> Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task<List<Candle>> RequestHistoricalData(
             IBApi.Contract contract,
@@ -144,7 +146,7 @@ namespace IbSwingTrader.MarketData.IB
                 requestId,
                 subscription,
                 [],
-                filters);
+                []);
 
             var result = await tcs.Task;
 
@@ -156,15 +158,32 @@ namespace IbSwingTrader.MarketData.IB
             return result;
         }
 
+        public async Task<string> RequestScannerParametersAsync()
+        {
+            await WaitForConnectionAsync();
+
+            var tcs = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _scannerParametersTcs = tcs;
+
+            Client.reqScannerParameters();
+
+            return await tcs.Task;
+        }
+
         private async Task WaitForConnectionAsync()
         {
-            if (_ibConnected)
+            if (Client.IsConnected() && _ibConnected)
                 return;
 
-            _logger.Info("Waiting for IB reconnect...");
+            if (!Client.IsConnected())
+            {
+                _logger.Info("Connecting to TWS...");
+                Connect();
+            }
 
-            while (!_ibConnected)
-                await Task.Delay(1000);
+            await Ready.Task;
         }
 
         // ---- EWrapper methods ----
@@ -456,7 +475,9 @@ namespace IbSwingTrader.MarketData.IB
 
         public void scannerParameters(string xml)
         {
-            // ignore
+            _logger.Info("Scanner parameters received");
+
+            _scannerParametersTcs?.TrySetResult(xml);
         }
 
         public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
