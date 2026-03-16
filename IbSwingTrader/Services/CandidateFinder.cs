@@ -49,7 +49,7 @@ namespace IbSwingTrader.Services
                     contract,
                     Timeframe.H4,
                     DateTime.UtcNow,
-                    150);
+                    300);
 
                 if (candles.Count < 60)
                     continue;
