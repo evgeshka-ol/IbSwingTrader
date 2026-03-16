@@ -11,5 +11,6 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
         public required IContractResolver ContractResolver { get; init; }
         public required IHistoricalDataService HistoricalService { get; init; }
         public required ICommand GetCandidatesCommand { get; init; }
+        public required ICommand GetScannerParamsCommand { get; init; }
     }
 }

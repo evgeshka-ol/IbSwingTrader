@@ -37,6 +37,10 @@ switch (command)
         await RunGetCandidates();
         break;
 
+    case "get-scanner-params":
+        await services.GetScannerParamsCommand.RunAsync();
+        break;
+
     default:
         services.Logger.Error("Unknown command");
         break;
@@ -81,7 +85,8 @@ static Services ConfigureServices()
                 new CandidateFilter(),
                 candidateScore,
                 new TradeBuilder()),
-            new CandidateResultWriter())
+            new CandidateResultWriter()),
+        GetScannerParamsCommand = new GetScannerParamsCommand(connection)
     };
 }
 
