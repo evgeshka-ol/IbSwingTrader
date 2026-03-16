@@ -19,7 +19,8 @@ namespace IbSwingTrader.MarketData.IB
                 Instrument = "STK",
                 LocationCode = _settings.LocationCode,
                 ScanCode = _settings.ScanCode,
-                NumberOfRows = 50
+                NumberOfRows = 50,
+                AbovePrice = 1
             };
 
             var filters = new List<TagValue>();
