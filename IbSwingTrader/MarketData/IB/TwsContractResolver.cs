@@ -4,10 +4,10 @@ using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsContractResolver(ITwsConnection tws, ILogger logger) : IContractResolver
+    public class TwsContractResolver(ITwsConnection tws, ITextLogger logger) : IContractResolver
     {
         private readonly ITwsConnection _tws = tws;
-        private readonly ILogger _logger = logger;
+        private readonly ITextLogger _logger = logger;
         private readonly ConcurrentDictionary<string, Contract> _cache = new();
 
         public async Task<Contract> ResolveStockAsync(string ticker)

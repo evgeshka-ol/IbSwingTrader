@@ -43,7 +43,7 @@ switch (command)
 
 static Services ConfigureServices()
 {
-    var logger = new SimpleLogger();
+    var logger = new TextLogger();
     var connection = new TwsConnection(logger);
 
     var provider = new TwsMarketDataProvider(connection, logger);

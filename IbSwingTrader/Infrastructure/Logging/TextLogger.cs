@@ -2,12 +2,12 @@
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
-    public class SimpleLogger : ILogger
+    public class TextLogger : ITextLogger
     {
         private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd_HHmm}.log";
         private static readonly Lock _lock = new();
 
-        public SimpleLogger()
+        public TextLogger()
         {
             var dir = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))

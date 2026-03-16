@@ -4,7 +4,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
 {
     public class Services
     {
-        public required ILogger Logger { get; init; }
+        public required ITextLogger Logger { get; init; }
         public required ITwsConnection Connection { get; init; }
         public required ITradeDatasetBuilder DatasetBuilder { get; init; }
         public required ICsvWriter CsvWriter { get; init; }

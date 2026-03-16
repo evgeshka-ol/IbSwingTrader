@@ -1,6 +1,6 @@
 ﻿namespace IbSwingTrader.Interfaces
 {
-    public interface ILogger
+    public interface ITextLogger
     {
         void EmptyLine();
         void Info(string message);

@@ -4,10 +4,10 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.MarketData.IB
 {
-    public class TwsMarketDataProvider(ITwsConnection tws, ILogger logger) : IMarketDataProvider
+    public class TwsMarketDataProvider(ITwsConnection tws, ITextLogger logger) : IMarketDataProvider
     {
         private readonly ITwsConnection _tws = tws;
-        private readonly ILogger _logger = logger;
+        private readonly ITextLogger _logger = logger;
 
         public Task<List<Candle>> GetCandles(
             Contract contract,

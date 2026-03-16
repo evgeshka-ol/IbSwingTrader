@@ -9,13 +9,13 @@ public class HistoricalDataService(
     IHistoricalRequestThrottler throttler,
     IHistoricalCache cache,
     IHistoricalRetryPolicy retryPolicy,
-    ILogger logger) : IHistoricalDataService
+    ITextLogger logger) : IHistoricalDataService
 {
     private readonly IMarketDataProvider _provider = provider;
     private readonly IHistoricalRequestThrottler _throttler = throttler;
     private readonly IHistoricalCache _cache = cache;
     private readonly IHistoricalRetryPolicy _retryPolicy = retryPolicy;
-    private readonly ILogger _logger = logger;
+    private readonly ITextLogger _logger = logger;
 
     public async Task<List<Candle>?> GetCandlesRange(
         string symbol,

@@ -11,7 +11,7 @@ namespace IbSwingTrader.MarketData.IB
     {
         private readonly EReaderMonitorSignal _signal;
 
-        private readonly ILogger _logger;
+        private readonly ITextLogger _logger;
         private EReader? _reader;
 
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
@@ -26,7 +26,7 @@ namespace IbSwingTrader.MarketData.IB
         private int _nextRequestId = 1;
         private volatile bool _ibConnected = true;
 
-        public TwsConnection(ILogger logger)
+        public TwsConnection(ITextLogger logger)
         {
             _logger = logger;
             _signal = new EReaderMonitorSignal();
