@@ -7,6 +7,9 @@ namespace IbSwingTrader.Analysis
     {
         public FeatureSet Calculate(List<Candle> candles, int index)
         {
+            if (index <= 0 || index > candles.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
             return new FeatureSet
             {
                 Pullback5d = CalcPullback(candles, index, 5),
@@ -17,6 +20,11 @@ namespace IbSwingTrader.Analysis
                 ATRRatio = CalcATRRatio(candles, index),
                 TrendPosition = CalcTrendPosition(candles, index, 50)
             };
+        }
+
+        public FeatureSet CalculateLast(List<Candle> candles)
+        {
+            return Calculate(candles, candles.Count);
         }
 
         private static decimal CalcPullback(List<Candle> candles, int i, int days)
