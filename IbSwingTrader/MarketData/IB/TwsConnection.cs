@@ -9,15 +9,19 @@ namespace IbSwingTrader.MarketData.IB
 {
     public class TwsConnection : EWrapper, ITwsConnection
     {
-        private readonly ILogger _logger;
         private readonly EReaderMonitorSignal _signal;
+
+        private readonly ILogger _logger;
         private EReader? _reader;
 
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
 
-        private readonly Dictionary<int, TaskCompletionSource<List<ContractDetails>>> _contractRequests = new();
+        private readonly Dictionary<int, TaskCompletionSource<List<ContractDetails>>> _contractRequests = [];
         private readonly Dictionary<int, List<ContractDetails>> _contractResults = [];
+
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<List<StockInfo>>> _scannerRequests = new();
+        private readonly ConcurrentDictionary<int, List<StockInfo>> _scannerResults = new();
 
         private int _nextRequestId = 1;
         private volatile bool _ibConnected = true;
@@ -75,11 +79,7 @@ namespace IbSwingTrader.MarketData.IB
             _buffers[reqId] = [];
             _requests[reqId] = tcs;
 
-            while (!_ibConnected)
-            {
-                _logger.Info("Waiting for IB reconnect...");
-                await Task.Delay(1000);
-            }
+            await WaitForConnectionAsync();
 
             Client.reqHistoricalData(
                 reqId,
@@ -124,6 +124,47 @@ namespace IbSwingTrader.MarketData.IB
             Client.reqContractDetails(requestId, contract);
 
             return tcs.Task;
+        }
+
+        public async Task<List<StockInfo>> GetStocksAsync(
+            ScannerSubscription subscription,
+            List<TagValue> filters)
+        {
+            await WaitForConnectionAsync();
+
+            int requestId = Interlocked.Increment(ref _nextRequestId);
+
+            var tcs = new TaskCompletionSource<List<StockInfo>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _scannerRequests[requestId] = tcs;
+            _scannerResults[requestId] = [];
+
+            Client.reqScannerSubscription(
+                requestId,
+                subscription,
+                [],
+                filters);
+
+            var result = await tcs.Task;
+
+            Client.cancelScannerSubscription(requestId);
+
+            _scannerRequests.TryRemove(requestId, out _);
+            _scannerResults.TryRemove(requestId, out _);
+
+            return result;
+        }
+
+        private async Task WaitForConnectionAsync()
+        {
+            if (_ibConnected)
+                return;
+
+            _logger.Info("Waiting for IB reconnect...");
+
+            while (!_ibConnected)
+                await Task.Delay(1000);
         }
 
         // ---- EWrapper methods ----
@@ -177,18 +218,20 @@ namespace IbSwingTrader.MarketData.IB
             {
                 if (_contractRequests.TryGetValue(id, out var tcs))
                 {
-                    tcs.SetException(new Exception($"Contract not found: {errorMsg}"));
+                    tcs.TrySetException(new Exception($"Contract not found: {errorMsg}"));
                 }
             }
         }
 
         public void connectionClosed()
         {
+            _ibConnected = false;
             _logger.Info("TWS connection closed");
         }
 
         public void nextValidId(int orderId)
         {
+            _ibConnected = true;
             _logger.Info($"Connected to TWS. Next OrderId: {orderId}");
             Client.reqCurrentTime();
             Ready.TrySetResult(true);
@@ -418,12 +461,27 @@ namespace IbSwingTrader.MarketData.IB
 
         public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
-            // ignore
+            if (!_scannerResults.TryGetValue(reqId, out var list))
+                return;
+
+            var contract = contractDetails.Contract;
+
+            var stock = new StockInfo
+            {
+                Ticker = contract.Symbol,
+            };
+
+            if (!list.Any(x => x.Ticker == contract.Symbol))
+                list.Add(stock);
         }
 
         public void scannerDataEnd(int reqId)
         {
-            // ignore
+            if (_scannerRequests.TryGetValue(reqId, out var tcs) &&
+                _scannerResults.TryGetValue(reqId, out var list))
+            {
+                tcs.TrySetResult(list);
+            }
         }
 
         public void receiveFA(int faDataType, string faXmlData)

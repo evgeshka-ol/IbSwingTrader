@@ -12,5 +12,6 @@ namespace IbSwingTrader.Interfaces
         void Connect(string host = "127.0.0.1", int port = 7496, int clientId = 1);
         Task<List<ContractDetails>> GetContractDetails(Contract contract);
         Task<List<Candle>> RequestHistoricalData(Contract contract, Timeframe timeframe, DateTime endTimeUtc, int bars);
+        Task<List<StockInfo>> GetStocksAsync(ScannerSubscription subscription, List<TagValue> filters);
     }
 }
