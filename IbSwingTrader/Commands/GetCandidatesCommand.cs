@@ -4,7 +4,7 @@ namespace IbSwingTrader.Commands
 {
     public class GetCandidatesCommand(
         ICandidateFinder finder,
-        ICandidateResultWriter writer)
+        ICandidateResultWriter writer) : ICommand
     {
         private readonly ICandidateFinder _finder = finder;
         private readonly ICandidateResultWriter _writer = writer;
