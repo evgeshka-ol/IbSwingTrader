@@ -86,7 +86,9 @@ namespace IbSwingTrader.Services
                 });
             }
 
-            return results;
+            return [.. results
+                .OrderByDescending(x => x.Score)
+                .Take(10)];
         }
     }
 }
