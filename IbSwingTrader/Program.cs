@@ -1,5 +1,6 @@
 ﻿using IBApi;
 using IbSwingTrader.Analysis;
+using IbSwingTrader.Commands;
 using IbSwingTrader.Infrastructure.Bootstrap;
 using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Infrastructure.Logging;
@@ -70,7 +71,17 @@ static Services ConfigureServices()
         CsvWriter = new CsvDatasetWriter(),
         ContractResolver = new TwsContractResolver(connection, logger),
         HistoricalService = historicalService,
-        StockPreFilter = new StockPreFilter()
+        GetCandidatesCommand = new GetCandidatesCommand(
+            new CandidateFinder(
+                new TwsStockUniverseProvider(connection, new ScannerSettings()),
+                new StockPreFilter(),
+                new TwsContractResolver(connection, logger),
+                provider,
+                featureEngine,
+                new CandidateFilter(),
+                candidateScore,
+                new TradeBuilder()),
+            new CandidateResultWriter())
     };
 }
 
@@ -203,5 +214,5 @@ async Task RunBuildDataset(string[] args, Services services)
 
 async Task RunGetCandidates()
 {
-    services.Logger.Info("Candidate search not implemented yet");
+    await services.GetCandidatesCommand.RunAsync();
 }
