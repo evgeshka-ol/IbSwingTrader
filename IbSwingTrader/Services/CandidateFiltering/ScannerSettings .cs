@@ -6,7 +6,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
     {
         public string LocationCode { get; set; } = "STK.US.MAJOR";
 
-        public string ScanCode { get; set; } = "MOST_ACTIVE";
+        public string ScanCode { get; set; } = "TOP_PERC_LOSE";
 
         public decimal MinPrice { get; set; } = 5m;
         public decimal MaxPrice { get; set; } = 200m;

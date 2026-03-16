@@ -1,4 +1,5 @@
-﻿using IBApi;
+﻿using System.Globalization;
+using IBApi;
 using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
@@ -17,22 +18,26 @@ namespace IbSwingTrader.MarketData.IB
             {
                 Instrument = "STK",
                 LocationCode = _settings.LocationCode,
-                ScanCode = _settings.ScanCode
+                ScanCode = _settings.ScanCode,
+                NumberOfRows = 50
             };
 
             var filters = new List<TagValue>();
 
             if (_settings.MinPrice > 0)
-                filters.Add(new TagValue("priceAbove", _settings.MinPrice.ToString()));
+                filters.Add(new TagValue(
+                    "priceAbove",
+                    _settings.MinPrice.ToString(CultureInfo.InvariantCulture)));
 
             if (_settings.MaxPrice > 0)
-                filters.Add(new TagValue("priceBelow", _settings.MaxPrice.ToString()));
-
-            if (_settings.MinMarketCap > 0)
-                filters.Add(new TagValue("marketCapAbove", _settings.MinMarketCap.ToString()));
+                filters.Add(new TagValue(
+                    "priceBelow",
+                    _settings.MaxPrice.ToString(CultureInfo.InvariantCulture)));
 
             if (_settings.MinAvgVolume > 0)
-                filters.Add(new TagValue("avgVolumeAbove", _settings.MinAvgVolume.ToString()));
+                filters.Add(new TagValue(
+                    "avgVolumeAbove",
+                    _settings.MinAvgVolume.ToString(CultureInfo.InvariantCulture)));
 
             return await _twsConnection.GetStocksAsync(subscription, filters);
         }
