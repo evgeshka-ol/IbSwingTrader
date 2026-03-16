@@ -1,13 +1,12 @@
 ﻿using IbSwingTrader.Interfaces;
-using IbSwingTrader.Services;
 
 namespace IbSwingTrader.Commands
 {
     public class GetCandidatesCommand(
-        CandidateFinder finder,
+        ICandidateFinder finder,
         ICandidateResultWriter writer)
     {
-        private readonly CandidateFinder _finder = finder;
+        private readonly ICandidateFinder _finder = finder;
         private readonly ICandidateResultWriter _writer = writer;
 
         public async Task RunAsync()

@@ -12,7 +12,7 @@ namespace IbSwingTrader.Services
         IFeatureEngine featureEngine,
         ICandidateFilter candidateFilter,
         ICandidateScore candidateScore,
-        ITradeBuilder tradeBuilder)
+        ITradeBuilder tradeBuilder) : ICandidateFinder
     {
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
         private readonly IStockPreFilter _preFilter = preFilter;
