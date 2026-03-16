@@ -14,7 +14,5 @@ namespace IbSwingTrader.Services.CandidateFiltering
         public decimal MinMarketCap { get; set; } = 1_000_000_000m;
 
         public long MinAvgVolume { get; set; } = 1_000_000;
-
-        public decimal MinDollarVolume { get; set; } = 10_000_000m;
     }
 }

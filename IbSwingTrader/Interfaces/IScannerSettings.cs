@@ -10,7 +10,5 @@
 
         decimal MinMarketCap { get; }
         long MinAvgVolume { get; }
-
-        decimal MinDollarVolume { get; }
     }
 }
