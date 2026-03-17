@@ -56,7 +56,13 @@ namespace IbSwingTrader.Services
 
                 var features = _featureEngine.CalculateLast(candles);
 
-                if (!_candidateFilter.Pass(features))
+                var price = candles[^1].Close;
+
+                var avgVolume20 = candles
+                    .TakeLast(20)
+                    .Average(x => x.Volume);
+
+                if (!_candidateFilter.Pass(features, price, avgVolume20, 0m))
                     continue;
 
                 var score = _candidateScore.Calculate(features);
