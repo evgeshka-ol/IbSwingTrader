@@ -193,6 +193,7 @@ namespace IbSwingTrader.Analysis
             row.DailyRSI14 = CalcDailyRSI14(candles, i);
 
             row.WeeklyTrendPosition = CalcWeeklyTrendPosition(candles, i);
+            row.WeeklyUptrend = row.WeeklyTrendPosition > 1m;
 
             row.DistanceTo20dHigh = featureSet.DistanceTo20dHigh;
             row.DistanceTo52wHigh = featureSet.DistanceTo52wHigh;
