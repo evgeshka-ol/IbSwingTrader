@@ -18,6 +18,7 @@ namespace IbSwingTrader.Analysis
 
             return new FeatureSet
             {
+                // --- 4H ---
                 Pullback5d = CalcPullback(candles, index, 5),
                 Pullback10d = CalcPullback(candles, index, 10),
                 DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, index),
@@ -35,13 +36,359 @@ namespace IbSwingTrader.Analysis
                 RSI14 = rsi14,
                 MACDHist = macdHist,
                 MACDHistDelta = macdHistDelta,
-                MACDHistImproving = macdHistDelta > 0m
+                MACDHistImproving = macdHistDelta > 0m,
+
+                // --- daily ---
+                DailyTrendPosition = CalcDailyTrendPosition(candles, index),
+                DailyPullback10d = CalcDailyPullback10d(candles, index),
+                DailyRSI14 = CalcDailyRSI14(candles, index),
+
+                // --- weekly ---
+                WeeklyTrendPosition = CalcWeeklyTrendPosition(candles, index),
+                WeeklyBBMidSlopePct = CalcWeeklyBBMidSlopePct(candles, index),
+                WeeklyMACDHistDelta = CalcWeeklyMACDHistDelta(candles, index),
+                WeeklyMACDLineMinusSignal = CalcWeeklyMACDLineMinusSignal(candles, index)
             };
+        }
+
+        private static decimal? CalcWeeklyTrendPosition(List<Candle> candles, int i)
+        {
+            const int length = 20;
+
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count < length)
+                return null;
+
+            decimal sum = 0m;
+
+            for (int k = weeklyCloses.Count - length; k < weeklyCloses.Count; k++)
+                sum += weeklyCloses[k];
+
+            var sma = sum / length;
+
+            if (sma == 0m)
+                return null;
+
+            var close = weeklyCloses[^1];
+
+            return close / sma;
+        }
+
+        private static decimal? CalcWeeklyBBMidSlopePct(
+            List<Candle> candles,
+            int i,
+            int length = 20,
+            int lookbackBars = 1)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count < length + lookbackBars)
+                return null;
+
+            decimal currentSum = 0m;
+            for (int k = weeklyCloses.Count - length; k < weeklyCloses.Count; k++)
+                currentSum += weeklyCloses[k];
+
+            var currentMid = currentSum / length;
+
+            int prevEndExclusive = weeklyCloses.Count - lookbackBars;
+            int prevStart = prevEndExclusive - length;
+
+            decimal prevSum = 0m;
+            for (int k = prevStart; k < prevEndExclusive; k++)
+                prevSum += weeklyCloses[k];
+
+            var prevMid = prevSum / length;
+
+            if (prevMid == 0m)
+                return null;
+
+            return (currentMid - prevMid) / prevMid * 100m;
+        }
+
+        private static decimal? CalcWeeklyMACDHistDelta(List<Candle> candles, int i)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count < 2)
+                return null;
+
+            var macdSeries = BuildMacdSeries(weeklyCloses);
+
+            if (macdSeries.Count < 2)
+                return null;
+
+            return macdSeries[^1].Histogram - macdSeries[^2].Histogram;
+        }
+
+        private static decimal? CalcWeeklyMACDLineMinusSignal(List<Candle> candles, int i)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count == 0)
+                return null;
+
+            var macdSeries = BuildMacdSeries(weeklyCloses);
+
+            if (macdSeries.Count == 0)
+                return null;
+
+            return macdSeries[^1].Macd - macdSeries[^1].Signal;
+        }
+
+        private static List<decimal> BuildWeeklyCloses(List<Candle> candles, int i)
+        {
+            var weeklyBars = BuildWeeklyBars(candles, i);
+
+            var closes = new List<decimal>(weeklyBars.Count);
+
+            for (int k = 0; k < weeklyBars.Count; k++)
+                closes.Add(weeklyBars[k].Close);
+
+            return closes;
+        }
+
+        private static List<WeeklyBar> BuildWeeklyBars(List<Candle> candles, int i)
+        {
+            var result = new List<WeeklyBar>();
+
+            WeeklyBar? current = null;
+
+            for (int k = 0; k < i; k++)
+            {
+                var candle = candles[k];
+                var weekStart = GetWeekStart(candle.Time);
+
+                if (current == null || current.WeekStart != weekStart)
+                {
+                    if (current != null)
+                        result.Add(current);
+
+                    current = new WeeklyBar
+                    {
+                        WeekStart = weekStart,
+                        Open = candle.Open,
+                        High = candle.High,
+                        Low = candle.Low,
+                        Close = candle.Close
+                    };
+                }
+                else
+                {
+                    if (candle.High > current.High)
+                        current.High = candle.High;
+
+                    if (candle.Low < current.Low)
+                        current.Low = candle.Low;
+
+                    current.Close = candle.Close;
+                }
+            }
+
+            if (current != null)
+                result.Add(current);
+
+            return result;
+        }
+
+        private static DateTime GetWeekStart(DateTime time)
+        {
+            var date = time.Date;
+            int diff = ((int)date.DayOfWeek + 6) % 7; // Monday = 0
+            return date.AddDays(-diff);
         }
 
         public FeatureSet CalculateLast(List<Candle> candles)
         {
             return Calculate(candles, candles.Count);
+        }
+
+        private static decimal CalcDailyRSI14(List<Candle> candles, int i)
+        {
+            const int rsiLength = 14;
+
+            if (i <= 0 || i > candles.Count)
+                return 0m;
+
+            var dailyCloses = new List<decimal>();
+            DateTime? currentDay = null;
+
+            for (int k = 0; k < i; k++)
+            {
+                var candle = candles[k];
+                var day = candle.Time.Date;
+
+                if (currentDay == null || currentDay.Value != day)
+                {
+                    dailyCloses.Add(candle.Close);
+                    currentDay = day;
+                }
+                else
+                {
+                    dailyCloses[^1] = candle.Close;
+                }
+            }
+
+            if (dailyCloses.Count < rsiLength + 1)
+                return 0m;
+
+            decimal gainSum = 0m;
+            decimal lossSum = 0m;
+
+            int start = dailyCloses.Count - rsiLength;
+
+            for (int k = start; k < dailyCloses.Count; k++)
+            {
+                var change = dailyCloses[k] - dailyCloses[k - 1];
+
+                if (change > 0)
+                    gainSum += change;
+                else
+                    lossSum -= change;
+            }
+
+            var avgGain = gainSum / rsiLength;
+            var avgLoss = lossSum / rsiLength;
+
+            if (avgLoss == 0m)
+                return 100m;
+
+            var rs = avgGain / avgLoss;
+
+            return 100m - (100m / (1m + rs));
+        }
+
+        private static decimal CalcDailyPullback10d(List<Candle> candles, int i)
+        {
+            const int days = 10;
+
+            if (i <= 0 || i > candles.Count)
+                return 0m;
+
+            var dailyBars = BuildDailyBars(candles, i);
+
+            if (dailyBars.Count == 0)
+                return 0m;
+
+            int start = Math.Max(0, dailyBars.Count - days);
+
+            decimal highest = decimal.MinValue;
+
+            for (int k = start; k < dailyBars.Count; k++)
+            {
+                var high = dailyBars[k].High;
+
+                if (high > highest)
+                    highest = high;
+            }
+
+            if (highest <= 0m)
+                return 0m;
+
+            var close = dailyBars[^1].Close;
+
+            return (close - highest) / highest * 100m;
+        }
+
+        private static List<(DateTime Day, decimal High, decimal Close)> BuildDailyBars(List<Candle> candles, int i)
+        {
+            var result = new List<(DateTime Day, decimal High, decimal Close)>();
+
+            DateTime? currentDay = null;
+            decimal dayHigh = 0m;
+            decimal dayClose = 0m;
+
+            for (int k = 0; k < i; k++)
+            {
+                var candle = candles[k];
+                var day = candle.Time.Date;
+
+                if (currentDay == null || currentDay.Value != day)
+                {
+                    if (currentDay != null)
+                        result.Add((currentDay.Value, dayHigh, dayClose));
+
+                    currentDay = day;
+                    dayHigh = candle.High;
+                    dayClose = candle.Close;
+                }
+                else
+                {
+                    if (candle.High > dayHigh)
+                        dayHigh = candle.High;
+
+                    dayClose = candle.Close;
+                }
+            }
+
+            if (currentDay != null)
+                result.Add((currentDay.Value, dayHigh, dayClose));
+
+            return result;
+        }
+
+        private static decimal CalcDailyTrendPosition(List<Candle> candles, int i)
+        {
+            const int length = 50;
+
+            if (i <= 0 || i > candles.Count)
+                return 1m;
+
+            var dailyCloses = BuildDailyCloses(candles, i);
+
+            if (dailyCloses.Count < length)
+                return 1m;
+
+            decimal sum = 0m;
+
+            for (int k = dailyCloses.Count - length; k < dailyCloses.Count; k++)
+                sum += dailyCloses[k];
+
+            var sma = sum / length;
+
+            if (sma == 0m)
+                return 1m;
+
+            var close = dailyCloses[^1];
+
+            return close / sma;
+        }
+
+        private static List<decimal> BuildDailyCloses(List<Candle> candles, int i)
+        {
+            var result = new List<decimal>();
+            DateTime? currentDay = null;
+
+            for (int k = 0; k < i; k++)
+            {
+                var candle = candles[k];
+                var day = candle.Time.Date;
+
+                if (currentDay == null || currentDay.Value != day)
+                {
+                    result.Add(candle.Close);
+                    currentDay = day;
+                }
+                else
+                {
+                    result[^1] = candle.Close;
+                }
+            }
+
+            return result;
         }
 
         private static decimal CalcBBMidSignedDistancePct(List<Candle> candles, int i, int length = 20, decimal stdDevMult = 2m)
@@ -348,6 +695,79 @@ namespace IbSwingTrader.Analysis
                 return 1;
 
             return candles[i - 1].Close / ma;
+        }
+
+        private static List<MacdPoint> BuildMacdSeries(
+            List<decimal> closes,
+            int fast = 12,
+            int slow = 26,
+            int signalLen = 9)
+        {
+            var result = new List<MacdPoint>();
+
+            if (closes.Count == 0)
+                return result;
+
+            decimal fastMultiplier = 2m / (fast + 1);
+            decimal slowMultiplier = 2m / (slow + 1);
+            decimal signalMultiplier = 2m / (signalLen + 1);
+
+            decimal emaFast = closes[0];
+            decimal emaSlow = closes[0];
+            decimal signal = 0m;
+            bool signalInitialized = false;
+
+            for (int k = 0; k < closes.Count; k++)
+            {
+                var close = closes[k];
+
+                if (k == 0)
+                {
+                    emaFast = close;
+                    emaSlow = close;
+                }
+                else
+                {
+                    emaFast = ((close - emaFast) * fastMultiplier) + emaFast;
+                    emaSlow = ((close - emaSlow) * slowMultiplier) + emaSlow;
+                }
+
+                var macd = emaFast - emaSlow;
+
+                if (!signalInitialized)
+                {
+                    signal = macd;
+                    signalInitialized = true;
+                }
+                else
+                {
+                    signal = ((macd - signal) * signalMultiplier) + signal;
+                }
+
+                result.Add(new MacdPoint
+                {
+                    Macd = macd,
+                    Signal = signal
+                });
+            }
+
+            return result;
+        }
+
+        private sealed class WeeklyBar
+        {
+            public DateTime WeekStart { get; set; }
+            public decimal Open { get; set; }
+            public decimal High { get; set; }
+            public decimal Low { get; set; }
+            public decimal Close { get; set; }
+        }
+
+        private sealed class MacdPoint
+        {
+            public decimal Macd { get; set; }
+            public decimal Signal { get; set; }
+            public decimal Histogram => Macd - Signal;
         }
     }
 }
