@@ -4,9 +4,9 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
-    public class CandidateResultWriter(string file = "candidates.json") : ICandidateResultWriter
+    public class CandidateResultWriter() : ICandidateResultWriter
     {
-        private readonly string _file = file;
+        private readonly string _file = $"candidates_{DateTime.UtcNow:yyyyMMdd_HHmm}.json";
         private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
         public async Task WriteAsync(List<CandidateDetails> candidates)
@@ -25,11 +25,11 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             Write(ConsoleColor.Gray, $"{c.Ticker} ");
 
-            Write(ConsoleColor.DarkGray, $"{c.EntryPrice:F2} ");
+            Write(ConsoleColor.DarkYellow, $"{c.EntryPrice:F2} ");
 
             Write(ConsoleColor.DarkGreen, $"{c.ExitPrice:F2} ");
 
-            Write(ConsoleColor.DarkYellow, $"{c.StopLoss:F2} ");
+            Write(ConsoleColor.DarkRed, $"{c.StopLoss:F2} ");
 
             Write(ConsoleColor.Green, $"{c.ProfitPercent:+0.00;-0.00}%");
 
