@@ -5,10 +5,10 @@
         string LocationCode { get; }
         string ScanCode { get; }
 
-        decimal MinPrice { get; }
-        decimal MaxPrice { get; }
+        double MinPrice { get; }
+        double MaxPrice { get; }
 
-        decimal MinMarketCap { get; }
-        long MinAvgVolume { get; }
+        double MinMarketCap { get; }
+        int MinAvgVolume { get; }
     }
 }

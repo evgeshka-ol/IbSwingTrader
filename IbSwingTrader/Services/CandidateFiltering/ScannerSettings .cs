@@ -6,13 +6,16 @@ namespace IbSwingTrader.Services.CandidateFiltering
     {
         public string LocationCode { get; set; } = "STK.US.MAJOR";
 
-        public string ScanCode { get; set; } = "TOP_PERC_GAIN";
+        // Было TOP_PERC_GAIN
+        public string ScanCode { get; set; } = "TOP_PERC_LOSE";
 
-        public decimal MinPrice { get; set; } = 5m;
-        public decimal MaxPrice { get; set; } = 200m;
+        public double MinPrice { get; set; } = 5;
+        public double MaxPrice { get; set; } = 200;
 
-        public decimal MinMarketCap { get; set; } = 1_000_000_000m;
+        // Пока market cap лучше не передавать в scanner filter,
+        // он у тебя уже давал disabled.
+        public double MinMarketCap { get; set; } = 1_000_000_000;
 
-        public long MinAvgVolume { get; set; } = 1_000_000;
+        public int MinAvgVolume { get; set; } = 1_000_000;
     }
 }
