@@ -37,6 +37,14 @@
         public decimal MaxDrawdown1d { get; set; }
         public decimal MaxDrawdown2d { get; set; }
 
+        public decimal BBPositionCentered { get; set; }
+        public decimal BBMidSignedDistancePct { get; set; }
+        public bool IsBelowBBMid { get; set; }
+        public decimal DistanceToBBLowerPct { get; set; }
+
+        public decimal MACDHistDelta { get; set; }
+        public bool MACDHistImproving { get; set; }
+
         // --- targets ---
         public bool Target10pct1d { get; set; }
         public bool Target10pct2d { get; set; }
