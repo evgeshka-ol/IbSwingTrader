@@ -8,13 +8,15 @@ namespace IbSwingTrader.Analysis
     public class TradeDatasetBuilder(
         IFeatureEngine featureEngine,
         ICandidateScore candidateScore,
-        IFutureStatsCalculator futureStatsCalculator) : ITradeDatasetBuilder
+        IFutureStatsCalculator futureStatsCalculator,
+        ITextLogger logger) : ITradeDatasetBuilder
     {
         private static readonly int[] EntryShifts = { -12, -9, -6, -3, 0 };
 
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly IFutureStatsCalculator _futureStatsCalculator = futureStatsCalculator;
+        private readonly ITextLogger _logger = logger;
 
         public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
@@ -28,12 +30,25 @@ namespace IbSwingTrader.Analysis
 
                 var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
+                // вход раньше первой свечи
+                if (entryIndexReal < 0)
+                {
+                    _logger.Info($"Trade {t}: Entry time {trade.EntryTimeUtc} is before first candle {candles[0].Time}");
+                    continue;
+                }
+
                 // нужен warmup для индикаторов
                 if (entryIndexReal < 60)
+                {
+                    _logger.Info($"Trade {t}: Entry index {entryIndexReal} is too early for indicator warmup");
                     continue;
+                }
 
                 if (entryIndexReal >= candles.Count - 20)
+                {
+                    _logger.Info($"Trade {t}: Entry index {entryIndexReal} is too late, not enough future bars");
                     continue;
+                }
 
                 var candlePriceReal = candles[entryIndexReal].Close;
                 var splitFactor = DetectSplitFactor(trade.EntryPrice, candlePriceReal);
@@ -42,19 +57,36 @@ namespace IbSwingTrader.Analysis
                 {
                     int entryIndex = entryIndexReal + shift;
 
-                    if (entryIndex < 60)
+                    if (entryIndex < 0)
+                    {
+                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} before first candle");
                         continue;
+                    }
+
+                    if (entryIndex < 60)
+                    {
+                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} too early for indicator warmup");
+                        continue;
+                    }
 
                     if (entryIndex >= candles.Count - 20)
                         continue;
 
-                    var entryTime = candles[entryIndex].Time;
+                    var entryTime = shift == 0
+                        ? trade.EntryTimeUtc
+                        : candles[entryIndex].Time;
 
                     if (entryTime >= trade.ExitTimeUtc)
+                    {
+                        _logger.Info($"Trade {t}: Shift {shift} leads to entry time {entryTime} after exit time {trade.ExitTimeUtc}");
                         continue;
+                    }
 
                     if ((trade.ExitTimeUtc - entryTime).TotalHours < 4)
+                    {
+                        _logger.Info($"Trade {t}: Shift {shift} leads to hold time {(trade.ExitTimeUtc - entryTime).TotalHours} hours, less than 4 hours");
                         continue;
+                    }
 
                     decimal entryPrice = shift == 0
                         ? trade.EntryPrice / splitFactor
@@ -81,12 +113,14 @@ namespace IbSwingTrader.Analysis
                         EntryShiftBars = shift
                     };
 
-                    // FEATURES
                     CalculateFeatures(row, candles, entryIndex);
 
-                    // TARGET требует future
                     if (!HasFutureBars(candles, entryIndex))
+                    {
+                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} with insufficient future bars");
                         continue;
+                    }
+
                     _futureStatsCalculator.Calculate(row, candles, entryIndex);
 
                     rows.Add(row);
@@ -120,13 +154,13 @@ namespace IbSwingTrader.Analysis
             {
                 int mid = left + ((right - left) >> 1);
 
-                if (candles[mid].Time < entryTime)
+                if (candles[mid].Time <= entryTime)
                     left = mid + 1;
                 else
                     right = mid - 1;
             }
 
-            return left;
+            return right;
         }
 
         private void CalculateFeatures(

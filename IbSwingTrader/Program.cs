@@ -72,7 +72,7 @@ static Services ConfigureServices()
     {
         Logger = logger,
         Connection = connection,
-        DatasetBuilder = new TradeDatasetBuilder(featureEngine, candidateScore, new FutureStatsCalculator()),
+        DatasetBuilder = new TradeDatasetBuilder(featureEngine, candidateScore, new FutureStatsCalculator(), logger),
         CsvWriter = new CsvDatasetWriter(),
         ContractResolver = contractResolver,
         HistoricalService = historicalService,
