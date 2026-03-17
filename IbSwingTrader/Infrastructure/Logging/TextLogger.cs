@@ -55,9 +55,9 @@ namespace IbSwingTrader.Infrastructure.Logging
 
                     Console.WriteLine(line);
                     Console.ForegroundColor = oldColor;
-                }
 
-                File.AppendAllText(_filePath, $"{DateTime.UtcNow:O} {line}{Environment.NewLine}");
+                    File.AppendAllText(_filePath, $"{DateTime.UtcNow:O} {line}{Environment.NewLine}");
+                }
             }
         }
 
