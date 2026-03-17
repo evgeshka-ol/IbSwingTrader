@@ -142,7 +142,6 @@ async Task RunBuildDataset(string[] args, Services services)
     services.Logger.EmptyLine();
     services.Logger.Info($"Failed requests: {failedRequests.Count}");
 
-
     services.Logger.EmptyLine();
     var failedTable = FailedHistoryRequestTableFormatter.Format(failedRequests);
     services.Logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
@@ -167,12 +166,18 @@ async Task RunBuildDataset(string[] args, Services services)
             var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
             var latest = tickerTrades.Max(t => t.ExitTimeUtc);
 
+            // Слева запас под warmup / индикаторы
             var start = earliest.AddDays(-120);
+
+            // Справа запас под future bars / target
+            var end = latest.AddDays(21);
 
             services.Logger.EmptyLine();
             services.Logger.Info($"Ticker: {originalTicker}");
             services.Logger.Info($"Trades: {tickerTrades.Count}");
-            services.Logger.Info($"Range: {start:yyyy-MM-dd} -> {latest:yyyy-MM-dd}");
+            services.Logger.Info(
+                $"Range: {start:yyyy-MM-dd} -> {end:yyyy-MM-dd} " +
+                $"(last trade exit: {latest:yyyy-MM-dd})");
 
             Contract contract;
 
@@ -208,7 +213,7 @@ async Task RunBuildDataset(string[] args, Services services)
                     contract,
                     Timeframe.H4,
                     start,
-                    latest);
+                    end);
             }
             catch (Exception ex)
             {
@@ -257,6 +262,7 @@ async Task RunBuildDataset(string[] args, Services services)
             try
             {
                 rows = services.DatasetBuilder.Build(tickerTrades, candles);
+
                 if (rows.Count == 0)
                 {
                     var problem = "No dataset rows built";
