@@ -2,12 +2,17 @@
 {
     public class StockInfo
     {
-        public required string Ticker { get; set; }
+        public string Ticker { get; set; } = "";
+        public int ConId { get; set; }
+        public string Exchange { get; set; } = "";
+        public string Currency { get; set; } = "";
+        public string TradingClass { get; set; } = "";
+        public int Rank { get; set; }
 
-        public decimal Price { get; set; }
-
-        public decimal MarketCap { get; set; }
-
-        public long AvgVolume20 { get; set; }
+        // Эти поля пока будут заполняться позже, после истории
+        public decimal EntryPrice { get; set; }
+        public decimal ExitPrice { get; set; }
+        public decimal StopLoss { get; set; }
+        public string? StockType { get; internal set; }
     }
 }
