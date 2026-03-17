@@ -1,4 +1,5 @@
-﻿using IBApi;
+﻿using System.Collections.Concurrent;
+using IBApi;
 using IbSwingTrader.Analysis;
 using IbSwingTrader.Commands;
 using IbSwingTrader.Infrastructure.Bootstrap;
@@ -66,20 +67,20 @@ static Services ConfigureServices()
 
     var featureEngine = new FeatureEngine();
     var candidateScore = new CandidateScore();
-
+    var contractResolver = new TwsContractResolver(connection, logger);
     return new Services
     {
         Logger = logger,
         Connection = connection,
         DatasetBuilder = new TradeDatasetBuilder(featureEngine, candidateScore, new FutureStatsCalculator()),
         CsvWriter = new CsvDatasetWriter(),
-        ContractResolver = new TwsContractResolver(connection, logger),
+        ContractResolver = contractResolver,
         HistoricalService = historicalService,
         GetCandidatesCommand = new GetCandidatesCommand(
             new CandidateFinder(
                 new TwsStockUniverseProvider(connection, new ScannerSettings()),
                 new StockPreFilter(),
-                new TwsContractResolver(connection, logger),
+                contractResolver,
                 provider,
                 featureEngine,
                 new CandidateFilter(),
@@ -120,6 +121,7 @@ async Task RunBuildDataset(string[] args, Services services)
     await services.Connection.Ready.Task;
 
     var semaphore = new SemaphoreSlim(3);
+    var failedRequests = new ConcurrentBag<FailedHistoryRequest>();
 
     var tasks = new List<Task<List<TradeDatasetRow>>>();
 
@@ -136,6 +138,14 @@ async Task RunBuildDataset(string[] args, Services services)
     services.CsvWriter.Write(datasetPath, allRows);
 
     services.Logger.Info($"Dataset saved: {datasetPath}");
+
+    services.Logger.EmptyLine();
+    services.Logger.Info($"Failed requests: {failedRequests.Count}");
+
+
+    services.Logger.EmptyLine();
+    var failedTable = FailedHistoryRequestTableFormatter.Format(failedRequests);
+    services.Logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
 
     async Task<List<TradeDatasetRow>> ProcessTicker(IGrouping<string, TradeRecord> g)
     {
@@ -177,7 +187,15 @@ async Task RunBuildDataset(string[] args, Services services)
             }
             catch (Exception ex)
             {
-                services.Logger.Error($"Failed to resolve contract for {requestTicker}: {ex.Message}");
+                var problem = $"Failed to resolve contract: {ex.Message}";
+                services.Logger.Error($"{originalTicker}: {problem}");
+
+                failedRequests.Add(new FailedHistoryRequest
+                {
+                    Ticker = originalTicker,
+                    Problem = problem
+                });
+
                 return [];
             }
 
@@ -194,17 +212,79 @@ async Task RunBuildDataset(string[] args, Services services)
             }
             catch (Exception ex)
             {
-                services.Logger.Error($"Failed to load candles for {requestTicker}: {ex.Message}");
+                var problem = $"Failed to load candles: {ex.Message}";
+                services.Logger.Error($"{originalTicker}: {problem}");
+
+                failedRequests.Add(new FailedHistoryRequest
+                {
+                    Ticker = originalTicker,
+                    Problem = problem
+                });
+
                 return [];
             }
 
             if (candles == null || candles.Count == 0)
             {
-                services.Logger.Info($"Skipping {originalTicker} — no market data");
+                var problem = "No market data";
+                services.Logger.Info($"Skipping {originalTicker} — {problem}");
+
+                failedRequests.Add(new FailedHistoryRequest
+                {
+                    Ticker = originalTicker,
+                    Problem = problem
+                });
+
                 return [];
             }
 
-            var rows = services.DatasetBuilder.Build(tickerTrades, candles);
+            if (candles.Count < 60)
+            {
+                var problem = $"Not enough candles: {candles.Count}";
+                services.Logger.Info($"Skipping {originalTicker} — {problem}");
+
+                failedRequests.Add(new FailedHistoryRequest
+                {
+                    Ticker = originalTicker,
+                    Problem = problem
+                });
+
+                return [];
+            }
+
+            List<TradeDatasetRow> rows;
+
+            try
+            {
+                rows = services.DatasetBuilder.Build(tickerTrades, candles);
+                if (rows.Count == 0)
+                {
+                    var problem = "No dataset rows built";
+
+                    services.Logger.Info($"Skipping {originalTicker} — {problem}");
+
+                    failedRequests.Add(new FailedHistoryRequest
+                    {
+                        Ticker = originalTicker,
+                        Problem = problem
+                    });
+
+                    return [];
+                }
+            }
+            catch (Exception ex)
+            {
+                var problem = $"Dataset build failed: {ex.Message}";
+                services.Logger.Error($"{originalTicker}: {problem}");
+
+                failedRequests.Add(new FailedHistoryRequest
+                {
+                    Ticker = originalTicker,
+                    Problem = problem
+                });
+
+                return [];
+            }
 
             services.Logger.Info($"Rows built for {originalTicker}: {rows.Count}");
 
