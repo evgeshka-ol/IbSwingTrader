@@ -14,6 +14,7 @@ namespace IbSwingTrader.MarketData.IB
         private readonly ITextLogger _logger;
         private EReader? _reader;
 
+        private readonly SemaphoreSlim _historicalGate = new(3, 3);
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
 
@@ -68,50 +69,36 @@ namespace IbSwingTrader.MarketData.IB
             DateTime endTimeUtc,
             int bars)
         {
-            _logger.Info("GetCandles called");
+            await _historicalGate.WaitAsync();
 
-            var reqId = Interlocked.Increment(ref _nextRequestId);
-
-            _logger.Info($"Sending reqHistoricalData for contract {contract.Symbol}: request={reqId}, end time = {endTimeUtc.ToIbEndTime()}");
-            _logger.Info($"time frame: {timeframe}, IB format: {timeframe.ToIBBarSize()}");
-
-            var tcs = new TaskCompletionSource<List<Candle>>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-
-            _buffers[reqId] = [];
-            _requests[reqId] = tcs;
-
-            await WaitForConnectionAsync();
-
-            Client.reqHistoricalData(
-                reqId,
-                contract,
-                endTimeUtc.ToIbEndTime(),
-                timeframe.ToIBDuration(bars),
-                timeframe.ToIBBarSize(),
-                "TRADES",
-                0,
-                1,
-                false,
-                null);
-
-            _logger.Info($"REQ {reqId} waiting for candles");
-
-            var completed = await Task.WhenAny(
-                tcs.Task,
-                Task.Delay(TimeSpan.FromSeconds(30)));
-
-            if (completed != tcs.Task)
+            try
             {
-                _logger.Error($"REQ {reqId} TIMEOUT");
+                for (int attempt = 1; attempt <= 2; attempt++)
+                {
+                    var result = await RequestHistoricalDataOnce(
+                        contract,
+                        timeframe,
+                        endTimeUtc,
+                        bars,
+                        attempt);
 
-                _buffers.TryRemove(reqId, out _);
-                _requests.TryRemove(reqId, out _);
+                    if (result.Count > 0)
+                        return result;
+
+                    if (attempt < 2)
+                    {
+                        _logger.Info($"Historical retry {attempt} for {contract.Symbol}");
+
+                        await Task.Delay(TimeSpan.FromSeconds(2 * attempt));
+                    }
+                }
 
                 return [];
             }
-
-            return await tcs.Task;
+            finally
+            {
+                _historicalGate.Release();
+            }
         }
 
         public Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
@@ -179,6 +166,99 @@ namespace IbSwingTrader.MarketData.IB
             return await tcs.Task;
         }
 
+        private async Task<List<Candle>> RequestHistoricalDataOnce(
+            IBApi.Contract contract,
+            Timeframe timeframe,
+            DateTime endTimeUtc,
+            int bars,
+            int attempt)
+        {
+            _logger.Info(
+                $"GetCandles called for {contract.Symbol}, attempt {attempt}");
+
+            var reqId = Interlocked.Increment(ref _nextRequestId);
+
+            var endTime = endTimeUtc.ToIbEndTime();
+            var duration = timeframe.ToIBDuration(bars);
+            var barSize = timeframe.ToIBBarSize();
+            var timeout = GetHistoricalTimeout(timeframe, bars);
+
+            _logger.Info(
+                $"Sending reqHistoricalData: symbol={contract.Symbol}, reqId={reqId}, end={endTime}, duration={duration}, barSize={barSize}, timeout={timeout.TotalSeconds}s");
+
+            var tcs = new TaskCompletionSource<List<Candle>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _buffers[reqId] = [];
+            _requests[reqId] = tcs;
+
+            try
+            {
+                await WaitForConnectionAsync();
+
+                Client.reqHistoricalData(
+                    reqId,
+                    contract,
+                    endTime,
+                    duration,
+                    barSize,
+                    "TRADES",
+                    0,
+                    1,
+                    false,
+                    null);
+
+                _logger.Info($"REQ {reqId} waiting for candles");
+
+                var completed = await Task.WhenAny(
+                    tcs.Task,
+                    Task.Delay(timeout));
+
+                if (completed != tcs.Task)
+                {
+                    _logger.Error(
+                        $"REQ {reqId} TIMEOUT: symbol={contract.Symbol}, duration={duration}, barSize={barSize}");
+
+                    try
+                    {
+                        Client.cancelHistoricalData(reqId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"REQ {reqId} cancelHistoricalData failed: {ex.Message}");
+                    }
+
+                    return [];
+                }
+
+                var result = await tcs.Task;
+
+                _logger.Info(
+                    $"REQ {reqId} completed: symbol={contract.Symbol}, candles={result.Count}");
+
+                return result;
+            }
+            finally
+            {
+                _buffers.TryRemove(reqId, out _);
+                _requests.TryRemove(reqId, out _);
+            }
+        }
+
+        private static TimeSpan GetHistoricalTimeout(Timeframe timeframe, int bars)
+        {
+            if (timeframe == Timeframe.H4 && bars >= 300)
+                return TimeSpan.FromSeconds(45);
+
+            if (bars >= 300)
+                return TimeSpan.FromSeconds(40);
+
+            if (bars >= 100)
+                return TimeSpan.FromSeconds(30);
+
+            return TimeSpan.FromSeconds(20);
+        }
+
         private async Task WaitForConnectionAsync()
         {
             if (Client.IsConnected() && _ibConnected)
@@ -191,6 +271,9 @@ namespace IbSwingTrader.MarketData.IB
             }
 
             await Ready.Task;
+
+            // Небольшая пауза после готовности, чтобы фермы успели стабилизироваться
+            await Task.Delay(1500);
         }
 
         // ---- EWrapper methods ----
