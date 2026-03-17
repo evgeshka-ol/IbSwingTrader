@@ -142,20 +142,27 @@ namespace IbSwingTrader.MarketData.IB
             _scannerRequests[requestId] = tcs;
             _scannerResults[requestId] = [];
 
-            Client.reqScannerSubscription(
-                requestId,
-                subscription,
-                [],
-                []);
+            _logger.Info($"Scanner request: {subscription.Instrument} {subscription.LocationCode} {subscription.ScanCode}");
 
-            var result = await tcs.Task;
+            try
+            {
+                Client.reqScannerSubscription(
+                    requestId,
+                    subscription,
+                    null,
+                    filters);
 
-            Client.cancelScannerSubscription(requestId);
+                var result = await tcs.Task;
+                _logger.Info($"Scanner completed. Items received: {result.Count}");
+                return result;
+            }
+            finally
+            {
+                Client.cancelScannerSubscription(requestId);
 
-            _scannerRequests.TryRemove(requestId, out _);
-            _scannerResults.TryRemove(requestId, out _);
-
-            return result;
+                _scannerRequests.TryRemove(requestId, out _);
+                _scannerResults.TryRemove(requestId, out _);
+            }
         }
 
         public async Task<string> RequestScannerParametersAsync()
@@ -217,12 +224,15 @@ namespace IbSwingTrader.MarketData.IB
 
                 case 1101:
                 case 1102:
+                    isError = false;
+                    header = "IB VERY LONG INFO";
                     _ibConnected = true;
                     _logger.Info("IB connection restored");
                     break;
                 case 2104:
                 case 2106:
                 case 2158:
+                case 165:
                     isError = false;
                     header = "IB VERY LONG INFO";
                     break;
@@ -489,10 +499,16 @@ namespace IbSwingTrader.MarketData.IB
 
             var stock = new StockInfo
             {
-                Ticker = contract.Symbol,
+                Ticker = contract.Symbol ?? "",
+                ConId = contract.ConId,
+                Exchange = contract.Exchange ?? "",
+                Currency = contract.Currency ?? "",
+                TradingClass = contract.TradingClass ?? "",
+                StockType = contract.SecType ?? "",
+                Rank = rank
             };
 
-            if (!list.Any(x => x.Ticker == contract.Symbol))
+            if (!list.Any(x => x.Ticker == stock.Ticker))
                 list.Add(stock);
         }
 
