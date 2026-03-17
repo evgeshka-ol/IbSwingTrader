@@ -22,8 +22,10 @@
         public decimal DailyRSI14 { get; set; }
 
         // --- weekly context ---
-        public decimal WeeklyTrendPosition { get; set; }
-        public bool WeeklyUptrend { get; set; }
+        public decimal? WeeklyTrendPosition { get; set; }
+        public decimal? WeeklyBBMidSlopePct { get; set; }
+        public decimal? WeeklyMACDHistDelta { get; set; }
+        public decimal? WeeklyMACDLineMinusSignal { get; set; }
 
         // --- future movement ---
         public decimal FutureHigh1d { get; set; }

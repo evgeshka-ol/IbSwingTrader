@@ -193,7 +193,9 @@ namespace IbSwingTrader.Analysis
             row.DailyRSI14 = CalcDailyRSI14(candles, i);
 
             row.WeeklyTrendPosition = CalcWeeklyTrendPosition(candles, i);
-            row.WeeklyUptrend = row.WeeklyTrendPosition > 1m;
+            row.WeeklyBBMidSlopePct = CalcWeeklyBBMidSlopePct(candles, i);
+            row.WeeklyMACDHistDelta = CalcWeeklyMACDHistDelta(candles, i);
+            row.WeeklyMACDLineMinusSignal = CalcWeeklyMACDLineMinusSignal(candles, i);
 
             row.DistanceTo20dHigh = featureSet.DistanceTo20dHigh;
             row.DistanceTo52wHigh = featureSet.DistanceTo52wHigh;
@@ -232,7 +234,7 @@ namespace IbSwingTrader.Analysis
                 }
                 else
                 {
-                    dailyCloses[dailyCloses.Count - 1] = candle.Close;
+                    dailyCloses[^1] = candle.Close;
                 }
             }
 
@@ -324,17 +326,17 @@ namespace IbSwingTrader.Analysis
             return (close - highest) / highest * 100m;
         }
 
-        private static decimal CalcWeeklyTrendPosition(List<Candle> candles, int i)
+        private static decimal? CalcWeeklyTrendPosition(List<Candle> candles, int i)
         {
             const int length = 20;
 
             if (i <= 0 || i > candles.Count)
-                return 1m;
+                return null;
 
             var weeklyCloses = BuildWeeklyCloses(candles, i);
 
             if (weeklyCloses.Count < length)
-                return 1m;
+                return null;
 
             decimal sum = 0m;
 
@@ -344,11 +346,82 @@ namespace IbSwingTrader.Analysis
             var sma = sum / length;
 
             if (sma == 0m)
-                return 1m;
+                return null;
 
             var close = weeklyCloses[^1];
 
             return close / sma;
+        }
+
+        private static decimal? CalcWeeklyBBMidSlopePct(
+            List<Candle> candles,
+            int i,
+            int length = 20,
+            int lookbackBars = 1)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count < length + lookbackBars)
+                return null;
+
+            decimal currentSum = 0m;
+            for (int k = weeklyCloses.Count - length; k < weeklyCloses.Count; k++)
+                currentSum += weeklyCloses[k];
+
+            var currentMid = currentSum / length;
+
+            int prevEndExclusive = weeklyCloses.Count - lookbackBars;
+            int prevStart = prevEndExclusive - length;
+
+            decimal prevSum = 0m;
+            for (int k = prevStart; k < prevEndExclusive; k++)
+                prevSum += weeklyCloses[k];
+
+            var prevMid = prevSum / length;
+
+            if (prevMid == 0m)
+                return null;
+
+            return (currentMid - prevMid) / prevMid * 100m;
+        }
+
+        private static decimal? CalcWeeklyMACDHistDelta(List<Candle> candles, int i)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count < 2)
+                return null;
+
+            var macdSeries = BuildMacdSeries(weeklyCloses);
+
+            if (macdSeries.Count < 2)
+                return null;
+
+            return macdSeries[^1].Histogram - macdSeries[^2].Histogram;
+        }
+
+        private static decimal? CalcWeeklyMACDLineMinusSignal(List<Candle> candles, int i)
+        {
+            if (i <= 0 || i > candles.Count)
+                return null;
+
+            var weeklyCloses = BuildWeeklyCloses(candles, i);
+
+            if (weeklyCloses.Count == 0)
+                return null;
+
+            var macdSeries = BuildMacdSeries(weeklyCloses);
+
+            if (macdSeries.Count == 0)
+                return null;
+
+            return macdSeries[^1].Macd - macdSeries[^1].Signal;
         }
 
         private static List<decimal> BuildDailyCloses(List<Candle> candles, int i)
@@ -414,33 +487,134 @@ namespace IbSwingTrader.Analysis
 
         private static List<decimal> BuildWeeklyCloses(List<Candle> candles, int i)
         {
-            var result = new List<decimal>();
+            var weeklyBars = BuildWeeklyBars(candles, i);
 
-            var calendar = System.Globalization.CultureInfo.InvariantCulture.Calendar;
-            int? currentYear = null;
-            int? currentWeek = null;
+            var closes = new List<decimal>(weeklyBars.Count);
+
+            for (int k = 0; k < weeklyBars.Count; k++)
+                closes.Add(weeklyBars[k].Close);
+
+            return closes;
+        }
+
+        private static List<WeeklyBar> BuildWeeklyBars(List<Candle> candles, int i)
+        {
+            var result = new List<WeeklyBar>();
+
+            WeeklyBar? current = null;
 
             for (int k = 0; k < i; k++)
             {
                 var candle = candles[k];
-                var time = candle.Time;
+                var weekStart = GetWeekStart(candle.Time);
 
-                int year = time.Year;
-                int week = calendar.GetWeekOfYear(
-                    time,
-                    System.Globalization.CalendarWeekRule.FirstFourDayWeek,
-                    DayOfWeek.Monday);
-
-                if (currentYear == null || currentWeek == null || currentYear.Value != year || currentWeek.Value != week)
+                if (current == null || current.WeekStart != weekStart)
                 {
-                    result.Add(candle.Close);
-                    currentYear = year;
-                    currentWeek = week;
+                    if (current != null)
+                        result.Add(current);
+
+                    current = new WeeklyBar
+                    {
+                        WeekStart = weekStart,
+                        Open = candle.Open,
+                        High = candle.High,
+                        Low = candle.Low,
+                        Close = candle.Close
+                    };
                 }
                 else
                 {
-                    result[^1] = candle.Close;
+                    if (candle.High > current.High)
+                        current.High = candle.High;
+
+                    if (candle.Low < current.Low)
+                        current.Low = candle.Low;
+
+                    current.Close = candle.Close;
                 }
+            }
+
+            if (current != null)
+                result.Add(current);
+
+            return result;
+        }
+
+        private static DateTime GetWeekStart(DateTime time)
+        {
+            var date = time.Date;
+            int diff = ((int)date.DayOfWeek + 6) % 7; // Monday = 0
+            return date.AddDays(-diff);
+        }
+
+        private sealed class WeeklyBar
+        {
+            public DateTime WeekStart { get; set; }
+            public decimal Open { get; set; }
+            public decimal High { get; set; }
+            public decimal Low { get; set; }
+            public decimal Close { get; set; }
+        }
+
+        private sealed class MacdPoint
+        {
+            public decimal Macd { get; set; }
+            public decimal Signal { get; set; }
+            public decimal Histogram => Macd - Signal;
+        }
+
+        private static List<MacdPoint> BuildMacdSeries(
+            List<decimal> closes,
+            int fast = 12,
+            int slow = 26,
+            int signalLen = 9)
+        {
+            var result = new List<MacdPoint>();
+
+            if (closes.Count == 0)
+                return result;
+
+            decimal fastMultiplier = 2m / (fast + 1);
+            decimal slowMultiplier = 2m / (slow + 1);
+            decimal signalMultiplier = 2m / (signalLen + 1);
+
+            decimal emaFast = closes[0];
+            decimal emaSlow = closes[0];
+            decimal signal = 0m;
+            bool signalInitialized = false;
+
+            for (int k = 0; k < closes.Count; k++)
+            {
+                var close = closes[k];
+
+                if (k == 0)
+                {
+                    emaFast = close;
+                    emaSlow = close;
+                }
+                else
+                {
+                    emaFast = ((close - emaFast) * fastMultiplier) + emaFast;
+                    emaSlow = ((close - emaSlow) * slowMultiplier) + emaSlow;
+                }
+
+                var macd = emaFast - emaSlow;
+
+                if (!signalInitialized)
+                {
+                    signal = macd;
+                    signalInitialized = true;
+                }
+                else
+                {
+                    signal = ((macd - signal) * signalMultiplier) + signal;
+                }
+
+                result.Add(new MacdPoint
+                {
+                    Macd = macd,
+                    Signal = signal
+                });
             }
 
             return result;
