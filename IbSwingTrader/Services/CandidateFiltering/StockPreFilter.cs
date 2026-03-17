@@ -5,19 +5,27 @@ namespace IbSwingTrader.Services.CandidateFiltering
 {
     public class StockPreFilter : IStockPreFilter
     {
-        public decimal MinDollarVolume { get; set; } = 10_000_000m;
-
-        public decimal MinMarketCap { get; set; } = 300_000_000m;
-
         public bool Pass(StockInfo stock)
         {
-            var dollarVolume = stock.Price * stock.AvgVolume20;
+            //if (stock == null)
+            //    return false;
 
-            if (dollarVolume < MinDollarVolume)
-                return false;
+            //if (string.IsNullOrWhiteSpace(stock.Ticker))
+            //    return false;
 
-            if (stock.MarketCap < MinMarketCap)
-                return false;
+            //if (!string.Equals(stock.Currency, "USD", StringComparison.OrdinalIgnoreCase))
+            //    return false;
+
+            //if (!string.IsNullOrWhiteSpace(stock.StockType) &&
+            //    !stock.StockType.Contains("CORP", StringComparison.OrdinalIgnoreCase) &&
+            //    !stock.StockType.Contains("ADR", StringComparison.OrdinalIgnoreCase))
+            //    return false;
+
+            //if (stock.Ticker.EndsWith("U", StringComparison.OrdinalIgnoreCase))
+            //    return false;
+
+            //if (stock.Ticker.EndsWith("W", StringComparison.OrdinalIgnoreCase))
+            //    return false;
 
             return true;
         }
