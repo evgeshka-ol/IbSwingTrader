@@ -3,7 +3,7 @@
     public class CandidateDetails : Candidate
     {
         public string PresetScanCode { get; set; }
-        public string PresetScanCode { get; set; }
+        public string PresetDescription { get; set; }
 
         public decimal Pullback10d { get; set; }
 
