@@ -2,6 +2,9 @@
 {
     public class CandidateDetails : Candidate
     {
+        public string PresetScanCode { get; set; }
+        public string PresetScanCode { get; set; }
+
         public decimal Pullback10d { get; set; }
 
         public decimal DistanceTo20dHigh { get; set; }

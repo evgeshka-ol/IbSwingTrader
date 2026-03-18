@@ -4,6 +4,6 @@ namespace IbSwingTrader.Interfaces
 {
     public interface IStockUniverseProvider
     {
-        Task<List<StockInfo>> GetStocksAsync();
+        Task<List<StockInfo>> GetStocksAsync(string scanCode);
     }
 }

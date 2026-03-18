@@ -10,8 +10,6 @@ namespace IbSwingTrader.MarketData.IB
     {
         private readonly ITwsConnection _twsConnection = tws;
 
-        private string ScanCode { get; set; } = "HOT_BY_VOLUME";
-
         private const double MinMarketCap = 300_000_000;
 
         private string LocationCode { get; set; } = "STK.US.MAJOR";
@@ -22,13 +20,13 @@ namespace IbSwingTrader.MarketData.IB
 
         private int MinAvgVolume { get; set; } = 1_000_000;
 
-        public async Task<List<StockInfo>> GetStocksAsync()
+        public async Task<List<StockInfo>> GetStocksAsync(string scanCode)
         {
             var subscription = new ScannerSubscription
             {
                 Instrument = "STK",
                 LocationCode = LocationCode,
-                ScanCode = ScanCode,
+                ScanCode = scanCode,
 
                 // IB scanner uses reversed market cap semantics here.
                 // MarketCapBelow acts like our minimum market cap threshold.
