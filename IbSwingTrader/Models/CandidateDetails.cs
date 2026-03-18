@@ -15,5 +15,10 @@
         public decimal TrendPosition { get; set; }
 
         public DateTime ScanTime { get; set; }
+        public decimal DailyTrendPosition { get; internal set; }
+        public decimal DailyPullback10d { get; internal set; }
+        public decimal DailyRSI14 { get; internal set; }
+        public decimal BBMidSignedDistancePct { get; internal set; }
+        public decimal? WeeklyMACDHistDelta { get; internal set; }
     }
 }
