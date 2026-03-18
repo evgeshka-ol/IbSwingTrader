@@ -1,37 +1,43 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace IbSwingTrader.Models
+﻿namespace IbSwingTrader.Models
 {
     public class CandidateEvaluationResult
     {
+        public required string Ticker { get; set; }
+        public DateTime ScanTime { get; set; }
+
         public required string PresetScanCode { get; set; }
-        public string? PresetDescription { get; set; }
+        public decimal CandidateScore { get; set; }
 
-        public int TotalCandidates { get; set; }
+        public decimal EntryPrice { get; set; }
+        public decimal ExitPrice { get; set; }
+        public decimal StopLoss { get; set; }
 
-        public int EntryTouchedCount { get; set; }
-        public int WinCount { get; set; }
-        public int LossCount { get; set; }
-        public int OpenCount { get; set; }
-        public int NoEntryCount { get; set; }
+        public bool EntryTouched { get; set; }
+        public bool ExitTouched { get; set; }
+        public bool StopTouched { get; set; }
 
-        public decimal EntryTouchRatePct { get; set; }
-        public decimal WinRatePct { get; set; }
-        public decimal LossRatePct { get; set; }
+        public DateTime? EntryTime { get; set; }
+        public DateTime? ExitTime { get; set; }
+        public DateTime? StopTime { get; set; }
 
-        public decimal AvgRealizedPct { get; set; }
-        public decimal AvgMaxMovePct1D { get; set; }
-        public decimal AvgMaxMovePct2D { get; set; }
-        public decimal AvgMaxMovePct5D { get; set; }
+        public bool ExitBeforeStop { get; set; }
+        public bool StopBeforeExit { get; set; }
 
-        public decimal AvgMaxDrawdownPct1D { get; set; }
-        public decimal AvgMaxDrawdownPct2D { get; set; }
-        public decimal AvgMaxDrawdownPct5D { get; set; }
+        public decimal MaxHighAfterScan1D { get; set; }
+        public decimal MaxHighAfterScan2D { get; set; }
+        public decimal MaxHighAfterScan5D { get; set; }
 
-        public decimal Target10Pct1DHitRatePct { get; set; }
+        public decimal MaxMovePct1D { get; set; }
+        public decimal MaxMovePct2D { get; set; }
+        public decimal MaxMovePct5D { get; set; }
 
-        public decimal AvgCandidateScore { get; set; }
+        public decimal MaxDrawdownPct1D { get; set; }
+        public decimal MaxDrawdownPct2D { get; set; }
+        public decimal MaxDrawdownPct5D { get; set; }
+
+        public bool Target10Pct1DHit { get; set; }
+
+        public string? Outcome { get; set; }
+        public decimal? RealizedPct { get; set; }
     }
 }
