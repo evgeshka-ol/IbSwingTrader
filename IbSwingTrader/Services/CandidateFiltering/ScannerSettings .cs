@@ -6,8 +6,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
     {
         public string LocationCode { get; set; } = "STK.US.MAJOR";
 
-        // Было TOP_PERC_GAIN
-        public string ScanCode { get; set; } = "TOP_PERC_LOSE";
+        // Было TOP_PERC_GAIN TOP_PERC_LOSE
+        public string ScanCode { get; set; } = "HOT_BY_VOLUME";
 
         public double MinPrice { get; set; } = 5;
         public double MaxPrice { get; set; } = 200;
