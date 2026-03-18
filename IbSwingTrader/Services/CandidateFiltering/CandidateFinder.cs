@@ -34,6 +34,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             foreach (var preset in _scannerPresets.GetAll())
             {
                 var stocks = await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
+
                 foreach (var stock in stocks)
                 {
                     if (!_preFilter.Pass(stock))
@@ -67,17 +68,27 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         .TakeLast(20)
                         .Average(x => x.Volume);
 
-                    _logger.Info($"Candidate filter for: ticker ({stock.Ticker}), stock type ({stock.StockType}), trading class ({stock.TradingClass}), exchange ({stock.Exchange}), rank ({stock.Rank})");
+                    _logger.Info(
+                        $"Candidate filter for: " +
+                        $"ticker ({stock.Ticker}), " +
+                        $"preset ({preset.PresetScanCode}), " +
+                        $"stock type ({stock.StockType}), " +
+                        $"trading class ({stock.TradingClass}), " +
+                        $"exchange ({stock.Exchange}), " +
+                        $"rank ({stock.Rank})");
 
                     if (!_candidateFilter.Pass(features, price, avgVolume20))
                         continue;
 
                     var score = _candidateScore.Calculate(features);
                     var trade = _tradeBuilder.Build(candles);
+                    var scanTime = DateTime.UtcNow;
 
                     results.Add(new CandidateDetails
                     {
                         Ticker = stock.Ticker,
+                        PresetScanCode = preset.PresetScanCode,
+                        PresetDescription = preset.Description,
 
                         EntryPrice = trade.Entry,
                         ExitPrice = trade.Exit,
@@ -95,18 +106,18 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         ATRRatio = features.ATRRatio,
                         TrendPosition = features.TrendPosition,
 
-                        ScanTime = DateTime.UtcNow,
+                        ScanTime = scanTime,
 
-                        // добавить
                         DailyTrendPosition = features.DailyTrendPosition,
                         DailyPullback10d = features.DailyPullback10d,
                         DailyRSI14 = features.DailyRSI14,
                         BBMidSignedDistancePct = features.BBMidSignedDistancePct,
                         WeeklyMACDHistDelta = features.WeeklyMACDHistDelta
                     });
-                    _logger.Info($"Ticker {stock.Ticker} passed candidate filter.");
-                }
 
+                    _logger.Info(
+                        $"Ticker {stock.Ticker} passed candidate filter. Preset: {stock.PresetScanCode}");
+                }
             }
 
             return [.. results
