@@ -9,6 +9,8 @@ namespace IbSwingTrader.MarketData.IB
         ITwsConnection tws,
         IScannerSettings settings) : IStockUniverseProvider
     {
+        private const double MinMarketCap = 300_000_000;
+
         private readonly ITwsConnection _twsConnection = tws;
         private readonly IScannerSettings _settings = settings;
 
@@ -18,29 +20,21 @@ namespace IbSwingTrader.MarketData.IB
             {
                 Instrument = "STK",
                 LocationCode = _settings.LocationCode,
-                ScanCode = _settings.ScanCode
-                // NumberOfRows пока вообще не задаем
+                ScanCode = _settings.ScanCode,
+                MarketCapBelow = MinMarketCap,
+                StockTypeFilter = "CORP"
             };
 
             var filters = new List<TagValue>();
 
             if (_settings.MinPrice > 0)
-                filters.Add(new TagValue(
-                    "priceAbove",
-                    _settings.MinPrice.ToString(CultureInfo.InvariantCulture)));
+                filters.Add(new TagValue("priceAbove", _settings.MinPrice.ToString(CultureInfo.InvariantCulture)));
 
             if (_settings.MaxPrice > 0)
-                filters.Add(new TagValue(
-                    "priceBelow",
-                    _settings.MaxPrice.ToString(CultureInfo.InvariantCulture)));
+                filters.Add(new TagValue("priceBelow", _settings.MaxPrice.ToString(CultureInfo.InvariantCulture)));
 
             if (_settings.MinAvgVolume > 0)
-                filters.Add(new TagValue(
-                    "avgVolumeAbove",
-                    _settings.MinAvgVolume.ToString(CultureInfo.InvariantCulture)));
-
-            // market cap пока не шлем в IB scanner
-            // отфильтруем потом локально
+                filters.Add(new TagValue("avgVolumeAbove", _settings.MinAvgVolume.ToString(CultureInfo.InvariantCulture)));
 
             return await _twsConnection.GetStocksAsync(subscription, filters);
         }
