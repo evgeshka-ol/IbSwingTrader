@@ -29,7 +29,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
         public async Task<List<CandidateDetails>> FindAsync()
         {
-            var results = new List<CandidateDetails>();
+            var results = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var preset in _scannerPresets.GetAll())
             {
@@ -84,7 +84,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     var trade = _tradeBuilder.Build(candles);
                     var scanTime = DateTime.UtcNow;
 
-                    results.Add(new CandidateDetails
+                    var candidate = new CandidateDetails
                     {
                         Ticker = stock.Ticker,
                         PresetScanCode = preset.ScanCode,
@@ -113,13 +113,36 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         DailyRSI14 = features.DailyRSI14,
                         BBMidSignedDistancePct = features.BBMidSignedDistancePct,
                         WeeklyMACDHistDelta = features.WeeklyMACDHistDelta
-                    });
+                    };
 
-                    _logger.Info($"Ticker {stock.Ticker} passed candidate filter. Preset: {preset.ScanCode}");
+                    if (results.TryGetValue(stock.Ticker, out var existing))
+                    {
+                        if (candidate.Score > existing.Score)
+                        {
+                            results[stock.Ticker] = candidate;
+
+                            _logger.Info(
+                                $"Ticker {stock.Ticker} replaced existing candidate with a higher score. " +
+                                $"Old preset: {existing.PresetScanCode}, new preset: {preset.ScanCode}");
+                        }
+                        else
+                        {
+                            _logger.Info(
+                                $"Ticker {stock.Ticker} already exists. " +
+                                $"Keeping existing candidate from preset {existing.PresetScanCode}");
+                        }
+                    }
+                    else
+                    {
+                        results[stock.Ticker] = candidate;
+
+                        _logger.Info(
+                            $"Ticker {stock.Ticker} passed candidate filter. Preset: {preset.ScanCode}");
+                    }
                 }
             }
 
-            return [.. results
+            return [.. results.Values
                 .OrderByDescending(x => x.Score)
                 .Take(10)];
         }
