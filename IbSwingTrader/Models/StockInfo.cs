@@ -2,9 +2,6 @@
 {
     public class StockInfo
     {
-        public string PresetScanCode { get; set; }
-        public string PresetScanCode { get; set; }
-
         public string Ticker { get; set; } = "";
         public int ConId { get; set; }
         public string Exchange { get; set; } = "";
