@@ -10,6 +10,14 @@ namespace IbSwingTrader.Infrastructure.Logging
     public class CandidateResultWriter() : ICandidateResultWriter
     {
         private readonly string _file = $"candidates/candidates_{DateTime.UtcNow:yyyyMMdd_HHmm}.json";
+        private static readonly HashSet<string> RoundTo2Fields =
+            [
+                nameof(Candidate.EntryPrice),
+                nameof(Candidate.ExitPrice),
+                nameof(Candidate.StopLoss),
+                nameof(Candidate.ProfitPercent),
+                nameof(Candidate.LossPercent)
+            ];
 
         public async Task WriteAsync(List<CandidateDetails> candidates)
         {
@@ -75,9 +83,13 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             return value switch
             {
-                decimal d => JsonValue.Create(decimal.Parse(
-                    d.ToString("F6", CultureInfo.InvariantCulture),
-                    CultureInfo.InvariantCulture)),
+                decimal d when RoundTo2Fields.Contains(propertyName)
+                    => JsonValue.Create(Math.Round(d, 2, MidpointRounding.AwayFromZero)),
+
+                decimal d
+                    => JsonValue.Create(decimal.Parse(
+                        d.ToString("F6", CultureInfo.InvariantCulture),
+                        CultureInfo.InvariantCulture)),
 
                 DateTime dt => JsonValue.Create(
                     propertyName.EndsWith("Date", StringComparison.OrdinalIgnoreCase)
