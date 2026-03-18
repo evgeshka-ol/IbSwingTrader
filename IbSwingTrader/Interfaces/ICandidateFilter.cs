@@ -7,7 +7,6 @@ namespace IbSwingTrader.Interfaces
         bool Pass(
             FeatureSet features,
             decimal price,
-            decimal avgVolume20,
-            decimal marketCap);
+            decimal avgVolume20);
     }
 }

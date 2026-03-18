@@ -79,14 +79,15 @@ static Services ConfigureServices()
         GetCandidatesCommand = new GetCandidatesCommand(
             new CandidateFinder(
                 new TwsStockUniverseProvider(connection, new ScannerSettings()),
-                new StockPreFilter(),
+                new StockPreFilter(logger),
                 contractResolver,
                 provider,
                 featureEngine,
-                new CandidateFilter(),
+                new CandidateFilter(logger),
                 candidateScore,
-                new TradeBuilder()),
-            new CandidateResultWriter()),
+                new TradeBuilder(),
+                logger),
+                new CandidateResultWriter()),
         GetScannerParamsCommand = new GetScannerParamsCommand(connection)
     };
 }

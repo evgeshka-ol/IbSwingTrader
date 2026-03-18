@@ -12,7 +12,8 @@ namespace IbSwingTrader.Services
         IFeatureEngine featureEngine,
         ICandidateFilter candidateFilter,
         ICandidateScore candidateScore,
-        ITradeBuilder tradeBuilder) : ICandidateFinder
+        ITradeBuilder tradeBuilder,
+        ITextLogger logger) : ICandidateFinder
     {
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
         private readonly IStockPreFilter _preFilter = preFilter;
@@ -22,6 +23,7 @@ namespace IbSwingTrader.Services
         private readonly ICandidateFilter _candidateFilter = candidateFilter;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
+        private readonly ITextLogger _logger = logger;
 
         public async Task<List<CandidateDetails>> FindAsync()
         {
@@ -62,7 +64,9 @@ namespace IbSwingTrader.Services
                     .TakeLast(20)
                     .Average(x => x.Volume);
 
-                if (!_candidateFilter.Pass(features, price, avgVolume20, 0m))
+                _logger.Info($"Candidate filter for: ticker ({stock.Ticker}), stock type ({stock.StockType}), trading class ({stock.TradingClass}), exchange ({stock.Exchange}), rank ({stock.Rank})");
+
+                if (!_candidateFilter.Pass(features, price, avgVolume20))
                     continue;
 
                 var score = _candidateScore.Calculate(features);
@@ -88,8 +92,16 @@ namespace IbSwingTrader.Services
                     ATRRatio = features.ATRRatio,
                     TrendPosition = features.TrendPosition,
 
-                    ScanTime = DateTime.UtcNow
+                    ScanTime = DateTime.UtcNow,
+
+                    // добавить
+                    DailyTrendPosition = features.DailyTrendPosition,
+                    DailyPullback10d = features.DailyPullback10d,
+                    DailyRSI14 = features.DailyRSI14,
+                    BBMidSignedDistancePct = features.BBMidSignedDistancePct,
+                    WeeklyMACDHistDelta = features.WeeklyMACDHistDelta
                 });
+                _logger.Info($"Ticker {stock.Ticker} passed candidate filter.");
             }
 
             return [.. results
