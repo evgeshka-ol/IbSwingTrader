@@ -71,7 +71,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     _logger.Info(
                         $"Candidate filter for: " +
                         $"ticker ({stock.Ticker}), " +
-                        $"preset ({preset.PresetScanCode}), " +
+                        $"preset ({preset.ScanCode}), " +
                         $"stock type ({stock.StockType}), " +
                         $"trading class ({stock.TradingClass}), " +
                         $"exchange ({stock.Exchange}), " +
@@ -87,7 +87,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     results.Add(new CandidateDetails
                     {
                         Ticker = stock.Ticker,
-                        PresetScanCode = preset.PresetScanCode,
+                        PresetScanCode = preset.ScanCode,
                         PresetDescription = preset.Description,
 
                         EntryPrice = trade.Entry,
@@ -115,8 +115,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         WeeklyMACDHistDelta = features.WeeklyMACDHistDelta
                     });
 
-                    _logger.Info(
-                        $"Ticker {stock.Ticker} passed candidate filter. Preset: {stock.PresetScanCode}");
+                    _logger.Info($"Ticker {stock.Ticker} passed candidate filter. Preset: {preset.ScanCode}");
                 }
             }
 

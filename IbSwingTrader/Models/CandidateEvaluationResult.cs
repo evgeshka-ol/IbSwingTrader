@@ -6,7 +6,7 @@ namespace IbSwingTrader.Models
 {
     public class CandidateEvaluationResult
     {
-        public string Ticker { get; set; }
+        public required string Ticker { get; set; }
         public DateTime ScanTime { get; set; }
 
         public decimal EntryPrice { get; set; }

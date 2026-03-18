@@ -86,6 +86,7 @@ static Services ConfigureServices()
                 new CandidateFilter(logger),
                 candidateScore,
                 new TradeBuilder(),
+                new ScannerPresetService(),
                 logger),
                 new CandidateResultWriter()),
         GetScannerParamsCommand = new GetScannerParamsCommand(connection)
