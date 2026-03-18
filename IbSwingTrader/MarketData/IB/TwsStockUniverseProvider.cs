@@ -6,21 +6,29 @@ using IbSwingTrader.Models;
 namespace IbSwingTrader.MarketData.IB
 {
     public class TwsStockUniverseProvider(
-        ITwsConnection tws,
-        IScannerSettings settings) : IStockUniverseProvider
+        ITwsConnection tws) : IStockUniverseProvider
     {
+        private readonly ITwsConnection _twsConnection = tws;
+
+        private string ScanCode { get; set; } = "HOT_BY_VOLUME";
+
         private const double MinMarketCap = 300_000_000;
 
-        private readonly ITwsConnection _twsConnection = tws;
-        private readonly IScannerSettings _settings = settings;
+        private string LocationCode { get; set; } = "STK.US.MAJOR";
+
+        // Было TOP_PERC_GAIN TOP_PERC_LOSE
+        private double MinPrice { get; set; } = 5;
+        private double MaxPrice { get; set; } = 200;
+
+        private int MinAvgVolume { get; set; } = 1_000_000;
 
         public async Task<List<StockInfo>> GetStocksAsync()
         {
             var subscription = new ScannerSubscription
             {
                 Instrument = "STK",
-                LocationCode = _settings.LocationCode,
-                ScanCode = _settings.ScanCode,
+                LocationCode = LocationCode,
+                ScanCode = ScanCode,
 
                 // IB scanner uses reversed market cap semantics here.
                 // MarketCapBelow acts like our minimum market cap threshold.
@@ -31,14 +39,14 @@ namespace IbSwingTrader.MarketData.IB
 
             var filters = new List<TagValue>();
 
-            if (_settings.MinPrice > 0)
-                filters.Add(new TagValue("priceAbove", _settings.MinPrice.ToString(CultureInfo.InvariantCulture)));
+            if (MinPrice > 0)
+                filters.Add(new TagValue("priceAbove", MinPrice.ToString(CultureInfo.InvariantCulture)));
 
-            if (_settings.MaxPrice > 0)
-                filters.Add(new TagValue("priceBelow", _settings.MaxPrice.ToString(CultureInfo.InvariantCulture)));
+            if (MaxPrice > 0)
+                filters.Add(new TagValue("priceBelow", MaxPrice.ToString(CultureInfo.InvariantCulture)));
 
-            if (_settings.MinAvgVolume > 0)
-                filters.Add(new TagValue("avgVolumeAbove", _settings.MinAvgVolume.ToString(CultureInfo.InvariantCulture)));
+            if (MinAvgVolume > 0)
+                filters.Add(new TagValue("avgVolumeAbove", MinAvgVolume.ToString(CultureInfo.InvariantCulture)));
 
             return await _twsConnection.GetStocksAsync(subscription, filters);
         }

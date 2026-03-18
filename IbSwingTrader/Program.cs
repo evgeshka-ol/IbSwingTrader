@@ -78,7 +78,7 @@ static Services ConfigureServices()
         HistoricalService = historicalService,
         GetCandidatesCommand = new GetCandidatesCommand(
             new CandidateFinder(
-                new TwsStockUniverseProvider(connection, new ScannerSettings()),
+                new TwsStockUniverseProvider(connection),
                 new StockPreFilter(logger),
                 contractResolver,
                 provider,
