@@ -21,7 +21,11 @@ namespace IbSwingTrader.MarketData.IB
                 Instrument = "STK",
                 LocationCode = _settings.LocationCode,
                 ScanCode = _settings.ScanCode,
+
+                // IB scanner uses reversed market cap semantics here.
+                // MarketCapBelow acts like our minimum market cap threshold.
                 MarketCapBelow = MinMarketCap,
+
                 StockTypeFilter = "CORP"
             };
 
