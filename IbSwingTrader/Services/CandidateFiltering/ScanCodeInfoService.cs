@@ -3,9 +3,9 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services.CandidateFiltering
 {
-    public class ScannerPresetService : IScannerPresetService
+    public class ScanCodeInfoService : IScanCodeInfoService
     {
-        public IReadOnlyList<ScannerPreset> GetAll() =>
+        public IReadOnlyList<PresetScanCode> GetAll() =>
         [
             new("TOP_PERC_LOSE", "Top percentage losers. Better for watch list after sharp selloff."),
             new("TOP_PERC_GAIN", "Top percentage gainers. Momentum names already showing strength."),

@@ -13,7 +13,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
         ICandidateFilter candidateFilter,
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
-        IScannerPresetService scannerPresets,
+        IScanCodeInfoService scannerPresets,
         ITextLogger logger) : ICandidateFinder
     {
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
@@ -24,7 +24,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
         private readonly ICandidateFilter _candidateFilter = candidateFilter;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
-        private readonly IScannerPresetService _scannerPresets = scannerPresets;
+        private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
         private readonly ITextLogger _logger = logger;
 
         public async Task<List<CandidateDetails>> FindAsync()
