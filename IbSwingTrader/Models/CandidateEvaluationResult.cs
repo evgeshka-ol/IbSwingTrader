@@ -3,7 +3,7 @@
     public class CandidateEvaluationResult
     {
         public required string Ticker { get; set; }
-        public DateTime ScanTime { get; set; }
+        public DateTime ScanTimeNy { get; set; }
 
         public required string PresetScanCode { get; set; }
         public decimal CandidateScore { get; set; }

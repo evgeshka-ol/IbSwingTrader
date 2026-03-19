@@ -9,28 +9,39 @@ namespace IbSwingTrader.Infrastructure.Logging
 {
     public class CandidateResultWriter() : ICandidateResultWriter
     {
-        private readonly string _file = $"candidates/candidates_{DateTime.UtcNow:yyyyMMdd_HHmm}.json";
+        private const string Folder = "candidates";
+        private const string NewYorkTimeZoneIana = "America/New_York";
+        private const string NewYorkTimeZoneWindows = "Eastern Standard Time";
+
         private static readonly HashSet<string> RoundTo2Fields =
-            [
-                nameof(Candidate.EntryPrice),
-                nameof(Candidate.ExitPrice),
-                nameof(Candidate.StopLoss),
-                nameof(Candidate.ProfitPercent),
-                nameof(Candidate.LossPercent)
-            ];
+        [
+            nameof(Candidate.EntryPrice),
+            nameof(Candidate.ExitPrice),
+            nameof(Candidate.StopLoss),
+            nameof(Candidate.ProfitPercent),
+            nameof(Candidate.LossPercent)
+        ];
 
         public async Task WriteAsync(List<CandidateDetails> candidates)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
+            Directory.CreateDirectory(Folder);
+
+            var scanTimeNy = GetNewYorkNow();
+            var filePath = Path.Combine(
+                Folder,
+                $"candidates_{scanTimeNy:yyyyMMdd_HHmm}_NY.json");
 
             foreach (var c in candidates)
             {
+                c.ScanTimeNy = scanTimeNy;
+                c.ScanTimeZone = NewYorkTimeZoneIana;
+
                 WriteCandidate(c);
             }
 
             var json = BuildJson(candidates);
 
-            await File.WriteAllTextAsync(_file, json);
+            await File.WriteAllTextAsync(filePath, json);
         }
 
         private static string BuildJson(IEnumerable<CandidateDetails> candidates)
@@ -104,6 +115,26 @@ namespace IbSwingTrader.Infrastructure.Logging
 
                 _ => JsonValue.Create(value.ToString())
             };
+        }
+
+        private static DateTime GetNewYorkNow()
+        {
+            var utcNow = DateTime.UtcNow;
+            var timeZone = GetNewYorkTimeZone();
+
+            return TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
+        }
+
+        private static TimeZoneInfo GetNewYorkTimeZone()
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(NewYorkTimeZoneIana);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(NewYorkTimeZoneWindows);
+            }
         }
 
         private static void WriteCandidate(Candidate c)

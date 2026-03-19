@@ -106,7 +106,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         ATRRatio = features.ATRRatio,
                         TrendPosition = features.TrendPosition,
 
-                        ScanTime = scanTime,
+                        ScanTimeNy = scanTime,
 
                         DailyTrendPosition = features.DailyTrendPosition,
                         DailyPullback10d = features.DailyPullback10d,
