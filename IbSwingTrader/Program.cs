@@ -9,6 +9,7 @@ using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Models;
 using IbSwingTrader.Services;
+using IbSwingTrader.Services.CandidateEvaluation;
 using IbSwingTrader.Services.CandidateFiltering;
 
 Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
@@ -35,7 +36,11 @@ switch (command)
         break;
 
     case "get-candidates":
-        await RunGetCandidates();
+        await services.GetCandidatesCommand.RunAsync();
+        break;
+
+    case "evaluate-candidates":
+        await services.EvaluateCandidatesFolderCommand.RunAsync();
         break;
 
     case "get-scanner-params":
@@ -89,7 +94,18 @@ static Services ConfigureServices()
                 new ScanCodeInfoService(),
                 logger),
                 new CandidateResultWriter()),
-        GetScannerParamsCommand = new GetScannerParamsCommand(connection)
+        GetScannerParamsCommand = new GetScannerParamsCommand(connection),
+        EvaluateCandidatesFolderCommand = new EvaluateCandidatesFolderCommand(
+            connection,
+            new CandidateEvaluator(contractResolver, historicalService, new AmbiguousBarResolver(historicalService, logger), logger),
+            new JsonFileService(),
+            new CandidateEvaluationCsvService(),
+            new ProcessedCandidateFilesService(),
+            new FileHashService(),
+            logger,
+            candidatesFolder: "candidates",
+            evaluationsFolder: "evaluations",
+            manifestPath: "manifests/processed-candidate-files.json")
     };
 }
 
@@ -303,9 +319,4 @@ async Task RunBuildDataset(string[] args, Services services)
             semaphore.Release();
         }
     }
-}
-
-async Task RunGetCandidates()
-{
-    await services.GetCandidatesCommand.RunAsync();
 }
