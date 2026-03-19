@@ -149,19 +149,57 @@ namespace IbSwingTrader.Commands
             string sourceFileName,
             List<CandidateEvaluationResult> results)
         {
-            var wins = results.Count(x => x.Outcome == "Win");
-            var losses = results.Count(x => x.Outcome == "Loss");
-            var open = results.Count(x => x.Outcome == "Open");
-            var noEntry = results.Count(x => x.Outcome == "NoEntry");
+            var wins = results.Count(x =>
+                string.Equals(x.Outcome, "Win", StringComparison.OrdinalIgnoreCase));
+
+            var losses = results.Count(x =>
+                string.Equals(x.Outcome, "Loss", StringComparison.OrdinalIgnoreCase));
+
+            var open = results.Count(x =>
+                string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase));
+
+            var noEntry = results.Count(x =>
+                string.Equals(x.Outcome, "NoEntry", StringComparison.OrdinalIgnoreCase));
+
             var noData = results.Count(x =>
-                x.Outcome == "NoData" ||
-                x.Outcome == "NoDataAfterScan");
+                string.Equals(x.Outcome, "NoData", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.Outcome, "NoDataAfterScan", StringComparison.OrdinalIgnoreCase));
+
+            var insufficientFutureData = results.Count(x =>
+                string.Equals(x.Outcome, "InsufficientFutureData", StringComparison.OrdinalIgnoreCase));
+
             var errors = results.Count(x =>
-                x.Outcome != null &&
+                !string.IsNullOrWhiteSpace(x.Outcome) &&
                 x.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase));
 
+            var hitPlus5BeforeMinus5 = results.Count(x => x.HitPlus5BeforeMinus5 == true);
+            var hitPlus7BeforeMinus5 = results.Count(x => x.HitPlus7BeforeMinus5 == true);
+            var hitPlus10BeforeMinus5 = results.Count(x => x.HitPlus10BeforeMinus5 == true);
+
+            var target3Pct1DHit = results.Count(x => x.Target3Pct1DHit);
+            var target5Pct1DHit = results.Count(x => x.Target5Pct1DHit);
+            var target7Pct1DHit = results.Count(x => x.Target7Pct1DHit);
+            var target10Pct1DHit = results.Count(x => x.Target10Pct1DHit);
+            var target15Pct1DHit = results.Count(x => x.Target15Pct1DHit);
+
             _logger.Info(
-                $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} NoData={noData} Errors={errors}");
+                $"Done {sourceFileName} | " +
+                $"Total={results.Count} " +
+                $"Win={wins} " +
+                $"Loss={losses} " +
+                $"Open={open} " +
+                $"NoEntry={noEntry} " +
+                $"NoData={noData} " +
+                $"InsufficientFutureData={insufficientFutureData} " +
+                $"Hit+5Before-5={hitPlus5BeforeMinus5} " +
+                $"Hit+7Before-5={hitPlus7BeforeMinus5} " +
+                $"Hit+10Before-5={hitPlus10BeforeMinus5} " +
+                $"Target3Pct1D={target3Pct1DHit} " +
+                $"Target5Pct1D={target5Pct1DHit} " +
+                $"Target7Pct1D={target7Pct1DHit} " +
+                $"Target10Pct1D={target10Pct1DHit} " +
+                $"Target15Pct1D={target15Pct1DHit} " +
+                $"Errors={errors}");
         }
 
         private static string BuildOutputCsvFileName(string inputFileName)

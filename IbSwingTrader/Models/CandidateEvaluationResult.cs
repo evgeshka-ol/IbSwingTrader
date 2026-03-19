@@ -35,9 +35,41 @@
         public decimal MaxDrawdownPct2D { get; set; }
         public decimal MaxDrawdownPct5D { get; set; }
 
-        public bool Target10Pct1DHit { get; set; }
-
         public string? Outcome { get; set; }
         public decimal? RealizedPct { get; set; }
+
+        public DateTime? EvaluationStartTime { get; set; }
+        public DateTime? EvaluationEndTime { get; set; }
+
+        public decimal MaxHighAfterEntry1D { get; set; }
+        public decimal MinLowAfterEntry1D { get; set; }
+
+        public decimal MaxHighAfterEntry2D { get; set; }
+        public decimal MinLowAfterEntry2D { get; set; }
+
+        public decimal MaxHighAfterEntry5D { get; set; }
+        public decimal MinLowAfterEntry5D { get; set; }
+
+        public bool Target3Pct1DHit { get; set; }
+        public bool Target5Pct1DHit { get; set; }
+        public bool Target7Pct1DHit { get; set; }
+        public bool Target10Pct1DHit { get; set; }
+        public bool Target15Pct1DHit { get; set; }
+
+        public bool Target3Pct2DHit { get; set; }
+        public bool Target5Pct2DHit { get; set; }
+        public bool Target7Pct2DHit { get; set; }
+        public bool Target10Pct2DHit { get; set; }
+        public bool Target15Pct2DHit { get; set; }
+
+        public bool Target3Pct5DHit { get; set; }
+        public bool Target5Pct5DHit { get; set; }
+        public bool Target7Pct5DHit { get; set; }
+        public bool Target10Pct5DHit { get; set; }
+        public bool Target15Pct5DHit { get; set; }
+
+        public bool? HitPlus5BeforeMinus5 { get; set; }
+        public bool? HitPlus7BeforeMinus5 { get; set; }
+        public bool? HitPlus10BeforeMinus5 { get; set; }
     }
 }
