@@ -1,7 +1,7 @@
 ﻿using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
-namespace IbSwingTrader.Services
+namespace IbSwingTrader.Services.CandidateFiltering
 {
     public class TradeBuilder : ITradeBuilder
     {
