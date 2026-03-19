@@ -2,9 +2,19 @@
 
 namespace IbSwingTrader.Interfaces
 {
-    public interface IHistoricalCache
+    namespace IbSwingTrader.Interfaces
     {
-        bool TryLoad(string symbol, out List<Candle>? candles);
-        void Save(string symbol, List<Candle> candles);
+        public interface IHistoricalCache
+        {
+            bool TryLoad(
+                string symbol,
+                Timeframe timeframe,
+                out List<Candle>? candles);
+
+            void Save(
+                string symbol,
+                Timeframe timeframe,
+                List<Candle> candles);
+        }
     }
 }

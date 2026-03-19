@@ -1,7 +1,7 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using IbSwingTrader.Interfaces;
+using IbSwingTrader.Interfaces.IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Historical
@@ -24,11 +24,14 @@ namespace IbSwingTrader.Infrastructure.Historical
             Directory.CreateDirectory(_folder);
         }
 
-        public bool TryLoad(string key, out List<Candle> candles)
+        public bool TryLoad(
+            string symbol,
+            Timeframe timeframe,
+            out List<Candle>? candles)
         {
-            candles = [];
+            candles = null;
 
-            var path = BuildPath(key);
+            var path = BuildPath(symbol);
 
             if (!File.Exists(path))
                 return false;
@@ -36,12 +39,24 @@ namespace IbSwingTrader.Infrastructure.Historical
             try
             {
                 var json = File.ReadAllText(path);
-                var data = JsonSerializer.Deserialize<List<Candle>>(json, JsonOptions);
+                var file = JsonSerializer.Deserialize<HistoricalSymbolCache>(json, JsonOptions);
 
-                if (data == null)
+                if (file == null)
                     return false;
 
-                candles = data;
+                var timeframeKey = BuildTimeframeKey(timeframe);
+
+                if (!file.Timeframes.TryGetValue(timeframeKey, out var storedCandles) ||
+                    storedCandles == null ||
+                    storedCandles.Count == 0)
+                {
+                    return false;
+                }
+
+                candles = storedCandles
+                    .OrderBy(x => x.Time)
+                    .ToList();
+
                 return true;
             }
             catch (Exception ex)
@@ -51,13 +66,39 @@ namespace IbSwingTrader.Infrastructure.Historical
             }
         }
 
-        public void Save(string key, List<Candle> candles)
+        public void Save(
+            string symbol,
+            Timeframe timeframe,
+            List<Candle> candles)
         {
-            var path = BuildPath(key);
+            var path = BuildPath(symbol);
 
             try
             {
-                var json = JsonSerializer.Serialize(candles, JsonOptions);
+                HistoricalSymbolCache file;
+
+                if (File.Exists(path))
+                {
+                    var existingJson = File.ReadAllText(path);
+                    file = JsonSerializer.Deserialize<HistoricalSymbolCache>(existingJson, JsonOptions)
+                           ?? new HistoricalSymbolCache();
+                }
+                else
+                {
+                    file = new HistoricalSymbolCache();
+                }
+
+                file.Symbol = symbol;
+
+                var timeframeKey = BuildTimeframeKey(timeframe);
+
+                file.Timeframes[timeframeKey] = candles
+                    .GroupBy(x => new { x.Timeframe, x.Time })
+                    .Select(g => g.First())
+                    .OrderBy(x => x.Time)
+                    .ToList();
+
+                var json = JsonSerializer.Serialize(file, JsonOptions);
                 File.WriteAllText(path, json);
             }
             catch (Exception ex)
@@ -66,31 +107,15 @@ namespace IbSwingTrader.Infrastructure.Historical
             }
         }
 
-        private string BuildPath(string key)
+        private string BuildPath(string symbol)
         {
-            var safeFileName = BuildSafeFileName(key);
-            return Path.Combine(_folder, safeFileName);
+            var safeSymbol = SanitizeFileNamePart(symbol);
+            return Path.Combine(_folder, $"{safeSymbol}.json");
         }
 
-        private static string BuildSafeFileName(string key)
+        private static string BuildTimeframeKey(Timeframe timeframe)
         {
-            var readablePrefix = BuildReadablePrefix(key);
-            var hash = ComputeSha256(key);
-
-            return $"{readablePrefix}_{hash}.json";
-        }
-
-        private static string BuildReadablePrefix(string key)
-        {
-            var parts = key.Split('|', StringSplitOptions.RemoveEmptyEntries);
-
-            var symbol = parts.Length > 0 ? parts[0] : "unknown";
-            var timeframe = parts.Length > 1 ? parts[1] : "tf";
-
-            symbol = SanitizeFileNamePart(symbol);
-            timeframe = SanitizeFileNamePart(timeframe);
-
-            return $"{symbol}_{timeframe}";
+            return timeframe.ToString();
         }
 
         private static string SanitizeFileNamePart(string value)
@@ -105,19 +130,6 @@ namespace IbSwingTrader.Infrastructure.Historical
                 else
                     sb.Append(ch);
             }
-
-            return sb.ToString();
-        }
-
-        private static string ComputeSha256(string input)
-        {
-            var bytes = Encoding.UTF8.GetBytes(input);
-            var hash = SHA256.HashData(bytes);
-
-            var sb = new StringBuilder(hash.Length * 2);
-
-            foreach (var b in hash)
-                sb.Append(b.ToString("x2"));
 
             return sb.ToString();
         }

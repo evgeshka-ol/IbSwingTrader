@@ -1,6 +1,7 @@
 ﻿using IBApi;
 using IbSwingTrader.Extensions;
 using IbSwingTrader.Interfaces;
+using IbSwingTrader.Interfaces.IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services
@@ -28,14 +29,58 @@ namespace IbSwingTrader.Services
             if (end <= start)
                 return [];
 
-            var cacheKey = BuildCacheKey(symbol, timeframe, start, end);
+            List<Candle> allCandles = [];
 
-            if (_cache.TryLoad(cacheKey, out var cached))
+            var hasCache = _cache.TryLoad(symbol, timeframe, out var cached) &&
+                           cached != null &&
+                           cached.Count > 0;
+
+            if (hasCache)
             {
-                _logger.Debug($"Historical cache hit: {cacheKey}");
-                return cached;
+                allCandles = cached!;
+                _logger.Debug(
+                    $"Historical cache hit: {symbol}, tf={timeframe}, candles={allCandles.Count}");
             }
 
+            var missingRanges = BuildMissingRanges(allCandles, start, end);
+
+            if (missingRanges.Count > 0)
+            {
+                foreach (var range in missingRanges)
+                {
+                    _logger.Debug(
+                        $"Historical cache miss: {symbol}, tf={timeframe}, start={range.Start:yyyy-MM-dd HH:mm:ss}, end={range.End:yyyy-MM-dd HH:mm:ss}");
+
+                    var loaded = await LoadRangeFromIb(
+                        symbol,
+                        contract,
+                        timeframe,
+                        range.Start,
+                        range.End);
+
+                    if (loaded != null && loaded.Count > 0)
+                        allCandles.AddRange(loaded);
+                }
+
+                allCandles = MergeCandles(allCandles);
+                _cache.Save(symbol, timeframe, allCandles);
+            }
+
+            var result = allCandles
+                .Where(x => x.Time >= start && x.Time <= end)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            return result;
+        }
+
+        private async Task<List<Candle>> LoadRangeFromIb(
+            string symbol,
+            Contract contract,
+            Timeframe timeframe,
+            DateTime start,
+            DateTime end)
+        {
             var chunkSpan = timeframe.GetMaxRequestSpan();
             var allCandles = new List<Candle>();
 
@@ -71,24 +116,69 @@ namespace IbSwingTrader.Services
                 chunkStart = chunkEnd;
             }
 
-            var merged = allCandles
+            return MergeCandles(allCandles);
+        }
+
+        private static List<DateRange> BuildMissingRanges(
+            List<Candle> candles,
+            DateTime requestedStart,
+            DateTime requestedEnd)
+        {
+            if (candles.Count == 0)
+            {
+                return
+                [
+                    new DateRange(requestedStart, requestedEnd)
+                ];
+            }
+
+            var ordered = candles
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            var cachedStart = ordered.First().Time;
+            var cachedEnd = ordered.Last().Time;
+
+            var ranges = new List<DateRange>();
+
+            if (requestedStart < cachedStart)
+            {
+                var leftEnd = Min(requestedEnd, cachedStart);
+
+                if (requestedStart < leftEnd)
+                    ranges.Add(new DateRange(requestedStart, leftEnd));
+            }
+
+            if (requestedEnd > cachedEnd)
+            {
+                var rightStart = Max(requestedStart, cachedEnd);
+
+                if (rightStart < requestedEnd)
+                    ranges.Add(new DateRange(rightStart, requestedEnd));
+            }
+
+            return ranges;
+        }
+
+        private static List<Candle> MergeCandles(List<Candle> candles)
+        {
+            return candles
                 .GroupBy(x => new { x.Timeframe, x.Time })
                 .Select(g => g.First())
                 .OrderBy(x => x.Time)
                 .ToList();
-
-            _cache.Save(cacheKey, merged);
-
-            return merged;
         }
 
-        private static string BuildCacheKey(
-            string symbol,
-            Timeframe timeframe,
-            DateTime start,
-            DateTime end)
+        private static DateTime Min(DateTime a, DateTime b)
         {
-            return $"{symbol}|{timeframe}|{start:O}|{end:O}";
+            return a <= b ? a : b;
         }
+
+        private static DateTime Max(DateTime a, DateTime b)
+        {
+            return a >= b ? a : b;
+        }
+
+        private readonly record struct DateRange(DateTime Start, DateTime End);
     }
 }
