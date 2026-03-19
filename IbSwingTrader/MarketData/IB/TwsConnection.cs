@@ -281,9 +281,13 @@ namespace IbSwingTrader.MarketData.IB
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
-            var details = string.IsNullOrWhiteSpace(advancedOrderRejectJson) ? string.Empty : $" details={advancedOrderRejectJson}";
+            var details = string.IsNullOrWhiteSpace(advancedOrderRejectJson)
+                ? string.Empty
+                : $" details={advancedOrderRejectJson}";
+
             var header = "IB VERY LONG ERROR";
             var isError = true;
+
             switch (errorCode)
             {
                 case 1100:
@@ -298,6 +302,7 @@ namespace IbSwingTrader.MarketData.IB
                     _ibConnected = true;
                     _logger.Info("IB connection restored");
                     break;
+
                 case 2104:
                 case 2106:
                 case 2158:
@@ -307,6 +312,16 @@ namespace IbSwingTrader.MarketData.IB
                     break;
             }
 
+            var noHistoricalData =
+                errorCode == 162 &&
+                errorMsg.Contains("HMDS query returned no data", StringComparison.OrdinalIgnoreCase);
+
+            if (noHistoricalData)
+            {
+                isError = false;
+                header = "IB VERY LONG INFO";
+            }
+
             if (isError)
                 _logger.Error($"{header} id={id} time={errorTime} code={errorCode} msg={errorMsg}{details}");
             else
@@ -314,10 +329,24 @@ namespace IbSwingTrader.MarketData.IB
 
             if (errorCode == 200)
             {
-                if (_contractRequests.TryGetValue(id, out var tcs))
-                {
-                    tcs.TrySetException(new Exception($"Contract not found: {errorMsg}"));
-                }
+                if (_contractRequests.TryGetValue(id, out var contractTcs))
+                    contractTcs.TrySetException(new Exception($"Contract not found: {errorMsg}"));
+
+                return;
+            }
+
+            if (noHistoricalData)
+            {
+                if (_requests.TryGetValue(id, out var historyTcs))
+                    historyTcs.TrySetResult([]);
+
+                return;
+            }
+
+            if (_requests.TryGetValue(id, out var requestTcs))
+            {
+                requestTcs.TrySetException(
+                    new Exception($"Historical data request failed. code={errorCode}, msg={errorMsg}"));
             }
         }
 
