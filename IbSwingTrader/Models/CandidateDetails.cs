@@ -23,5 +23,10 @@
         public decimal DailyRSI14 { get; internal set; }
         public decimal BBMidSignedDistancePct { get; internal set; }
         public decimal? WeeklyMACDHistDelta { get; internal set; }
+
+        // New York time only
+        public DateTime ScanTimeNy { get; set; }
+
+        public string ScanTimeZone { get; set; } = "America/New_York";
     }
 }
