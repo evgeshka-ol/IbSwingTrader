@@ -2,7 +2,7 @@
   "profiles": {
     "IbSwingTrader": {
       "commandName": "Project",
-      "commandLineArgs": "evaluate-candidates",
+      "commandLineArgs": "build-dataset trades.csv dataset.csv",
       "workingDirectory": "C:\\Git_Home\\IbSwingTrader\\Data"
     }
   }
