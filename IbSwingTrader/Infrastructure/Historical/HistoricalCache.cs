@@ -6,7 +6,7 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {
-    public class FileHistoricalCache : IHistoricalCache
+    public class HistoricalCache : IHistoricalCache
     {
         private readonly string _folder;
         private readonly ITextLogger _logger;
@@ -16,7 +16,7 @@ namespace IbSwingTrader.Infrastructure.Historical
             WriteIndented = false
         };
 
-        public FileHistoricalCache(string folder, ITextLogger logger)
+        public HistoricalCache(string folder, ITextLogger logger)
         {
             _folder = folder;
             _logger = logger;

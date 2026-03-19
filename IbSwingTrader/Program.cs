@@ -60,7 +60,7 @@ static Services ConfigureServices()
     var provider = new TwsMarketDataProvider(connection, logger);
 
     var throttler = new HistoricalRequestThrottler(3, 250);
-    var cache = new HistoricalCache("cache");
+    var cache = new HistoricalCache("cache", logger);
     var retryPolicy = new HistoricalRetryPolicy();
 
     var historicalService = new HistoricalDataService(
