@@ -181,7 +181,7 @@ namespace IbSwingTrader.MarketData.IB
             var endTime = endTimeUtc.ToIbEndTime();
             var duration = timeframe.ToIBDuration(bars);
             var barSize = timeframe.ToIBBarSize();
-            var timeout = GetHistoricalTimeout(timeframe, bars);
+            var timeout = timeframe.GetHistoricalTimeout(bars);
 
             _logger.Info(
                 $"Sending reqHistoricalData: symbol={contract.Symbol}, reqId={reqId}, end={endTime}, duration={duration}, barSize={barSize}, timeout={timeout.TotalSeconds}s");
@@ -243,20 +243,6 @@ namespace IbSwingTrader.MarketData.IB
                 _buffers.TryRemove(reqId, out _);
                 _requests.TryRemove(reqId, out _);
             }
-        }
-
-        private static TimeSpan GetHistoricalTimeout(Timeframe timeframe, int bars)
-        {
-            if (timeframe == Timeframe.H4 && bars >= 300)
-                return TimeSpan.FromSeconds(45);
-
-            if (bars >= 300)
-                return TimeSpan.FromSeconds(40);
-
-            if (bars >= 100)
-                return TimeSpan.FromSeconds(30);
-
-            return TimeSpan.FromSeconds(20);
         }
 
         private async Task WaitForConnectionAsync()

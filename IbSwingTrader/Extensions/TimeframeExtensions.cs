@@ -66,15 +66,39 @@ namespace IbSwingTrader.Extensions
                 Timeframe.M5 => TimeSpan.FromDays(1),
                 Timeframe.M15 => TimeSpan.FromDays(1),
                 Timeframe.M30 => TimeSpan.FromDays(1),
-                Timeframe.H1 => TimeSpan.FromDays(1),
+                Timeframe.H1 => TimeSpan.FromDays(7),
 
-                Timeframe.H4 => TimeSpan.FromDays(5),
+                Timeframe.H4 => TimeSpan.FromDays(30),
 
-                Timeframe.D1 => TimeSpan.FromDays(30),
-                Timeframe.W1 => TimeSpan.FromDays(180),
+                Timeframe.D1 => TimeSpan.FromDays(365),
+                Timeframe.W1 => TimeSpan.FromDays(365 * 5),
 
                 _ => throw new ArgumentOutOfRangeException(nameof(tf), tf, "Unsupported timeframe")
             };
+        }
+
+        public static TimeSpan GetHistoricalTimeout(this Timeframe timeframe, int bars)
+        {
+            if (timeframe == Timeframe.H4 && bars >= 300)
+                return TimeSpan.FromSeconds(45);
+
+            if (bars >= 300)
+                return TimeSpan.FromSeconds(40);
+
+            if (bars >= 100)
+                return TimeSpan.FromSeconds(30);
+
+            return TimeSpan.FromSeconds(20);
+        }
+
+        public static int GetMaxBarsPerRequest(this Timeframe timeframe)
+        {
+            var requestSpan = timeframe.GetMaxRequestSpan();
+            var candleSpan = timeframe.ToTimeSpan();
+
+            var bars = (int)Math.Floor(requestSpan.TotalSeconds / candleSpan.TotalSeconds);
+
+            return Math.Max(1, bars);
         }
     }
 }

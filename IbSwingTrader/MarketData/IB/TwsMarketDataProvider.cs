@@ -1,4 +1,5 @@
 ﻿using IBApi;
+using IbSwingTrader.Extensions;
 using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
@@ -23,22 +24,38 @@ namespace IbSwingTrader.MarketData.IB
         }
 
         public async Task<List<Candle>> GetHistoricalRange(
-           Contract contract,
-           Timeframe timeframe,
-           DateTime start,
-           DateTime end)
+            Contract contract,
+            Timeframe timeframe,
+            DateTime start,
+            DateTime end)
         {
             var result = new List<Candle>();
+
+            if (end <= start)
+                return result;
+
+            var tfSpan = timeframe.ToTimeSpan();
+            var maxBarsPerRequest = timeframe.GetMaxBarsPerRequest();
 
             var cursor = end;
 
             while (cursor > start)
             {
+                var remainingSpan = cursor - start;
+                var remainingBars = (int)Math.Ceiling(remainingSpan.TotalSeconds / tfSpan.TotalSeconds);
+
+                var barsToRequest = Math.Min(maxBarsPerRequest, remainingBars);
+                if (barsToRequest <= 0)
+                    break;
+
+                _logger.Debug(
+                    $"Historical range chunk: tf={timeframe}, cursor={cursor:yyyy-MM-dd HH:mm:ss}, bars={barsToRequest}");
+
                 var chunk = await GetCandles(
                     contract,
                     timeframe,
                     cursor,
-                    300 * 6);
+                    barsToRequest);
 
                 if (chunk.Count == 0)
                     break;
@@ -46,6 +63,10 @@ namespace IbSwingTrader.MarketData.IB
                 result.AddRange(chunk);
 
                 var earliest = chunk.Min(x => x.Time);
+
+                if (earliest >= cursor)
+                    break;
+
                 cursor = earliest.AddSeconds(-1);
 
                 await Task.Delay(300);
@@ -53,7 +74,7 @@ namespace IbSwingTrader.MarketData.IB
 
             var candles = result
                 .Where(c => c.Time >= start && c.Time <= end)
-                .GroupBy(c => c.Time)            // remove duplicates
+                .GroupBy(c => new { c.Timeframe, c.Time })
                 .Select(g => g.First())
                 .OrderBy(c => c.Time)
                 .ToList();
