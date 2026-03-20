@@ -7,19 +7,33 @@ namespace IbSwingTrader.Services.CandidateFiltering
     {
         public TradePlan Build(List<Candle> candles)
         {
+            if (candles == null || candles.Count < 10)
+                throw new ArgumentException("Not enough candles");
+
             var last = candles[^1];
+
+            // Берем минимум последних 5 свечей как опору для стопа
+            var recentLow = candles
+                .Skip(Math.Max(0, candles.Count - 5))
+                .Min(x => x.Low);
 
             var entry = last.Close;
 
-            var stop = entry * 0.95m;
+            // Небольшой отступ ниже локального минимума
+            var stop = recentLow * 0.99m;
 
-            var exit = entry * 1.15m;
+            // Защита от кривого плана
+            if (stop >= entry)
+                stop = entry * 0.97m;
+
+            var risk = entry - stop;
+            var exit = entry + risk * 2m; // RR 1:2
 
             return new TradePlan
             {
                 Entry = entry,
-                Exit = exit,
-                Stop = stop
+                Stop = stop,
+                Exit = exit
             };
         }
     }
