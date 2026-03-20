@@ -25,6 +25,9 @@ if (args.Length == 0)
     services.Logger.Info("Usage:");
     services.Logger.Info("  build-dataset <trades.csv> <dataset.csv>");
     services.Logger.Info("  get-candidates");
+    services.Logger.Info("  evaluate-candidates");
+    services.Logger.Info("  get-scanner-params");
+    services.Logger.Info("  download-fundamental-snapshot");
     return;
 }
 
