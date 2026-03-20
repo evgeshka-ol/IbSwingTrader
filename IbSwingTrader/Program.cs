@@ -47,6 +47,10 @@ switch (command)
         await services.GetScannerParamsCommand.RunAsync();
         break;
 
+    case "download-fundamental-snapshot":
+        await services.DownloadFundamentalSnapshotCommand.RunAsync();
+        break;
+
     default:
         services.Logger.Error("Unknown command");
         break;
@@ -105,7 +109,11 @@ static Services ConfigureServices()
             logger,
             candidatesFolder: "candidates",
             evaluationsFolder: "evaluations",
-            manifestPath: "manifests/processed-candidate-files.json")
+            manifestPath: "manifests/processed-candidate-files.json"),
+        DownloadFundamentalSnapshotCommand = new DownloadFundamentalSnapshotCommand(
+            connection,
+            contractResolver,
+            logger)
     };
 }
 

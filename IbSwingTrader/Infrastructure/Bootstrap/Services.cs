@@ -13,5 +13,6 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
         public required ICommand GetCandidatesCommand { get; init; }
         public required ICommand GetScannerParamsCommand { get; init; }
         public required ICommand EvaluateCandidatesFolderCommand { get; init; }
+        public required ICommand DownloadFundamentalSnapshotCommand { get; init; }
     }
 }

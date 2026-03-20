@@ -7,7 +7,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
     {
         private readonly ITextLogger _logger = logger;
 
-        public decimal MinDollarVolume { get; set; } = 5_000_000m;
+        public decimal MinDollarVolume { get; set; } = 1_000_000m;
 
         public bool Pass(
             FeatureSet featureSet,

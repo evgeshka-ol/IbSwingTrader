@@ -30,7 +30,7 @@ namespace IbSwingTrader.MarketData.IB
 
                 // IB scanner uses reversed market cap semantics here.
                 // MarketCapBelow acts like our minimum market cap threshold.
-                MarketCapBelow = MinMarketCap,
+                // MarketCapBelow = MinMarketCap, // temorarily disabled market cap to extend the range for analysis purposes
 
                 StockTypeFilter = "CORP"
             };

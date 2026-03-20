@@ -18,11 +18,13 @@ namespace IbSwingTrader.MarketData.IB
         private readonly ConcurrentDictionary<int, List<Candle>> _buffers = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<Candle>>> _requests = new();
 
-        private readonly Dictionary<int, TaskCompletionSource<List<ContractDetails>>> _contractRequests = [];
-        private readonly Dictionary<int, List<ContractDetails>> _contractResults = [];
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<List<ContractDetails>>> _contractRequests = [];
+        private readonly ConcurrentDictionary<int, List<ContractDetails>> _contractResults = [];
 
         private readonly ConcurrentDictionary<int, TaskCompletionSource<List<StockInfo>>> _scannerRequests = new();
         private readonly ConcurrentDictionary<int, List<StockInfo>> _scannerResults = new();
+
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _fundamentalRequests = new();
 
         private int _nextRequestId = 1;
         private volatile bool _ibConnected = false;
@@ -101,8 +103,10 @@ namespace IbSwingTrader.MarketData.IB
             }
         }
 
-        public Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
+        public async Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
         {
+            await WaitForConnectionAsync();
+
             var requestId = Interlocked.Increment(ref _nextRequestId);
 
             var tcs = new TaskCompletionSource<List<ContractDetails>>(
@@ -112,7 +116,7 @@ namespace IbSwingTrader.MarketData.IB
 
             Client.reqContractDetails(requestId, contract);
 
-            return tcs.Task;
+            return await tcs.Task;
         }
 
         public async Task<List<StockInfo>> GetStocksAsync(
@@ -164,6 +168,69 @@ namespace IbSwingTrader.MarketData.IB
             Client.reqScannerParameters();
 
             return await tcs.Task;
+        }
+
+        public async Task<FundamentalSnapshot?> GetFundamentalSnapshotAsync(IBApi.Contract contract)
+        {
+            await WaitForConnectionAsync();
+
+            var requestId = Interlocked.Increment(ref _nextRequestId);
+
+            var tcs = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _fundamentalRequests[requestId] = tcs;
+
+            _logger.Info($"Fundamental request: {contract.Symbol}, report=ReportSnapshot");
+
+            try
+            {
+                Client.reqFundamentalData(
+                    requestId,
+                    contract,
+                    "ReportSnapshot",
+                    null);
+
+                var completed = await Task.WhenAny(
+                    tcs.Task,
+                    Task.Delay(TimeSpan.FromSeconds(20)));
+
+                if (completed != tcs.Task)
+                {
+                    _logger.Error($"Fundamental TIMEOUT: symbol={contract.Symbol}, reqId={requestId}");
+
+                    try
+                    {
+                        Client.cancelFundamentalData(requestId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Fundamental cancel failed: {ex.Message}");
+                    }
+
+                    return null;
+                }
+
+                var result = new FundamentalSnapshot { RawXml = await tcs.Task };
+
+                if (string.IsNullOrWhiteSpace(result.RawXml))
+                    return null;
+
+                return result;
+            }
+            finally
+            {
+                _fundamentalRequests.TryRemove(requestId, out _);
+
+                try
+                {
+                    Client.cancelFundamentalData(requestId);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
         }
 
         private async Task<List<Candle>> RequestHistoricalDataOnce(
@@ -329,7 +396,7 @@ namespace IbSwingTrader.MarketData.IB
 
             if (errorCode == 200)
             {
-                if (_contractRequests.TryGetValue(id, out var contractTcs))
+                if (_contractRequests.TryRemove(id, out var contractTcs))
                     contractTcs.TrySetException(new Exception($"Contract not found: {errorMsg}"));
 
                 return;
@@ -337,16 +404,26 @@ namespace IbSwingTrader.MarketData.IB
 
             if (noHistoricalData)
             {
-                if (_requests.TryGetValue(id, out var historyTcs))
+                if (_requests.TryRemove(id, out var historyTcs))
                     historyTcs.TrySetResult([]);
 
                 return;
             }
 
-            if (_requests.TryGetValue(id, out var requestTcs))
+            if (_fundamentalRequests.TryRemove(id, out var fundamentalTcs))
+            {
+                fundamentalTcs.TrySetException(
+                    new Exception($"Fundamental data request failed. code={errorCode}, msg={errorMsg}"));
+
+                return;
+            }
+
+            if (_requests.TryRemove(id, out var requestTcs))
             {
                 requestTcs.TrySetException(
                     new Exception($"Historical data request failed. code={errorCode}, msg={errorMsg}"));
+
+                return;
             }
         }
 
@@ -483,8 +560,8 @@ namespace IbSwingTrader.MarketData.IB
 
                 tcs.SetResult(result);
 
-                _contractRequests.Remove(reqId);
-                _contractResults.Remove(reqId);
+                _contractRequests.TryRemove(reqId, out var contractTcs);
+                _contractResults.TryRemove(reqId, out var contractDetails);
             }
         }
 
@@ -505,7 +582,10 @@ namespace IbSwingTrader.MarketData.IB
 
         public void fundamentalData(int reqId, string data)
         {
-            // ignore
+            _logger.Info($"Fundamental data received: reqId={reqId}, size={data?.Length ?? 0}");
+
+            if (_fundamentalRequests.TryRemove(reqId, out var tcs))
+                tcs.TrySetResult(data ?? string.Empty);
         }
 
         public void historicalData(int reqId, Bar bar)

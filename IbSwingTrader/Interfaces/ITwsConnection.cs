@@ -14,5 +14,6 @@ namespace IbSwingTrader.Interfaces
         Task<List<Candle>> RequestHistoricalData(Contract contract, Timeframe timeframe, DateTime endTimeUtc, int bars);
         Task<List<StockInfo>> GetStocksAsync(ScannerSubscription subscription, List<TagValue> filters);
         Task<string> RequestScannerParametersAsync();
+        Task<FundamentalSnapshot?> GetFundamentalSnapshotAsync(Contract contract);
     }
 }
