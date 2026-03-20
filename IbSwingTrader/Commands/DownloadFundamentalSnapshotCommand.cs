@@ -31,7 +31,7 @@ namespace IbSwingTrader.Commands
                 "HYMC"
             };
 
-            var dir = Path.Combine("Data", "market-probe");
+            var dir = Path.Combine("market-probe");
             Directory.CreateDirectory(dir);
 
             var successCount = 0;

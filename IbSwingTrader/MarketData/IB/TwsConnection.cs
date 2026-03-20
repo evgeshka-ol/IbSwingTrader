@@ -254,7 +254,7 @@ namespace IbSwingTrader.MarketData.IB
 
             try
             {
-                Client.reqMarketDataType(1); // live if available
+                Client.reqMarketDataType(3); // try to use delayed market data
 
                 Client.reqMktData(
                     reqId,
