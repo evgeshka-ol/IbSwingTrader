@@ -27,5 +27,23 @@
         public DateTime ScanTimeNy { get; set; }
 
         public string ScanTimeZone { get; set; } = "America/New_York";
+
+        public bool IsWishList { get; set; }
+
+        public DateTime? FirstSeenNy { get; set; }
+
+        public DateTime? LastEvaluatedNy { get; set; }
+
+        public DateTime? ExpectedTargetTimeNy { get; set; }
+
+        public int? ExpectedBarsToTarget { get; set; }
+
+        public decimal? WeeklyScore { get; set; }
+
+        public decimal? DailyScore { get; set; }
+
+        public decimal? EntryScore { get; set; }
+
+        public string? Notes { get; set; }
     }
 }
