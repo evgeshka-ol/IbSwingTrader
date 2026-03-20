@@ -26,6 +26,10 @@ namespace IbSwingTrader.MarketData.IB
 
         private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _fundamentalRequests = new();
 
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<List<string>>> _marketProbeRequests = new();
+        private readonly ConcurrentDictionary<int, List<string>> _marketProbeLogs = new();
+        private readonly ConcurrentDictionary<int, string> _marketProbeSymbols = new();
+
         private int _nextRequestId = 1;
         private volatile bool _ibConnected = false;
 
@@ -233,6 +237,60 @@ namespace IbSwingTrader.MarketData.IB
             }
         }
 
+        public async Task<List<string>> ProbeMarketDataAsync(IBApi.Contract contract, int seconds = 10)
+        {
+            await WaitForConnectionAsync();
+
+            var reqId = Interlocked.Increment(ref _nextRequestId);
+
+            var tcs = new TaskCompletionSource<List<string>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _marketProbeRequests[reqId] = tcs;
+            _marketProbeLogs[reqId] = [];
+            _marketProbeSymbols[reqId] = contract.Symbol ?? string.Empty;
+
+            _logger.Info($"Market probe request: {contract.Symbol}, genericTicks=165,236,293,294,295");
+
+            try
+            {
+                Client.reqMarketDataType(1); // live if available
+
+                Client.reqMktData(
+                    reqId,
+                    contract,
+                    "165,236,293,294,295",
+                    false,
+                    false,
+                    null);
+
+                var completed = await Task.WhenAny(
+                    tcs.Task,
+                    Task.Delay(TimeSpan.FromSeconds(seconds)));
+
+                if (completed == tcs.Task)
+                    return await tcs.Task;
+
+                if (_marketProbeLogs.TryRemove(reqId, out var list))
+                    return list;
+
+                return [];
+            }
+            finally
+            {
+                try
+                {
+                    Client.cancelMktData(reqId);
+                }
+                catch
+                {
+                }
+
+                _marketProbeRequests.TryRemove(reqId, out _);
+                _marketProbeSymbols.TryRemove(reqId, out _);
+            }
+        }
+
         private async Task<List<Candle>> RequestHistoricalDataOnce(
             IBApi.Contract contract,
             Timeframe timeframe,
@@ -327,6 +385,17 @@ namespace IbSwingTrader.MarketData.IB
 
             // Небольшая пауза после готовности, чтобы фермы успели стабилизироваться
             await Task.Delay(1500);
+        }
+
+        private void AddMarketProbeLine(int reqId, string line)
+        {
+            if (!_marketProbeLogs.TryGetValue(reqId, out var list))
+                return;
+
+            lock (list)
+            {
+                list.Add($"{DateTime.Now:HH:mm:ss.fff} | {line}");
+            }
         }
 
         // ---- EWrapper methods ----
@@ -425,6 +494,18 @@ namespace IbSwingTrader.MarketData.IB
 
                 return;
             }
+
+            if (_marketProbeRequests.TryRemove(id, out var probeTcs))
+            {
+                var lines = _marketProbeLogs.TryRemove(id, out var list)
+                    ? list
+                    : [];
+
+                lines.Add($"ERROR code={errorCode} msg={errorMsg}");
+
+                probeTcs.TrySetResult(lines);
+                return;
+            }
         }
 
         public void connectionClosed()
@@ -449,22 +530,30 @@ namespace IbSwingTrader.MarketData.IB
 
         public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
-            // ignore
+            AddMarketProbeLine(
+                tickerId,
+                $"tickPrice field={field} price={price} autoExec={attribs.CanAutoExecute} pastLimit={attribs.PastLimit} preOpen={attribs.PreOpen}");
         }
 
         public void tickSize(int tickerId, int field, decimal size)
         {
-            // ignore
+            AddMarketProbeLine(
+                tickerId,
+                $"tickSize field={field} size={size}");
         }
 
         public void tickString(int tickerId, int field, string value)
         {
-            // ignore
+            AddMarketProbeLine(
+                tickerId,
+                $"tickString field={field} value={value}");
         }
 
         public void tickGeneric(int tickerId, int field, double value)
         {
-            // ignore
+            AddMarketProbeLine(
+                tickerId,
+                $"tickGeneric field={field} value={value}");
         }
 
         public void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
@@ -484,7 +573,15 @@ namespace IbSwingTrader.MarketData.IB
 
         public void tickSnapshotEnd(int tickerId)
         {
-            // ignore
+            AddMarketProbeLine(tickerId, "tickSnapshotEnd");
+
+            if (_marketProbeRequests.TryRemove(tickerId, out var tcs))
+            {
+                if (_marketProbeLogs.TryRemove(tickerId, out var list))
+                    tcs.TrySetResult(list);
+                else
+                    tcs.TrySetResult([]);
+            }
         }
 
         public void managedAccounts(string accountsList)
@@ -628,7 +725,9 @@ namespace IbSwingTrader.MarketData.IB
 
         public void marketDataType(int reqId, int marketDataType)
         {
-            // ignore
+            AddMarketProbeLine(
+                reqId,
+                $"marketDataType type={marketDataType}");
         }
 
         public void updateMktDepth(int tickerId, int position, int operation, int side, double price, decimal size)

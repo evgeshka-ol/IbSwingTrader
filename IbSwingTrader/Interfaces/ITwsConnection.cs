@@ -15,5 +15,6 @@ namespace IbSwingTrader.Interfaces
         Task<List<StockInfo>> GetStocksAsync(ScannerSubscription subscription, List<TagValue> filters);
         Task<string> RequestScannerParametersAsync();
         Task<FundamentalSnapshot?> GetFundamentalSnapshotAsync(Contract contract);
+        Task<List<string>> ProbeMarketDataAsync(Contract contract, int seconds = 10);
     }
 }
