@@ -3,8 +3,9 @@
     public interface IAgentPathService
     {
         string GetDataRoot();
+        string GetTradesFile();
+        string GetDatasetFile();
         string GetCacheFolder();
-        string GetDatasetFolder();
         string GetCandidatesFolder();
         string GetEvaluationsFolder();
         string GetWishListFile();

@@ -13,12 +13,14 @@ namespace IbSwingTrader.Infrastructure.Settings
         }
 
         public string GetDataRoot() => _paths.DataRoot;
+        public string GetTradesFile() => Combine(_paths.TradesFile);
+        public string GetDatasetFile() => Combine(_paths.DatasetFile);
         public string GetCacheFolder() => Combine(_paths.CacheFolder);
-        public string GetDatasetFolder() => Combine(_paths.DatasetFolder);
         public string GetCandidatesFolder() => Combine(_paths.CandidatesFolder);
         public string GetEvaluationsFolder() => Combine(_paths.EvaluationsFolder);
         public string GetWishListFile() => Combine(_paths.WishListFile);
-        public string GetProcessedCandidateFilesManifest() => Combine(_paths.ProcessedCandidateFilesManifest);
+        public string GetProcessedCandidateFilesManifest() =>
+            Combine(_paths.ProcessedCandidateFilesManifest);
         public string GetLogsFolder() => Combine(_paths.LogsFolder);
 
         private string Combine(string relativePath) =>

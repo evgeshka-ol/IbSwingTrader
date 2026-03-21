@@ -28,15 +28,9 @@ var command = args[0];
 switch (command)
 {
     case "build-dataset":
-        if (args.Length < 3)
-        {
-            logger.Info("Usage: build-dataset <trades.csv> <dataset.csv>");
-            return;
-        }
-
         await services
             .GetRequiredService<BuildDatasetCommand>()
-            .RunAsync(args[1], args[2]);
+            .RunAsync();
         break;
 
     case "get-candidates":

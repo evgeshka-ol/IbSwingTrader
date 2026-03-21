@@ -9,7 +9,7 @@ namespace IbSwingTrader.Commands
         private readonly ICandidateFinder _finder = finder;
         private readonly ICandidateResultWriter _writer = writer;
 
-        public async Task RunAsync(params string[] args)
+        public async Task RunAsync()
         {
             var candidates = await _finder.FindAsync();
             await _writer.WriteAsync(candidates);

@@ -2,6 +2,6 @@
 {
     public interface ICommand
     {
-        Task RunAsync(params string[] args);
+        Task RunAsync();
     }
 }

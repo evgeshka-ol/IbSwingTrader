@@ -7,43 +7,48 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Commands
 {
-    public class BuildDatasetCommand(
-        ITwsConnection connection,
-        ICsvWriter csvWriter,
-        IContractResolver contractResolver,
-        IHistoricalDataService historicalService,
-        ITradeDatasetBuilder datasetBuilder,
-        ITextLogger logger) : ICommand
+    public class BuildDatasetCommand : ICommand
     {
-        private readonly ITwsConnection _connection = connection;
-        private readonly ICsvWriter _csvWriter = csvWriter;
-        private readonly IContractResolver _contractResolver = contractResolver;
-        private readonly IHistoricalDataService _historicalService = historicalService;
-        private readonly ITradeDatasetBuilder _datasetBuilder = datasetBuilder;
-        private readonly ITextLogger _logger = logger;
+        private readonly ITwsConnection _connection;
+        private readonly ICsvWriter _csvWriter;
+        private readonly IContractResolver _contractResolver;
+        private readonly IHistoricalDataService _historicalService;
+        private readonly ITradeDatasetBuilder _datasetBuilder;
+        private readonly ITextLogger _logger;
+        private readonly IAgentPathService _pathService;
+        private readonly BuildDatasetSettings _buildDataset;
+        private readonly SemaphoreSlim _semaphore;
 
-        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(3);
-        private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = new ();
+        private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = new();
 
-        private string? _tradesPath = null;
-        private string? _datasetPath = null;
-
-        private Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
+        public BuildDatasetCommand(
+            ITwsConnection connection,
+            ICsvWriter csvWriter,
+            IContractResolver contractResolver,
+            IHistoricalDataService historicalService,
+            ITradeDatasetBuilder datasetBuilder,
+            ITextLogger logger,
+            IAgentPathService pathService,
+            IBuildDatasetSettingsProvider buildDatasetSettingsProvider)
         {
-            ["NYCB"] = "FLG"
-        };
+            _connection = connection;
+            _csvWriter = csvWriter;
+            _contractResolver = contractResolver;
+            _historicalService = historicalService;
+            _datasetBuilder = datasetBuilder;
+            _logger = logger;
+            _pathService = pathService;
 
-        public async Task RunAsync(params string[] args)
+            _buildDataset = buildDatasetSettingsProvider.Get();
+            _semaphore = new SemaphoreSlim(_buildDataset.MaxParallelTickers);
+        }
+
+        public async Task RunAsync()
         {
-            _tradesPath = args.Length > 0 ? args[0] : _tradesPath;
-            _datasetPath = args.Length > 1 ? args[1] : _datasetPath;
-            if (string.IsNullOrWhiteSpace(_tradesPath) || string.IsNullOrWhiteSpace(_datasetPath))
-            {
-                _logger.Error("Usage: BuildDatasetCommand <trades.csv> <dataset.csv>");
-                return;
-            }
+            var tradesPath = _pathService.GetTradesFile();
+            var datasetPath = _pathService.GetDatasetFile();
 
-            var trades = CsvTradeReader.Read(_tradesPath);
+            var trades = CsvTradeReader.Read(tradesPath);
 
             if (trades.Count == 0)
             {
@@ -57,23 +62,23 @@ namespace IbSwingTrader.Commands
                 .ToList();
 
             _logger.Info($"Tickers found: {grouped.Count}");
+
             _connection.Connect();
             await _connection.Ready.Task;
 
-            var tasks = new List<Task<List<TradeDatasetRow>>>();
-
-            foreach (var g in grouped)
-                tasks.Add(ProcessTicker(g));
+            var tasks = grouped
+                .Select(ProcessTicker)
+                .ToList();
 
             var results = await Task.WhenAll(tasks);
-
-            var allRows = results.SelectMany(r => r).ToList();
+            var allRows = results.SelectMany(x => x).ToList();
 
             _logger.EmptyLine();
             _logger.Info($"Total dataset rows: {allRows.Count}");
-            _csvWriter.Write(_datasetPath, allRows);
 
-            _logger.Info($"Dataset saved: {_datasetPath}");
+            _csvWriter.Write(datasetPath, allRows);
+
+            _logger.Info($"Dataset saved: {datasetPath}");
 
             _logger.EmptyLine();
             _logger.Info($"Failed requests: {_failedRequests.Count}");
@@ -81,34 +86,27 @@ namespace IbSwingTrader.Commands
             _logger.EmptyLine();
             var failedTable = FailedHistoryRequestTableFormatter.Format(_failedRequests);
             _logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
-
         }
 
-        private async Task<List<TradeDatasetRow>> ProcessTicker(IGrouping<string, TradeRecord> tickerGroup)
+        private async Task<List<TradeDatasetRow>> ProcessTicker(
+            IGrouping<string, TradeRecord> tickerGroup)
         {
             await _semaphore.WaitAsync();
 
             try
             {
                 var originalTicker = tickerGroup.Key.Trim().ToUpperInvariant();
-                var requestTicker = originalTicker;
-
-                if (TickerAliases.TryGetValue(originalTicker, out var mapped))
-                {
-                    _logger.Info($"Ticker remapped: {originalTicker} → {mapped}");
-                    requestTicker = mapped;
-                }
-
+                var requestTicker = MapTickerAlias(originalTicker);
                 var tickerTrades = tickerGroup.ToList();
+
+                if (!string.Equals(originalTicker, requestTicker, StringComparison.OrdinalIgnoreCase))
+                    _logger.Info($"Ticker remapped: {originalTicker} → {requestTicker}");
 
                 var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
                 var latest = tickerTrades.Max(t => t.ExitTimeUtc);
 
-                // Слева запас под warmup / индикаторы
-                var start = earliest.AddDays(-120);
-
-                // Справа запас под future bars / target
-                var end = latest.AddDays(21);
+                var start = earliest.AddDays(-_buildDataset.HistoryWarmupDays);
+                var end = latest.AddDays(_buildDataset.FuturePaddingDays);
 
                 _logger.EmptyLine();
                 _logger.Info($"Ticker: {originalTicker}");
@@ -130,15 +128,7 @@ namespace IbSwingTrader.Commands
                 }
                 catch (Exception ex)
                 {
-                    var problem = $"Failed to resolve contract: {ex.Message}";
-                    _logger.Error($"{originalTicker}: {problem}");
-
-                    _failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
+                    RegisterFailure(originalTicker, $"Failed to resolve contract: {ex.Message}");
                     return [];
                 }
 
@@ -155,89 +145,67 @@ namespace IbSwingTrader.Commands
                 }
                 catch (Exception ex)
                 {
-                    var problem = $"Failed to load candles: {ex.Message}";
-                    _logger.Error($"{originalTicker}: {problem}");
-
-                    _failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
+                    RegisterFailure(originalTicker, $"Failed to load candles: {ex.Message}");
                     return [];
                 }
 
                 if (candles == null || candles.Count == 0)
                 {
-                    var problem = "No market data";
-                    _logger.Info($"Skipping {originalTicker} — {problem}");
-
-                    _failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
+                    RegisterFailure(originalTicker, "No market data");
                     return [];
                 }
 
-                if (candles.Count < 60)
+                if (candles.Count < _buildDataset.MinimumCandlesRequired)
                 {
-                    var problem = $"Not enough candles: {candles.Count}";
-                    _logger.Info($"Skipping {originalTicker} — {problem}");
-
-                    _failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
+                    RegisterFailure(originalTicker, $"Not enough candles: {candles.Count}");
                     return [];
                 }
-
-                List<TradeDatasetRow> rows;
 
                 try
                 {
-                    rows = _datasetBuilder.Build(tickerTrades, candles);
+                    var rows = _datasetBuilder.Build(tickerTrades, candles);
 
                     if (rows.Count == 0)
                     {
-                        var problem = "No dataset rows built";
-
-                        _logger.Info($"Skipping {originalTicker} — {problem}");
-
-                        _failedRequests.Add(new FailedHistoryRequest
-                        {
-                            Ticker = originalTicker,
-                            Problem = problem
-                        });
-
+                        RegisterFailure(originalTicker, "No dataset rows built");
                         return [];
                     }
+
+                    _logger.Info($"Rows built for {originalTicker}: {rows.Count}");
+                    return rows;
                 }
                 catch (Exception ex)
                 {
-                    var problem = $"Dataset build failed: {ex.Message}";
-                    _logger.Error($"{originalTicker}: {problem}");
-
-                    _failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
+                    RegisterFailure(originalTicker, $"Dataset build failed: {ex.Message}");
                     return [];
                 }
-
-                _logger.Info($"Rows built for {originalTicker}: {rows.Count}");
-
-                return rows;
             }
             finally
             {
                 _semaphore.Release();
             }
+        }
+
+        private void RegisterFailure(string ticker, string problem)
+        {
+            _logger.Info($"Skipping {ticker} — {problem}");
+
+            _failedRequests.Add(new FailedHistoryRequest
+            {
+                Ticker = ticker,
+                Problem = problem
+            });
+        }
+
+        private string MapTickerAlias(string ticker)
+        {
+            if (_buildDataset.TickerAliases.TryGetValue(ticker, out var mapped) &&
+                !string.IsNullOrWhiteSpace(mapped))
+            {
+                return mapped.Trim().ToUpperInvariant();
+            }
+
+            return ticker;
         }
     }
 }

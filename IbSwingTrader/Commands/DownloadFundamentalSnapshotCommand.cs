@@ -18,7 +18,7 @@ namespace IbSwingTrader.Commands
             _logger = logger;
         }
 
-        public async Task RunAsync(params string[] args)
+        public async Task RunAsync()
         {
             var tickers = new[]
             {

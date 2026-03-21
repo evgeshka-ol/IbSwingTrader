@@ -44,7 +44,7 @@ namespace IbSwingTrader.Commands
             _searchPattern = searchPattern;
         }
 
-        public async Task RunAsync(params string[] args)
+        public async Task RunAsync()
         {
             EnsureConnected();
 

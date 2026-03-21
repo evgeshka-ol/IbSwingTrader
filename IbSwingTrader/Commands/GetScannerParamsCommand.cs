@@ -5,7 +5,7 @@ namespace IbSwingTrader.Commands
     public class GetScannerParamsCommand(
         ITwsConnection connection) : ICommand
     {
-        public async Task RunAsync(params string[] args)
+        public async Task RunAsync()
         {
             var xml = await connection.RequestScannerParametersAsync();
 
