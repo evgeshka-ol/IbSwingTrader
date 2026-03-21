@@ -12,11 +12,8 @@ namespace IbSwingTrader.Commands
         private readonly IProcessedCandidateFilesService _processedFilesService;
         private readonly IFileHashService _fileHashService;
         private readonly ITextLogger _logger;
-
-        private readonly string _candidatesFolder;
-        private readonly string _evaluationsFolder;
-        private readonly string _manifestPath;
-        private readonly string _searchPattern;
+        private readonly IAgentPathService _pathService;
+        private readonly IEvaluateCandidatesFolderSettingsProvider _settingsProvider;
 
         public EvaluateCandidatesFolderCommand(
             ITwsConnection twsConnection,
@@ -26,10 +23,8 @@ namespace IbSwingTrader.Commands
             IProcessedCandidateFilesService processedFilesService,
             IFileHashService fileHashService,
             ITextLogger logger,
-            string candidatesFolder,
-            string evaluationsFolder,
-            string manifestPath,
-            string searchPattern = "candidates_*.json")
+            IAgentPathService pathService,
+            IEvaluateCandidatesFolderSettingsProvider settingsProvider)
         {
             _twsConnection = twsConnection;
             _candidateEvaluator = candidateEvaluator;
@@ -38,23 +33,30 @@ namespace IbSwingTrader.Commands
             _processedFilesService = processedFilesService;
             _fileHashService = fileHashService;
             _logger = logger;
-            _candidatesFolder = candidatesFolder;
-            _evaluationsFolder = evaluationsFolder;
-            _manifestPath = manifestPath;
-            _searchPattern = searchPattern;
+            _pathService = pathService;
+            _settingsProvider = settingsProvider;
         }
 
         public async Task RunAsync()
         {
-            EnsureConnected();
+            var settings = _settingsProvider.Get();
 
-            Directory.CreateDirectory(_candidatesFolder);
-            Directory.CreateDirectory(_evaluationsFolder);
+            var candidatesFolder = _pathService.GetCandidatesFolder();
+            var evaluationsFolder = _pathService.GetEvaluationsFolder();
+            var manifestPath = _pathService.GetProcessedCandidateFilesManifest();
 
-            var manifest = await _processedFilesService.ReadAsync(_manifestPath);
+            EnsureConnected(settings.ConnectTimeoutSeconds);
+
+            Directory.CreateDirectory(candidatesFolder);
+            Directory.CreateDirectory(evaluationsFolder);
+
+            var manifest = await _processedFilesService.ReadAsync(manifestPath);
 
             var files = Directory
-                .GetFiles(_candidatesFolder, _searchPattern, SearchOption.TopDirectoryOnly)
+                .GetFiles(
+                    candidatesFolder,
+                    settings.SearchPattern,
+                    SearchOption.TopDirectoryOnly)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -64,17 +66,22 @@ namespace IbSwingTrader.Commands
 
             foreach (var file in files)
             {
-                var processed = await ProcessFileAsync(file, manifest);
+                var processed = await ProcessFileAsync(
+                    file,
+                    evaluationsFolder,
+                    manifestPath,
+                    manifest);
+
                 manifestChanged = manifestChanged || processed;
             }
 
             if (manifestChanged)
-                await _processedFilesService.WriteAsync(_manifestPath, manifest);
+                await _processedFilesService.WriteAsync(manifestPath, manifest);
 
             _logger.Info("Folder evaluation completed.");
         }
 
-        private void EnsureConnected()
+        private void EnsureConnected(int connectTimeoutSeconds)
         {
             if (_twsConnection.IsConnected)
                 return;
@@ -84,7 +91,7 @@ namespace IbSwingTrader.Commands
             _twsConnection.Connect();
 
             var connected = _twsConnection.Ready.Task
-                .Wait(TimeSpan.FromSeconds(15));
+                .Wait(TimeSpan.FromSeconds(connectTimeoutSeconds));
 
             if (!connected || !_twsConnection.IsConnected)
                 throw new InvalidOperationException("Failed to connect to TWS.");
@@ -94,6 +101,8 @@ namespace IbSwingTrader.Commands
 
         private async Task<bool> ProcessFileAsync(
             string filePath,
+            string evaluationsFolder,
+            string manifestPath,
             ProcessedCandidateFilesManifest manifest)
         {
             var fileInfo = new FileInfo(filePath);
@@ -119,7 +128,7 @@ namespace IbSwingTrader.Commands
             var results = await _candidateEvaluator.EvaluateAsync(candidates);
 
             var outputFileName = BuildOutputCsvFileName(fileInfo.Name);
-            var outputFullPath = Path.Combine(_evaluationsFolder, outputFileName);
+            var outputFullPath = Path.Combine(evaluationsFolder, outputFileName);
 
             await _csvService.WriteAsync(outputFullPath, results);
 
@@ -140,7 +149,7 @@ namespace IbSwingTrader.Commands
                     OutputCsvFullPath = outputFullPath
                 });
 
-            await _processedFilesService.WriteAsync(_manifestPath, manifest);
+            await _processedFilesService.WriteAsync(manifestPath, manifest);
 
             LogSummary(fileInfo.Name, results);
 
