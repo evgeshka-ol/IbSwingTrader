@@ -16,9 +16,11 @@ namespace IbSwingTrader.Infrastructure.Historical
             WriteIndented = false
         };
 
-        public HistoricalCache(string folder, ITextLogger logger)
+        public HistoricalCache(
+            IAgentPathService pathService,
+            ITextLogger logger)
         {
-            _folder = folder;
+            _folder = pathService.GetCacheFolder();
             _logger = logger;
 
             Directory.CreateDirectory(_folder);
