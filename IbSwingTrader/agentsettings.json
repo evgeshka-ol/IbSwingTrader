@@ -1,0 +1,78 @@
+{
+    "ConfigVersion": 1,
+
+    "Paths": {
+        "DataRoot": "Data",
+        "CacheFolder": "cache",
+        "DatasetFolder": "datasets",
+        "CandidatesFolder": "candidates",
+        "EvaluationsFolder": "evaluations",
+        "WishListFile": "wishlist/current.json",
+        "ProcessedCandidateFilesManifest": "manifests/processed-candidate-files.json",
+        "LogsFolder": "logs"
+    },
+
+    "Ibkr": {
+        "Host": "127.0.0.1",
+        "Port": 7497,
+        "ClientId": 7,
+        "UseRth": false,
+        "HistoricalRequestMaxParallel": 3,
+        "HistoricalRequestDelayMs": 250
+    },
+
+    "Market": {
+        "Timezone": "America/New_York",
+        "ExcludeOtc": true,
+        "MinPrice": 1.0,
+        "MaxPrice": 100.0,
+        "MinAvgVolume": 500000,
+        "MinDollarVolume": 1000000
+    },
+
+    "BuildDataset": {
+        "LookbackCandles": 300,
+        "MinimumCandlesRequired": 60,
+        "AvgVolumeWindow": 20,
+        "IncludeSyntheticTrades": false
+    },
+
+    "GetCandidates": {
+        "RowsPerScan": 50,
+        "FinalTopCandidates": 10,
+        "UseWishListFirst": true,
+        "MaxWishListItems": 100,
+        "ScanCodes": [
+            {
+                "Code": "TOP_OPEN_PERC_GAIN",
+                "Description": "Top percentage gainer at open."
+            },
+            {
+                "Code": "TOP_PERC_GAIN",
+                "Description": "Top percentage gainers."
+            },
+            {
+                "Code": "HOT_BY_VOLUME",
+                "Description": "Most active by volume."
+            },
+            {
+                "Code": "MOST_ACTIVE",
+                "Description": "Most active stocks."
+            }
+        ]
+    },
+
+    "Evaluation": {
+        "SearchPattern": "candidates_*.json",
+        "ForwardEvaluationDays": 7,
+        "FreshDataSafetyLagMinutes": 10,
+        "DefaultTargetPct": 10.0,
+        "UseAmbiguousBarResolver": true
+    },
+
+    "Logging": {
+        "EnableConsoleColors": true,
+        "MinimumLevel": "Information",
+        "WriteToFile": true
+    }
+}
