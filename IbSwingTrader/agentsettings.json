@@ -3,8 +3,9 @@
 
     "Paths": {
         "DataRoot": "Data",
+        "TradesFile": "trades.csv",
+        "DatasetFile": "dataset.csv",
         "CacheFolder": "cache",
-        "DatasetFolder": "datasets",
         "CandidatesFolder": "candidates",
         "EvaluationsFolder": "evaluations",
         "WishListFile": "wishlist/current.json",
@@ -31,10 +32,19 @@
     },
 
     "BuildDataset": {
-        "LookbackCandles": 300,
         "MinimumCandlesRequired": 60,
-        "AvgVolumeWindow": 20,
-        "IncludeSyntheticTrades": false
+        "IncludeSyntheticTrades": false,
+        "MaxParallelTickers": 3,
+        "HistoryWarmupDays": 120,
+        "FuturePaddingDays": 21,
+        "TickerAliases": {
+            "NYCB": "FLG"
+        }
+    },
+
+    "FeatureCalculation": {
+        "LookbackCandles": 300,
+        "AvgVolumeWindow": 20
     },
 
     "GetCandidates": {
