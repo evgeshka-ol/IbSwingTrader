@@ -1,11 +1,17 @@
 ﻿using System.Text;
+using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {
-    public static class FailedHistoryRequestTableFormatter
+    public class FailedHistoryRequestTableFormatter : IFailedHistoryRequestTableFormatter
     {
-        public static string Format(IEnumerable<FailedHistoryRequest> items)
+        public string Format(IEnumerable<FailedHistoryRequest> items)
+        {
+            return FormatInternal(items);
+        }
+
+        private static string FormatInternal(IEnumerable<FailedHistoryRequest> items)
         {
             var list = items.ToList();
 

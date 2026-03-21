@@ -29,7 +29,8 @@ namespace IbSwingTrader.Commands
             ITradeDatasetBuilder datasetBuilder,
             ITextLogger logger,
             IAgentPathService pathService,
-            IBuildDatasetSettingsProvider buildDatasetSettingsProvider)
+            IBuildDatasetSettingsProvider buildDatasetSettingsProvider,
+            IFailedHistoryRequestTableFormatter failedHistoryRequestTableFormatter)
         {
             _connection = connection;
             _csvWriter = csvWriter;
@@ -84,7 +85,7 @@ namespace IbSwingTrader.Commands
             _logger.Info($"Failed requests: {_failedRequests.Count}");
 
             _logger.EmptyLine();
-            var failedTable = FailedHistoryRequestTableFormatter.Format(_failedRequests);
+            var failedTable = failedHistoryRequestTableFormatter.Format(_failedRequests);
             _logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
         }
 
