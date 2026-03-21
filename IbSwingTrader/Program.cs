@@ -1,22 +1,13 @@
-﻿using System.Collections.Concurrent;
-using IBApi;
-using IbSwingTrader.Analysis;
+﻿using IbSwingTrader.Analysis;
 using IbSwingTrader.Commands;
 using IbSwingTrader.Infrastructure.Bootstrap;
 using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Infrastructure.Logging;
-using IbSwingTrader.Interfaces;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
-using IbSwingTrader.Models;
 using IbSwingTrader.Services;
 using IbSwingTrader.Services.CandidateEvaluation;
 using IbSwingTrader.Services.CandidateFiltering;
-
-Dictionary<string, string> TickerAliases = new(StringComparer.OrdinalIgnoreCase)
-{
-    ["NYCB"] = "FLG"
-};
 
 var services = ConfigureServices();
 
@@ -36,7 +27,12 @@ var command = args[0];
 switch (command)
 {
     case "build-dataset":
-        await RunBuildDataset(args, services.Logger, services.Connection, services.CsvWriter, services.ContractResolver, services.HistoricalService, services.DatasetBuilder);
+        if (args.Length < 3)
+        {
+            services.Logger.Info("Usage: build-dataset <trades.csv> <dataset.csv>");
+            return;
+        }
+        await services.BuildDatasetCommand.RunAsync(args[1], args[2]);
         break;
 
     case "get-candidates":
@@ -84,11 +80,12 @@ static Services ConfigureServices()
     return new Services
     {
         Logger = logger,
-        Connection = connection,
-        DatasetBuilder = new TradeDatasetBuilder(featureEngine, candidateScore, new FutureStatsCalculator(), logger),
-        CsvWriter = new CsvDatasetWriter(),
-        ContractResolver = contractResolver,
-        HistoricalService = historicalService,
+        BuildDatasetCommand = new BuildDatasetCommand(connection,
+            new CsvDatasetWriter(),
+            contractResolver,
+            historicalService,
+            new TradeDatasetBuilder(featureEngine, candidateScore, new FutureStatsCalculator(), logger),
+            logger),
         GetCandidatesCommand = new GetCandidatesCommand(
             new CandidateFinder(
                 new TwsStockUniverseProvider(connection),
@@ -102,7 +99,6 @@ static Services ConfigureServices()
                 new ScanCodeInfoService(),
                 logger),
                 new CandidateResultWriter()),
-        GetScannerParamsCommand = new GetScannerParamsCommand(connection),
         EvaluateCandidatesFolderCommand = new EvaluateCandidatesFolderCommand(
             connection,
             new CandidateEvaluator(contractResolver, historicalService, new AmbiguousBarResolver(historicalService, logger), logger),
@@ -114,219 +110,10 @@ static Services ConfigureServices()
             candidatesFolder: "candidates",
             evaluationsFolder: "evaluations",
             manifestPath: "manifests/processed-candidate-files.json"),
+        GetScannerParamsCommand = new GetScannerParamsCommand(connection),
         DownloadFundamentalSnapshotCommand = new DownloadFundamentalSnapshotCommand(
             connection,
             contractResolver,
             logger)
     };
-}
-
-async Task RunBuildDataset(string[] args, ITextLogger logger, ITwsConnection connection, ICsvWriter csvWriter, IContractResolver contractResolver, IHistoricalDataService historicalService, ITradeDatasetBuilder datasetBuilder)
-{
-    if (args.Length < 3)
-    {
-        logger.Info("Usage: build-dataset <trades.csv> <dataset.csv>");
-        return;
-    }
-
-    var tradesPath = args[1];
-    var datasetPath = args[2];
-
-    var trades = CsvTradeReader.Read(tradesPath);
-
-    if (trades.Count == 0)
-    {
-        logger.Error("No trades found");
-        return;
-    }
-
-    var grouped = trades
-        .GroupBy(t => t.Ticker)
-        .OrderBy(g => g.Key)
-        .ToList();
-
-    logger.Info($"Tickers found: {grouped.Count}");
-    connection.Connect();
-    await connection.Ready.Task;
-
-    var semaphore = new SemaphoreSlim(3);
-    var failedRequests = new ConcurrentBag<FailedHistoryRequest>();
-
-    var tasks = new List<Task<List<TradeDatasetRow>>>();
-
-    foreach (var g in grouped)
-        tasks.Add(ProcessTicker(g, contractResolver, historicalService, datasetBuilder));
-
-    var results = await Task.WhenAll(tasks);
-
-    var allRows = results.SelectMany(r => r).ToList();
-
-    logger.EmptyLine();
-    logger.Info($"Total dataset rows: {allRows.Count}");
-    csvWriter.Write(datasetPath, allRows);
-
-    logger.Info($"Dataset saved: {datasetPath}");
-
-    logger.EmptyLine();
-    logger.Info($"Failed requests: {failedRequests.Count}");
-
-    logger.EmptyLine();
-    var failedTable = FailedHistoryRequestTableFormatter.Format(failedRequests);
-    logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
-
-    async Task<List<TradeDatasetRow>> ProcessTicker(IGrouping<string, TradeRecord> g, IContractResolver contractResolver, IHistoricalDataService historicalService, ITradeDatasetBuilder datasetBuilder)
-    {
-        await semaphore.WaitAsync();
-
-        try
-        {
-            var originalTicker = g.Key.Trim().ToUpperInvariant();
-            var requestTicker = originalTicker;
-
-            if (TickerAliases.TryGetValue(originalTicker, out var mapped))
-            {
-                logger.Info($"Ticker remapped: {originalTicker} → {mapped}");
-                requestTicker = mapped;
-            }
-
-            var tickerTrades = g.ToList();
-
-            var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
-            var latest = tickerTrades.Max(t => t.ExitTimeUtc);
-
-            // Слева запас под warmup / индикаторы
-            var start = earliest.AddDays(-120);
-
-            // Справа запас под future bars / target
-            var end = latest.AddDays(21);
-
-            logger.EmptyLine();
-            logger.Info($"Ticker: {originalTicker}");
-            logger.Info($"Trades: {tickerTrades.Count}");
-            logger.Info(
-                $"Range: {start:yyyy-MM-dd} -> {end:yyyy-MM-dd} " +
-                $"(last trade exit: {latest:yyyy-MM-dd})");
-
-            Contract contract;
-
-            try
-            {
-                contract = await contractResolver.ResolveStockAsync(requestTicker);
-
-                logger.Info(
-                    $"Resolved contract: {contract.Symbol} " +
-                    $"conId={contract.ConId} " +
-                    $"exchange={contract.Exchange}");
-            }
-            catch (Exception ex)
-            {
-                var problem = $"Failed to resolve contract: {ex.Message}";
-                logger.Error($"{originalTicker}: {problem}");
-
-                failedRequests.Add(new FailedHistoryRequest
-                {
-                    Ticker = originalTicker,
-                    Problem = problem
-                });
-
-                return [];
-            }
-
-            List<Candle>? candles;
-
-            try
-            {
-                candles = await historicalService.GetCandlesRange(
-                    requestTicker,
-                    contract,
-                    Timeframe.H4,
-                    start,
-                    end);
-            }
-            catch (Exception ex)
-            {
-                var problem = $"Failed to load candles: {ex.Message}";
-                logger.Error($"{originalTicker}: {problem}");
-
-                failedRequests.Add(new FailedHistoryRequest
-                {
-                    Ticker = originalTicker,
-                    Problem = problem
-                });
-
-                return [];
-            }
-
-            if (candles == null || candles.Count == 0)
-            {
-                var problem = "No market data";
-                logger.Info($"Skipping {originalTicker} — {problem}");
-
-                failedRequests.Add(new FailedHistoryRequest
-                {
-                    Ticker = originalTicker,
-                    Problem = problem
-                });
-
-                return [];
-            }
-
-            if (candles.Count < 60)
-            {
-                var problem = $"Not enough candles: {candles.Count}";
-                logger.Info($"Skipping {originalTicker} — {problem}");
-
-                failedRequests.Add(new FailedHistoryRequest
-                {
-                    Ticker = originalTicker,
-                    Problem = problem
-                });
-
-                return [];
-            }
-
-            List<TradeDatasetRow> rows;
-
-            try
-            {
-                rows = datasetBuilder.Build(tickerTrades, candles);
-
-                if (rows.Count == 0)
-                {
-                    var problem = "No dataset rows built";
-
-                    logger.Info($"Skipping {originalTicker} — {problem}");
-
-                    failedRequests.Add(new FailedHistoryRequest
-                    {
-                        Ticker = originalTicker,
-                        Problem = problem
-                    });
-
-                    return [];
-                }
-            }
-            catch (Exception ex)
-            {
-                var problem = $"Dataset build failed: {ex.Message}";
-                logger.Error($"{originalTicker}: {problem}");
-
-                failedRequests.Add(new FailedHistoryRequest
-                {
-                    Ticker = originalTicker,
-                    Problem = problem
-                });
-
-                return [];
-            }
-
-            logger.Info($"Rows built for {originalTicker}: {rows.Count}");
-
-            return rows;
-        }
-        finally
-        {
-            semaphore.Release();
-        }
-    }
 }
