@@ -13,7 +13,8 @@ namespace IbSwingTrader.Commands
         private readonly IFileHashService _fileHashService;
         private readonly ITextLogger _logger;
         private readonly IAgentPathService _pathService;
-        private readonly IEvaluateCandidatesFolderSettingsProvider _settingsProvider;
+        private readonly IEvaluationSettingsProvider _evaluationSettingsProvider;
+        private readonly ITwsSettingsProvider _twsSettingsProvider;
 
         public EvaluateCandidatesFolderCommand(
             ITwsConnection twsConnection,
@@ -24,7 +25,8 @@ namespace IbSwingTrader.Commands
             IFileHashService fileHashService,
             ITextLogger logger,
             IAgentPathService pathService,
-            IEvaluateCandidatesFolderSettingsProvider settingsProvider)
+            IEvaluationSettingsProvider evaluationSettingsProvider,
+            ITwsSettingsProvider twsSettingsProvider)
         {
             _twsConnection = twsConnection;
             _candidateEvaluator = candidateEvaluator;
@@ -34,18 +36,20 @@ namespace IbSwingTrader.Commands
             _fileHashService = fileHashService;
             _logger = logger;
             _pathService = pathService;
-            _settingsProvider = settingsProvider;
+            _evaluationSettingsProvider = evaluationSettingsProvider;
+            _twsSettingsProvider = twsSettingsProvider;
         }
 
         public async Task RunAsync()
         {
-            var settings = _settingsProvider.Get();
+            var evaluationSettings = _evaluationSettingsProvider.Get();
+            var twsSettings = _twsSettingsProvider.Get();
 
             var candidatesFolder = _pathService.GetCandidatesFolder();
             var evaluationsFolder = _pathService.GetEvaluationsFolder();
             var manifestPath = _pathService.GetProcessedCandidateFilesManifest();
 
-            EnsureConnected(settings.ConnectTimeoutSeconds);
+            EnsureConnected(twsSettings.ConnectTimeoutSeconds);
 
             Directory.CreateDirectory(candidatesFolder);
             Directory.CreateDirectory(evaluationsFolder);
@@ -55,7 +59,7 @@ namespace IbSwingTrader.Commands
             var files = Directory
                 .GetFiles(
                     candidatesFolder,
-                    settings.SearchPattern,
+                    evaluationSettings.SearchPattern,
                     SearchOption.TopDirectoryOnly)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -81,7 +85,7 @@ namespace IbSwingTrader.Commands
             _logger.Info("Folder evaluation completed.");
         }
 
-        private void EnsureConnected(int connectTimeoutSeconds)
+        private void EnsureConnected(int timeoutSeconds)
         {
             if (_twsConnection.IsConnected)
                 return;
@@ -91,7 +95,7 @@ namespace IbSwingTrader.Commands
             _twsConnection.Connect();
 
             var connected = _twsConnection.Ready.Task
-                .Wait(TimeSpan.FromSeconds(connectTimeoutSeconds));
+                .Wait(TimeSpan.FromSeconds(timeoutSeconds));
 
             if (!connected || !_twsConnection.IsConnected)
                 throw new InvalidOperationException("Failed to connect to TWS.");

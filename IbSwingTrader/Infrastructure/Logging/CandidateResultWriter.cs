@@ -1,5 +1,4 @@
 ﻿using System.Globalization;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using IbSwingTrader.Interfaces;
@@ -7,12 +6,8 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
-    public class CandidateResultWriter() : ICandidateResultWriter
+    public class CandidateResultWriter : ICandidateResultWriter
     {
-        private const string Folder = "candidates";
-        private const string NewYorkTimeZoneIana = "America/New_York";
-        private const string NewYorkTimeZoneWindows = "Eastern Standard Time";
-
         private static readonly HashSet<string> RoundTo2Fields =
         [
             nameof(Candidate.EntryPrice),
@@ -22,36 +17,62 @@ namespace IbSwingTrader.Infrastructure.Logging
             nameof(Candidate.LossPercent)
         ];
 
+        private readonly IAgentPathService _pathService;
+        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider;
+        private readonly IMarketSettingsProvider _marketSettingsProvider;
+        private readonly ITextLogger _logger;
+        private readonly IConsoleColorWriter _console;
+        private readonly IObjectPropertyReader _propertyReader;
+
+        public CandidateResultWriter(
+            IAgentPathService pathService,
+            IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
+            IMarketSettingsProvider marketSettingsProvider,
+            ITextLogger logger,
+            IConsoleColorWriter console,
+            IObjectPropertyReader propertyReader)
+        {
+            _pathService = pathService;
+            _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
+            _marketSettingsProvider = marketSettingsProvider;
+            _logger = logger;
+            _console = console;
+            _propertyReader = propertyReader;
+        }
+
         public async Task WriteAsync(List<CandidateDetails> candidates)
         {
-            Directory.CreateDirectory(Folder);
+            var settings = _getCandidatesSettingsProvider.Get();
+            var marketSettings = _marketSettingsProvider.Get();
 
-            var scanTimeNy = GetNewYorkNow();
-            var filePath = Path.Combine(
-                Folder,
-                $"candidates_{scanTimeNy:yyyyMMdd_HHmm}_NY.json");
+            var folder = _pathService.GetCandidatesFolder();
+            Directory.CreateDirectory(folder);
 
-            foreach (var c in candidates)
+            var scanTimeMarket = GetMarketNow(marketSettings.Timezone);
+            var fileName = BuildFileName(scanTimeMarket);
+            var filePath = Path.Combine(folder, fileName);
+
+            foreach (var candidate in candidates)
             {
-                c.ScanTimeNy = scanTimeNy;
-                c.ScanTimeZone = NewYorkTimeZoneIana;
+                candidate.ScanTimeMarket = scanTimeMarket;
+                candidate.ScanTimeZone = marketSettings.Timezone;
 
-                WriteCandidate(c);
+                WriteCandidateToConsole(candidate);
             }
 
             var json = BuildJson(candidates);
 
             await File.WriteAllTextAsync(filePath, json);
+
+            _logger.Info($"Candidates saved: {filePath}");
         }
 
-        private static string BuildJson(IEnumerable<CandidateDetails> candidates)
+        private string BuildJson(IEnumerable<CandidateDetails> candidates)
         {
             var array = new JsonArray();
 
             foreach (var candidate in candidates)
-            {
                 array.Add(ToJsonObject(candidate));
-            }
 
             return array.ToJsonString(new JsonSerializerOptions
             {
@@ -59,23 +80,9 @@ namespace IbSwingTrader.Infrastructure.Logging
             });
         }
 
-        private static JsonObject ToJsonObject<T>(T item)
+        private JsonObject ToJsonObject<T>(T item)
         {
-            var type = typeof(T);
-
-            var baseProps = type.BaseType?
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .OrderBy(p => p.MetadataToken)
-                ?? Enumerable.Empty<PropertyInfo>();
-
-            var ownProps = type
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .OrderBy(p => p.MetadataToken);
-
-            var props = baseProps
-                .Concat(ownProps)
-                .ToArray();
-
+            var props = _propertyReader.GetOrderedProperties(typeof(T));
             var obj = new JsonObject();
 
             foreach (var prop in props)
@@ -117,53 +124,26 @@ namespace IbSwingTrader.Infrastructure.Logging
             };
         }
 
-        private static DateTime GetNewYorkNow()
+        private void WriteCandidateToConsole(Candidate candidate)
         {
-            var utcNow = DateTime.UtcNow;
-            var timeZone = GetNewYorkTimeZone();
-
-            return TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
+            _console.Write($"{candidate.Ticker} ", ConsoleColor.Gray);
+            _console.Write($"{candidate.EntryPrice:F2} ", ConsoleColor.DarkYellow);
+            _console.Write($"{candidate.ExitPrice:F2} ", ConsoleColor.DarkGreen);
+            _console.Write($"{candidate.StopLoss:F2} ", ConsoleColor.DarkRed);
+            _console.Write($"{candidate.ProfitPercent:+0.00;-0.00}%", ConsoleColor.Green);
+            _console.Write("/", ConsoleColor.DarkGray);
+            _console.WriteLine($"{candidate.LossPercent:+0.00;-0.00}%", ConsoleColor.Red);
         }
 
-        private static TimeZoneInfo GetNewYorkTimeZone()
+        private static string BuildFileName(DateTime scanTimeMarket)
         {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(NewYorkTimeZoneIana);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(NewYorkTimeZoneWindows);
-            }
+            return $"candidates_{scanTimeMarket:yyyyMMdd_HHmm}_MARKET.json";
         }
 
-        private static void WriteCandidate(Candidate c)
+        private static DateTime GetMarketNow(string timezoneId)
         {
-            Write(ConsoleColor.Gray, $"{c.Ticker} ");
-
-            Write(ConsoleColor.DarkYellow, $"{c.EntryPrice:F2} ");
-
-            Write(ConsoleColor.DarkGreen, $"{c.ExitPrice:F2} ");
-
-            Write(ConsoleColor.DarkRed, $"{c.StopLoss:F2} ");
-
-            Write(ConsoleColor.Green, $"{c.ProfitPercent:+0.00;-0.00}%");
-
-            Write(ConsoleColor.DarkGray, "/");
-
-            Write(ConsoleColor.Red, $"{c.LossPercent:+0.00;-0.00}%");
-
-            Console.WriteLine();
-        }
-
-        private static void Write(ConsoleColor color, string text)
-        {
-            var old = Console.ForegroundColor;
-
-            Console.ForegroundColor = color;
-            Console.Write(text);
-
-            Console.ForegroundColor = old;
+            var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
         }
     }
 }

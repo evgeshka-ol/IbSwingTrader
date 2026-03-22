@@ -56,8 +56,8 @@ namespace IbSwingTrader.Services.CandidateEvaluation
 
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
 
-            var start = candidate.ScanTimeNy;
-            var requestedEnd = candidate.ScanTimeNy.Add(MaxEvaluationWindow);
+            var start = candidate.ScanTimeMarket;
+            var requestedEnd = candidate.ScanTimeMarket.Add(MaxEvaluationWindow);
             var availableNow = DateTime.UtcNow - FreshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
@@ -84,7 +84,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             }
 
             var ordered = candles
-                .Where(x => x.Time >= candidate.ScanTimeNy && x.Time <= end)
+                .Where(x => x.Time >= candidate.ScanTimeMarket && x.Time <= end)
                 .OrderBy(x => x.Time)
                 .ToList();
 
@@ -265,7 +265,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.ScanTimeNy,
+                ScanTimeNy = candidate.ScanTimeMarket,
                 PresetScanCode = candidate.PresetScanCode,
                 CandidateScore = candidate.Score,
                 EntryPrice = candidate.EntryPrice,
@@ -281,7 +281,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.ScanTimeNy,
+                ScanTimeNy = candidate.ScanTimeMarket,
                 PresetScanCode = candidate.PresetScanCode,
                 CandidateScore = candidate.Score,
                 EntryPrice = candidate.EntryPrice,

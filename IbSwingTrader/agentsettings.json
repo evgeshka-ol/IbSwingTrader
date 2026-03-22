@@ -13,13 +13,16 @@
         "LogsFolder": "logs"
     },
 
-    "Ibkr": {
+    "Tws": {
         "Host": "127.0.0.1",
         "Port": 7497,
         "ClientId": 7,
         "UseRth": false,
-        "HistoricalRequestMaxParallel": 3,
-        "HistoricalRequestDelayMs": 250
+        "ConnectTimeoutSeconds": 15,
+        "HistoryTimeoutSeconds": 60,
+        "ReconnectDelaySeconds": 5,
+        "MaxParallelHistoryRequests": 2,
+        "HistoryRequestPauseMs": 250
     },
 
     "Market": {
@@ -78,11 +81,5 @@
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
         "UseAmbiguousBarResolver": true
-    },
-
-    "Logging": {
-        "EnableConsoleColors": true,
-        "MinimumLevel": "Information",
-        "WriteToFile": true
     }
 }

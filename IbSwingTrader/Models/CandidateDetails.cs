@@ -24,9 +24,9 @@
         public decimal? WeeklyMACDHistDelta { get; internal set; }
 
         // New York time only
-        public DateTime ScanTimeNy { get; set; }
+        public DateTime ScanTimeMarket { get; set; }
 
-        public string ScanTimeZone { get; set; } = "America/New_York";
+        public string ScanTimeZone { get; set; } = string.Empty;
 
         public bool IsWishList { get; set; }
 

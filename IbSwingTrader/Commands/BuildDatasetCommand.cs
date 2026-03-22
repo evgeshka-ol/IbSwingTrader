@@ -17,6 +17,7 @@ namespace IbSwingTrader.Commands
         private readonly ITextLogger _logger;
         private readonly IAgentPathService _pathService;
         private readonly BuildDatasetSettings _buildDataset;
+        private readonly IFailedHistoryRequestTableFormatter _failedHistoryRequestTableFormatter;
         private readonly SemaphoreSlim _semaphore;
 
         private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = new();
@@ -41,6 +42,7 @@ namespace IbSwingTrader.Commands
             _pathService = pathService;
 
             _buildDataset = buildDatasetSettingsProvider.Get();
+            _failedHistoryRequestTableFormatter = failedHistoryRequestTableFormatter;
             _semaphore = new SemaphoreSlim(_buildDataset.MaxParallelTickers);
         }
 
@@ -85,7 +87,7 @@ namespace IbSwingTrader.Commands
             _logger.Info($"Failed requests: {_failedRequests.Count}");
 
             _logger.EmptyLine();
-            var failedTable = failedHistoryRequestTableFormatter.Format(_failedRequests);
+            var failedTable = _failedHistoryRequestTableFormatter.Format(_failedRequests);
             _logger.InfoBlock("FAILED HISTORY REQUESTS", failedTable);
         }
 

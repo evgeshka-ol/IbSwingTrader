@@ -1,92 +1,118 @@
-﻿using IbSwingTrader.Interfaces;
+﻿using System.Text;
+using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class TextLogger : ITextLogger
     {
-        private static readonly string _filePath = $"logs/log-{DateTime.UtcNow:yyyyMMdd_HHmm}.log";
-        private static readonly Lock _lock = new();
+        private readonly string _logFilePath;
+        private readonly IConsoleColorWriter _console;
+        private readonly object _fileLock = new();
 
-        public TextLogger()
+        public TextLogger(
+            IAgentPathService pathService,
+            IConsoleColorWriter console)
         {
-            var dir = Path.GetDirectoryName(_filePath);
+            _console = console;
 
-            if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
+            var logsFolder = pathService.GetLogsFolder();
+            Directory.CreateDirectory(logsFolder);
+
+            _logFilePath = Path.Combine(
+                logsFolder,
+                $"log-{DateTime.UtcNow:yyyyMMdd_HHmm}.log");
         }
 
         public void EmptyLine()
         {
-            lock (_lock)
-            {
-                Console.WriteLine();
-                File.AppendAllText(_filePath, Environment.NewLine);
-            }
+            _console.WriteLine();
+            AppendRawLine(string.Empty);
         }
 
         public void Info(string message)
-            => Write("INFO", message, ConsoleColor.DarkGray);
-
-        public void Debug(string message)
-            => Write("DEBUG", message);
-
-        public void Warning(string message)
-            => Write("WARNING", message);
-
-        public void Error(string message)
-            => Write("ERROR", message, ConsoleColor.Red);
-
-        public void InfoBlock(string title, string block)
-            => WriteBlock("INFO", title, block, ConsoleColor.DarkGray);
-
-        public void ErrorBlock(string title, string block)
-            => WriteBlock("ERROR", title, block, ConsoleColor.Red);
-
-        private static void Write(string level, string message, ConsoleColor? color = null)
         {
-            var time = DateTime.UtcNow.ToString("HH:mm:ss");
-            var line = $"{time} [{level}] | {message}";
-
-            lock (_lock)
-            {
-                if (level != "DEBUG")
-                {
-                    var oldColor = Console.ForegroundColor;
-
-                    if (color.HasValue)
-                        Console.ForegroundColor = color.Value;
-
-                    Console.WriteLine(line);
-                    Console.ForegroundColor = oldColor;
-
-                    File.AppendAllText(_filePath, $"{DateTime.UtcNow:O} {line}{Environment.NewLine}");
-                }
-            }
+            Write("INFO", message, ConsoleColor.DarkGray, writeToConsole: true);
         }
 
-        private static void WriteBlock(
+        public void Debug(string message)
+        {
+            Write("DEBUG", message, color: null, writeToConsole: false);
+        }
+
+        public void Warning(string message)
+        {
+            Write("WARNING", message, ConsoleColor.Yellow, writeToConsole: true);
+        }
+
+        public void Error(string message)
+        {
+            Write("ERROR", message, ConsoleColor.Red, writeToConsole: true);
+        }
+
+        public void InfoBlock(string title, string block)
+        {
+            WriteBlock("INFO", title, block, ConsoleColor.DarkGray);
+        }
+
+        public void ErrorBlock(string title, string block)
+        {
+            WriteBlock("ERROR", title, block, ConsoleColor.Red);
+        }
+
+        private void Write(
+            string level,
+            string message,
+            ConsoleColor? color,
+            bool writeToConsole)
+        {
+            var line = BuildConsoleLine(level, message);
+            var fileLine = BuildFileLine(line);
+
+            if (writeToConsole)
+                _console.WriteLine(line, color);
+
+            AppendRawLine(fileLine);
+        }
+
+        private void WriteBlock(
             string level,
             string title,
             string block,
-            ConsoleColor? color = null)
+            ConsoleColor? color)
+        {
+            var header = BuildConsoleLine(level, title);
+            var fileHeader = BuildFileLine(header);
+
+            _console.WriteLine(header, color);
+
+            if (!string.IsNullOrEmpty(block))
+                _console.WriteLine(block, color);
+
+            AppendRawLine(fileHeader);
+
+            if (!string.IsNullOrEmpty(block))
+                AppendRawLine(block);
+        }
+
+        private static string BuildConsoleLine(string level, string message)
         {
             var time = DateTime.UtcNow.ToString("HH:mm:ss");
-            var header = $"{time} [{level}] | {title}";
+            return $"{time} [{level}] | {message}";
+        }
 
-            lock (_lock)
+        private static string BuildFileLine(string consoleLine)
+        {
+            return $"{DateTime.UtcNow:O} {consoleLine}";
+        }
+
+        private void AppendRawLine(string line)
+        {
+            lock (_fileLock)
             {
-                var oldColor = Console.ForegroundColor;
-
-                if (color.HasValue)
-                    Console.ForegroundColor = color.Value;
-
-                Console.WriteLine(header);
-                Console.WriteLine(block);
-                Console.ForegroundColor = oldColor;
-
                 File.AppendAllText(
-                    _filePath,
-                    $"{DateTime.UtcNow:O} {header}{Environment.NewLine}{block}{Environment.NewLine}");
+                    _logFilePath,
+                    line + Environment.NewLine,
+                    Encoding.UTF8);
             }
         }
     }

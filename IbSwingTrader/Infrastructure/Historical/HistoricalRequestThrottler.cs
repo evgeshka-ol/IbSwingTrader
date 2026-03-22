@@ -2,12 +2,19 @@
 
 namespace IbSwingTrader.Infrastructure.Historical
 {
-    public class HistoricalRequestThrottler(
-        int maxParallel = 3,
-        int delayMs = 250) : IHistoricalRequestThrottler
+    public class HistoricalRequestThrottler : IHistoricalRequestThrottler
     {
-        private readonly SemaphoreSlim _semaphore = new(maxParallel);
-        private readonly TimeSpan _delay = TimeSpan.FromMilliseconds(delayMs);
+        private readonly SemaphoreSlim _semaphore;
+        private readonly TimeSpan _delay;
+
+        public HistoricalRequestThrottler(
+            ITwsSettingsProvider settingsProvider)
+        {
+            var settings = settingsProvider.Get();
+
+            _semaphore = new SemaphoreSlim(settings.MaxParallelHistoryRequests);
+            _delay = TimeSpan.FromMilliseconds(settings.HistoryTimeoutSeconds);
+        }
 
         public async Task<IDisposable> AcquireAsync()
         {
@@ -17,9 +24,14 @@ namespace IbSwingTrader.Infrastructure.Historical
             return new Releaser(_semaphore);
         }
 
-        private class Releaser(SemaphoreSlim semaphore) : IDisposable
+        private sealed class Releaser : IDisposable
         {
-            private readonly SemaphoreSlim _semaphore = semaphore;
+            private readonly SemaphoreSlim _semaphore;
+
+            public Releaser(SemaphoreSlim semaphore)
+            {
+                _semaphore = semaphore;
+            }
 
             public void Dispose()
             {

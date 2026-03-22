@@ -1,29 +1,22 @@
 ﻿using System.Globalization;
-using System.Reflection;
 using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.Csv
 {
     public class CsvDatasetWriter : ICsvWriter
     {
+        private readonly IObjectPropertyReader _propertyReader;
+
+        public CsvDatasetWriter(IObjectPropertyReader propertyReader)
+        {
+            _propertyReader = propertyReader;
+        }
+
         public void Write<T>(string path, IEnumerable<T> rows)
         {
             using var writer = new StreamWriter(path);
 
-            var type = typeof(T);
-
-            var baseProps = type.BaseType?
-                .GetProperties()
-                .OrderBy(p => p.MetadataToken)
-                ?? Enumerable.Empty<PropertyInfo>();
-
-            var ownProps = type
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .OrderBy(p => p.MetadataToken);
-
-            var props = baseProps
-                .Concat(ownProps)
-                .ToArray();
+            var props = _propertyReader.GetOrderedProperties(typeof(T));
 
             writer.WriteLine(string.Join(",", props.Select(p => p.Name)));
 
