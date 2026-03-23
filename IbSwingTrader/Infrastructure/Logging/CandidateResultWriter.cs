@@ -6,43 +6,52 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
-    public class CandidateResultWriter : ICandidateResultWriter
+    public class CandidateResultWriter(
+        IAgentPathService pathService,
+        IMarketSettingsProvider marketSettingsProvider,
+        ITextLogger logger,
+        IConsoleColorWriter console,
+        IObjectPropertyReader propertyReader,
+        INumberTextFormatter fmt) : ICandidateResultWriter
     {
-        private static readonly HashSet<string> RoundTo2Fields =
+        private static readonly HashSet<string> PriceFields =
         [
             nameof(Candidate.EntryPrice),
             nameof(Candidate.ExitPrice),
-            nameof(Candidate.StopLoss),
+            nameof(Candidate.StopLoss)
+        ];
+
+        private static readonly HashSet<string> PercentFields =
+        [
             nameof(Candidate.ProfitPercent),
             nameof(Candidate.LossPercent)
         ];
 
-        private readonly IAgentPathService _pathService;
-        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider;
-        private readonly IMarketSettingsProvider _marketSettingsProvider;
-        private readonly ITextLogger _logger;
-        private readonly IConsoleColorWriter _console;
-        private readonly IObjectPropertyReader _propertyReader;
+        private static readonly HashSet<string> RatioFields =
+        [
+            nameof(CandidateDetails.Pullback10d),
+            nameof(CandidateDetails.DistanceTo20dHigh),
+            nameof(CandidateDetails.DistanceTo52wHigh),
+            nameof(CandidateDetails.VolumeRatio20),
+            nameof(CandidateDetails.ATRRatio),
+            nameof(CandidateDetails.TrendPosition),
+            nameof(CandidateDetails.DailyTrendPosition),
+            nameof(CandidateDetails.DailyPullback10d),
+            nameof(CandidateDetails.DailyRSI14),
+            nameof(CandidateDetails.BBMidSignedDistancePct),
+            nameof(CandidateDetails.WeeklyMACDHistDelta),
+            nameof(CandidateDetails.Score)
+        ];
 
-        public CandidateResultWriter(
-            IAgentPathService pathService,
-            IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
-            IMarketSettingsProvider marketSettingsProvider,
-            ITextLogger logger,
-            IConsoleColorWriter console,
-            IObjectPropertyReader propertyReader)
-        {
-            _pathService = pathService;
-            _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
-            _marketSettingsProvider = marketSettingsProvider;
-            _logger = logger;
-            _console = console;
-            _propertyReader = propertyReader;
-        }
+        private readonly IAgentPathService _pathService = pathService;
+        private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
+        private readonly ITextLogger _logger = logger;
+        private readonly IConsoleColorWriter _console = console;
+        private readonly IObjectPropertyReader _propertyReader = propertyReader;
+        private readonly INumberTextFormatter _fmt = fmt;
 
         public async Task WriteAsync(List<CandidateDetails> candidates)
         {
-            var settings = _getCandidatesSettingsProvider.Get();
             var marketSettings = _marketSettingsProvider.Get();
 
             var folder = _pathService.GetCandidatesFolder();
@@ -61,7 +70,6 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             var json = BuildJson(candidates);
-
             await File.WriteAllTextAsync(filePath, json);
 
             _logger.Info($"Candidates saved: {filePath}");
@@ -94,20 +102,24 @@ namespace IbSwingTrader.Infrastructure.Logging
             return obj;
         }
 
-        private static JsonNode? ToJsonNode(object? value, string propertyName)
+        private JsonValue? ToJsonNode(object? value, string propertyName)
         {
             if (value == null)
                 return null;
 
             return value switch
             {
-                decimal d when RoundTo2Fields.Contains(propertyName)
-                    => JsonValue.Create(Math.Round(d, 2, MidpointRounding.AwayFromZero)),
+                decimal d when PriceFields.Contains(propertyName)
+                    => JsonValue.Create(_fmt.PriceValue(d)),
+
+                decimal d when PercentFields.Contains(propertyName)
+                    => JsonValue.Create(_fmt.PercentValue(d)),
+
+                decimal d when RatioFields.Contains(propertyName)
+                    => JsonValue.Create(_fmt.RatioValue(d)),
 
                 decimal d
-                    => JsonValue.Create(decimal.Parse(
-                        d.ToString("F6", CultureInfo.InvariantCulture),
-                        CultureInfo.InvariantCulture)),
+                    => JsonValue.Create(_fmt.GenericValue(d)),
 
                 DateTime dt => JsonValue.Create(
                     propertyName.EndsWith("Date", StringComparison.OrdinalIgnoreCase)
@@ -127,12 +139,12 @@ namespace IbSwingTrader.Infrastructure.Logging
         private void WriteCandidateToConsole(Candidate candidate)
         {
             _console.Write($"{candidate.Ticker} ", ConsoleColor.Gray);
-            _console.Write($"{candidate.EntryPrice:F2} ", ConsoleColor.DarkYellow);
-            _console.Write($"{candidate.ExitPrice:F2} ", ConsoleColor.DarkGreen);
-            _console.Write($"{candidate.StopLoss:F2} ", ConsoleColor.DarkRed);
-            _console.Write($"{candidate.ProfitPercent:+0.00;-0.00}%", ConsoleColor.Green);
+            _console.Write($"{_fmt.Price(candidate.EntryPrice)} ", ConsoleColor.DarkYellow);
+            _console.Write($"{_fmt.Price(candidate.ExitPrice)} ", ConsoleColor.DarkGreen);
+            _console.Write($"{_fmt.Price(candidate.StopLoss)} ", ConsoleColor.DarkRed);
+            _console.Write($"{_fmt.Percent(candidate.ProfitPercent)}%", ConsoleColor.Green);
             _console.Write("/", ConsoleColor.DarkGray);
-            _console.WriteLine($"{candidate.LossPercent:+0.00;-0.00}%", ConsoleColor.Red);
+            _console.WriteLine($"{_fmt.Percent(candidate.LossPercent)}%", ConsoleColor.Red);
         }
 
         private static string BuildFileName(DateTime scanTimeMarket)
