@@ -7,14 +7,16 @@ namespace IbSwingTrader.Analysis
         IFeatureEngine featureEngine,
         ICandidateScore candidateScore,
         IFutureStatsCalculator futureStatsCalculator,
-        ITextLogger logger) : ITradeDatasetBuilder
+        ITextLogger logger,
+        INumberTextFormatter numberFormatter,
+        IBuildDatasetSettingsProvider settingsProvider) : ITradeDatasetBuilder
     {
-        private static readonly int[] EntryShifts = { -12, -9, -6, -3, 0 };
-
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly IFutureStatsCalculator _futureStatsCalculator = futureStatsCalculator;
         private readonly ITextLogger _logger = logger;
+        private readonly INumberTextFormatter _fmt = numberFormatter;
+        private readonly IBuildDatasetSettingsProvider _settingsProvider = settingsProvider;
 
         public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
@@ -28,14 +30,12 @@ namespace IbSwingTrader.Analysis
 
                 var entryIndexReal = FindEntryBarIndex(candles, trade.EntryTimeUtc);
 
-                // вход раньше первой свечи
                 if (entryIndexReal < 0)
                 {
                     _logger.Info($"Trade {t}: Entry time {trade.EntryTimeUtc} is before first candle {candles[0].Time}");
                     continue;
                 }
 
-                // нужен warmup для индикаторов
                 if (entryIndexReal < 60)
                 {
                     _logger.Info($"Trade {t}: Entry index {entryIndexReal} is too early for indicator warmup");
@@ -51,7 +51,8 @@ namespace IbSwingTrader.Analysis
                 var candlePriceReal = candles[entryIndexReal].Close;
                 var splitFactor = DetectSplitFactor(trade.EntryPrice, candlePriceReal);
 
-                foreach (var shift in EntryShifts)
+                var entryShifts = _settingsProvider.Get().EntryShifts;
+                foreach (var shift in entryShifts)
                 {
                     int entryIndex = entryIndexReal + shift;
 
@@ -80,9 +81,12 @@ namespace IbSwingTrader.Analysis
                         continue;
                     }
 
-                    if ((trade.ExitTimeUtc - entryTime).TotalHours < 4)
+                    var holdHours = (decimal)(trade.ExitTimeUtc - entryTime).TotalHours;
+
+                    if (holdHours < 4m)
                     {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to hold time {(trade.ExitTimeUtc - entryTime).TotalHours} hours, less than 4 hours");
+                        _logger.Info(
+                            $"Trade {t}: Shift {shift} leads to hold time {_fmt.Hours(holdHours)} hours, less than 4 hours");
                         continue;
                     }
 

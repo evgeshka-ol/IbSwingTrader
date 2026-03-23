@@ -42,7 +42,8 @@
         "FuturePaddingDays": 21,
         "TickerAliases": {
             "NYCB": "FLG"
-        }
+        },
+        "EntryShifts": [ -12, -9, -6, -3, 0 ]
     },
 
     "FeatureCalculation": {
