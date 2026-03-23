@@ -57,9 +57,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             // dataset / analysis
             services.AddSingleton<ICsvTradeReader, CsvTradeReader>();
             services.AddSingleton<IFeatureEngine, FeatureEngine>();
-            services.AddSingleton<ICandidateScore, CandidateScore>();
             services.AddSingleton<ICsvWriter, CsvDatasetWriter>();
-            services.AddSingleton<IFutureStatsCalculator, FutureStatsCalculator>();
             services.AddSingleton<ITradeDatasetBuilder, TradeDatasetBuilder>();
 
             // candidate search

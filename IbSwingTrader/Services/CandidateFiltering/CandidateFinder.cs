@@ -99,20 +99,12 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
                         Score = score,
 
-                        Pullback10d = features.Pullback10d,
                         DistanceTo20dHigh = features.DistanceTo20dHigh,
                         DistanceTo52wHigh = features.DistanceTo52wHigh,
-                        VolumeRatio20 = features.VolumeRatio20,
-                        ATRRatio = features.ATRRatio,
-                        TrendPosition = features.TrendPosition,
 
                         ScanTimeMarket = scanTime,
 
-                        DailyTrendPosition = features.DailyTrendPosition,
-                        DailyPullback10d = features.DailyPullback10d,
                         DailyRSI14 = features.DailyRSI14,
-                        BBMidSignedDistancePct = features.BBMidSignedDistancePct,
-                        WeeklyMACDHistDelta = features.WeeklyMACDHistDelta
                     };
 
                     if (results.TryGetValue(stock.Ticker, out var existing))

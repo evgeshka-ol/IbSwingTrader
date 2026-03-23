@@ -27,24 +27,10 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 return false;
             }
 
-            if (featureSet.BBMidSignedDistancePct > settings.MaxBbMidSignedDistancePct)
-            {
-                _logger.Info(
-                    $"Filtered out due to BBMidSignedDistancePct {_fmt.Ratio(featureSet.BBMidSignedDistancePct)} above {_fmt.Ratio(settings.MaxBbMidSignedDistancePct)}");
-                return false;
-            }
-
             if (featureSet.DistanceTo20dHigh > settings.MaxDistanceTo20dHigh)
             {
                 _logger.Info(
                     $"Filtered out due to DistanceTo20dHigh {_fmt.Ratio(featureSet.DistanceTo20dHigh)} above {_fmt.Ratio(settings.MaxDistanceTo20dHigh)}");
-                return false;
-            }
-
-            if (featureSet.ATRRatio > settings.MaxAtrRatio)
-            {
-                _logger.Info(
-                    $"Filtered out due to ATRRatio {_fmt.Ratio(featureSet.ATRRatio)} above {_fmt.Ratio(settings.MaxAtrRatio)}");
                 return false;
             }
 
