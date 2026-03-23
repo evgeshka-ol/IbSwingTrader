@@ -36,6 +36,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
 
             // shared infrastructure
             services.AddSingleton<INumberTextFormatter, NumberTextFormatter>();
+            services.AddSingleton<IArrayCellFormatter, ArrayCellFormatter>();
             services.AddSingleton<IConsoleColorWriter, ConsoleColorWriter>();
             services.AddSingleton<IObjectPropertyReader, ObjectPropertyReader>();
             services.AddSingleton<ITextLogger, TextLogger>();

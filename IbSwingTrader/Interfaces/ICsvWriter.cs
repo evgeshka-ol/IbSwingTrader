@@ -2,6 +2,6 @@
 {
     public interface ICsvWriter
     {
-        void Write<T>(string path, IEnumerable<T> rows);
+        void Write<T>(string path, IReadOnlyCollection<T> rows);
     }
 }

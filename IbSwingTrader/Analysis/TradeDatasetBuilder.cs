@@ -20,7 +20,7 @@ namespace IbSwingTrader.Analysis
         {
             var rows = new List<TradeDatasetRow>();
 
-            if (candles.Count == 0)
+            if (candles == null || candles.Count == 0)
                 return rows;
 
             var entryShifts = _settingsProvider.Get().EntryShifts;
@@ -34,19 +34,22 @@ namespace IbSwingTrader.Analysis
 
                 if (entryIndexReal < 0)
                 {
-                    _logger.Info($"Trade {t}: Entry time {trade.EntryTimeUtc} is before first candle {candles[0].Time}");
+                    _logger.Info(
+                        $"Trade {t}: Entry time {trade.EntryTimeUtc} is before first candle {candles[0].Time}");
                     continue;
                 }
 
                 if (exitIndexReal < 0)
                 {
-                    _logger.Info($"Trade {t}: Exit time {trade.ExitTimeUtc} is before first candle {candles[0].Time}");
+                    _logger.Info(
+                        $"Trade {t}: Exit time {trade.ExitTimeUtc} is before first candle {candles[0].Time}");
                     continue;
                 }
 
-                if (exitIndexReal <= entryIndexReal)
+                if (exitIndexReal < entryIndexReal)
                 {
-                    _logger.Info($"Trade {t}: Exit index {exitIndexReal} is not after entry index {entryIndexReal}");
+                    _logger.Info(
+                        $"Trade {t}: Exit index {exitIndexReal} is before entry index {entryIndexReal}");
                     continue;
                 }
 
@@ -60,31 +63,22 @@ namespace IbSwingTrader.Analysis
 
                     if (entryIndex < 0)
                     {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} before first candle");
+                        _logger.Info(
+                            $"Trade {t}: Shift {shift} leads to entry index {entryIndex} before first candle");
                         continue;
                     }
 
                     if (entryIndex >= candles.Count)
                     {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} after last candle");
+                        _logger.Info(
+                            $"Trade {t}: Shift {shift} leads to entry index {entryIndex} after last candle");
                         continue;
                     }
 
-                    if (entryIndex >= exitIndex)
+                    if (exitIndex < entryIndex)
                     {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} not before exit index {exitIndex}");
-                        continue;
-                    }
-
-                    if (entryIndex < 60)
-                    {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to entry index {entryIndex} too early for indicator warmup");
-                        continue;
-                    }
-
-                    if (exitIndex < 60)
-                    {
-                        _logger.Info($"Trade {t}: Exit index {exitIndex} is too early for indicator warmup");
+                        _logger.Info(
+                            $"Trade {t}: Shift {shift} leads to exit index {exitIndex} before entry index {entryIndex}");
                         continue;
                     }
 
@@ -96,7 +90,8 @@ namespace IbSwingTrader.Analysis
 
                     if (entryTime >= exitTime)
                     {
-                        _logger.Info($"Trade {t}: Shift {shift} leads to entry time {entryTime} after exit time {exitTime}");
+                        _logger.Info(
+                            $"Trade {t}: Shift {shift} leads to entry time {entryTime} after or equal to exit time {exitTime}");
                         continue;
                     }
 
@@ -133,7 +128,7 @@ namespace IbSwingTrader.Analysis
                         EntryShiftBars = shift
                     };
 
-                    CalculateContexts(row, candles, entryIndex, exitIndex);
+                    FillSeries(row, candles, entryIndex, exitIndex);
 
                     rows.Add(row);
                 }
@@ -146,90 +141,150 @@ namespace IbSwingTrader.Analysis
                 .ToList();
         }
 
-        private void CalculateContexts(
+        private void FillSeries(
             TradeDatasetRow row,
             List<Candle> candles,
             int entryIndex,
             int exitIndex)
         {
-            var entryFeatures = _featureEngine.Calculate(candles, entryIndex);
-            var exitFeatures = _featureEngine.Calculate(candles, exitIndex);
+            var entryFeatures = _featureEngine.Calculate(candles, entryIndex + 1);
 
             row.DistanceTo20dHigh = entryFeatures.DistanceTo20dHigh;
             row.DistanceTo52wHigh = entryFeatures.DistanceTo52wHigh;
 
-            // Daily MA
-            row.DailyMaEntry = entryFeatures.DailyMaSignedDistancePct;
-            row.DailyMaExit = exitFeatures.DailyMaSignedDistancePct;
-            row.DailyMaDelta = row.DailyMaExit - row.DailyMaEntry;
+            FillDailySeries(row, candles, entryIndex, exitIndex);
+            FillWeeklySeries(row, candles, entryIndex, exitIndex);
 
-            // Weekly MA
-            row.WeeklyMaEntry = entryFeatures.WeeklyMaSignedDistancePct;
-            row.WeeklyMaExit = exitFeatures.WeeklyMaSignedDistancePct;
-            row.WeeklyMaDelta = row.WeeklyMaExit - row.WeeklyMaEntry;
-
-            // Daily RSI
-            row.DailyRsiEntry = entryFeatures.DailyRSI14;
-            row.DailyRsiExit = exitFeatures.DailyRSI14;
-            row.DailyRsiDelta = row.DailyRsiExit - row.DailyRsiEntry;
-
-            // Weekly RSI
-            row.WeeklyRsiEntry = entryFeatures.WeeklyRSI14;
-            row.WeeklyRsiExit = exitFeatures.WeeklyRSI14;
-            row.WeeklyRsiDelta = row.WeeklyRsiExit - row.WeeklyRsiEntry;
-
-            // Daily MACD
-            row.DailyMacdEntry = entryFeatures.DailyMACDLineMinusSignal;
-            row.DailyMacdExit = exitFeatures.DailyMACDLineMinusSignal;
-            row.DailyMacdDelta = row.DailyMacdExit - row.DailyMacdEntry;
-
-            // Weekly MACD
-            row.WeeklyMacdEntry = entryFeatures.WeeklyMACDLineMinusSignal;
-            row.WeeklyMacdExit = exitFeatures.WeeklyMACDLineMinusSignal;
-            row.WeeklyMacdDelta = row.WeeklyMacdExit - row.WeeklyMacdEntry;
-
-            // H4 only for same day / next day exits
             if (row.HoldDays <= 1)
+                FillH4Series(row, candles, entryIndex, exitIndex);
+        }
+
+        private void FillDailySeries(
+            TradeDatasetRow row,
+            List<Candle> candles,
+            int entryIndex,
+            int exitIndex)
+        {
+            DateTime? lastDay = null;
+
+            for (int i = entryIndex; i <= exitIndex; i++)
             {
-                row.H4MaEntry = entryFeatures.H4MaSignedDistancePct;
-                row.H4MaExit = exitFeatures.H4MaSignedDistancePct;
-                row.H4MaDelta = row.H4MaExit - row.H4MaEntry;
+                var day = candles[i].Time.Date;
 
-                row.H4RsiEntry = entryFeatures.RSI14;
-                row.H4RsiExit = exitFeatures.RSI14;
-                row.H4RsiDelta = row.H4RsiExit - row.H4RsiEntry;
+                if (lastDay.HasValue && lastDay.Value == day)
+                    continue;
 
-                row.H4MacdEntry = entryFeatures.MACDLineMinusSignal;
-                row.H4MacdExit = exitFeatures.MACDLineMinusSignal;
-                row.H4MacdDelta = row.H4MacdExit - row.H4MacdEntry;
+                lastDay = day;
+
+                var lastBarIndexOfDay = FindLastBarIndexOfDay(candles, i, exitIndex, day);
+                var features = _featureEngine.Calculate(candles, lastBarIndexOfDay + 1);
+
+                row.DailyMaDistances.Add(features.DailyMaSignedDistancePct);
+                row.DailyRsiValues.Add(features.DailyRSI14);
+                row.DailyMacdValues.Add(features.DailyMACDLineMinusSignal);
             }
-            else
+        }
+
+        private void FillWeeklySeries(
+            TradeDatasetRow row,
+            List<Candle> candles,
+            int entryIndex,
+            int exitIndex)
+        {
+            DateTime? lastWeekStart = null;
+
+            for (int i = entryIndex; i <= exitIndex; i++)
             {
-                row.H4MaEntry = null;
-                row.H4MaExit = null;
-                row.H4MaDelta = null;
+                var weekStart = GetWeekStart(candles[i].Time);
 
-                row.H4RsiEntry = null;
-                row.H4RsiExit = null;
-                row.H4RsiDelta = null;
+                if (lastWeekStart.HasValue && lastWeekStart.Value == weekStart)
+                    continue;
 
-                row.H4MacdEntry = null;
-                row.H4MacdExit = null;
-                row.H4MacdDelta = null;
+                lastWeekStart = weekStart;
+
+                var lastBarIndexOfWeek = FindLastBarIndexOfWeek(candles, i, exitIndex, weekStart);
+                var features = _featureEngine.Calculate(candles, lastBarIndexOfWeek + 1);
+
+                if (features.WeeklyMaSignedDistancePct.HasValue)
+                    row.WeeklyMaDistances.Add(features.WeeklyMaSignedDistancePct.Value);
+
+                if (features.WeeklyRSI14.HasValue)
+                    row.WeeklyRsiValues.Add(features.WeeklyRSI14.Value);
+
+                if (features.WeeklyMACDLineMinusSignal.HasValue)
+                    row.WeeklyMacdValues.Add(features.WeeklyMACDLineMinusSignal.Value);
             }
+        }
+
+        private void FillH4Series(
+            TradeDatasetRow row,
+            List<Candle> candles,
+            int entryIndex,
+            int exitIndex)
+        {
+            row.H4MaDistances = [];
+            row.H4RsiValues = [];
+            row.H4MacdValues = [];
+
+            for (int i = entryIndex; i <= exitIndex; i++)
+            {
+                var features = _featureEngine.Calculate(candles, i + 1);
+
+                row.H4MaDistances.Add(features.H4MaSignedDistancePct);
+                row.H4RsiValues.Add(features.RSI14);
+                row.H4MacdValues.Add(features.MACDLineMinusSignal);
+            }
+        }
+
+        private static int FindLastBarIndexOfDay(
+            List<Candle> candles,
+            int startIndex,
+            int maxIndex,
+            DateTime day)
+        {
+            int i = startIndex;
+
+            while (i + 1 <= maxIndex && candles[i + 1].Time.Date == day)
+                i++;
+
+            return i;
+        }
+
+        private static int FindLastBarIndexOfWeek(
+            List<Candle> candles,
+            int startIndex,
+            int maxIndex,
+            DateTime weekStart)
+        {
+            int i = startIndex;
+
+            while (i + 1 <= maxIndex && GetWeekStart(candles[i + 1].Time) == weekStart)
+                i++;
+
+            return i;
+        }
+
+        private static DateTime GetWeekStart(DateTime time)
+        {
+            var date = time.Date;
+            int diff = ((int)date.DayOfWeek + 6) % 7; // Monday = 0
+            return date.AddDays(-diff);
         }
 
         private static decimal DetectSplitFactor(decimal tradePrice, decimal candlePrice)
         {
-            if (candlePrice <= 0)
+            if (candlePrice <= 0m)
                 return 1m;
 
             var ratio = tradePrice / candlePrice;
             var rounded = Math.Round(ratio);
 
-            if (rounded >= 2 && rounded <= 20 &&
+            if (rounded >= 2m &&
+                rounded <= 20m &&
                 Math.Abs(ratio - rounded) < 0.2m)
+            {
                 return rounded;
+            }
 
             return 1m;
         }
