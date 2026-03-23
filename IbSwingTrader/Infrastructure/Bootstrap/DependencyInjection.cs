@@ -46,6 +46,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IStockUniverseProvider, TwsStockUniverseProvider>();
 
             // historical
+            services.AddSingleton<IFailedHistoryRequestTableFormatter, FailedHistoryRequestTableFormatter>();
             services.AddSingleton<IHistoricalRequestThrottler, HistoricalRequestThrottler>();
             services.AddSingleton<IHistoricalCache, HistoricalCache>();
             services.AddSingleton<IHistoricalRetryPolicy, HistoricalRetryPolicy>();
