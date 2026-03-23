@@ -3,21 +3,14 @@
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class ArrayCellFormatter(
-            INumberTextFormatter numberFormatter) : IArrayCellFormatter
+        INumberTextFormatter numberFormatter) : IArrayCellFormatter
     {
         private readonly INumberTextFormatter _fmt = numberFormatter;
 
-        public string Format(decimal first, decimal second, decimal third)
+        public string Format(IEnumerable<decimal> values)
         {
-            return $"[{_fmt.Generic(first)} {_fmt.Generic(second)} {_fmt.Generic(third)}]";
-        }
-
-        public string? Format(decimal? first, decimal? second, decimal? third)
-        {
-            if (!first.HasValue || !second.HasValue || !third.HasValue)
-                return null;
-
-            return $"[{_fmt.Generic(first.Value)} {_fmt.Generic(second.Value)} {_fmt.Generic(third.Value)}]";
+            var parts = values.Select(_fmt.Generic);
+            return $"[{string.Join(" ", parts)}]";
         }
     }
 }

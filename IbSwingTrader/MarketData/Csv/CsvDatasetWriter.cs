@@ -1,20 +1,22 @@
 ﻿using System.Collections;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.MarketData.Csv
 {
     public class CsvDatasetWriter(
-        INumberTextFormatter numberFormatter) : ICsvWriter
+        INumberTextFormatter numberFormatter,
+        IArrayCellFormatter arrayCellFormatter,
+        IObjectPropertyReader objectPropertyReader) : ICsvWriter
     {
         private readonly INumberTextFormatter _fmt = numberFormatter;
+        private readonly IArrayCellFormatter _arrayFmt = arrayCellFormatter;
+        private readonly IObjectPropertyReader _propertyReader = objectPropertyReader;
 
-        public void Write<T>(string path, IReadOnlyCollection<T> rows)
+        public void Write<T>(string path, IEnumerable<T> rows)
         {
-            if (rows == null)
-                throw new ArgumentNullException(nameof(rows));
+            ArgumentNullException.ThrowIfNull(rows);
 
             var list = rows.ToList();
 
@@ -24,10 +26,7 @@ namespace IbSwingTrader.MarketData.Csv
                 return;
             }
 
-            var properties = typeof(T)
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(p => p.CanRead)
-                .ToList();
+            var properties = _propertyReader.GetOrderedProperties(typeof(T));
 
             var sb = new StringBuilder();
 
@@ -62,39 +61,23 @@ namespace IbSwingTrader.MarketData.Csv
             if (value is bool b)
                 return b ? "true" : "false";
 
-            if (value is IEnumerable<decimal> decimalList)
-                return FormatDecimalList(decimalList);
+            if (value is IEnumerable<decimal> decimalValues)
+                return _arrayFmt.Format(decimalValues);
 
             if (value is IEnumerable enumerable && value is not string)
-                return FormatEnumerable(enumerable);
-
-            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-        }
-
-        private string FormatDecimalList(IEnumerable<decimal> values)
-        {
-            return $"[{string.Join(" ", values.Select(v => _fmt.Generic(v)))}]";
-        }
-
-        private string FormatEnumerable(IEnumerable values)
-        {
-            var parts = new List<string>();
-
-            foreach (var item in values)
             {
-                if (item == null)
-                    continue;
+                var decimals = new List<decimal>();
 
-                if (item is decimal d)
+                foreach (var item in enumerable)
                 {
-                    parts.Add(_fmt.Generic(d));
-                    continue;
+                    if (item is decimal dItem)
+                        decimals.Add(dItem);
                 }
 
-                parts.Add(Convert.ToString(item, CultureInfo.InvariantCulture) ?? string.Empty);
+                return _arrayFmt.Format(decimals);
             }
 
-            return $"[{string.Join(" ", parts)}]";
+            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
         private static string Escape(string value)
