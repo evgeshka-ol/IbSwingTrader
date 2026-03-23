@@ -120,8 +120,7 @@ namespace IbSwingTrader.Commands
 
             _logger.Info($"Processing file: {fileInfo.Name}");
 
-            var candidateFile = await _jsonFileService.ReadAsync<CandidateFile>(filePath);
-            var candidates = candidateFile?.Candidates;
+            var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath);
 
             if (candidates == null || candidates.Count == 0)
             {
