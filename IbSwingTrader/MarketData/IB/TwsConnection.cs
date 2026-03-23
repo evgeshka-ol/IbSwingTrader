@@ -398,6 +398,25 @@ namespace IbSwingTrader.MarketData.IB
             }
         }
 
+        private static string FormatIbErrorTime(long errorTime)
+        {
+            if (errorTime <= 0)
+                return errorTime.ToString();
+
+            try
+            {
+                var dt = DateTimeOffset
+                    .FromUnixTimeMilliseconds(errorTime)
+                    .UtcDateTime;
+
+                return dt.ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'");
+            }
+            catch
+            {
+                return errorTime.ToString();
+            }
+        }
+
         // ---- EWrapper methods ----
 
         public void error(Exception e)
@@ -415,6 +434,13 @@ namespace IbSwingTrader.MarketData.IB
             _logger.Error($"IB ERROR LONG id={id} code={errorCode} msg={errorMsg}");
         }
 
+        private enum LogLevel
+        {
+            Info,
+            Warning,
+            Error
+        }
+
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
             var details = string.IsNullOrWhiteSpace(advancedOrderRejectJson)
@@ -422,7 +448,7 @@ namespace IbSwingTrader.MarketData.IB
                 : $" details={advancedOrderRejectJson}";
 
             var header = "IB VERY LONG ERROR";
-            var isError = true;
+            var level = LogLevel.Error;
 
             var noHistoricalData =
                 errorCode == 162 &&
@@ -445,7 +471,7 @@ namespace IbSwingTrader.MarketData.IB
 
                 case 1101:
                 case 1102:
-                    isError = false;
+                    level = LogLevel.Info;
                     header = "IB VERY LONG INFO";
                     _ibConnected = true;
                     _logger.Info("IB connection restored");
@@ -453,23 +479,42 @@ namespace IbSwingTrader.MarketData.IB
 
                 case 2104:
                 case 2106:
+                case 2107:
                 case 2158:
                 case 165:
-                    isError = false;
+                    level = LogLevel.Info;
                     header = "IB VERY LONG INFO";
+                    break;
+
+                case 2105:
+                    level = LogLevel.Warning;
+                    header = "IB VERY LONG WARNING";
                     break;
             }
 
             if (noHistoricalData || scannerSubscriptionCancelled || historicalQueryCancelled)
             {
-                isError = false;
+                level = LogLevel.Info;
                 header = "IB VERY LONG INFO";
             }
 
-            if (isError)
-                _logger.Error($"{header} id={id} time={errorTime} code={errorCode} msg={errorMsg}{details}");
-            else
-                _logger.Info($"{header} id={id} time={errorTime} code={errorCode} msg={errorMsg}{details}");
+            var formattedErrorTime = FormatIbErrorTime(errorTime);
+            var text = $"{header} id={id} time={formattedErrorTime} code={errorCode} msg={errorMsg}{details}";
+
+            switch (level)
+            {
+                case LogLevel.Info:
+                    _logger.Info(text);
+                    break;
+
+                case LogLevel.Warning:
+                    _logger.Warning(text);
+                    break;
+
+                default:
+                    _logger.Error(text);
+                    break;
+            }
 
             if (errorCode == 200)
             {
@@ -488,14 +533,10 @@ namespace IbSwingTrader.MarketData.IB
             }
 
             if (scannerSubscriptionCancelled)
-            {
                 return;
-            }
 
             if (historicalQueryCancelled)
-            {
                 return;
-            }
 
             if (_fundamentalRequests.TryRemove(id, out var fundamentalTcs))
             {
