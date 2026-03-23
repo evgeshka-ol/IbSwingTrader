@@ -424,6 +424,18 @@ namespace IbSwingTrader.MarketData.IB
             var header = "IB VERY LONG ERROR";
             var isError = true;
 
+            var noHistoricalData =
+                errorCode == 162 &&
+                errorMsg.Contains("HMDS query returned no data", StringComparison.OrdinalIgnoreCase);
+
+            var scannerSubscriptionCancelled =
+                errorCode == 162 &&
+                errorMsg.Contains("API scanner subscription cancelled", StringComparison.OrdinalIgnoreCase);
+
+            var historicalQueryCancelled =
+                errorCode == 162 &&
+                errorMsg.Contains("API historical data query cancelled", StringComparison.OrdinalIgnoreCase);
+
             switch (errorCode)
             {
                 case 1100:
@@ -448,11 +460,7 @@ namespace IbSwingTrader.MarketData.IB
                     break;
             }
 
-            var noHistoricalData =
-                errorCode == 162 &&
-                errorMsg.Contains("HMDS query returned no data", StringComparison.OrdinalIgnoreCase);
-
-            if (noHistoricalData)
+            if (noHistoricalData || scannerSubscriptionCancelled || historicalQueryCancelled)
             {
                 isError = false;
                 header = "IB VERY LONG INFO";
@@ -476,6 +484,16 @@ namespace IbSwingTrader.MarketData.IB
                 if (_requests.TryRemove(id, out var historyTcs))
                     historyTcs.TrySetResult([]);
 
+                return;
+            }
+
+            if (scannerSubscriptionCancelled)
+            {
+                return;
+            }
+
+            if (historicalQueryCancelled)
+            {
                 return;
             }
 
