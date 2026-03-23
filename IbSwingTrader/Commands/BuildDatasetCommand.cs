@@ -9,6 +9,7 @@ namespace IbSwingTrader.Commands
 {
     public class BuildDatasetCommand : ICommand
     {
+        private readonly ICsvTradeReader _csvTradeReader;
         private readonly ITwsConnection _connection;
         private readonly ICsvWriter _csvWriter;
         private readonly IContractResolver _contractResolver;
@@ -23,6 +24,7 @@ namespace IbSwingTrader.Commands
         private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = new();
 
         public BuildDatasetCommand(
+            ICsvTradeReader csvTradeReader,
             ITwsConnection connection,
             ICsvWriter csvWriter,
             IContractResolver contractResolver,
@@ -33,6 +35,7 @@ namespace IbSwingTrader.Commands
             IBuildDatasetSettingsProvider buildDatasetSettingsProvider,
             IFailedHistoryRequestTableFormatter failedHistoryRequestTableFormatter)
         {
+            _csvTradeReader = csvTradeReader;
             _connection = connection;
             _csvWriter = csvWriter;
             _contractResolver = contractResolver;
@@ -51,7 +54,7 @@ namespace IbSwingTrader.Commands
             var tradesPath = _pathService.GetTradesFile();
             var datasetPath = _pathService.GetDatasetFile();
 
-            var trades = CsvTradeReader.Read(tradesPath);
+            var trades = _csvTradeReader.Read(tradesPath);
 
             if (trades.Count == 0)
             {

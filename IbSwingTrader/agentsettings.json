@@ -72,7 +72,14 @@
                 "Code": "MOST_ACTIVE",
                 "Description": "Most active stocks."
             }
-        ]
+        ],
+        "TradePlan": {
+            "MinimumCandles": 10,
+            "StopLookbackBars": 5,
+            "StopBufferMultiplier": 0.99,
+            "FallbackStopMultiplier": 0.97,
+            "RiskRewardRatio": 2.0
+        }
     },
 
     "Evaluation": {
@@ -81,5 +88,52 @@
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
         "UseAmbiguousBarResolver": true
+    },
+
+    "CsvTradeReader": {
+        "Separator": ";",
+        "HasHeader": true,
+        "Columns": [
+            {
+                "Name": "HoldDays",
+                "Index": 0
+            },
+            {
+                "Name": "ProfitPercent",
+                "Index": 1
+            },
+            {
+                "Name": "Ticker",
+                "Index": 2
+            },
+            {
+                "Name": "EntryDate",
+                "Index": 3
+            },
+            {
+                "Name": "EntryTime",
+                "Index": 4
+            },
+            {
+                "Name": "EntryPrice",
+                "Index": 6
+            },
+            {
+                "Name": "ExitDate",
+                "Index": 10
+            },
+            {
+                "Name": "ExitTime",
+                "Index": 11
+            },
+            {
+                "Name": "ExitPrice",
+                "Index": 13
+            },
+            {
+                "Name": "IsShort",
+                "Index": 19
+            }
+        ]
     }
 }

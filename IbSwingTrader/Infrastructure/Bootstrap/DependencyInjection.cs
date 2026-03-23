@@ -32,6 +32,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IFeatureCalculationSettingsProvider, FeatureCalculationSettingsProvider>();
             services.AddSingleton<IGetCandidatesSettingsProvider, GetCandidatesSettingsProvider>();
             services.AddSingleton<IEvaluationSettingsProvider, EvaluationSettingsProvider>();
+            services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
 
             // shared infrastructure
             services.AddSingleton<IConsoleColorWriter, ConsoleColorWriter>();
@@ -52,6 +53,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IAmbiguousBarResolver, AmbiguousBarResolver>();
 
             // dataset / analysis
+            services.AddSingleton<ICsvTradeReader, CsvTradeReader>();
             services.AddSingleton<IFeatureEngine, FeatureEngine>();
             services.AddSingleton<ICandidateScore, CandidateScore>();
             services.AddSingleton<ICsvWriter, CsvDatasetWriter>();

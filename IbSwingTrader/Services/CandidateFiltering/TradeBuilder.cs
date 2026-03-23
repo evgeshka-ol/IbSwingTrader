@@ -3,31 +3,31 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services.CandidateFiltering
 {
-    public class TradeBuilder : ITradeBuilder
+    public class TradeBuilder(IGetCandidatesSettingsProvider settingsProvider) : ITradeBuilder
     {
+        private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
+
         public TradePlan Build(List<Candle> candles)
         {
-            if (candles == null || candles.Count < 10)
+            var settings = _settingsProvider.Get().TradePlan;
+
+            if (candles == null || candles.Count < settings.MinimumCandles)
                 throw new ArgumentException("Not enough candles");
 
             var last = candles[^1];
 
-            // Берем минимум последних 5 свечей как опору для стопа
             var recentLow = candles
-                .Skip(Math.Max(0, candles.Count - 5))
+                .Skip(Math.Max(0, candles.Count - settings.StopLookbackBars))
                 .Min(x => x.Low);
 
             var entry = last.Close;
+            var stop = recentLow * settings.StopBufferMultiplier;
 
-            // Небольшой отступ ниже локального минимума
-            var stop = recentLow * 0.99m;
-
-            // Защита от кривого плана
             if (stop >= entry)
-                stop = entry * 0.97m;
+                stop = entry * settings.FallbackStopMultiplier;
 
             var risk = entry - stop;
-            var exit = entry + risk * 2m; // RR 1:2
+            var exit = entry + risk * settings.RiskRewardRatio;
 
             return new TradePlan
             {

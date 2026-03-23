@@ -3,15 +3,10 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Settings
 {
-    public class GetCandidatesSettingsProvider : IGetCandidatesSettingsProvider
+    public class GetCandidatesSettingsProvider(
+        IAgentSettingsProvider agentSettingsProvider) : IGetCandidatesSettingsProvider
     {
-        private readonly IAgentSettingsProvider _agentSettingsProvider;
-
-        public GetCandidatesSettingsProvider(
-            IAgentSettingsProvider agentSettingsProvider)
-        {
-            _agentSettingsProvider = agentSettingsProvider;
-        }
+        private readonly IAgentSettingsProvider _agentSettingsProvider = agentSettingsProvider;
 
         public GetCandidatesSettings Get()
         {
