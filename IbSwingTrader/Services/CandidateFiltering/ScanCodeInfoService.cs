@@ -3,15 +3,17 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services.CandidateFiltering
 {
-    public class ScanCodeInfoService : IScanCodeInfoService
+    public class ScanCodeInfoService(
+        IGetCandidatesSettingsProvider settingsProvider) : IScanCodeInfoService
     {
-        public IReadOnlyList<PresetScanCode> GetAll() =>
-        [
-            new("TOP_OPEN_PERC_GAIN", "Top percentage gainer."),
-            new("TOP_PERC_LOSE", "Top percentage losers. Better for watch list after sharp selloff."),
-            new("TOP_PERC_GAIN", "Top percentage gainers. Momentum names already showing strength."),
-            new("HOT_BY_VOLUME", "Most active by volume. Broad live universe for pullback setups."),
-            new("MOST_ACTIVE", "Most active stocks. General liquid and active universe.")
-        ];
+        private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
+
+        public IReadOnlyList<PresetScanCode> GetAll()
+        {
+            return [.. _settingsProvider
+                .Get()
+                .ScanCodes
+                .Select(x => new PresetScanCode(x.Code, x.Description))];
+        }
     }
 }

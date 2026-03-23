@@ -55,6 +55,7 @@
         "FinalTopCandidates": 10,
         "UseWishListFirst": true,
         "MaxWishListItems": 100,
+
         "ScanCodes": [
             {
                 "Code": "TOP_OPEN_PERC_GAIN",
@@ -73,12 +74,33 @@
                 "Description": "Most active stocks."
             }
         ],
+
         "TradePlan": {
             "MinimumCandles": 10,
             "StopLookbackBars": 5,
             "StopBufferMultiplier": 0.99,
             "FallbackStopMultiplier": 0.97,
             "RiskRewardRatio": 2.0
+        },
+
+        "CandidateFilter": {
+            "MinDollarVolume": 1000000.0,
+            "MaxBbMidSignedDistancePct": 0.5,
+            "MaxDistanceTo20dHigh": -20.0,
+            "MaxAtrRatio": 0.20
+        },
+
+        "Finder": {
+            "CandleCount": 300,
+            "MinimumCandles": 60,
+            "AvgVolumePeriod": 20
+        },
+
+        "PreFilter": {
+            "RequiredCurrency": "USD",
+            "DenyList": [ "UVIX", "AGQ", "SCO", "MSTZ" ],
+            "AllowedStockTypeMarkers": [ "STK", "CORP", "ADR" ],
+            "RejectTickersEndingWith": [ "U", "W" ]
         }
     },
 

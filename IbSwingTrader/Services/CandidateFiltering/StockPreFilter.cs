@@ -3,19 +3,17 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services.CandidateFiltering
 {
-    public class StockPreFilter(ITextLogger logger) : IStockPreFilter
+    public class StockPreFilter(
+        ITextLogger logger,
+        IGetCandidatesSettingsProvider settingsProvider) : IStockPreFilter
     {
         private readonly ITextLogger _logger = logger;
-        private static readonly HashSet<string> DenyList = new(StringComparer.OrdinalIgnoreCase)
-            {
-                "UVIX",
-                "AGQ",
-                "SCO",
-                "MSTZ"
-            };
+        private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
 
         public bool Pass(StockInfo stock)
         {
+            var settings = _settingsProvider.Get().PreFilter;
+
             if (stock == null)
             {
                 _logger.Info("Stock is null.");
@@ -28,15 +26,21 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 return false;
             }
 
-            if (DenyList.Contains(stock.Ticker))
+            if (settings.DenyList.Contains(
+                    stock.Ticker,
+                    StringComparer.OrdinalIgnoreCase))
             {
                 _logger.Info($"Stock {stock.Ticker} is in deny-list.");
                 return false;
             }
 
-            if (!string.Equals(stock.Currency, "USD", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(
+                    stock.Currency,
+                    settings.RequiredCurrency,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                _logger.Info($"Stock {stock.Ticker} has unsupported currency: {stock.Currency}");
+                _logger.Info(
+                    $"Stock {stock.Ticker} has unsupported currency: {stock.Currency}");
                 return false;
             }
 
@@ -44,28 +48,25 @@ namespace IbSwingTrader.Services.CandidateFiltering
             {
                 var type = stock.StockType.Trim();
 
-                var isSupported =
-                    type.Contains("STK", StringComparison.OrdinalIgnoreCase) ||
-                    type.Contains("CORP", StringComparison.OrdinalIgnoreCase) ||
-                    type.Contains("ADR", StringComparison.OrdinalIgnoreCase);
+                var isSupported = settings.AllowedStockTypeMarkers.Any(
+                    marker => type.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
                 if (!isSupported)
                 {
-                    _logger.Info($"Stock {stock.Ticker} has unsupported stock type: {stock.StockType}");
+                    _logger.Info(
+                        $"Stock {stock.Ticker} has unsupported stock type: {stock.StockType}");
                     return false;
                 }
             }
 
-            if (stock.Ticker.EndsWith("U", StringComparison.OrdinalIgnoreCase))
+            foreach (var suffix in settings.RejectTickersEndingWith)
             {
-                _logger.Info($"Stock {stock.Ticker} is a unit (ends with 'U'), which is not supported.");
-                return false;
-            }
-
-            if (stock.Ticker.EndsWith("W", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.Info($"Stock {stock.Ticker} is a warrant (ends with 'W'), which is not supported.");
-                return false;
+                if (stock.Ticker.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.Info(
+                        $"Stock {stock.Ticker} ends with '{suffix}', which is not supported.");
+                    return false;
+                }
             }
 
             return true;
