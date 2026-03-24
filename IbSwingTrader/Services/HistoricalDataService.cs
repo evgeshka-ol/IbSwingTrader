@@ -125,6 +125,8 @@ namespace IbSwingTrader.Services
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
                     allCandles.AddRange(chunkCandles);
+
+                chunkStart = chunkEnd;
             }
 
             return MergeCandles(allCandles);
