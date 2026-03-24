@@ -32,7 +32,8 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IBuildDatasetSettingsProvider, BuildDatasetSettingsProvider>();
             services.AddSingleton<IFeatureCalculationSettingsProvider, FeatureCalculationSettingsProvider>();
             services.AddSingleton<IGetCandidatesSettingsProvider, GetCandidatesSettingsProvider>();
-            services.AddSingleton<IEvaluationSettingsProvider, EvaluationSettingsProvider>();
+            services.AddSingleton<ICandidateEvaluationSettingsProvider, CandidateEvaluationSettingsProvider>();
+            services.AddSingleton<IWishListEvaluationSettingsProvider, WishListEvaluationSettingsProvider>();
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
 
             // shared infrastructure
@@ -80,6 +81,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
 
             // candidate evaluation
             services.AddSingleton<ICandidateEvaluator, CandidateEvaluator>();
+            services.AddSingleton<IWishListEvaluator, WishListEvaluator>();
             services.AddSingleton<IJsonFileService, JsonFileService>();
             services.AddSingleton<ICandidateEvaluationCsvService, CandidateEvaluationCsvService>();
             services.AddSingleton<IProcessedCandidateFilesService, ProcessedCandidateFilesService>();
@@ -88,7 +90,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             // commands
             services.AddTransient<BuildDatasetCommand>();
             services.AddTransient<GetCandidatesCommand>();
-            services.AddTransient<EvaluateCandidatesFolderCommand>();
+            services.AddTransient<EvaluateTickersCommand>();
             services.AddTransient<GetScannerParamsCommand>();
             services.AddTransient<DownloadFundamentalSnapshotCommand>();
 

@@ -1,0 +1,15 @@
+﻿namespace IbSwingTrader.Models
+{
+    public class WishListEvaluationResult
+    {
+        public required string Ticker { get; set; }
+
+        public DateTime ScanTimeNy { get; set; }
+
+        public bool RemoveFromWishList { get; set; }
+
+        public string Decision { get; set; } = string.Empty;
+
+        public string? Reason { get; set; }
+    }
+}

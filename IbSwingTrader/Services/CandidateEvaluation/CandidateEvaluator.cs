@@ -4,27 +4,19 @@ using IbSwingTrader.Models.Tickers;
 
 namespace IbSwingTrader.Services.CandidateEvaluation
 {
-    public class CandidateEvaluator : ICandidateEvaluator
+    public class CandidateEvaluator(
+        IContractResolver contractResolver,
+        IHistoricalDataService historicalDataService,
+        IAmbiguousBarResolver ambiguousBarResolver,
+        ITextLogger logger) : ICandidateEvaluator
     {
         private static readonly TimeSpan MaxEvaluationWindow = TimeSpan.FromDays(7);
         private static readonly TimeSpan FreshDataSafetyLag = TimeSpan.FromMinutes(10);
 
-        private readonly IContractResolver _contractResolver;
-        private readonly IHistoricalDataService _historicalDataService;
-        private readonly IAmbiguousBarResolver _ambiguousBarResolver;
-        private readonly ITextLogger _logger;
-
-        public CandidateEvaluator(
-            IContractResolver contractResolver,
-            IHistoricalDataService historicalDataService,
-            IAmbiguousBarResolver ambiguousBarResolver,
-            ITextLogger logger)
-        {
-            _contractResolver = contractResolver;
-            _historicalDataService = historicalDataService;
-            _ambiguousBarResolver = ambiguousBarResolver;
-            _logger = logger;
-        }
+        private readonly IContractResolver _contractResolver = contractResolver;
+        private readonly IHistoricalDataService _historicalDataService = historicalDataService;
+        private readonly IAmbiguousBarResolver _ambiguousBarResolver = ambiguousBarResolver;
+        private readonly ITextLogger _logger = logger;
 
         public async Task<List<CandidateEvaluationResult>> EvaluateAsync(
             List<CandidateDetails> candidates)

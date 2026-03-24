@@ -14,7 +14,8 @@ namespace IbSwingTrader.Models
         public FeatureCalculationSettings FeatureCalculation { get; set; } = new();
 
         public GetCandidatesSettings GetCandidates { get; set; } = new();
-        public EvaluationSettings Evaluation { get; set; } = new();
+        public CandidateEvaluationSettings CandidateEvaluation { get; set; } = new();
+        public WishListEvaluationSettings WishListEvaluation { get; set; } = new();
 
         public CsvTradeReaderSettings CsvTradeReader { get; set; } = new();
     }

@@ -1,6 +1,6 @@
 ﻿namespace IbSwingTrader.Models
 {
-    public class EvaluationSettings
+    public class CandidateEvaluationSettings
     {
         public string SearchPattern { get; set; } = "candidates_*.json";
         public int ForwardEvaluationDays { get; set; } = 7;

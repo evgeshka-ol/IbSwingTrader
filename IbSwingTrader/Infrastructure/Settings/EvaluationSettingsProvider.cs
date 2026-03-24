@@ -3,18 +3,13 @@ using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Settings
 {
-    public class EvaluationSettingsProvider : IEvaluationSettingsProvider
+    public class CandidateEvaluationSettingsProvider(IAgentSettingsProvider agentSettingsProvider) : ICandidateEvaluationSettingsProvider
     {
-        private readonly IAgentSettingsProvider _agentSettingsProvider;
+        private readonly IAgentSettingsProvider _agentSettingsProvider = agentSettingsProvider;
 
-        public EvaluationSettingsProvider(IAgentSettingsProvider agentSettingsProvider)
+        public CandidateEvaluationSettings Get()
         {
-            _agentSettingsProvider = agentSettingsProvider;
-        }
-
-        public EvaluationSettings Get()
-        {
-            return _agentSettingsProvider.Get().Evaluation;
+            return _agentSettingsProvider.Get().CandidateEvaluation;
         }
     }
 }

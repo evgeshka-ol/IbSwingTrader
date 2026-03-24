@@ -17,7 +17,7 @@ if (args.Length == 0)
     logger.Info("Usage:");
     logger.Info("  build-dataset <trades.csv> <dataset.csv>");
     logger.Info("  get-candidates");
-    logger.Info("  evaluate-candidates");
+    logger.Info("  evaluate-tickers");
     logger.Info("  get-scanner-params");
     logger.Info("  download-fundamental-snapshot");
     return;
@@ -39,9 +39,9 @@ switch (command)
             .RunAsync();
         break;
 
-    case "evaluate-candidates":
+    case "evaluate-tickers":
         await services
-            .GetRequiredService<EvaluateCandidatesFolderCommand>()
+            .GetRequiredService<EvaluateTickersCommand>()
             .RunAsync();
         break;
 
