@@ -1,8 +1,7 @@
 ﻿namespace IbSwingTrader.Models.Stocks
 {
-    public class TradeRecord
+    public class TradeRecord : TickerEntity
     {
-        public string Ticker { get; set; } = "";
         public bool IsShort { get; set; }
 
         public DateTime EntryDate => EntryTimeUtc.Date;
