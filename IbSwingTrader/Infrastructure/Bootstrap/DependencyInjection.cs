@@ -36,11 +36,14 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
 
             // shared infrastructure
+            services.AddSingleton<IObjectPropertyReader, ObjectPropertyReader>();
+            services.AddSingleton<ICompositePropertyJsonBuilder, CompositePropertyJsonBuilder>();
             services.AddSingleton<INumberTextFormatter, NumberTextFormatter>();
             services.AddSingleton<IArrayCellFormatter, ArrayCellFormatter>();
             services.AddSingleton<IConsoleColorWriter, ConsoleColorWriter>();
-            services.AddSingleton<IObjectPropertyReader, ObjectPropertyReader>();
             services.AddSingleton<ITextLogger, TextLogger>();
+            services.AddSingleton<ICandidateResultWriter, CandidateResultWriter>();
+            services.AddSingleton<IWishListResultWriter, WishListResultWriter>();
 
             // tws / market data
             services.AddSingleton<ITwsConnection, TwsConnection>();
@@ -74,7 +77,6 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<ITradeBuilder, TradeBuilder>();
             services.AddSingleton<IScanCodeInfoService, ScanCodeInfoService>();
             services.AddSingleton<ICandidateFinder, CandidateFinder>();
-            services.AddSingleton<ICandidateResultWriter, CandidateResultWriter>();
 
             // candidate evaluation
             services.AddSingleton<ICandidateEvaluator, CandidateEvaluator>();

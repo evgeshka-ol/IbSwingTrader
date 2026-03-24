@@ -41,7 +41,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                 catch (Exception ex)
                 {
                     _logger.Error(
-                        $"Evaluate failed for {candidate.Ticker} [{candidate.PresetScanCode}]: {ex.Message}");
+                        $"Evaluate failed for {candidate.Ticker} [{candidate.Scan.PresetScanCode}]: {ex.Message}");
 
                     results.Add(CreateErrorResult(candidate, ex.Message));
                 }
@@ -57,8 +57,8 @@ namespace IbSwingTrader.Services.CandidateEvaluation
 
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
 
-            var start = candidate.ScanTimeMarket;
-            var requestedEnd = candidate.ScanTimeMarket.Add(MaxEvaluationWindow);
+            var start = candidate.Scan.ScanTimeMarket;
+            var requestedEnd = candidate.Scan.ScanTimeMarket.Add(MaxEvaluationWindow);
             var availableNow = DateTime.UtcNow - FreshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
@@ -85,7 +85,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             }
 
             var ordered = candles
-                .Where(x => x.Time >= candidate.ScanTimeMarket && x.Time <= end)
+                .Where(x => x.Time >= candidate.Scan.ScanTimeMarket && x.Time <= end)
                 .OrderBy(x => x.Time)
                 .ToList();
 
@@ -95,7 +95,11 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                 return result;
             }
 
-            var entryCandle = ordered.FirstOrDefault(x => TouchesPrice(x, candidate.EntryPrice));
+            var entryPrice = candidate.TradePlan.EntryPrice;
+            var exitPrice = candidate.TradePlan.ExitPrice;
+            var stopPrice = candidate.TradePlan.StopLoss;
+
+            var entryCandle = ordered.FirstOrDefault(x => TouchesPrice(x, entryPrice));
             if (entryCandle == null)
             {
                 result.EntryTouched = false;
@@ -111,9 +115,9 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                 .OrderBy(x => x.Time)
                 .ToList();
 
-            FillWindowStatsFromEntry(result, afterEntry, candidate.EntryPrice, TimeSpan.FromDays(1), 1);
-            FillWindowStatsFromEntry(result, afterEntry, candidate.EntryPrice, TimeSpan.FromDays(2), 2);
-            FillWindowStatsFromEntry(result, afterEntry, candidate.EntryPrice, TimeSpan.FromDays(5), 5);
+            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(1), 1);
+            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(2), 2);
+            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(5), 5);
 
             result.Target3Pct1DHit = result.MaxMovePct1D >= 3m;
             result.Target5Pct1DHit = result.MaxMovePct1D >= 5m;
@@ -133,14 +137,14 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             result.Target10Pct5DHit = result.MaxMovePct5D >= 10m;
             result.Target15Pct5DHit = result.MaxMovePct5D >= 15m;
 
-            result.HitPlus5BeforeMinus5 = HitTargetBeforeStop(afterEntry, candidate.EntryPrice, 5m, 5m);
-            result.HitPlus7BeforeMinus5 = HitTargetBeforeStop(afterEntry, candidate.EntryPrice, 7m, 5m);
-            result.HitPlus10BeforeMinus5 = HitTargetBeforeStop(afterEntry, candidate.EntryPrice, 10m, 5m);
+            result.HitPlus5BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 5m, 5m);
+            result.HitPlus7BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 7m, 5m);
+            result.HitPlus10BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 10m, 5m);
 
             foreach (var candle in afterEntry)
             {
-                var hitExit = TouchesPrice(candle, candidate.ExitPrice);
-                var hitStop = TouchesPrice(candle, candidate.StopLoss);
+                var hitExit = TouchesPrice(candle, exitPrice);
+                var hitStop = TouchesPrice(candle, stopPrice);
 
                 if (hitExit && result.ExitTime == null)
                 {
@@ -160,9 +164,9 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                         candidate,
                         contract,
                         candle,
-                        candidate.EntryPrice,
-                        candidate.ExitPrice,
-                        candidate.StopLoss);
+                        entryPrice,
+                        exitPrice,
+                        stopPrice);
 
                     if (resolution != null)
                     {
@@ -172,7 +176,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                             result.ExitTime = resolution.ExitTime ?? candle.Time;
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
-                            result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.ExitPrice);
+                            result.RealizedPct = CalcPct(entryPrice, exitPrice);
                             result.Outcome = "Win";
                         }
                         else
@@ -181,7 +185,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                             result.StopTime = resolution.StopTime ?? candle.Time;
                             result.StopBeforeExit = true;
                             result.ExitBeforeStop = false;
-                            result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.StopLoss);
+                            result.RealizedPct = CalcPct(entryPrice, stopPrice);
                             result.Outcome = "Loss";
                         }
 
@@ -194,7 +198,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                         result.ExitTime = candle.Time;
                         result.ExitBeforeStop = true;
                         result.StopBeforeExit = false;
-                        result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.ExitPrice);
+                        result.RealizedPct = CalcPct(entryPrice, exitPrice);
                         result.Outcome = "Win";
                     }
                     else if (candle.Close < candle.Open)
@@ -203,13 +207,13 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                         result.StopTime = candle.Time;
                         result.StopBeforeExit = true;
                         result.ExitBeforeStop = false;
-                        result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.StopLoss);
+                        result.RealizedPct = CalcPct(entryPrice, stopPrice);
                         result.Outcome = "Loss";
                     }
                     else
                     {
-                        var closeToExit = Math.Abs(candle.Close - candidate.ExitPrice);
-                        var closeToStop = Math.Abs(candle.Close - candidate.StopLoss);
+                        var closeToExit = Math.Abs(candle.Close - exitPrice);
+                        var closeToStop = Math.Abs(candle.Close - stopPrice);
 
                         if (closeToExit < closeToStop)
                         {
@@ -217,7 +221,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                             result.ExitTime = candle.Time;
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
-                            result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.ExitPrice);
+                            result.RealizedPct = CalcPct(entryPrice, exitPrice);
                             result.Outcome = "Win";
                         }
                         else
@@ -226,7 +230,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                             result.StopTime = candle.Time;
                             result.StopBeforeExit = true;
                             result.ExitBeforeStop = false;
-                            result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.StopLoss);
+                            result.RealizedPct = CalcPct(entryPrice, stopPrice);
                             result.Outcome = "Loss";
                         }
                     }
@@ -240,7 +244,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                     result.StopTime = candle.Time;
                     result.StopBeforeExit = true;
                     result.ExitBeforeStop = false;
-                    result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.StopLoss);
+                    result.RealizedPct = CalcPct(entryPrice, stopPrice);
                     result.Outcome = "Loss";
                     return result;
                 }
@@ -251,7 +255,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
                     result.ExitTime = candle.Time;
                     result.ExitBeforeStop = true;
                     result.StopBeforeExit = false;
-                    result.RealizedPct = CalcPct(candidate.EntryPrice, candidate.ExitPrice);
+                    result.RealizedPct = CalcPct(entryPrice, exitPrice);
                     result.Outcome = "Win";
                     return result;
                 }
@@ -266,12 +270,12 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.ScanTimeMarket,
-                PresetScanCode = candidate.PresetScanCode,
-                CandidateScore = candidate.Score,
-                EntryPrice = candidate.EntryPrice,
-                ExitPrice = candidate.ExitPrice,
-                StopLoss = candidate.StopLoss
+                ScanTimeNy = candidate.Scan.ScanTimeMarket,
+                PresetScanCode = candidate.Scan.PresetScanCode,
+                CandidateScore = candidate.Score.Score,
+                EntryPrice = candidate.TradePlan.EntryPrice,
+                ExitPrice = candidate.TradePlan.ExitPrice,
+                StopLoss = candidate.TradePlan.StopLoss
             };
         }
 
@@ -282,12 +286,12 @@ namespace IbSwingTrader.Services.CandidateEvaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.ScanTimeMarket,
-                PresetScanCode = candidate.PresetScanCode,
-                CandidateScore = candidate.Score,
-                EntryPrice = candidate.EntryPrice,
-                ExitPrice = candidate.ExitPrice,
-                StopLoss = candidate.StopLoss,
+                ScanTimeNy = candidate.Scan.ScanTimeMarket,
+                PresetScanCode = candidate.Scan.PresetScanCode,
+                CandidateScore = candidate.Score.Score,
+                EntryPrice = candidate.TradePlan.EntryPrice,
+                ExitPrice = candidate.TradePlan.ExitPrice,
+                StopLoss = candidate.TradePlan.StopLoss,
                 Outcome = $"Error: {error}"
             };
         }
@@ -299,7 +303,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
 
         private static decimal CalcPct(decimal from, decimal to)
         {
-            if (from == 0)
+            if (from == 0m)
                 return 0m;
 
             return (to - from) / from * 100m;

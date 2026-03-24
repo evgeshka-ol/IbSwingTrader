@@ -1,16 +1,17 @@
 ﻿using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Commands
 {
     public class GetCandidatesCommand(
         ICandidateFinder finder,
-        ICandidateResultWriter writer,
+        IWishListResultWriter wishListWriter,
+        ICandidateResultWriter candidateWriter,
         IAgentPathService pathService,
         ITextLogger logger) : ICommand
     {
         private readonly ICandidateFinder _finder = finder;
-        private readonly ICandidateResultWriter _writer = writer;
+        private readonly IWishListResultWriter _wishListWriter = wishListWriter;
+        private readonly ICandidateResultWriter _candidateWriter = candidateWriter;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITextLogger _logger = logger;
 
@@ -34,8 +35,8 @@ namespace IbSwingTrader.Commands
             if (!string.IsNullOrWhiteSpace(wishListFolder))
                 Directory.CreateDirectory(wishListFolder);
 
-            await _writer.WriteAsync(wishListPath, result.WishList);
-            await _writer.WriteAsync(candidatesPath, result.Candidates);
+            await _wishListWriter.WriteAsync(wishListPath, result.WishList);
+            await _candidateWriter.WriteAsync(candidatesPath, result.Candidates);
 
             _logger.Info($"Wish list saved: {wishListPath}");
             _logger.Info($"Candidates saved: {candidatesPath}");

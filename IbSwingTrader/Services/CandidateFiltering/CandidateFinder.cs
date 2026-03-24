@@ -114,14 +114,12 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     }
 
                     var wishScore = _wishListScore.Calculate(snapshot);
-                    var trade = _tradeBuilder.Build(candles);
                     var scanTime = DateTime.UtcNow;
 
                     var wishListItem = BuildWishListItem(
                         stock,
                         preset,
                         snapshot,
-                        trade,
                         scanTime,
                         wishScore);
 
@@ -132,7 +130,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                             Stock = stock,
                             Preset = preset,
                             Snapshot = snapshot,
-                            Trade = trade,
+                            Candles = candles,
                             ScanTime = scanTime,
                             AvgDollarVolumeDaily20 = avgDollarVolumeDaily20,
                             WishListItem = wishListItem
@@ -142,24 +140,24 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
             foreach (var ctx in wishListContexts.Values)
             {
-                var lastPrice = ctx.Trade.Entry;
+                var trade = ctx.Trade ??= BuildTradePlan(ctx);
 
-                if (!_candidateFilter.Pass(ctx.Snapshot, lastPrice, ctx.AvgDollarVolumeDaily20))
+                if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily20))
                 {
                     _logger.Info($"Entry rejected after wish list pass: {ctx.Stock.Ticker}");
                     continue;
                 }
 
                 var entryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var finalScore = ctx.WishListItem.Score + entryScore;
+                var finalScore = ctx.WishListItem.Score.Score + entryScore;
 
                 var candidateItem = BuildCandidateItem(
                     ctx.Stock,
                     ctx.Preset,
                     ctx.Snapshot,
-                    ctx.Trade,
+                    trade,
                     ctx.ScanTime,
-                    ctx.WishListItem.Score,
+                    ctx.WishListItem.Score.Score,
                     entryScore,
                     finalScore);
 
@@ -171,13 +169,19 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
             return new CandidateSearchResult
             {
-                WishList = [.. wishListContexts.Values
-                    .Select(x => x.WishListItem)
-                    .OrderByDescending(x => x.Score)],
+                WishList =
+                [
+                    .. wishListContexts.Values
+                        .Select(x => x.WishListItem)
+                        .OrderByDescending(x => x.Score.Score)
+                ],
 
-                Candidates = [.. candidateResults.Values
-                    .OrderByDescending(x => x.Score)
-                    .Take(10)]
+                Candidates =
+                [
+                    .. candidateResults.Values
+                        .OrderByDescending(x => x.Score.Score)
+                        .Take(10)
+                ]
             };
         }
 
@@ -187,7 +191,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
         {
             if (results.TryGetValue(item.Stock.Ticker, out var existing))
             {
-                if (item.WishListItem.Score > existing.WishListItem.Score)
+                if (item.WishListItem.Score.Score > existing.WishListItem.Score.Score)
                 {
                     results[item.Stock.Ticker] = item;
 
@@ -216,62 +220,72 @@ namespace IbSwingTrader.Services.CandidateFiltering
         {
             if (results.TryGetValue(item.Ticker, out var existing))
             {
-                if (item.Score > existing.Score)
+                if (item.Score.Score > existing.Score.Score)
                 {
                     results[item.Ticker] = item;
 
                     _logger.Info(
                         $"Ticker {item.Ticker} replaced existing {bucketName} item with higher score. " +
-                        $"Old preset: {existing.PresetScanCode}, new preset: {item.PresetScanCode}");
+                        $"Old preset: {existing.Scan.PresetScanCode}, new preset: {item.Scan.PresetScanCode}");
                 }
                 else
                 {
                     _logger.Info(
                         $"Ticker {item.Ticker} already exists in {bucketName}. " +
-                        $"Keeping existing item from preset {existing.PresetScanCode}");
+                        $"Keeping existing item from preset {existing.Scan.PresetScanCode}");
                 }
             }
             else
             {
                 results[item.Ticker] = item;
-                _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.PresetScanCode}");
+                _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.Scan.PresetScanCode}");
             }
         }
 
-        private static CandidateDetails BuildWishListItem(
-            StockInfo stock,
-            PresetScanCode preset,
-            CandidateSignalSnapshot snapshot,
-            TradePlan trade,
-            DateTime scanTime,
-            decimal wishScore)
+        private TradePlanInfo BuildTradePlan(WishListContext ctx)
         {
-            return new CandidateDetails
-            {
-                Ticker = stock.Ticker,
-                PresetScanCode = preset.ScanCode,
-                PresetDescription = preset.Description,
+            var trade = _tradeBuilder.Build(ctx.Candles);
 
+            return new TradePlanInfo
+            {
                 EntryPrice = trade.Entry,
                 ExitPrice = trade.Exit,
                 StopLoss = trade.Stop,
-
                 ProfitPercent = CalculatePercent(trade.Entry, trade.Exit),
-                LossPercent = CalculatePercent(trade.Entry, trade.Stop),
+                LossPercent = CalculatePercent(trade.Entry, trade.Stop)
+            };
+        }
 
-                Score = wishScore,
-                WeeklyScore = null,
-                DailyScore = wishScore,
-                EntryScore = null,
-
-                IsWishList = true,
-
-                DistanceTo20dHigh = snapshot.Current.DistanceTo20dHigh,
-                DistanceTo52wHigh = snapshot.Current.DistanceTo52wHigh,
-                DailyRSI14 = snapshot.Current.DailyRSI14,
-
-                ScanTimeMarket = scanTime,
-                Notes = BuildWishListNotes(snapshot)
+        private static WishListItem BuildWishListItem(
+            StockInfo stock,
+            PresetScanCode preset,
+            CandidateSignalSnapshot snapshot,
+            DateTime scanTime,
+            decimal wishScore)
+        {
+            return new WishListItem
+            {
+                Ticker = stock.Ticker,
+                Scan = new ScanInfo
+                {
+                    PresetScanCode = preset.ScanCode,
+                    PresetDescription = preset.Description,
+                    ScanTimeMarket = scanTime
+                },
+                Score = new ScoreInfo
+                {
+                    Score = wishScore,
+                    WeeklyScore = null,
+                    DailyScore = wishScore,
+                    EntryScore = null
+                },
+                Context = new MarketContextInfo
+                {
+                    DistanceTo20dHigh = snapshot.Current.DistanceTo20dHigh,
+                    DistanceTo52wHigh = snapshot.Current.DistanceTo52wHigh,
+                    DailyRSI14 = snapshot.Current.DailyRSI14,
+                    Notes = BuildWishListNotes(snapshot)
+                }
             };
         }
 
@@ -279,7 +293,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             StockInfo stock,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
-            TradePlan trade,
+            TradePlanInfo trade,
             DateTime scanTime,
             decimal wishScore,
             decimal entryScore,
@@ -288,29 +302,43 @@ namespace IbSwingTrader.Services.CandidateFiltering
             return new CandidateDetails
             {
                 Ticker = stock.Ticker,
-                PresetScanCode = preset.ScanCode,
-                PresetDescription = preset.Description,
+                Scan = new ScanInfo
+                {
+                    PresetScanCode = preset.ScanCode,
+                    PresetDescription = preset.Description,
+                    ScanTimeMarket = scanTime
+                },
+                Score = new ScoreInfo
+                {
+                    Score = finalScore,
+                    WeeklyScore = null,
+                    DailyScore = wishScore,
+                    EntryScore = entryScore
+                },
+                Context = new MarketContextInfo
+                {
+                    DistanceTo20dHigh = snapshot.Current.DistanceTo20dHigh,
+                    DistanceTo52wHigh = snapshot.Current.DistanceTo52wHigh,
+                    DailyRSI14 = snapshot.Current.DailyRSI14,
+                    Notes = BuildCandidateNotes(snapshot)
+                },
+                TradePlan = trade,
+                Diagnostics = BuildDiagnostics(snapshot)
+            };
+        }
 
-                EntryPrice = trade.Entry,
-                ExitPrice = trade.Exit,
-                StopLoss = trade.Stop,
-
-                ProfitPercent = CalculatePercent(trade.Entry, trade.Exit),
-                LossPercent = CalculatePercent(trade.Entry, trade.Stop),
-
-                Score = finalScore,
-                WeeklyScore = null,
-                DailyScore = wishScore,
-                EntryScore = entryScore,
-
-                IsWishList = false,
-
-                DistanceTo20dHigh = snapshot.Current.DistanceTo20dHigh,
-                DistanceTo52wHigh = snapshot.Current.DistanceTo52wHigh,
-                DailyRSI14 = snapshot.Current.DailyRSI14,
-
-                ScanTimeMarket = scanTime,
-                Notes = BuildCandidateNotes(snapshot)
+        private static CandidateDiagnostics BuildDiagnostics(CandidateSignalSnapshot snapshot)
+        {
+            return new CandidateDiagnostics
+            {
+                Pullback10d = 0m,
+                VolumeRatio20 = 0m,
+                ATRRatio = 0m,
+                TrendPosition = 0m,
+                DailyTrendPosition = 0m,
+                DailyPullback10d = 0m,
+                BBMidSignedDistancePct = 0m,
+                WeeklyMACDHistDelta = null
             };
         }
 
@@ -395,10 +423,11 @@ namespace IbSwingTrader.Services.CandidateFiltering
             public required StockInfo Stock { get; init; }
             public required PresetScanCode Preset { get; init; }
             public required CandidateSignalSnapshot Snapshot { get; init; }
-            public required TradePlan Trade { get; init; }
+            public required List<Candle> Candles { get; init; }
             public required DateTime ScanTime { get; init; }
             public required decimal AvgDollarVolumeDaily20 { get; init; }
-            public required CandidateDetails WishListItem { get; init; }
+            public required WishListItem WishListItem { get; init; }
+            public TradePlanInfo? Trade { get; set; }
         }
     }
 }
