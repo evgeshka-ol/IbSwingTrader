@@ -4,6 +4,6 @@ namespace IbSwingTrader.Interfaces
 {
     public interface ICandidateFinder
     {
-        Task<List<CandidateDetails>> FindAsync();
+        Task<CandidateSearchResult> FindAsync();
     }
 }

@@ -5,8 +5,8 @@ namespace IbSwingTrader.Interfaces
     public interface ICandidateFilter
     {
         bool Pass(
-            FeatureSet features,
+            CandidateSignalSnapshot snapshot,
             decimal price,
-            decimal avgVolume20);
+            decimal avgDollarVolumeDaily20);
     }
 }

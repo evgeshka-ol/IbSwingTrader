@@ -5,32 +5,56 @@ namespace IbSwingTrader.Services.CandidateFiltering
 {
     public class CandidateFilter(
         ITextLogger logger,
-        IGetCandidatesSettingsProvider settingsProvider,
-        INumberTextFormatter fmt) : ICandidateFilter
+        IGetCandidatesSettingsProvider settingsProvider) : ICandidateFilter
     {
         private readonly ITextLogger _logger = logger;
         private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
-        private readonly INumberTextFormatter _fmt = fmt;
 
         public bool Pass(
-            FeatureSet featureSet,
+            CandidateSignalSnapshot snapshot,
             decimal price,
-            decimal avgVolume20)
+            decimal avgDollarVolumeDaily20)
         {
-            var settings = _settingsProvider.Get().CandidateFilter;
-            var dollarVolume = price * avgVolume20;
+            var s = _settingsProvider.Get().EntryFilter;
+            var f = snapshot.Current;
 
-            if (dollarVolume < settings.MinDollarVolume)
+            if (avgDollarVolumeDaily20 < s.MinDollarVolume)
             {
-                _logger.Info(
-                    $"Filtered out due to dollar volume {_fmt.Generic(dollarVolume)} below minimum {_fmt.Generic(settings.MinDollarVolume)}");
+                _logger.Info("Entry rejected: low daily dollar volume.");
                 return false;
             }
 
-            if (featureSet.DistanceTo20dHigh > settings.MaxDistanceTo20dHigh)
+            if (f.DistanceTo20dHigh > s.MaxDistanceTo20dHigh)
             {
-                _logger.Info(
-                    $"Filtered out due to DistanceTo20dHigh {_fmt.Ratio(featureSet.DistanceTo20dHigh)} above {_fmt.Ratio(settings.MaxDistanceTo20dHigh)}");
+                _logger.Info("Entry rejected: too close to 20d high.");
+                return false;
+            }
+
+            var dailyTurnCount = 0;
+            if (snapshot.DailyMaDelta3 > s.MinDailyMaDelta3) dailyTurnCount++;
+            if (snapshot.DailyRsiDelta3 > s.MinDailyRsiDelta3) dailyTurnCount++;
+            if (snapshot.DailyMacdDelta3 > s.MinDailyMacdDelta3) dailyTurnCount++;
+
+            if (dailyTurnCount < s.MinDailyTurnSignals)
+            {
+                _logger.Info("Entry rejected: daily reversal is too weak.");
+                return false;
+            }
+
+            var h4TurnCount = 0;
+            if (snapshot.H4MaDelta3 > s.MinH4MaDelta3) h4TurnCount++;
+            if (snapshot.H4RsiDelta3 > s.MinH4RsiDelta3) h4TurnCount++;
+            if (snapshot.H4MacdDelta3 > s.MinH4MacdDelta3) h4TurnCount++;
+
+            if (h4TurnCount < s.MinH4TurnSignals)
+            {
+                _logger.Info("Entry rejected: H4 reversal is too weak.");
+                return false;
+            }
+
+            if (f.DailyRSI14 < s.MinCurrentDailyRsi14)
+            {
+                _logger.Info("Entry rejected: current daily RSI too weak.");
                 return false;
             }
 

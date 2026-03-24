@@ -4,6 +4,6 @@ namespace IbSwingTrader.Interfaces
 {
     public interface ICandidateResultWriter
     {
-        Task WriteAsync(List<CandidateDetails> candidates);
+        Task WriteAsync(string filePath, List<CandidateDetails> candidates);
     }
 }

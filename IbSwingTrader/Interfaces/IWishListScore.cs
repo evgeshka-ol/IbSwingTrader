@@ -2,7 +2,7 @@
 
 namespace IbSwingTrader.Interfaces
 {
-    public interface ICandidateScore
+    public interface IWishListScore
     {
         decimal Calculate(CandidateSignalSnapshot snapshot);
     }

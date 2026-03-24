@@ -7,7 +7,6 @@ using IbSwingTrader.Models;
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class CandidateResultWriter(
-        IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         ITextLogger logger,
         IConsoleColorWriter console,
@@ -40,26 +39,29 @@ namespace IbSwingTrader.Infrastructure.Logging
             nameof(CandidateDetails.DailyRSI14),
             nameof(CandidateDetails.BBMidSignedDistancePct),
             nameof(CandidateDetails.WeeklyMACDHistDelta),
-            nameof(CandidateDetails.Score)
+            nameof(CandidateDetails.Score),
+            nameof(CandidateDetails.WeeklyScore),
+            nameof(CandidateDetails.DailyScore),
+            nameof(CandidateDetails.EntryScore)
         ];
 
-        private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IConsoleColorWriter _console = console;
         private readonly IObjectPropertyReader _propertyReader = propertyReader;
         private readonly INumberTextFormatter _fmt = fmt;
 
-        public async Task WriteAsync(List<CandidateDetails> candidates)
+        public async Task WriteAsync(string filePath, List<CandidateDetails> candidates)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            ArgumentNullException.ThrowIfNull(candidates);
+
+            var folder = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(folder))
+                Directory.CreateDirectory(folder);
+
             var marketSettings = _marketSettingsProvider.Get();
-
-            var folder = _pathService.GetCandidatesFolder();
-            Directory.CreateDirectory(folder);
-
             var scanTimeMarket = GetMarketNow(marketSettings.Timezone);
-            var fileName = BuildFileName(scanTimeMarket);
-            var filePath = Path.Combine(folder, fileName);
 
             foreach (var candidate in candidates)
             {
@@ -72,7 +74,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var json = BuildJson(candidates);
             await File.WriteAllTextAsync(filePath, json);
 
-            _logger.Info($"Candidates saved: {filePath}");
+            _logger.Info($"Candidate results saved: {filePath}");
         }
 
         private string BuildJson(IEnumerable<CandidateDetails> candidates)
@@ -102,7 +104,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             return obj;
         }
 
-        private JsonValue? ToJsonNode(object? value, string propertyName)
+        private JsonNode? ToJsonNode(object? value, string propertyName)
         {
             if (value == null)
                 return null;
@@ -136,20 +138,25 @@ namespace IbSwingTrader.Infrastructure.Logging
             };
         }
 
-        private void WriteCandidateToConsole(Candidate candidate)
+        private void WriteCandidateToConsole(CandidateDetails candidate)
         {
-            _console.Write($"{candidate.Ticker} ", ConsoleColor.Gray);
+            var tickerColor = candidate.IsWishList ? ConsoleColor.DarkCyan : ConsoleColor.Gray;
+            var scoreColor = candidate.IsWishList ? ConsoleColor.Cyan : ConsoleColor.White;
+
+            _console.Write($"{candidate.Ticker} ", tickerColor);
             _console.Write($"{_fmt.Price(candidate.EntryPrice)} ", ConsoleColor.DarkYellow);
             _console.Write($"{_fmt.Price(candidate.ExitPrice)} ", ConsoleColor.DarkGreen);
             _console.Write($"{_fmt.Price(candidate.StopLoss)} ", ConsoleColor.DarkRed);
             _console.Write($"{_fmt.Percent(candidate.ProfitPercent)}%", ConsoleColor.Green);
             _console.Write("/", ConsoleColor.DarkGray);
-            _console.WriteLine($"{_fmt.Percent(candidate.LossPercent)}%", ConsoleColor.Red);
-        }
+            _console.Write($"{_fmt.Percent(candidate.LossPercent)}%", ConsoleColor.Red);
+            _console.Write(" ", ConsoleColor.DarkGray);
+            _console.Write($"score={_fmt.Ratio(candidate.Score)}", scoreColor);
 
-        private static string BuildFileName(DateTime scanTimeMarket)
-        {
-            return $"candidates_{scanTimeMarket:yyyyMMdd_HHmm}_MARKET.json";
+            if (candidate.IsWishList)
+                _console.Write(" [WL]", ConsoleColor.Cyan);
+
+            _console.WriteLine(string.Empty, ConsoleColor.Gray);
         }
 
         private static DateTime GetMarketNow(string timezoneId)

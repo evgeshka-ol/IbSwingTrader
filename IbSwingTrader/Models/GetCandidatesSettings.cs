@@ -8,16 +8,56 @@
         public int MaxWishListItems { get; set; }
 
         public List<ScanCodeSettings> ScanCodes { get; set; } = [];
-        public TradePlanSettings TradePlan { get; set; } = new();
+        public WishListFilterSettings WishListFilter { get; set; } = new();
+        public EntryFilterSettings EntryFilter { get; set; } = new();
         public CandidateFilterSettings CandidateFilter { get; set; } = new();
         public CandidateFinderSettings Finder { get; set; } = new();
         public StockPreFilterSettings PreFilter { get; set; } = new();
+        public TradePlanSettings TradePlan { get; set; } = new();
     }
 
     public class ScanCodeSettings
     {
         public string Code { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+    }
+
+    public class WishListFilterSettings
+    {
+        public decimal MinDollarVolume { get; set; }
+
+        public decimal MaxDistanceTo20dHigh { get; set; }
+        public decimal MaxDistanceTo52wHigh { get; set; }
+
+        public decimal MaxDailyMaSignedDistancePct { get; set; }
+
+        public decimal MinWeeklyMaSignedDistancePct { get; set; }
+
+        public decimal MinDailyRsi14 { get; set; }
+        public decimal MaxDailyRsi14 { get; set; }
+
+        public decimal MinWeeklyRsi14 { get; set; }
+
+        public decimal MaxDailyMacdLineMinusSignal { get; set; }
+    }
+
+    public class EntryFilterSettings
+    {
+        public decimal MinDollarVolume { get; set; }
+
+        public decimal MaxDistanceTo20dHigh { get; set; }
+
+        public decimal MinDailyMaDelta3 { get; set; }
+        public decimal MinDailyRsiDelta3 { get; set; }
+        public decimal MinDailyMacdDelta3 { get; set; }
+        public int MinDailyTurnSignals { get; set; }
+
+        public decimal MinH4MaDelta3 { get; set; }
+        public decimal MinH4RsiDelta3 { get; set; }
+        public decimal MinH4MacdDelta3 { get; set; }
+        public int MinH4TurnSignals { get; set; }
+
+        public decimal MinCurrentDailyRsi14 { get; set; }
     }
 
     public class TradePlanSettings

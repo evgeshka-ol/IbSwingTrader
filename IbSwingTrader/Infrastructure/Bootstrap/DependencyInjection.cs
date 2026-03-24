@@ -10,6 +10,7 @@ using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Services;
 using IbSwingTrader.Services.CandidateEvaluation;
 using IbSwingTrader.Services.CandidateFiltering;
+using IbSwingTrader.Services.WishListFiltering;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace IbSwingTrader.Infrastructure.Bootstrap
@@ -61,7 +62,13 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<ICsvWriter, CsvDatasetWriter>();
             services.AddSingleton<ITradeDatasetBuilder, TradeDatasetBuilder>();
 
+            // wish list
+            services.AddSingleton<IWishListFilter, WishListFilter>();
+            services.AddSingleton<IWishListScore, WishListScore>();
+
             // candidate search
+            services.AddSingleton<ICandidateSignalAnalyzer, CandidateSignalAnalyzer>();
+            services.AddSingleton<ICandidateScore, CandidateScore>();
             services.AddSingleton<IStockPreFilter, StockPreFilter>();
             services.AddSingleton<ICandidateFilter, CandidateFilter>();
             services.AddSingleton<ITradeBuilder, TradeBuilder>();

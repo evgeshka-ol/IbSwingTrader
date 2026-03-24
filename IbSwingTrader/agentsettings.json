@@ -76,12 +76,30 @@
             }
         ],
 
-        "TradePlan": {
-            "MinimumCandles": 10,
-            "StopLookbackBars": 5,
-            "StopBufferMultiplier": 0.99,
-            "FallbackStopMultiplier": 0.97,
-            "RiskRewardRatio": 2.0
+        "WishListFilter": {
+            "MinDollarVolume": 15000000,
+            "MaxDistanceTo20dHigh": -5.0,
+            "MaxDistanceTo52wHigh": -10.0,
+            "MaxDailyMaSignedDistancePct": -1.0,
+            "MinWeeklyMaSignedDistancePct": -12.0,
+            "MinDailyRsi14": 28.0,
+            "MaxDailyRsi14": 55.0,
+            "MinWeeklyRsi14": 35.0,
+            "MaxDailyMacdLineMinusSignal": 0.0
+        },
+
+        "EntryFilter": {
+            "MinDollarVolume": 15000000,
+            "MaxDistanceTo20dHigh": -2.5,
+            "MinDailyMaDelta3": 0.30,
+            "MinDailyRsiDelta3": 2.0,
+            "MinDailyMacdDelta3": 0.05,
+            "MinDailyTurnSignals": 2,
+            "MinH4MaDelta3": 0.20,
+            "MinH4RsiDelta3": 2.0,
+            "MinH4MacdDelta3": 0.03,
+            "MinH4TurnSignals": 2,
+            "MinCurrentDailyRsi14": 40.0
         },
 
         "CandidateFilter": {
@@ -102,6 +120,14 @@
             "DenyList": [ "UVIX", "AGQ", "SCO", "MSTZ" ],
             "AllowedStockTypeMarkers": [ "STK", "CORP", "ADR" ],
             "RejectTickersEndingWith": [ "U", "W" ]
+        },
+
+        "TradePlan": {
+            "MinimumCandles": 10,
+            "StopLookbackBars": 5,
+            "StopBufferMultiplier": 0.99,
+            "FallbackStopMultiplier": 0.97,
+            "RiskRewardRatio": 2.0
         }
     },
 
