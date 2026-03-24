@@ -4,6 +4,6 @@ namespace IbSwingTrader.Interfaces
 {
     public interface IWishListScore
     {
-        decimal Calculate(CandidateSignalSnapshot snapshot);
+        WishListScoreResult Calculate(CandidateSignalSnapshot snapshot);
     }
 }

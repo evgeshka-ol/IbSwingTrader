@@ -5,28 +5,35 @@ namespace IbSwingTrader.Services.WishListFiltering
 {
     public class WishListScore : IWishListScore
     {
-        public decimal Calculate(CandidateSignalSnapshot snapshot)
+        public WishListScoreResult Calculate(CandidateSignalSnapshot snapshot)
         {
             var f = snapshot.Current;
-            decimal score = 0m;
 
-            score += Clamp(-f.DistanceTo20dHigh, 0m, 25m) * 1.2m;
-            score += Clamp(-f.DistanceTo52wHigh, 0m, 40m) * 0.8m;
-            score += Clamp(-f.DailyMaSignedDistancePct, 0m, 10m) * 1.5m;
+            decimal dailyScore = 0m;
+            decimal weeklyScore = 0m;
 
-            if (f.WeeklyMaSignedDistancePct.HasValue)
-                score += Clamp(-f.WeeklyMaSignedDistancePct.Value, 0m, 12m) * 1.0m;
+            dailyScore += Clamp(-f.DistanceTo20dHigh, 0m, 25m) * 1.2m;
+            dailyScore += Clamp(-f.DistanceTo52wHigh, 0m, 40m) * 0.8m;
+            dailyScore += Clamp(-f.DailyMaSignedDistancePct, 0m, 10m) * 1.5m;
 
-            score += ScoreRsiZone(f.DailyRSI14, 35m, 50m, 55m);
-            score += ScoreNegativeButNotBroken(f.DailyMACDLineMinusSignal, -3m, 0m);
+            dailyScore += ScoreRsiZone(f.DailyRSI14, 35m, 50m, 55m);
+            dailyScore += ScoreNegativeButNotBroken(f.DailyMACDLineMinusSignal, -3m, 0m);
 
             if (f.DailyRSI14 < 30m)
-                score -= 20m;
+                dailyScore -= 20m;
+
+            if (f.WeeklyMaSignedDistancePct.HasValue)
+                weeklyScore += Clamp(-f.WeeklyMaSignedDistancePct.Value, 0m, 12m) * 1.0m;
 
             if (f.WeeklyMaSignedDistancePct.HasValue && f.WeeklyMaSignedDistancePct.Value < -12m)
-                score -= 20m;
+                weeklyScore -= 20m;
 
-            return score;
+            return new WishListScoreResult
+            {
+                DailyScore = dailyScore,
+                WeeklyScore = weeklyScore,
+                TotalScore = dailyScore + weeklyScore
+            };
         }
 
         private static decimal Clamp(decimal value, decimal min, decimal max)

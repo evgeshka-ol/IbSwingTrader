@@ -113,9 +113,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         continue;
                     }
 
-                    var totalWishScore = _wishListScore.Calculate(snapshot);
-                    var weeklyScore = CalculateWeeklyScore(snapshot);
-                    var dailyScore = totalWishScore - weeklyScore;
+                    var wishScore = _wishListScore.Calculate(snapshot);
                     var scanTime = DateTime.UtcNow;
 
                     var wishListItem = BuildWishListItem(
@@ -123,9 +121,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         preset,
                         snapshot,
                         scanTime,
-                        totalWishScore,
-                        dailyScore,
-                        weeklyScore);
+                        wishScore);
 
                     AddOrReplaceWishListContext(
                         wishListContexts,
@@ -161,7 +157,6 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     ctx.Stock,
                     ctx.Preset,
                     ctx.Snapshot,
-                    ctx.Candles,
                     trade,
                     ctx.ScanTime,
                     dailyScore,
@@ -269,9 +264,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
             DateTime scanTime,
-            decimal totalScore,
-            decimal dailyScore,
-            decimal weeklyScore)
+            WishListScoreResult wishScore)
         {
             return new WishListItem
             {
@@ -284,9 +277,9 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 },
                 Score = new ScoreInfo
                 {
-                    Score = totalScore,
-                    WeeklyScore = weeklyScore,
-                    DailyScore = dailyScore,
+                    Score = wishScore.TotalScore,
+                    WeeklyScore = wishScore.WeeklyScore,
+                    DailyScore = wishScore.DailyScore,
                     EntryScore = null
                 },
                 Context = new MarketContextInfo
@@ -303,7 +296,6 @@ namespace IbSwingTrader.Services.CandidateFiltering
             StockInfo stock,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
-            List<Candle> candles,
             TradePlanInfo trade,
             DateTime scanTime,
             decimal dailyScore,
@@ -335,24 +327,22 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     Notes = BuildCandidateNotes(snapshot)
                 },
                 TradePlan = trade,
-                Diagnostics = BuildDiagnostics(snapshot, candles)
+                Diagnostics = BuildDiagnostics(snapshot)
             };
         }
 
-        private static CandidateDiagnostics BuildDiagnostics(
-            CandidateSignalSnapshot snapshot,
-            List<Candle> candles)
+        private static CandidateDiagnostics BuildDiagnostics(CandidateSignalSnapshot snapshot)
         {
             return new CandidateDiagnostics
             {
-                Pullback10d = CalculatePullbackByCalendarDays(candles, 10),
-                VolumeRatio20 = CalculateVolumeRatio20(candles),
-                ATRRatio = CalculateAtrRatio(candles, 14),
-                TrendPosition = snapshot.Current.H4MaSignedDistancePct,
-                DailyTrendPosition = snapshot.Current.DailyMaSignedDistancePct,
-                DailyPullback10d = CalculateDailyPullback10d(candles),
-                BBMidSignedDistancePct = CalculateSmaSignedDistancePct(candles, 20),
-                WeeklyMACDHistDelta = CalculateWeeklyMacdHistDelta(candles)
+                Pullback10d = 0m,
+                VolumeRatio20 = 0m,
+                ATRRatio = 0m,
+                TrendPosition = 0m,
+                DailyTrendPosition = 0m,
+                DailyPullback10d = 0m,
+                BBMidSignedDistancePct = 0m,
+                WeeklyMACDHistDelta = null
             };
         }
 
@@ -382,20 +372,6 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 return 0m;
 
             return (to - from) / from * 100m;
-        }
-
-        private static decimal CalculateWeeklyScore(CandidateSignalSnapshot snapshot)
-        {
-            var f = snapshot.Current;
-            decimal score = 0m;
-
-            if (f.WeeklyMaSignedDistancePct.HasValue)
-                score += Clamp(-f.WeeklyMaSignedDistancePct.Value, 0m, 12m) * 1.0m;
-
-            if (f.WeeklyMaSignedDistancePct.HasValue && f.WeeklyMaSignedDistancePct.Value < -12m)
-                score -= 20m;
-
-            return score;
         }
 
         private static string BuildWishListNotes(CandidateSignalSnapshot snapshot)
@@ -444,226 +420,6 @@ namespace IbSwingTrader.Services.CandidateFiltering
             return parts.Count == 0
                 ? "entry confirmed"
                 : string.Join(", ", parts);
-        }
-
-        private static decimal CalculatePullbackByCalendarDays(List<Candle> candles, int days)
-        {
-            if (candles.Count == 0)
-                return 0m;
-
-            var lastTime = candles[^1].Time;
-            var start = lastTime.AddDays(-days);
-
-            var range = candles
-                .Where(x => x.Time >= start)
-                .ToList();
-
-            if (range.Count == 0)
-                return 0m;
-
-            var highest = range.Max(x => x.High);
-            var close = candles[^1].Close;
-
-            if (highest <= 0m)
-                return 0m;
-
-            return (close - highest) / highest * 100m;
-        }
-
-        private static decimal CalculateVolumeRatio20(List<Candle> candles)
-        {
-            if (candles.Count < 21)
-                return 0m;
-
-            var currentVolume = candles[^1].Volume;
-            var avgVolume20 = candles
-                .Skip(candles.Count - 21)
-                .Take(20)
-                .Average(x => x.Volume);
-
-            if (avgVolume20 <= 0m)
-                return 0m;
-
-            return currentVolume / avgVolume20;
-        }
-
-        private static decimal CalculateAtrRatio(List<Candle> candles, int length)
-        {
-            if (candles.Count < length + 1)
-                return 0m;
-
-            var trueRanges = new List<decimal>();
-
-            for (int i = candles.Count - length; i < candles.Count; i++)
-            {
-                var current = candles[i];
-                var prevClose = candles[i - 1].Close;
-
-                var tr = Math.Max(
-                    current.High - current.Low,
-                    Math.Max(
-                        Math.Abs(current.High - prevClose),
-                        Math.Abs(current.Low - prevClose)));
-
-                trueRanges.Add(tr);
-            }
-
-            if (trueRanges.Count == 0)
-                return 0m;
-
-            var atr = trueRanges.Average();
-            var close = candles[^1].Close;
-
-            if (close == 0m)
-                return 0m;
-
-            return atr / close * 100m;
-        }
-
-        private static decimal CalculateDailyPullback10d(List<Candle> candles)
-        {
-            var dailyBars = BuildDailyBars(candles);
-
-            if (dailyBars.Count == 0)
-                return 0m;
-
-            var range = dailyBars.TakeLast(10).ToList();
-            var highest = range.Max(x => x.High);
-            var close = dailyBars[^1].Close;
-
-            if (highest <= 0m)
-                return 0m;
-
-            return (close - highest) / highest * 100m;
-        }
-
-        private static decimal CalculateSmaSignedDistancePct(List<Candle> candles, int length)
-        {
-            if (candles.Count < length)
-                return 0m;
-
-            var sma = candles
-                .TakeLast(length)
-                .Average(x => x.Close);
-
-            if (sma == 0m)
-                return 0m;
-
-            var close = candles[^1].Close;
-            return (close - sma) / sma * 100m;
-        }
-
-        private static decimal? CalculateWeeklyMacdHistDelta(List<Candle> candles)
-        {
-            var weeklyCloses = BuildWeeklyBars(candles)
-                .Select(x => x.Close)
-                .ToList();
-
-            var macdSeries = BuildMacdSeries(weeklyCloses);
-
-            if (macdSeries.Count < 2)
-                return null;
-
-            var currentHist = macdSeries[^1].Macd - macdSeries[^1].Signal;
-            var prevHist = macdSeries[^2].Macd - macdSeries[^2].Signal;
-
-            return currentHist - prevHist;
-        }
-
-        private static List<Candle> BuildDailyBars(List<Candle> candles)
-        {
-            var result = new List<Candle>();
-
-            foreach (var group in candles.GroupBy(x => x.Time.Date).OrderBy(x => x.Key))
-            {
-                var ordered = group.OrderBy(x => x.Time).ToList();
-
-                result.Add(new Candle
-                {
-                    Timeframe = Timeframe.D1,
-                    Time = group.Key,
-                    Open = ordered[0].Open,
-                    High = ordered.Max(x => x.High),
-                    Low = ordered.Min(x => x.Low),
-                    Close = ordered[^1].Close,
-                    Volume = ordered.Sum(x => x.Volume)
-                });
-            }
-
-            return result;
-        }
-
-        private static List<Candle> BuildWeeklyBars(List<Candle> candles)
-        {
-            var result = new List<Candle>();
-
-            foreach (var group in candles
-                .GroupBy(x => StartOfWeek(x.Time.Date))
-                .OrderBy(x => x.Key))
-            {
-                var ordered = group.OrderBy(x => x.Time).ToList();
-
-                result.Add(new Candle
-                {
-                    Timeframe = Timeframe.W1,
-                    Time = group.Key,
-                    Open = ordered[0].Open,
-                    High = ordered.Max(x => x.High),
-                    Low = ordered.Min(x => x.Low),
-                    Close = ordered[^1].Close,
-                    Volume = ordered.Sum(x => x.Volume)
-                });
-            }
-
-            return result;
-        }
-
-        private static DateTime StartOfWeek(DateTime value)
-        {
-            var diff = (7 + (value.DayOfWeek - DayOfWeek.Monday)) % 7;
-            return value.AddDays(-diff).Date;
-        }
-
-        private static List<MacdPoint> BuildMacdSeries(List<decimal> closes)
-        {
-            var result = new List<MacdPoint>();
-
-            if (closes.Count == 0)
-                return result;
-
-            decimal? ema12 = null;
-            decimal? ema26 = null;
-            decimal? signal = null;
-
-            const decimal k12 = 2m / 13m;
-            const decimal k26 = 2m / 27m;
-            const decimal k9 = 2m / 10m;
-
-            foreach (var close in closes)
-            {
-                ema12 = ema12 == null ? close : ema12.Value + (close - ema12.Value) * k12;
-                ema26 = ema26 == null ? close : ema26.Value + (close - ema26.Value) * k26;
-
-                var macd = ema12.Value - ema26.Value;
-                signal = signal == null ? macd : signal.Value + (macd - signal.Value) * k9;
-
-                result.Add(new MacdPoint
-                {
-                    Macd = macd,
-                    Signal = signal.Value
-                });
-            }
-
-            return result;
-        }
-
-        private static decimal Clamp(decimal value, decimal min, decimal max)
-            => Math.Min(max, Math.Max(min, value));
-
-        private sealed class MacdPoint
-        {
-            public decimal Macd { get; init; }
-            public decimal Signal { get; init; }
         }
 
         private sealed class WishListContext
