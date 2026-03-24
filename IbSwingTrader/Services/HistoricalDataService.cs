@@ -31,6 +31,7 @@ namespace IbSwingTrader.Services
 
             var expectedStep = GetExpectedStep(timeframe);
             var overlap = expectedStep;
+
             List<Candle> allCandles = [];
 
             var hasCache = _cache.TryLoad(symbol, timeframe, out var cached) &&
@@ -46,7 +47,7 @@ namespace IbSwingTrader.Services
                     $"first={allCandles.First().Time:yyyy-MM-dd HH:mm:ss}, last={allCandles.Last().Time:yyyy-MM-dd HH:mm:ss}");
             }
 
-            var missingRanges = BuildMissingRanges(allCandles, start, end, expectedStep, overlap);
+            var missingRanges = BuildMissingRanges(allCandles, start, end, overlap);
 
             if (missingRanges.Count > 0)
             {
@@ -124,18 +125,15 @@ namespace IbSwingTrader.Services
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
                     allCandles.AddRange(chunkCandles);
-
-                chunkStart = chunkEnd;
             }
 
             return MergeCandles(allCandles);
         }
 
-        private List<DateRange> BuildMissingRanges(
+        private static List<DateRange> BuildMissingRanges(
             List<Candle> candles,
             DateTime requestedStart,
             DateTime requestedEnd,
-            TimeSpan expectedStep,
             TimeSpan overlap)
         {
             if (candles.Count == 0)
@@ -171,22 +169,6 @@ namespace IbSwingTrader.Services
                     ranges.Add(new DateRange(requestedStart, leftEnd));
             }
 
-            for (int i = 1; i < ordered.Count; i++)
-            {
-                var prev = ordered[i - 1].Time;
-                var current = ordered[i].Time;
-                var diff = current - prev;
-
-                if (diff > expectedStep + GetGapTolerance(expectedStep))
-                {
-                    var gapStart = Max(requestedStart, prev - overlap);
-                    var gapEnd = Min(requestedEnd, current + overlap);
-
-                    if (gapStart < gapEnd)
-                        ranges.Add(new DateRange(gapStart, gapEnd));
-                }
-            }
-
             if (requestedEnd > cachedEnd)
             {
                 var rightStart = Max(requestedStart, cachedEnd - overlap);
@@ -213,7 +195,7 @@ namespace IbSwingTrader.Services
                 return;
             }
 
-            var gaps = FindGaps(candles, expectedStep);
+            var gaps = FindGaps(candles, expectedStep, timeframe);
 
             _logger.Debug(
                 $"Historical result ready: {symbol}, tf={timeframe}, candles={candles.Count}, " +
@@ -227,13 +209,20 @@ namespace IbSwingTrader.Services
             }
         }
 
-        private static List<DateRange> FindGaps(List<Candle> candles, TimeSpan expectedStep)
+        private static List<DateRange> FindGaps(
+            List<Candle> candles,
+            TimeSpan expectedStep,
+            Timeframe timeframe)
         {
             var ordered = candles
                 .OrderBy(x => x.Time)
                 .ToList();
 
             var result = new List<DateRange>();
+
+            if (ordered.Count <= 1)
+                return result;
+
             var tolerance = GetGapTolerance(expectedStep);
 
             for (int i = 1; i < ordered.Count; i++)
@@ -241,11 +230,51 @@ namespace IbSwingTrader.Services
                 var prev = ordered[i - 1].Time;
                 var current = ordered[i].Time;
 
-                if (current - prev > expectedStep + tolerance)
+                var diff = current - prev;
+
+                if (IsExpectedMarketGap(prev, current, timeframe))
+                    continue;
+
+                if (diff > expectedStep + tolerance)
                     result.Add(new DateRange(prev, current));
             }
 
             return result;
+        }
+
+        private static bool IsExpectedMarketGap(
+            DateTime previous,
+            DateTime current,
+            Timeframe timeframe)
+        {
+            if (timeframe != Timeframe.H4 &&
+                timeframe != Timeframe.H1 &&
+                timeframe != Timeframe.M30 &&
+                timeframe != Timeframe.M15 &&
+                timeframe != Timeframe.M5 &&
+                timeframe != Timeframe.M1)
+            {
+                return false;
+            }
+
+            if (current <= previous)
+                return false;
+
+            var diff = current - previous;
+
+            if (diff >= TimeSpan.FromDays(2))
+                return true;
+
+            if (previous.DayOfWeek == DayOfWeek.Friday &&
+                current.DayOfWeek == DayOfWeek.Monday)
+            {
+                return true;
+            }
+
+            if (previous.Date != current.Date && diff >= TimeSpan.FromHours(8))
+                return true;
+
+            return false;
         }
 
         private static List<Candle> MergeCandles(List<Candle> candles)
