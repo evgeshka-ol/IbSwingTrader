@@ -73,6 +73,14 @@
             {
                 "Code": "MOST_ACTIVE",
                 "Description": "Most active stocks."
+            },
+            {
+                "Code": "TOP_OPEN_PERC_GAIN",
+                "Description": "Top percentage gainer at open."
+            },
+            {
+                "Code": "TOP_PERC_GAIN",
+                "Description": "Top percentage gainers."
             }
         ],
 
