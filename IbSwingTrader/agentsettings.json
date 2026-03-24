@@ -59,12 +59,12 @@
 
         "ScanCodes": [
             {
-                "Code": "TOP_OPEN_PERC_GAIN",
-                "Description": "Top percentage gainer at open."
+                "Code": "TOP_OPEN_PERC_LOSE",
+                "Description": "Top percentage losers at open."
             },
             {
-                "Code": "TOP_PERC_GAIN",
-                "Description": "Top percentage gainers."
+                "Code": "TOP_PERC_LOSE",
+                "Description": "Top percentage losers. Better for watch list after sharp selloff."
             },
             {
                 "Code": "HOT_BY_VOLUME",
