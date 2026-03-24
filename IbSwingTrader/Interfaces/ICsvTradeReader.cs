@@ -1,4 +1,4 @@
-﻿using IbSwingTrader.Models.Stocks;
+﻿using IbSwingTrader.Models.Tickers;
 
 namespace IbSwingTrader.Interfaces
 {

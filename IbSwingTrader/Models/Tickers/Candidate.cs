@@ -1,4 +1,4 @@
-﻿namespace IbSwingTrader.Models.Stocks
+﻿namespace IbSwingTrader.Models.Tickers
 {
     public class Candidate
     {
