@@ -29,6 +29,8 @@ namespace IbSwingTrader.Services
             if (end <= start)
                 return [];
 
+            var expectedStep = GetExpectedStep(timeframe);
+            var overlap = expectedStep;
             List<Candle> allCandles = [];
 
             var hasCache = _cache.TryLoad(symbol, timeframe, out var cached) &&
@@ -37,12 +39,14 @@ namespace IbSwingTrader.Services
 
             if (hasCache)
             {
-                allCandles = cached!;
+                allCandles = MergeCandles(cached!);
+
                 _logger.Debug(
-                    $"Historical cache hit: {symbol}, tf={timeframe}, candles={allCandles.Count}");
+                    $"Historical cache hit: {symbol}, tf={timeframe}, candles={allCandles.Count}, " +
+                    $"first={allCandles.First().Time:yyyy-MM-dd HH:mm:ss}, last={allCandles.Last().Time:yyyy-MM-dd HH:mm:ss}");
             }
 
-            var missingRanges = BuildMissingRanges(allCandles, start, end);
+            var missingRanges = BuildMissingRanges(allCandles, start, end, expectedStep, overlap);
 
             if (missingRanges.Count > 0)
             {
@@ -58,7 +62,7 @@ namespace IbSwingTrader.Services
                         range.Start,
                         range.End);
 
-                    if (loaded != null && loaded.Count > 0)
+                    if (loaded.Count > 0)
                         allCandles.AddRange(loaded);
                 }
 
@@ -70,6 +74,14 @@ namespace IbSwingTrader.Services
                 .Where(x => x.Time >= start && x.Time <= end)
                 .OrderBy(x => x.Time)
                 .ToList();
+
+            LogCoverage(symbol, timeframe, start, end, result, expectedStep);
+
+            if (result.Count <= 2)
+            {
+                _logger.Error(
+                    $"Historical result too small: {symbol}, tf={timeframe}, start={start:yyyy-MM-dd HH:mm:ss}, end={end:yyyy-MM-dd HH:mm:ss}, candles={result.Count}");
+            }
 
             return result;
         }
@@ -119,10 +131,12 @@ namespace IbSwingTrader.Services
             return MergeCandles(allCandles);
         }
 
-        private static List<DateRange> BuildMissingRanges(
+        private List<DateRange> BuildMissingRanges(
             List<Candle> candles,
             DateTime requestedStart,
-            DateTime requestedEnd)
+            DateTime requestedEnd,
+            TimeSpan expectedStep,
+            TimeSpan overlap)
         {
             if (candles.Count == 0)
             {
@@ -133,40 +147,181 @@ namespace IbSwingTrader.Services
             }
 
             var ordered = candles
+                .Where(x => x.Time >= requestedStart - overlap && x.Time <= requestedEnd + overlap)
                 .OrderBy(x => x.Time)
                 .ToList();
 
+            if (ordered.Count == 0)
+            {
+                return
+                [
+                    new DateRange(requestedStart, requestedEnd)
+                ];
+            }
+
+            var ranges = new List<DateRange>();
             var cachedStart = ordered.First().Time;
             var cachedEnd = ordered.Last().Time;
 
-            var ranges = new List<DateRange>();
-
             if (requestedStart < cachedStart)
             {
-                var leftEnd = Min(requestedEnd, cachedStart);
+                var leftEnd = Min(requestedEnd, cachedStart + overlap);
 
                 if (requestedStart < leftEnd)
                     ranges.Add(new DateRange(requestedStart, leftEnd));
             }
 
+            for (int i = 1; i < ordered.Count; i++)
+            {
+                var prev = ordered[i - 1].Time;
+                var current = ordered[i].Time;
+                var diff = current - prev;
+
+                if (diff > expectedStep + GetGapTolerance(expectedStep))
+                {
+                    var gapStart = Max(requestedStart, prev - overlap);
+                    var gapEnd = Min(requestedEnd, current + overlap);
+
+                    if (gapStart < gapEnd)
+                        ranges.Add(new DateRange(gapStart, gapEnd));
+                }
+            }
+
             if (requestedEnd > cachedEnd)
             {
-                var rightStart = Max(requestedStart, cachedEnd);
+                var rightStart = Max(requestedStart, cachedEnd - overlap);
 
                 if (rightStart < requestedEnd)
                     ranges.Add(new DateRange(rightStart, requestedEnd));
             }
 
-            return ranges;
+            return MergeRanges(ranges);
+        }
+
+        private void LogCoverage(
+            string symbol,
+            Timeframe timeframe,
+            DateTime requestedStart,
+            DateTime requestedEnd,
+            List<Candle> candles,
+            TimeSpan expectedStep)
+        {
+            if (candles.Count == 0)
+            {
+                _logger.Error(
+                    $"Historical result empty: {symbol}, tf={timeframe}, start={requestedStart:yyyy-MM-dd HH:mm:ss}, end={requestedEnd:yyyy-MM-dd HH:mm:ss}");
+                return;
+            }
+
+            var gaps = FindGaps(candles, expectedStep);
+
+            _logger.Debug(
+                $"Historical result ready: {symbol}, tf={timeframe}, candles={candles.Count}, " +
+                $"first={candles.First().Time:yyyy-MM-dd HH:mm:ss}, last={candles.Last().Time:yyyy-MM-dd HH:mm:ss}");
+
+            if (gaps.Count > 0)
+            {
+                _logger.Error(
+                    $"Gaps detected: {gaps.Count}, symbol={symbol}, tf={timeframe}, " +
+                    $"examples={string.Join("; ", gaps.Take(5).Select(x => $"{x.Start:MM-dd HH:mm}->{x.End:MM-dd HH:mm}"))}");
+            }
+        }
+
+        private static List<DateRange> FindGaps(List<Candle> candles, TimeSpan expectedStep)
+        {
+            var ordered = candles
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            var result = new List<DateRange>();
+            var tolerance = GetGapTolerance(expectedStep);
+
+            for (int i = 1; i < ordered.Count; i++)
+            {
+                var prev = ordered[i - 1].Time;
+                var current = ordered[i].Time;
+
+                if (current - prev > expectedStep + tolerance)
+                    result.Add(new DateRange(prev, current));
+            }
+
+            return result;
         }
 
         private static List<Candle> MergeCandles(List<Candle> candles)
         {
             return candles
                 .GroupBy(x => new { x.Timeframe, x.Time })
-                .Select(g => g.First())
+                .Select(g => g.Last())
                 .OrderBy(x => x.Time)
                 .ToList();
+        }
+
+        private static List<DateRange> MergeRanges(List<DateRange> ranges)
+        {
+            if (ranges.Count == 0)
+                return [];
+
+            var ordered = ranges
+                .OrderBy(x => x.Start)
+                .ToList();
+
+            var result = new List<DateRange>
+            {
+                ordered[0]
+            };
+
+            for (int i = 1; i < ordered.Count; i++)
+            {
+                var last = result[^1];
+                var current = ordered[i];
+
+                if (current.Start <= last.End)
+                {
+                    result[^1] = new DateRange(
+                        last.Start,
+                        Max(last.End, current.End));
+                }
+                else
+                {
+                    result.Add(current);
+                }
+            }
+
+            return result;
+        }
+
+        private static TimeSpan GetExpectedStep(Timeframe timeframe)
+        {
+            return timeframe switch
+            {
+                Timeframe.M1 => TimeSpan.FromMinutes(1),
+                Timeframe.M5 => TimeSpan.FromMinutes(5),
+                Timeframe.M15 => TimeSpan.FromMinutes(15),
+                Timeframe.M30 => TimeSpan.FromMinutes(30),
+                Timeframe.H1 => TimeSpan.FromHours(1),
+                Timeframe.H4 => TimeSpan.FromHours(4),
+                Timeframe.D1 => TimeSpan.FromDays(1),
+                Timeframe.W1 => TimeSpan.FromDays(7),
+                _ => TimeSpan.FromHours(4)
+            };
+        }
+
+        private static TimeSpan GetGapTolerance(TimeSpan expectedStep)
+        {
+            if (expectedStep <= TimeSpan.FromMinutes(5))
+                return TimeSpan.FromMinutes(2);
+
+            if (expectedStep <= TimeSpan.FromHours(1))
+                return TimeSpan.FromMinutes(20);
+
+            if (expectedStep <= TimeSpan.FromHours(4))
+                return TimeSpan.FromHours(6);
+
+            if (expectedStep <= TimeSpan.FromDays(1))
+                return TimeSpan.FromHours(36);
+
+            return TimeSpan.FromDays(3);
         }
 
         private static DateTime Min(DateTime a, DateTime b)
