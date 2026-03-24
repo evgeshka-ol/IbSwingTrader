@@ -1,4 +1,5 @@
 ﻿using IbSwingTrader.Models;
+using IbSwingTrader.Models.Stocks;
 
 namespace IbSwingTrader.Interfaces
 {

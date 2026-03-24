@@ -1,4 +1,6 @@
-﻿namespace IbSwingTrader.Models
+﻿using IbSwingTrader.Models.Stocks;
+
+namespace IbSwingTrader.Models
 {
     public class CandidateSearchResult
     {

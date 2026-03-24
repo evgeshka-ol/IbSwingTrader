@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
+using IbSwingTrader.Models.Stocks;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
