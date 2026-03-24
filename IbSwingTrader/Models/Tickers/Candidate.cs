@@ -1,9 +1,7 @@
 ﻿namespace IbSwingTrader.Models.Tickers
 {
-    public class Candidate
+    public class Candidate : TickerEntity
     {
-        public required string Ticker { get; set; }
-
         public decimal EntryPrice { get; set; }
 
         public decimal ExitPrice { get; set; }
