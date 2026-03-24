@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using IBApi;
-using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Commands
@@ -17,8 +15,8 @@ namespace IbSwingTrader.Commands
         private readonly ITradeDatasetBuilder _datasetBuilder;
         private readonly ITextLogger _logger;
         private readonly IAgentPathService _pathService;
-        private readonly BuildDatasetSettings _buildDataset;
         private readonly IFailedHistoryRequestTableFormatter _failedHistoryRequestTableFormatter;
+        private readonly BuildDatasetSettings _buildDataset;
         private readonly SemaphoreSlim _semaphore;
 
         private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = new();
@@ -43,9 +41,9 @@ namespace IbSwingTrader.Commands
             _datasetBuilder = datasetBuilder;
             _logger = logger;
             _pathService = pathService;
+            _failedHistoryRequestTableFormatter = failedHistoryRequestTableFormatter;
 
             _buildDataset = buildDatasetSettingsProvider.Get();
-            _failedHistoryRequestTableFormatter = failedHistoryRequestTableFormatter;
             _semaphore = new SemaphoreSlim(_buildDataset.MaxParallelTickers);
         }
 
