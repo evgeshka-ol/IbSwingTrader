@@ -8,7 +8,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
         IStockUniverseProvider stockUniverseProvider,
         IStockPreFilter preFilter,
         IContractResolver contractResolver,
-        IMarketDataProvider marketData,
+        IHistoricalDataService historicalData,
         ICandidateSignalAnalyzer signalAnalyzer,
         IWishListFilter wishListFilter,
         IWishListScore wishListScore,
@@ -21,7 +21,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
         private readonly IStockPreFilter _preFilter = preFilter;
         private readonly IContractResolver _contractResolver = contractResolver;
-        private readonly IMarketDataProvider _marketData = marketData;
+        private readonly IHistoricalDataService _historicalData = historicalData;
         private readonly ICandidateSignalAnalyzer _signalAnalyzer = signalAnalyzer;
         private readonly IWishListFilter _wishListFilter = wishListFilter;
         private readonly IWishListScore _wishListScore = wishListScore;
@@ -33,7 +33,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
         public async Task<CandidateSearchResult> FindAsync()
         {
-            var wishListResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
+            var wishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var preset in _scannerPresets.GetAll())
@@ -57,15 +57,19 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         continue;
                     }
 
-                    List<Candle> candles;
+                    List<Candle>? candles;
 
                     try
                     {
-                        candles = await _marketData.GetCandles(
+                        var end = DateTime.UtcNow;
+                        var start = end.AddDays(-60);
+
+                        candles = await _historicalData.GetCandlesRange(
+                            stock.Ticker,
                             contract,
                             Timeframe.H4,
-                            DateTime.UtcNow,
-                            300);
+                            start,
+                            end);
                     }
                     catch (Exception ex)
                     {
@@ -73,9 +77,9 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         continue;
                     }
 
-                    if (candles.Count < 80)
+                    if (candles == null || candles.Count < 80)
                     {
-                        _logger.Info($"Skipping {stock.Ticker}: not enough candles ({candles.Count}).");
+                        _logger.Info($"Skipping {stock.Ticker}: not enough candles ({candles?.Count ?? 0}).");
                         continue;
                     }
 
@@ -120,46 +124,117 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         scanTime,
                         wishScore);
 
-                    AddOrReplaceHigherScore(
-                        wishListResults,
-                        wishListItem,
-                        "wish list");
-
-                    if (!_candidateFilter.Pass(snapshot, lastPrice, avgDollarVolumeDaily20))
-                    {
-                        _logger.Info($"Entry rejected after wish list pass: {stock.Ticker}");
-                        continue;
-                    }
-
-                    var entryScore = _candidateScore.Calculate(snapshot);
-                    var finalScore = wishScore + entryScore;
-
-                    var candidateItem = BuildCandidateItem(
-                        stock,
-                        preset,
-                        snapshot,
-                        trade,
-                        scanTime,
-                        wishScore,
-                        entryScore,
-                        finalScore);
-
-                    AddOrReplaceHigherScore(
-                        candidateResults,
-                        candidateItem,
-                        "candidate");
+                    AddOrReplaceWishListContext(
+                        wishListContexts,
+                        new WishListContext
+                        {
+                            Stock = stock,
+                            Preset = preset,
+                            Snapshot = snapshot,
+                            Trade = trade,
+                            ScanTime = scanTime,
+                            AvgDollarVolumeDaily20 = avgDollarVolumeDaily20,
+                            WishListItem = wishListItem
+                        });
                 }
+            }
+
+            foreach (var ctx in wishListContexts.Values)
+            {
+                var lastPrice = ctx.Trade.Entry;
+
+                if (!_candidateFilter.Pass(ctx.Snapshot, lastPrice, ctx.AvgDollarVolumeDaily20))
+                {
+                    _logger.Info($"Entry rejected after wish list pass: {ctx.Stock.Ticker}");
+                    continue;
+                }
+
+                var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+                var finalScore = ctx.WishListItem.Score + entryScore;
+
+                var candidateItem = BuildCandidateItem(
+                    ctx.Stock,
+                    ctx.Preset,
+                    ctx.Snapshot,
+                    ctx.Trade,
+                    ctx.ScanTime,
+                    ctx.WishListItem.Score,
+                    entryScore,
+                    finalScore);
+
+                AddOrReplaceHigherScore(
+                    candidateResults,
+                    candidateItem,
+                    "candidate");
             }
 
             return new CandidateSearchResult
             {
-                WishList = [.. wishListResults.Values
+                WishList = [.. wishListContexts.Values
+                    .Select(x => x.WishListItem)
                     .OrderByDescending(x => x.Score)],
 
                 Candidates = [.. candidateResults.Values
                     .OrderByDescending(x => x.Score)
                     .Take(10)]
             };
+        }
+
+        private void AddOrReplaceWishListContext(
+            Dictionary<string, WishListContext> results,
+            WishListContext item)
+        {
+            if (results.TryGetValue(item.Stock.Ticker, out var existing))
+            {
+                if (item.WishListItem.Score > existing.WishListItem.Score)
+                {
+                    results[item.Stock.Ticker] = item;
+
+                    _logger.Info(
+                        $"Ticker {item.Stock.Ticker} replaced existing wish list item with higher score. " +
+                        $"Old preset: {existing.Preset.ScanCode}, new preset: {item.Preset.ScanCode}");
+                }
+                else
+                {
+                    _logger.Info(
+                        $"Ticker {item.Stock.Ticker} already exists in wish list. " +
+                        $"Keeping existing item from preset {existing.Preset.ScanCode}");
+                }
+            }
+            else
+            {
+                results[item.Stock.Ticker] = item;
+                _logger.Info($"Ticker {item.Stock.Ticker} added to wish list. Preset: {item.Preset.ScanCode}");
+            }
+        }
+
+        private void AddOrReplaceHigherScore(
+            Dictionary<string, CandidateDetails> results,
+            CandidateDetails item,
+            string bucketName)
+        {
+            if (results.TryGetValue(item.Ticker, out var existing))
+            {
+                if (item.Score > existing.Score)
+                {
+                    results[item.Ticker] = item;
+
+                    _logger.Info(
+                        $"Ticker {item.Ticker} replaced existing {bucketName} item with higher score. " +
+                        $"Old preset: {existing.PresetScanCode}, new preset: {item.PresetScanCode}");
+                }
+                else
+                {
+                    _logger.Info(
+                        $"Ticker {item.Ticker} already exists in {bucketName}. " +
+                        $"Keeping existing item from preset {existing.PresetScanCode}");
+                }
+            }
+            else
+            {
+                results[item.Ticker] = item;
+                _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.PresetScanCode}");
+            }
         }
 
         private static CandidateDetails BuildWishListItem(
@@ -238,35 +313,6 @@ namespace IbSwingTrader.Services.CandidateFiltering
             };
         }
 
-        private void AddOrReplaceHigherScore(
-            Dictionary<string, CandidateDetails> results,
-            CandidateDetails item,
-            string bucketName)
-        {
-            if (results.TryGetValue(item.Ticker, out var existing))
-            {
-                if (item.Score > existing.Score)
-                {
-                    results[item.Ticker] = item;
-
-                    _logger.Info(
-                        $"Ticker {item.Ticker} replaced existing {bucketName} item with higher score. " +
-                        $"Old preset: {existing.PresetScanCode}, new preset: {item.PresetScanCode}");
-                }
-                else
-                {
-                    _logger.Info(
-                        $"Ticker {item.Ticker} already exists in {bucketName}. " +
-                        $"Keeping existing item from preset {existing.PresetScanCode}");
-                }
-            }
-            else
-            {
-                results[item.Ticker] = item;
-                _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.PresetScanCode}");
-            }
-        }
-
         private static decimal CalculateAverageDollarVolumeDaily20(List<Candle> candles)
         {
             var dailyDollarVolumes = candles
@@ -341,6 +387,17 @@ namespace IbSwingTrader.Services.CandidateFiltering
             return parts.Count == 0
                 ? "entry confirmed"
                 : string.Join(", ", parts);
+        }
+
+        private sealed class WishListContext
+        {
+            public required StockInfo Stock { get; init; }
+            public required PresetScanCode Preset { get; init; }
+            public required CandidateSignalSnapshot Snapshot { get; init; }
+            public required TradePlan Trade { get; init; }
+            public required DateTime ScanTime { get; init; }
+            public required decimal AvgDollarVolumeDaily20 { get; init; }
+            public required CandidateDetails WishListItem { get; init; }
         }
     }
 }
