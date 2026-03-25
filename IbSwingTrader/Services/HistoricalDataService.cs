@@ -11,13 +11,17 @@ namespace IbSwingTrader.Services
         IHistoricalRequestThrottler throttler,
         IHistoricalCache cache,
         IHistoricalRetryPolicy retryPolicy,
-        ITextLogger logger) : IHistoricalDataService
+        ITextLogger logger,
+        IMarketGapAnalyzer marketGapAnalyzer,
+        IMarketCoverageService marketCoverageService) : IHistoricalDataService
     {
         private readonly IMarketDataProvider _provider = provider;
         private readonly IHistoricalRequestThrottler _throttler = throttler;
         private readonly IHistoricalCache _cache = cache;
         private readonly IHistoricalRetryPolicy _retryPolicy = retryPolicy;
         private readonly ITextLogger _logger = logger;
+        private readonly IMarketGapAnalyzer _marketGapAnalyzer = marketGapAnalyzer;
+        private readonly IMarketCoverageService _marketCoverageService = marketCoverageService;
 
         public async Task<List<Candle>?> GetCandlesRange(
             string symbol,
@@ -53,7 +57,13 @@ namespace IbSwingTrader.Services
                     $"first={allCandles.First().Time:yyyy-MM-dd HH:mm:ss}, last={allCandles.Last().Time:yyyy-MM-dd HH:mm:ss}");
             }
 
-            var missingRanges = BuildMissingRanges(allCandles, normalizedStart, normalizedEnd, overlap);
+            var missingRanges = await BuildMissingRangesAsync(
+                contract,
+                timeframe,
+                allCandles,
+                normalizedStart,
+                normalizedEnd,
+                overlap);
 
             if (missingRanges.Count > 0)
             {
@@ -82,7 +92,14 @@ namespace IbSwingTrader.Services
                 .OrderBy(x => x.Time)
                 .ToList();
 
-            LogCoverage(symbol, timeframe, normalizedStart, normalizedEnd, result, expectedStep);
+            await LogCoverageAsync(
+                symbol,
+                contract,
+                timeframe,
+                normalizedStart,
+                normalizedEnd,
+                result,
+                expectedStep);
 
             if (result.Count <= 2)
             {
@@ -138,7 +155,9 @@ namespace IbSwingTrader.Services
             return MergeCandles(allCandles);
         }
 
-        private static List<DateRange> BuildMissingRanges(
+        private async Task<List<DateRange>> BuildMissingRangesAsync(
+            Contract contract,
+            Timeframe timeframe,
             List<Candle> candles,
             DateTime requestedStart,
             DateTime requestedEnd,
@@ -174,7 +193,16 @@ namespace IbSwingTrader.Services
                 var leftEnd = Min(requestedEnd, cachedStart + overlap);
 
                 if (requestedStart < leftEnd)
-                    ranges.Add(new DateRange(requestedStart, leftEnd));
+                {
+                    var hasExpectedBars = await _marketCoverageService.HasExpectedBarsBetweenAsync(
+                        contract,
+                        timeframe,
+                        requestedStart,
+                        leftEnd);
+
+                    if (hasExpectedBars)
+                        ranges.Add(new DateRange(requestedStart, leftEnd));
+                }
             }
 
             if (requestedEnd > cachedEnd)
@@ -182,14 +210,24 @@ namespace IbSwingTrader.Services
                 var rightStart = Max(requestedStart, cachedEnd - overlap);
 
                 if (rightStart < requestedEnd)
-                    ranges.Add(new DateRange(rightStart, requestedEnd));
+                {
+                    var hasExpectedBars = await _marketCoverageService.HasExpectedBarsBetweenAsync(
+                        contract,
+                        timeframe,
+                        rightStart,
+                        requestedEnd);
+
+                    if (hasExpectedBars)
+                        ranges.Add(new DateRange(rightStart, requestedEnd));
+                }
             }
 
             return MergeRanges(ranges);
         }
 
-        private void LogCoverage(
+        private async Task LogCoverageAsync(
             string symbol,
+            Contract contract,
             Timeframe timeframe,
             DateTime requestedStart,
             DateTime requestedEnd,
@@ -203,7 +241,7 @@ namespace IbSwingTrader.Services
                 return;
             }
 
-            var gaps = FindGaps(candles, expectedStep, timeframe);
+            var gaps = await FindGapsAsync(contract, candles, expectedStep, timeframe);
 
             _logger.Debug(
                 $"Historical result ready: {symbol}, tf={timeframe}, candles={candles.Count}, " +
@@ -222,7 +260,8 @@ namespace IbSwingTrader.Services
             }
         }
 
-        private static List<DateRange> FindGaps(
+        private async Task<List<DateRange>> FindGapsAsync(
+            Contract contract,
             List<Candle> candles,
             TimeSpan expectedStep,
             Timeframe timeframe)
@@ -244,7 +283,13 @@ namespace IbSwingTrader.Services
                 var current = ordered[i].Time;
                 var diff = current - prev;
 
-                if (IsExpectedMarketGap(prev, current, timeframe))
+                var isExpectedGap = await _marketGapAnalyzer.IsExpectedGapAsync(
+                    contract,
+                    timeframe,
+                    prev,
+                    current);
+
+                if (isExpectedGap)
                     continue;
 
                 if (diff <= expectedStep + tolerance)
@@ -259,34 +304,6 @@ namespace IbSwingTrader.Services
             }
 
             return result;
-        }
-
-        private static bool IsExpectedMarketGap(
-            DateTime previous,
-            DateTime current,
-            Timeframe timeframe)
-        {
-            if (!IsIntraday(timeframe))
-                return false;
-
-            if (current <= previous)
-                return false;
-
-            var diff = current - previous;
-
-            if (previous.DayOfWeek == DayOfWeek.Friday &&
-                current.DayOfWeek == DayOfWeek.Monday)
-            {
-                return true;
-            }
-
-            if (diff >= TimeSpan.FromDays(2))
-                return true;
-
-            if (previous.Date != current.Date && diff >= TimeSpan.FromHours(8))
-                return true;
-
-            return false;
         }
 
         private static bool IsIntraday(Timeframe timeframe)

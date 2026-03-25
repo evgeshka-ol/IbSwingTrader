@@ -10,6 +10,7 @@ using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Services;
 using IbSwingTrader.Services.CandidateEvaluation;
 using IbSwingTrader.Services.CandidateFiltering;
+using IbSwingTrader.Services.MarketSessions;
 using IbSwingTrader.Services.WishListFiltering;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,6 +36,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<ICandidateEvaluationSettingsProvider, CandidateEvaluationSettingsProvider>();
             services.AddSingleton<IWishListEvaluationSettingsProvider, WishListEvaluationSettingsProvider>();
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
+            services.AddSingleton<IMarketSessionSettingsProvider, MarketSessionSettingsProvider>();
 
             // shared infrastructure
             services.AddSingleton<IObjectPropertyReader, ObjectPropertyReader>();
@@ -51,6 +53,14 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IMarketDataProvider, TwsMarketDataProvider>();
             services.AddSingleton<IContractResolver, TwsContractResolver>();
             services.AddSingleton<IStockUniverseProvider, TwsStockUniverseProvider>();
+
+            // market sessions
+            services.AddSingleton<ILocalMarketScheduleProvider, LocalMarketScheduleProvider>();
+            services.AddSingleton<IMarketScheduleCache, InMemoryMarketScheduleCache>();
+            services.AddSingleton<ITwsMarketScheduleProvider, TwsMarketScheduleProvider>();
+            services.AddSingleton<IMarketScheduleResolver, MarketScheduleResolver>();
+            services.AddSingleton<IMarketGapAnalyzer, MarketGapAnalyzer>();
+            services.AddSingleton<IMarketCoverageService, MarketCoverageService>();
 
             // historical
             services.AddSingleton<IFailedHistoryRequestTableFormatter, FailedHistoryRequestTableFormatter>();
