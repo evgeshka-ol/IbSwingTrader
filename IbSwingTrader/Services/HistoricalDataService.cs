@@ -29,6 +29,12 @@ namespace IbSwingTrader.Services
             if (end <= start)
                 return [];
 
+            var normalizedStart = NormalizeRangeStart(start, timeframe);
+            var normalizedEnd = NormalizeRangeEnd(end, timeframe);
+
+            if (normalizedEnd <= normalizedStart)
+                return [];
+
             var expectedStep = GetExpectedStep(timeframe);
             var overlap = expectedStep;
 
@@ -47,7 +53,7 @@ namespace IbSwingTrader.Services
                     $"first={allCandles.First().Time:yyyy-MM-dd HH:mm:ss}, last={allCandles.Last().Time:yyyy-MM-dd HH:mm:ss}");
             }
 
-            var missingRanges = BuildMissingRanges(allCandles, start, end, overlap);
+            var missingRanges = BuildMissingRanges(allCandles, normalizedStart, normalizedEnd, overlap);
 
             if (missingRanges.Count > 0)
             {
@@ -72,16 +78,16 @@ namespace IbSwingTrader.Services
             }
 
             var result = allCandles
-                .Where(x => x.Time >= start && x.Time <= end)
+                .Where(x => x.Time >= normalizedStart && x.Time <= normalizedEnd)
                 .OrderBy(x => x.Time)
                 .ToList();
 
-            LogCoverage(symbol, timeframe, start, end, result, expectedStep);
+            LogCoverage(symbol, timeframe, normalizedStart, normalizedEnd, result, expectedStep);
 
             if (result.Count <= 2)
             {
                 _logger.Error(
-                    $"Historical result too small: {symbol}, tf={timeframe}, start={start:yyyy-MM-dd HH:mm:ss}, end={end:yyyy-MM-dd HH:mm:ss}, candles={result.Count}");
+                    $"Historical result too small: {symbol}, tf={timeframe}, start={normalizedStart:yyyy-MM-dd HH:mm:ss}, end={normalizedEnd:yyyy-MM-dd HH:mm:ss}, candles={result.Count}");
             }
 
             return result;
@@ -205,9 +211,14 @@ namespace IbSwingTrader.Services
 
             if (gaps.Count > 0)
             {
-                _logger.Error(
+                var message =
                     $"Gaps detected: {gaps.Count}, symbol={symbol}, tf={timeframe}, " +
-                    $"examples={string.Join("; ", gaps.Take(5).Select(x => $"{x.Start:MM-dd HH:mm}->{x.End:MM-dd HH:mm}"))}");
+                    $"examples={string.Join("; ", gaps.Take(5).Select(x => $"{x.Start:MM-dd HH:mm}->{x.End:MM-dd HH:mm}"))}";
+
+                if (IsIntraday(timeframe))
+                    _logger.Debug(message);
+                else
+                    _logger.Error(message);
             }
         }
 
@@ -231,14 +242,20 @@ namespace IbSwingTrader.Services
             {
                 var prev = ordered[i - 1].Time;
                 var current = ordered[i].Time;
-
                 var diff = current - prev;
 
                 if (IsExpectedMarketGap(prev, current, timeframe))
                     continue;
 
-                if (diff > expectedStep + tolerance)
-                    result.Add(new DateRange(prev, current));
+                if (diff <= expectedStep + tolerance)
+                    continue;
+
+                var missingBars = (int)Math.Round(diff.TotalSeconds / expectedStep.TotalSeconds) - 1;
+
+                if (IsIntraday(timeframe) && missingBars < 3)
+                    continue;
+
+                result.Add(new DateRange(prev, current));
             }
 
             return result;
@@ -249,23 +266,13 @@ namespace IbSwingTrader.Services
             DateTime current,
             Timeframe timeframe)
         {
-            if (timeframe != Timeframe.H4 &&
-                timeframe != Timeframe.H1 &&
-                timeframe != Timeframe.M30 &&
-                timeframe != Timeframe.M15 &&
-                timeframe != Timeframe.M5 &&
-                timeframe != Timeframe.M1)
-            {
+            if (!IsIntraday(timeframe))
                 return false;
-            }
 
             if (current <= previous)
                 return false;
 
             var diff = current - previous;
-
-            if (diff >= TimeSpan.FromDays(2))
-                return true;
 
             if (previous.DayOfWeek == DayOfWeek.Friday &&
                 current.DayOfWeek == DayOfWeek.Monday)
@@ -273,10 +280,23 @@ namespace IbSwingTrader.Services
                 return true;
             }
 
+            if (diff >= TimeSpan.FromDays(2))
+                return true;
+
             if (previous.Date != current.Date && diff >= TimeSpan.FromHours(8))
                 return true;
 
             return false;
+        }
+
+        private static bool IsIntraday(Timeframe timeframe)
+        {
+            return timeframe == Timeframe.H4 ||
+                   timeframe == Timeframe.H1 ||
+                   timeframe == Timeframe.M30 ||
+                   timeframe == Timeframe.M15 ||
+                   timeframe == Timeframe.M5 ||
+                   timeframe == Timeframe.M1;
         }
 
         private static List<Candle> MergeCandles(List<Candle> candles)
@@ -320,6 +340,50 @@ namespace IbSwingTrader.Services
             }
 
             return result;
+        }
+
+        private static DateTime NormalizeRangeStart(DateTime value, Timeframe timeframe)
+        {
+            return timeframe switch
+            {
+                Timeframe.H4 => RoundDown(value, TimeSpan.FromHours(4)),
+                Timeframe.H1 => RoundDown(value, TimeSpan.FromHours(1)),
+                Timeframe.M30 => RoundDown(value, TimeSpan.FromMinutes(30)),
+                Timeframe.M15 => RoundDown(value, TimeSpan.FromMinutes(15)),
+                Timeframe.M5 => RoundDown(value, TimeSpan.FromMinutes(5)),
+                Timeframe.M1 => RoundDown(value, TimeSpan.FromMinutes(1)),
+                Timeframe.D1 => value.Date,
+                Timeframe.W1 => StartOfWeek(value.Date),
+                _ => value
+            };
+        }
+
+        private static DateTime NormalizeRangeEnd(DateTime value, Timeframe timeframe)
+        {
+            return timeframe switch
+            {
+                Timeframe.H4 => RoundDown(value, TimeSpan.FromHours(4)),
+                Timeframe.H1 => RoundDown(value, TimeSpan.FromHours(1)),
+                Timeframe.M30 => RoundDown(value, TimeSpan.FromMinutes(30)),
+                Timeframe.M15 => RoundDown(value, TimeSpan.FromMinutes(15)),
+                Timeframe.M5 => RoundDown(value, TimeSpan.FromMinutes(5)),
+                Timeframe.M1 => RoundDown(value, TimeSpan.FromMinutes(1)),
+                Timeframe.D1 => value.Date,
+                Timeframe.W1 => StartOfWeek(value.Date),
+                _ => value
+            };
+        }
+
+        private static DateTime RoundDown(DateTime value, TimeSpan step)
+        {
+            var ticks = value.Ticks / step.Ticks * step.Ticks;
+            return new DateTime(ticks, value.Kind);
+        }
+
+        private static DateTime StartOfWeek(DateTime value)
+        {
+            var diff = (7 + (value.DayOfWeek - DayOfWeek.Monday)) % 7;
+            return value.AddDays(-diff).Date;
         }
 
         private static TimeSpan GetExpectedStep(Timeframe timeframe)
