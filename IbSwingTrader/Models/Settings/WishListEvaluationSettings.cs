@@ -1,4 +1,4 @@
-﻿namespace IbSwingTrader.Models
+﻿namespace IbSwingTrader.Models.Settings
 {
     public class WishListEvaluationSettings
     {

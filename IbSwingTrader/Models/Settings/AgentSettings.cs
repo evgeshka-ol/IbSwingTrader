@@ -1,6 +1,4 @@
-﻿using IbSwingTrader.Interfaces;
-
-namespace IbSwingTrader.Models
+﻿namespace IbSwingTrader.Models.Settings
 {
     public class AgentSettings
     {

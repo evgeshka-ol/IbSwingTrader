@@ -1,4 +1,4 @@
-﻿using IbSwingTrader.Models;
+﻿using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Interfaces
 {

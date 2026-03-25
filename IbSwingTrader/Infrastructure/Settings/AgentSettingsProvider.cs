@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
+using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Infrastructure.Settings
 {

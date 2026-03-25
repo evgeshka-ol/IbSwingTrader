@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
+using IbSwingTrader.Models.Settings;
 using IbSwingTrader.Models.Tickers;
 
 namespace IbSwingTrader.MarketData.Csv
