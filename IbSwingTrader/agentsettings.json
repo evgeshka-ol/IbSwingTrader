@@ -240,5 +240,11 @@
                 "Index": 19
             }
         ]
+    },
+
+    "Logging": {
+        "FileMinimumLevel": "Info",
+        "ConsoleMinimumLevel": "Info",
+        "EnableColors": true
     }
 }

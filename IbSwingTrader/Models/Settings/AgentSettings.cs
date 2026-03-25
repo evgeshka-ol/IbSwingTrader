@@ -17,5 +17,6 @@
         public WishListEvaluationSettings WishListEvaluation { get; set; } = new();
 
         public CsvTradeReaderSettings CsvTradeReader { get; set; } = new();
+        public LoggingSettings Logging { get; set; } = new();
     }
 }

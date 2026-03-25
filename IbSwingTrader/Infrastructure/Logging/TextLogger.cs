@@ -1,5 +1,7 @@
 ﻿using System.Text;
 using IbSwingTrader.Interfaces;
+using IbSwingTrader.Models;
+using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
@@ -7,13 +9,16 @@ namespace IbSwingTrader.Infrastructure.Logging
     {
         private readonly string _logFilePath;
         private readonly IConsoleColorWriter _console;
-        private readonly object _fileLock = new();
+        private readonly LoggingSettings _settings;
+        private readonly Lock _fileLock = new();
 
         public TextLogger(
             IAgentPathService pathService,
-            IConsoleColorWriter console)
+            IConsoleColorWriter console,
+            ILoggingSettingsProvider loggingSettingsProvider)
         {
             _console = console;
+            _settings = loggingSettingsProvider.Get();
 
             var logsFolder = pathService.GetLogsFolder();
             Directory.CreateDirectory(logsFolder);
@@ -25,73 +30,104 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         public void EmptyLine()
         {
-            _console.WriteLine();
-            AppendRawLine(string.Empty);
+            if (ShouldWriteToConsole(LogLevel.Info))
+                _console.WriteLine();
+
+            if (ShouldWriteToFile(LogLevel.Info))
+                AppendRawLine(string.Empty);
         }
 
         public void Info(string message)
         {
-            Write("INFO", message, ConsoleColor.DarkGray, writeToConsole: true);
+            Write(LogLevel.Info, "INFO", message, ConsoleColor.DarkGray);
         }
 
         public void Debug(string message)
         {
-            Write("DEBUG", message, color: null, writeToConsole: false);
+            Write(LogLevel.Debug, "DEBUG", message, null);
         }
 
         public void Warning(string message)
         {
-            Write("WARNING", message, ConsoleColor.Yellow, writeToConsole: true);
+            Write(LogLevel.Warning, "WARNING", message, ConsoleColor.Yellow);
         }
 
         public void Error(string message)
         {
-            Write("ERROR", message, ConsoleColor.Red, writeToConsole: true);
+            Write(LogLevel.Error, "ERROR", message, ConsoleColor.Red);
         }
 
         public void InfoBlock(string title, string block)
         {
-            WriteBlock("INFO", title, block, ConsoleColor.DarkGray);
+            WriteBlock(LogLevel.Info, "INFO", title, block, ConsoleColor.DarkGray);
         }
 
         public void ErrorBlock(string title, string block)
         {
-            WriteBlock("ERROR", title, block, ConsoleColor.Red);
+            WriteBlock(LogLevel.Error, "ERROR", title, block, ConsoleColor.Red);
         }
 
         private void Write(
-            string level,
+            LogLevel level,
+            string levelName,
             string message,
-            ConsoleColor? color,
-            bool writeToConsole)
+            ConsoleColor? color)
         {
-            var line = BuildConsoleLine(level, message);
-            var fileLine = BuildFileLine(line);
+            var consoleLine = BuildConsoleLine(levelName, message);
+            var fileLine = BuildFileLine(consoleLine);
 
-            if (writeToConsole)
-                _console.WriteLine(line, color);
+            if (ShouldWriteToConsole(level))
+                _console.WriteLine(consoleLine, GetConsoleColor(color));
 
-            AppendRawLine(fileLine);
+            if (ShouldWriteToFile(level))
+                AppendRawLine(fileLine);
         }
 
         private void WriteBlock(
-            string level,
+            LogLevel level,
+            string levelName,
             string title,
             string block,
             ConsoleColor? color)
         {
-            var header = BuildConsoleLine(level, title);
+            var header = BuildConsoleLine(levelName, title);
             var fileHeader = BuildFileLine(header);
 
-            _console.WriteLine(header, color);
+            if (ShouldWriteToConsole(level))
+            {
+                _console.WriteLine(header, GetConsoleColor(color));
 
-            if (!string.IsNullOrEmpty(block))
-                _console.WriteLine(block, color);
+                if (!string.IsNullOrEmpty(block))
+                    _console.WriteLine(block, GetConsoleColor(color));
+            }
 
-            AppendRawLine(fileHeader);
+            if (ShouldWriteToFile(level))
+            {
+                AppendRawLine(fileHeader);
 
-            if (!string.IsNullOrEmpty(block))
-                AppendRawLine(block);
+                if (!string.IsNullOrEmpty(block))
+                    AppendRawLine(block);
+            }
+        }
+
+        private bool ShouldWriteToConsole(LogLevel level)
+        {
+            return _settings.ConsoleMinimumLevel != LogLevel.None
+                && level >= _settings.ConsoleMinimumLevel;
+        }
+
+        private bool ShouldWriteToFile(LogLevel level)
+        {
+            return _settings.FileMinimumLevel != LogLevel.None
+                && level >= _settings.FileMinimumLevel;
+        }
+
+        private ConsoleColor? GetConsoleColor(ConsoleColor? color)
+        {
+            if (!_settings.EnableColors)
+                return null;
+
+            return color;
         }
 
         private static string BuildConsoleLine(string level, string message)

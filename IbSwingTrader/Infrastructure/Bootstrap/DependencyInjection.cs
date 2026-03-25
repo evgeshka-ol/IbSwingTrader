@@ -36,6 +36,7 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             services.AddSingleton<IWishListEvaluationSettingsProvider, WishListEvaluationSettingsProvider>();
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
             services.AddSingleton<IMarketSessionSettingsProvider, MarketSessionSettingsProvider>();
+            services.AddSingleton<ILoggingSettingsProvider, LoggingSettingsProvider>();
 
             // shared infrastructure
             services.AddSingleton<IObjectPropertyReader, ObjectPropertyReader>();
