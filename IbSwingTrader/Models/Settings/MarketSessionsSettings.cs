@@ -2,11 +2,11 @@
 {
     public class MarketSessionsSettings
     {
-        public string TimeZoneId { get; set; } = "America/New_York";
+        public bool UseExtendedHoursByDefault { get; set; } = true;
 
-        public SessionWindowSettings? PreMarket { get; set; } = new();
-        public SessionWindowSettings? RegularSession { get; set; } = new();
-        public SessionWindowSettings? AfterHours { get; set; } = new();
+        public bool EnableHolidaySupport { get; set; } = false;
+
+        public bool EnableEarlyCloseSupport { get; set; } = false;
 
         public List<DayOfWeek> TradingDays { get; set; } =
         [
@@ -17,12 +17,31 @@
             DayOfWeek.Friday
         ];
 
-        public bool UseExtendedHoursByDefault { get; set; } = true;
+        public SessionWindowSettings PreMarket { get; set; } = new()
+        {
+            Enabled = true,
+            Start = "04:00",
+            End = "09:30"
+        };
 
-        public bool EnableHolidaySupport { get; set; } = false;
-        public bool EnableEarlyCloseSupport { get; set; } = false;
+        public SessionWindowSettings RegularSession { get; set; } = new()
+        {
+            Enabled = true,
+            Start = "09:30",
+            End = "16:00"
+        };
+
+        public SessionWindowSettings AfterHours { get; set; } = new()
+        {
+            Enabled = true,
+            Start = "16:00",
+            End = "20:00"
+        };
+
+        public TwsOverridesSettings TwsOverrides { get; set; } = new();
 
         public List<MarketHolidaySettings> Holidays { get; set; } = [];
+
         public List<EarlyCloseSettings> EarlyCloses { get; set; } = [];
     }
 
@@ -30,23 +49,35 @@
     {
         public bool Enabled { get; set; } = true;
 
-        // "04:00", "09:30", "16:00", "20:00"
         public string Start { get; set; } = string.Empty;
+
         public string End { get; set; } = string.Empty;
+    }
+
+    public class TwsOverridesSettings
+    {
+        public bool Enabled { get; set; } = true;
+
+        public bool PreferTwsTradingHours { get; set; } = true;
+
+        public bool PreferTwsLiquidHours { get; set; } = false;
+
+        public int CacheTtlHours { get; set; } = 24;
     }
 
     public class MarketHolidaySettings
     {
-        // "2026-01-19"
         public string Date { get; set; } = string.Empty;
+
         public string? Name { get; set; }
     }
 
     public class EarlyCloseSettings
     {
-        // "2026-11-27"
         public string Date { get; set; } = string.Empty;
-        public string CloseTime { get; set; } = string.Empty; // "13:00"
+
+        public string CloseTime { get; set; } = string.Empty;
+
         public string? Name { get; set; }
     }
 }

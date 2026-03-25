@@ -60,10 +60,10 @@
             "Start": "16:00",
             "End": "20:00"
         },
-        "IbOverrides": {
+        "TwsOverrides": {
             "Enabled": true,
-            "PreferIbTradingHours": true,
-            "PreferIbLiquidHours": false,
+            "PreferTwsTradingHours": true,
+            "PreferTwsLiquidHours": false,
             "CacheTtlHours": 24
         },
         "Holidays": [],
