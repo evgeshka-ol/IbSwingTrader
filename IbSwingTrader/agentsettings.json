@@ -28,10 +28,46 @@
     "Market": {
         "Timezone": "America/New_York",
         "ExcludeOtc": true,
-        "MinPrice": 1.0,
+        "MinPrice": 5.0,
         "MaxPrice": 100.0,
         "MinAvgVolume": 500000,
         "MinDollarVolume": 1000000
+    },
+
+    "MarketSessions": {
+        "UseExtendedHoursByDefault": true,
+        "EnableHolidaySupport": false,
+        "EnableEarlyCloseSupport": false,
+        "TradingDays": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday"
+        ],
+        "PreMarket": {
+            "Enabled": true,
+            "Start": "04:00",
+            "End": "09:30"
+        },
+        "RegularSession": {
+            "Enabled": true,
+            "Start": "09:30",
+            "End": "16:00"
+        },
+        "AfterHours": {
+            "Enabled": true,
+            "Start": "16:00",
+            "End": "20:00"
+        },
+        "IbOverrides": {
+            "Enabled": true,
+            "PreferIbTradingHours": true,
+            "PreferIbLiquidHours": false,
+            "CacheTtlHours": 24
+        },
+        "Holidays": [],
+        "EarlyCloses": []
     },
 
     "BuildDataset": {

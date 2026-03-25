@@ -7,6 +7,7 @@
         public PathSettings Paths { get; set; } = new();
         public TwsSettings Tws { get; set; } = new();
         public MarketSettings Market { get; set; } = new();
+        public MarketSessionsSettings MarketSessions { get; set; } = new();
 
         public BuildDatasetSettings BuildDataset { get; set; } = new();
         public FeatureCalculationSettings FeatureCalculation { get; set; } = new();
