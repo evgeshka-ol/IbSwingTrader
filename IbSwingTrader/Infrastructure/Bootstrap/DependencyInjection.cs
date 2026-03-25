@@ -4,7 +4,6 @@ using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Infrastructure.Logging;
 using IbSwingTrader.Infrastructure.Settings;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.Interfaces.IbSwingTrader.Interfaces;
 using IbSwingTrader.MarketData.Csv;
 using IbSwingTrader.MarketData.IB;
 using IbSwingTrader.Services;

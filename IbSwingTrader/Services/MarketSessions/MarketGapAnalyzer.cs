@@ -7,10 +7,17 @@ namespace IbSwingTrader.Services.MarketSessions
 {
     public class MarketGapAnalyzer(
         IMarketScheduleResolver marketScheduleResolver,
-        IMarketSessionSettingsProvider marketSessionSettingsProvider) : IMarketGapAnalyzer
+        IMarketSessionSettingsProvider marketSessionSettingsProvider,
+        IHistoricalCache historicalCache) : IMarketGapAnalyzer
     {
+        private const int MaxSearchDays = 10;
+        private const int MaxCandidateSlots = 512;
+        private const int ObservedLookbackDays = 15;
+        private const double ObservedSlotMinRatio = 0.60;
+
         private readonly IMarketScheduleResolver _marketScheduleResolver = marketScheduleResolver;
         private readonly IMarketSessionSettingsProvider _marketSessionSettingsProvider = marketSessionSettingsProvider;
+        private readonly IHistoricalCache _historicalCache = historicalCache;
 
         public async Task<bool> IsExpectedGapAsync(
             Contract contract,
@@ -20,9 +27,7 @@ namespace IbSwingTrader.Services.MarketSessions
             CancellationToken cancellationToken = default)
         {
             if (currentBarUtc <= previousBarUtc)
-            {
                 return true;
-            }
 
             var nextExpected = await GetNextExpectedBarTimeAsync(
                 contract,
@@ -31,11 +36,11 @@ namespace IbSwingTrader.Services.MarketSessions
                 cancellationToken);
 
             if (!nextExpected.HasValue)
-            {
                 return true;
-            }
 
-            return currentBarUtc <= nextExpected.Value;
+            var tolerance = GetSlotTolerance(timeframe);
+
+            return currentBarUtc <= nextExpected.Value.Add(tolerance);
         }
 
         public async Task<DateTime?> GetNextExpectedBarTimeAsync(
@@ -44,70 +49,228 @@ namespace IbSwingTrader.Services.MarketSessions
             DateTime previousBarUtc,
             CancellationToken cancellationToken = default)
         {
-            var step = timeframe.ToTimeSpan();
-            var settings = _marketSessionSettingsProvider.Get();
+            if (!IsIntraday(timeframe))
+                return previousBarUtc + timeframe.ToTimeSpan();
 
-            var searchStartUtc = previousBarUtc.AddDays(-1);
-            var searchEndUtc = previousBarUtc.AddDays(10);
+            var settings = _marketSessionSettingsProvider.Get();
+            var step = timeframe.ToTimeSpan();
+
+            var scheduleStartUtc = previousBarUtc.AddDays(-ObservedLookbackDays);
+            var scheduleEndUtc = previousBarUtc.AddDays(MaxSearchDays);
 
             var schedule = await _marketScheduleResolver.GetScheduleAsync(
                 contract,
-                searchStartUtc,
-                searchEndUtc,
+                scheduleStartUtc,
+                scheduleEndUtc,
                 cancellationToken);
 
-            var candidate = previousBarUtc + step;
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(schedule.TimeZoneId);
 
-            for (var i = 0; i < 500; i++)
+            var observedSlots = TryBuildObservedSlotPattern(
+                contract,
+                timeframe,
+                previousBarUtc,
+                timeZone,
+                settings.UseExtendedHoursByDefault);
+
+            var allowedDays = schedule.Days
+                .Where(x => x.IsTradingDay)
+                .OrderBy(x => x.Date)
+                .ToList();
+
+            var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
+            var previousDate = DateOnly.FromDateTime(previousLocal.Date);
+
+            var scanned = 0;
+
+            foreach (var day in allowedDays.Where(x => x.Date >= previousDate))
             {
-                if (IsInsideAllowedSession(schedule, candidate, settings.UseExtendedHoursByDefault))
+                var slots = BuildExpectedSlotsForDay(
+                    day,
+                    timeframe,
+                    timeZone,
+                    settings.UseExtendedHoursByDefault,
+                    observedSlots);
+
+                foreach (var slot in slots)
                 {
-                    return candidate;
+                    if (slot > previousBarUtc)
+                        return slot;
+
+                    scanned++;
+                    if (scanned >= MaxCandidateSlots)
+                        return null;
                 }
 
-                var nextSession = FindNextAllowedSession(schedule, candidate, settings.UseExtendedHoursByDefault);
-                if (nextSession is null)
-                {
+                scanned += slots.Count;
+                if (scanned >= MaxCandidateSlots)
                     return null;
-                }
-
-                if (candidate < nextSession.StartUtc)
-                {
-                    candidate = nextSession.StartUtc;
-                }
-                else
-                {
-                    candidate = nextSession.EndUtc;
-                }
             }
 
             return null;
         }
 
-        private static bool IsInsideAllowedSession(MarketSessionSchedule schedule, DateTime utc, bool useExtendedHours)
+        private HashSet<TimeOnly>? TryBuildObservedSlotPattern(
+            Contract contract,
+            Timeframe timeframe,
+            DateTime previousBarUtc,
+            TimeZoneInfo timeZone,
+            bool useExtendedHours)
         {
-            return schedule.Days
-                .SelectMany(x => x.Sessions)
-                .Any(x => IsSessionAllowed(x, useExtendedHours) && utc >= x.StartUtc && utc < x.EndUtc);
+            var symbol = contract.Symbol;
+            if (string.IsNullOrWhiteSpace(symbol))
+                return null;
+
+            if (!_historicalCache.TryLoad(symbol, timeframe, out var cached) ||
+                cached is null ||
+                cached.Count == 0)
+            {
+                return null;
+            }
+
+            var cutoffUtc = previousBarUtc.AddDays(-ObservedLookbackDays);
+
+            var recentCandles = cached
+                .Where(x => x.Time < previousBarUtc && x.Time >= cutoffUtc)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (recentCandles.Count == 0)
+                return null;
+
+            var groupedByLocalDay = recentCandles
+                .GroupBy(x => TimeZoneInfo.ConvertTimeFromUtc(x.Time, timeZone).Date)
+                .OrderByDescending(x => x.Key)
+                .Take(ObservedLookbackDays)
+                .ToList();
+
+            if (groupedByLocalDay.Count < 3)
+                return null;
+
+            var slotCounts = new Dictionary<TimeOnly, int>();
+            var effectiveDays = 0;
+
+            foreach (var dayGroup in groupedByLocalDay)
+            {
+                var localSlots = dayGroup
+                    .Select(x => TimeZoneInfo.ConvertTimeFromUtc(x.Time, timeZone))
+                    .Select(x => TimeOnly.FromDateTime(x))
+                    .Where(x => IsAllowedLocalTime(x, useExtendedHours))
+                    .Distinct()
+                    .ToList();
+
+                if (localSlots.Count == 0)
+                    continue;
+
+                effectiveDays++;
+
+                foreach (var slot in localSlots)
+                {
+                    if (!slotCounts.TryAdd(slot, 1))
+                        slotCounts[slot]++;
+                }
+            }
+
+            if (effectiveDays < 3 || slotCounts.Count == 0)
+                return null;
+
+            var minRequired = Math.Max(2, (int)Math.Ceiling(effectiveDays * ObservedSlotMinRatio));
+
+            var observed = slotCounts
+                .Where(x => x.Value >= minRequired)
+                .Select(x => x.Key)
+                .OrderBy(x => x)
+                .ToHashSet();
+
+            return observed.Count == 0 ? null : observed;
         }
 
-        private static SessionInterval? FindNextAllowedSession(MarketSessionSchedule schedule, DateTime utc, bool useExtendedHours)
+        private List<DateTime> BuildExpectedSlotsForDay(
+            TradingDaySchedule day,
+            Timeframe timeframe,
+            TimeZoneInfo timeZone,
+            bool useExtendedHours,
+            HashSet<TimeOnly>? observedSlots)
         {
-            return schedule.Days
-                .SelectMany(x => x.Sessions)
-                .Where(x => IsSessionAllowed(x, useExtendedHours) && x.EndUtc > utc)
-                .OrderBy(x => x.StartUtc)
-                .FirstOrDefault();
+            var step = timeframe.ToTimeSpan();
+            var result = new List<DateTime>();
+
+            foreach (var session in day.Sessions
+                         .Where(x => IsSessionAllowed(x, useExtendedHours))
+                         .OrderBy(x => x.StartUtc))
+            {
+                var sessionStartLocal = TimeZoneInfo.ConvertTimeFromUtc(session.StartUtc, timeZone);
+                var sessionEndLocal = TimeZoneInfo.ConvertTimeFromUtc(session.EndUtc, timeZone);
+
+                var slotLocal = sessionStartLocal;
+
+                while (slotLocal + step <= sessionEndLocal)
+                {
+                    var slotTimeOnly = TimeOnly.FromDateTime(slotLocal);
+
+                    if (observedSlots is null || observedSlots.Contains(slotTimeOnly))
+                    {
+                        result.Add(TimeZoneInfo.ConvertTimeToUtc(slotLocal, timeZone));
+                    }
+
+                    slotLocal = slotLocal.Add(step);
+                }
+            }
+
+            return result
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+
+        private static bool IsAllowedLocalTime(TimeOnly time, bool useExtendedHours)
+        {
+            var preMarketStart = new TimeOnly(4, 0);
+            var regularStart = new TimeOnly(9, 30);
+            var regularEnd = new TimeOnly(16, 0);
+            var afterHoursEnd = new TimeOnly(20, 0);
+
+            if (time >= regularStart && time < regularEnd)
+                return true;
+
+            if (!useExtendedHours)
+                return false;
+
+            return time >= preMarketStart && time < afterHoursEnd;
         }
 
         private static bool IsSessionAllowed(SessionInterval session, bool useExtendedHours)
         {
             if (session.Type == MarketSessionType.Regular)
-            {
                 return true;
-            }
 
             return useExtendedHours;
+        }
+
+        private static TimeSpan GetSlotTolerance(Timeframe timeframe)
+        {
+            return timeframe switch
+            {
+                Timeframe.M1 => TimeSpan.FromSeconds(30),
+                Timeframe.M5 => TimeSpan.FromMinutes(1),
+                Timeframe.M15 => TimeSpan.FromMinutes(2),
+                Timeframe.M30 => TimeSpan.FromMinutes(3),
+                Timeframe.H1 => TimeSpan.FromMinutes(5),
+                Timeframe.H4 => TimeSpan.FromMinutes(10),
+                Timeframe.D1 => TimeSpan.FromHours(1),
+                Timeframe.W1 => TimeSpan.FromHours(6),
+                _ => TimeSpan.FromMinutes(5)
+            };
+        }
+
+        private static bool IsIntraday(Timeframe timeframe)
+        {
+            return timeframe == Timeframe.H4 ||
+                   timeframe == Timeframe.H1 ||
+                   timeframe == Timeframe.M30 ||
+                   timeframe == Timeframe.M15 ||
+                   timeframe == Timeframe.M5 ||
+                   timeframe == Timeframe.M1;
         }
     }
 }

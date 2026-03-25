@@ -1,7 +1,6 @@
 ﻿using IBApi;
 using IbSwingTrader.Extensions;
 using IbSwingTrader.Interfaces;
-using IbSwingTrader.Interfaces.IbSwingTrader.Interfaces;
 using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Services
