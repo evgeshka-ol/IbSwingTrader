@@ -11,8 +11,8 @@ namespace IbSwingTrader.Services.MarketSessions
         IHistoricalCache historicalCache) : IMarketGapAnalyzer
     {
         private const int MaxSearchDays = 10;
-        private const int ObservedLookbackDays = 15;
-        private const double ObservedSlotMinRatio = 0.50;
+        private const int ObservedLookbackDays = 20;
+        private const double ObservedSlotMinRatio = 0.45;
 
         private readonly IMarketScheduleResolver _marketScheduleResolver = marketScheduleResolver;
         private readonly IMarketSessionSettingsProvider _marketSessionSettingsProvider = marketSessionSettingsProvider;
@@ -26,6 +26,19 @@ namespace IbSwingTrader.Services.MarketSessions
             CancellationToken cancellationToken = default)
         {
             if (currentBarUtc <= previousBarUtc)
+                return true;
+
+            if (!IsIntraday(timeframe))
+            {
+                var nextExpectedNonIntraday = previousBarUtc + timeframe.ToTimeSpan();
+                return currentBarUtc <= nextExpectedNonIntraday.Add(GetSlotTolerance(timeframe));
+            }
+
+            var timeZone = await GetTimeZoneAsync(contract, previousBarUtc, cancellationToken);
+            var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
+            var currentLocal = TimeZoneInfo.ConvertTimeFromUtc(currentBarUtc, timeZone);
+
+            if (IsExpectedWeekendTransition(previousLocal, currentLocal))
                 return true;
 
             var nextExpected = await GetNextExpectedBarTimeAsync(
@@ -63,21 +76,24 @@ namespace IbSwingTrader.Services.MarketSessions
                 cancellationToken);
 
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById(schedule.TimeZoneId);
+            var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
+            var previousDate = DateOnly.FromDateTime(previousLocal.Date);
 
-            var observedSlots = TryBuildObservedSlotPattern(
+            var observedPattern = TryBuildObservedPattern(
                 contract,
                 timeframe,
                 previousBarUtc,
                 timeZone,
                 settings.UseExtendedHoursByDefault);
 
-            if (observedSlots is { Count: > 0 })
+            if (observedPattern is not null)
             {
                 var observedNext = FindNextObservedSlot(
                     schedule,
                     timeZone,
                     previousBarUtc,
-                    observedSlots,
+                    previousLocal,
+                    observedPattern,
                     settings.UseExtendedHoursByDefault);
 
                 if (observedNext.HasValue)
@@ -89,10 +105,25 @@ namespace IbSwingTrader.Services.MarketSessions
                 timeZone,
                 timeframe,
                 previousBarUtc,
+                previousDate,
                 settings.UseExtendedHoursByDefault);
         }
 
-        private IReadOnlyList<TimeOnly>? TryBuildObservedSlotPattern(
+        private async Task<TimeZoneInfo> GetTimeZoneAsync(
+            Contract contract,
+            DateTime referenceUtc,
+            CancellationToken cancellationToken)
+        {
+            var schedule = await _marketScheduleResolver.GetScheduleAsync(
+                contract,
+                referenceUtc.AddDays(-1),
+                referenceUtc.AddDays(1),
+                cancellationToken);
+
+            return TimeZoneInfo.FindSystemTimeZoneById(schedule.TimeZoneId);
+        }
+
+        private ObservedIntradayPattern? TryBuildObservedPattern(
             Contract contract,
             Timeframe timeframe,
             DateTime previousBarUtc,
@@ -130,6 +161,8 @@ namespace IbSwingTrader.Services.MarketSessions
                 return null;
 
             var slotCounts = new Dictionary<TimeOnly, int>();
+            var transitionCounts = new Dictionary<TimeOnly, Dictionary<TimeOnly, int>>();
+            var firstSlotCounts = new Dictionary<TimeOnly, int>();
             var effectiveDays = 0;
 
             foreach (var dayGroup in groupedByLocalDay)
@@ -147,51 +180,147 @@ namespace IbSwingTrader.Services.MarketSessions
 
                 effectiveDays++;
 
+                var firstSlot = localSlots[0];
+                if (!firstSlotCounts.TryAdd(firstSlot, 1))
+                    firstSlotCounts[firstSlot]++;
+
                 foreach (var slot in localSlots)
                 {
                     if (!slotCounts.TryAdd(slot, 1))
                         slotCounts[slot]++;
+                }
+
+                for (int i = 0; i < localSlots.Count - 1; i++)
+                {
+                    var from = localSlots[i];
+                    var to = localSlots[i + 1];
+
+                    if (!transitionCounts.TryGetValue(from, out var nextMap))
+                    {
+                        nextMap = new Dictionary<TimeOnly, int>();
+                        transitionCounts[from] = nextMap;
+                    }
+
+                    if (!nextMap.TryAdd(to, 1))
+                        nextMap[to]++;
                 }
             }
 
             if (effectiveDays < 3 || slotCounts.Count == 0)
                 return null;
 
-            var minRequired = Math.Max(2, (int)Math.Ceiling(effectiveDays * ObservedSlotMinRatio));
+            var minSlotRequired = Math.Max(2, (int)Math.Ceiling(effectiveDays * ObservedSlotMinRatio));
 
-            var observed = slotCounts
-                .Where(x => x.Value >= minRequired)
+            var allowedSlots = slotCounts
+                .Where(x => x.Value >= minSlotRequired)
                 .Select(x => x.Key)
                 .OrderBy(x => x)
                 .ToList();
 
-            return observed.Count == 0 ? null : observed;
+            if (allowedSlots.Count == 0)
+                return null;
+
+            var nextSlotBySlot = new Dictionary<TimeOnly, TimeOnly>();
+
+            foreach (var pair in transitionCounts)
+            {
+                var from = pair.Key;
+                var nextMap = pair.Value;
+
+                var best = nextMap
+                    .OrderByDescending(x => x.Value)
+                    .ThenBy(x => x.Key)
+                    .FirstOrDefault();
+
+                if (best.Value >= 2)
+                {
+                    nextSlotBySlot[from] = best.Key;
+                }
+            }
+
+            var commonFirstSlot = firstSlotCounts
+                .OrderByDescending(x => x.Value)
+                .ThenBy(x => x.Key)
+                .FirstOrDefault();
+
+            var openingSlot = commonFirstSlot.Value >= 2
+                ? commonFirstSlot.Key
+                : allowedSlots[0];
+
+            return new ObservedIntradayPattern(
+                allowedSlots,
+                nextSlotBySlot,
+                openingSlot);
         }
 
         private static DateTime? FindNextObservedSlot(
             MarketSessionSchedule schedule,
             TimeZoneInfo timeZone,
             DateTime previousBarUtc,
-            IReadOnlyList<TimeOnly> observedSlots,
+            DateTime previousLocal,
+            ObservedIntradayPattern pattern,
             bool useExtendedHours)
         {
-            var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
             var previousDate = DateOnly.FromDateTime(previousLocal.Date);
+            var previousSlot = TimeOnly.FromDateTime(previousLocal);
 
             foreach (var day in schedule.Days
                          .Where(x => x.IsTradingDay && x.Date >= previousDate)
                          .OrderBy(x => x.Date))
             {
-                foreach (var slot in observedSlots)
+                if (day.Date == previousDate)
                 {
-                    var localCandidate = day.Date.ToDateTime(slot);
-                    var utcCandidate = TimeZoneInfo.ConvertTimeToUtc(localCandidate, timeZone);
+                    if (pattern.NextSlotBySlot.TryGetValue(previousSlot, out var mappedNextSameDay))
+                    {
+                        var candidate = day.Date.ToDateTime(mappedNextSameDay);
+                        var candidateUtc = TimeZoneInfo.ConvertTimeToUtc(candidate, timeZone);
 
-                    if (utcCandidate <= previousBarUtc)
-                        continue;
+                        if (candidateUtc > previousBarUtc &&
+                            IsWithinAllowedSessions(day, candidateUtc, useExtendedHours))
+                        {
+                            return candidateUtc;
+                        }
+                    }
 
-                    if (IsWithinAllowedSessions(day, utcCandidate, useExtendedHours))
-                        return utcCandidate;
+                    var laterSlots = pattern.AllowedSlots
+                        .Where(x => x > previousSlot)
+                        .OrderBy(x => x)
+                        .ToList();
+
+                    foreach (var laterSlot in laterSlots)
+                    {
+                        var candidate = day.Date.ToDateTime(laterSlot);
+                        var candidateUtc = TimeZoneInfo.ConvertTimeToUtc(candidate, timeZone);
+
+                        if (candidateUtc > previousBarUtc &&
+                            IsWithinAllowedSessions(day, candidateUtc, useExtendedHours))
+                        {
+                            return candidateUtc;
+                        }
+                    }
+
+                    continue;
+                }
+
+                var openingCandidate = day.Date.ToDateTime(pattern.OpeningSlot);
+                var openingCandidateUtc = TimeZoneInfo.ConvertTimeToUtc(openingCandidate, timeZone);
+
+                if (openingCandidateUtc > previousBarUtc &&
+                    IsWithinAllowedSessions(day, openingCandidateUtc, useExtendedHours))
+                {
+                    return openingCandidateUtc;
+                }
+
+                foreach (var slot in pattern.AllowedSlots.OrderBy(x => x))
+                {
+                    var candidate = day.Date.ToDateTime(slot);
+                    var candidateUtc = TimeZoneInfo.ConvertTimeToUtc(candidate, timeZone);
+
+                    if (candidateUtc > previousBarUtc &&
+                        IsWithinAllowedSessions(day, candidateUtc, useExtendedHours))
+                    {
+                        return candidateUtc;
+                    }
                 }
             }
 
@@ -203,11 +332,10 @@ namespace IbSwingTrader.Services.MarketSessions
             TimeZoneInfo timeZone,
             Timeframe timeframe,
             DateTime previousBarUtc,
+            DateOnly previousDate,
             bool useExtendedHours)
         {
             var step = timeframe.ToTimeSpan();
-            var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
-            var previousDate = DateOnly.FromDateTime(previousLocal.Date);
 
             foreach (var day in schedule.Days
                          .Where(x => x.IsTradingDay && x.Date >= previousDate)
@@ -235,6 +363,17 @@ namespace IbSwingTrader.Services.MarketSessions
             }
 
             return null;
+        }
+
+        private static bool IsExpectedWeekendTransition(
+            DateTime previousLocal,
+            DateTime currentLocal)
+        {
+            if (previousLocal.Date == currentLocal.Date)
+                return false;
+
+            return previousLocal.DayOfWeek == DayOfWeek.Friday &&
+                   (currentLocal.DayOfWeek == DayOfWeek.Monday || currentLocal.DayOfWeek == DayOfWeek.Sunday);
         }
 
         private static bool IsWithinAllowedSessions(
@@ -297,5 +436,10 @@ namespace IbSwingTrader.Services.MarketSessions
                    timeframe == Timeframe.M5 ||
                    timeframe == Timeframe.M1;
         }
+
+        private sealed record ObservedIntradayPattern(
+            IReadOnlyList<TimeOnly> AllowedSlots,
+            IReadOnlyDictionary<TimeOnly, TimeOnly> NextSlotBySlot,
+            TimeOnly OpeningSlot);
     }
 }
