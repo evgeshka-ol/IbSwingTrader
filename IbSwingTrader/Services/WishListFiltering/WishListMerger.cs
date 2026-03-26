@@ -14,7 +14,7 @@ namespace IbSwingTrader.Services.WishListFiltering
 
             var result = currentItems.ToDictionary(
                 x => x.Ticker,
-                x => x,
+                x => NormalizeExistingItem(x),
                 StringComparer.OrdinalIgnoreCase);
 
             foreach (var newItem in newItems)
@@ -37,7 +37,8 @@ namespace IbSwingTrader.Services.WishListFiltering
                     existing.FirstSeenMarketTime = restoredFirstSeen;
                     existing.LastEvaluatedMarketTime =
                         currentRunMarketTime
-                        ?? existing.LastEvaluatedMarketTime;
+                        ?? existing.LastEvaluatedMarketTime
+                        ?? existing.Scan?.ScanTimeMarket;
 
                     existing.ExpectedBarsToTarget =
                         newItem.ExpectedBarsToTarget
@@ -49,10 +50,11 @@ namespace IbSwingTrader.Services.WishListFiltering
                 }
                 else
                 {
-                    newItem.FirstSeenMarketTime ??= newItem.Scan?.ScanTimeMarket;
+                    newItem.FirstSeenMarketTime ??=
+                        newItem.Scan?.ScanTimeMarket;
+
                     newItem.LastEvaluatedMarketTime ??=
-                        newItem.LastEvaluatedMarketTime
-                        ?? newItem.Scan?.ScanTimeMarket;
+                        newItem.Scan?.ScanTimeMarket;
 
                     result[newItem.Ticker] = newItem;
                 }
@@ -64,6 +66,17 @@ namespace IbSwingTrader.Services.WishListFiltering
                     .OrderByDescending(x => x.Score.Score)
                     .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
             ];
+        }
+
+        private static WishListItem NormalizeExistingItem(WishListItem item)
+        {
+            item.FirstSeenMarketTime ??=
+                item.Scan?.ScanTimeMarket;
+
+            item.LastEvaluatedMarketTime ??=
+                item.Scan?.ScanTimeMarket;
+
+            return item;
         }
     }
 }
