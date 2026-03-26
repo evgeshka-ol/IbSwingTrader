@@ -2,7 +2,6 @@
 using IbSwingTrader.Commands;
 using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Infrastructure.Logging;
-using IbSwingTrader.Infrastructure.Persistence;
 using IbSwingTrader.Infrastructure.Settings;
 using IbSwingTrader.Interfaces;
 using IbSwingTrader.MarketData.Csv;

@@ -6,7 +6,6 @@ namespace IbSwingTrader.Interfaces
     {
         List<WishListItem> Merge(
             List<WishListItem> currentItems,
-            List<WishListItem> newItems,
-            DateTime marketNow);
+            List<WishListItem> newItems);
     }
 }

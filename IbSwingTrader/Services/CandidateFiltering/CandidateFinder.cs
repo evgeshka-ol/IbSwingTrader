@@ -17,6 +17,11 @@ namespace IbSwingTrader.Services.CandidateFiltering
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
+        IWishListReader wishListReader,
+        IWishListMerger wishListMerger,
+        IAgentPathService pathService,
+        IMarketSettingsProvider marketSettingsProvider,
+        IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
         ITextLogger logger) : ICandidateFinder
     {
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
@@ -30,11 +35,23 @@ namespace IbSwingTrader.Services.CandidateFiltering
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
+        private readonly IWishListReader _wishListReader = wishListReader;
+        private readonly IWishListMerger _wishListMerger = wishListMerger;
+        private readonly IAgentPathService _pathService = pathService;
+        private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
+        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly ITextLogger _logger = logger;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
-            var wishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
+            var marketTimezone = _marketSettingsProvider.Get().Timezone;
+            var marketNow = GetMarketNow(marketTimezone);
+            var todayMarketDate = marketNow.Date;
+
+            var wishListPath = _pathService.GetWishListFile();
+            var currentWishList = await _wishListReader.ReadAsync(wishListPath);
+
+            var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var preset in _scannerPresets.GetAll())
@@ -114,32 +131,55 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     }
 
                     var wishScore = _wishListScore.Calculate(snapshot);
-                    var scanTime = DateTime.UtcNow;
 
                     var wishListItem = BuildWishListItem(
                         stock,
                         preset,
                         snapshot,
-                        scanTime,
+                        marketNow,
+                        marketTimezone,
                         wishScore);
 
                     AddOrReplaceWishListContext(
-                        wishListContexts,
+                        scannedWishListContexts,
                         new WishListContext
                         {
                             Stock = stock,
                             Preset = preset,
                             Snapshot = snapshot,
                             Candles = candles,
-                            ScanTime = scanTime,
+                            ScanTimeMarket = marketNow,
                             AvgDollarVolumeDaily20 = avgDollarVolumeDaily20,
                             WishListItem = wishListItem
                         });
                 }
             }
 
-            foreach (var ctx in wishListContexts.Values)
+            var scannedWishListItems =
+                scannedWishListContexts.Values
+                    .Select(x => x.WishListItem)
+                    .ToList();
+
+            var mergedWishList = _wishListMerger.Merge(currentWishList, scannedWishListItems);
+
+            var mergedMap = mergedWishList.ToDictionary(
+                x => x.Ticker,
+                x => x,
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ctx in scannedWishListContexts.Values)
             {
+                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
+                    continue;
+
+                var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+
+                if (firstSeenDate == null || firstSeenDate.Value >= todayMarketDate)
+                {
+                    _logger.Info($"Entry skipped for {ctx.Stock.Ticker}: first seen today in wish list.");
+                    continue;
+                }
+
                 var trade = ctx.Trade ??= BuildTradePlan(ctx);
 
                 if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily20))
@@ -149,8 +189,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 }
 
                 var entryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var dailyScore = ctx.WishListItem.Score.DailyScore ?? 0m;
-                var weeklyScore = ctx.WishListItem.Score.WeeklyScore ?? 0m;
+                var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
+                var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
 
                 var candidateItem = BuildCandidateItem(
@@ -159,7 +199,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     ctx.Snapshot,
                     ctx.Candles,
                     trade,
-                    ctx.ScanTime,
+                    ctx.ScanTimeMarket,
+                    marketTimezone,
                     dailyScore,
                     weeklyScore,
                     entryScore,
@@ -171,21 +212,26 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     "candidate");
             }
 
+            var topLimit = _getCandidatesSettingsProvider.Get().FinalTopCandidates;
+
+            var finalCandidates = candidateResults.Values
+                    .OrderByDescending(x => x.Score.Score)
+                    .Take(topLimit)
+                    .ToList();
+
+            var promotedTickers = finalCandidates
+                .Select(x => x.Ticker)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var finalWishList = mergedWishList
+                    .Where(x => !promotedTickers.Contains(x.Ticker))
+                    .OrderByDescending(x => x.Score.Score)
+                    .ToList();
+
             return new CandidateSearchResult
             {
-                WishList =
-                [
-                    .. wishListContexts.Values
-                        .Select(x => x.WishListItem)
-                        .OrderByDescending(x => x.Score.Score)
-                ],
-
-                Candidates =
-                [
-                    .. candidateResults.Values
-                        .OrderByDescending(x => x.Score.Score)
-                        .Take(10)
-                ]
+                WishList = finalWishList,
+                Candidates = finalCandidates
             };
         }
 
@@ -264,7 +310,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
             StockInfo stock,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
-            DateTime scanTime,
+            DateTime scanTimeMarket,
+            string scanTimeZone,
             WishListScoreResult wishScore)
         {
             return new WishListItem
@@ -274,7 +321,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 {
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
-                    ScanTimeMarket = scanTime
+                    ScanTimeMarket = scanTimeMarket,
+                    ScanTimeZone = scanTimeZone
                 },
                 Score = new ScoreInfo
                 {
@@ -289,7 +337,11 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     DistanceTo52wHigh = snapshot.Current.DistanceTo52wHigh,
                     DailyRSI14 = snapshot.Current.DailyRSI14,
                     Notes = BuildWishListNotes(snapshot)
-                }
+                },
+                FirstSeenMarketTime = scanTimeMarket,
+                LastEvaluatedMarketTime = scanTimeMarket,
+                ExpectedTargetMarketTime = null,
+                ExpectedBarsToTarget = null
             };
         }
 
@@ -299,7 +351,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
             TradePlanInfo trade,
-            DateTime scanTime,
+            DateTime scanTimeMarket,
+            string scanTimeZone,
             decimal dailyScore,
             decimal weeklyScore,
             decimal entryScore,
@@ -312,7 +365,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 {
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
-                    ScanTimeMarket = scanTime
+                    ScanTimeMarket = scanTimeMarket,
+                    ScanTimeZone = scanTimeZone
                 },
                 Score = new ScoreInfo
                 {
@@ -644,13 +698,19 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 : string.Join(", ", parts);
         }
 
+        private static DateTime GetMarketNow(string timezoneId)
+        {
+            var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
+        }
+
         private sealed class WishListContext
         {
             public required StockInfo Stock { get; init; }
             public required PresetScanCode Preset { get; init; }
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
-            public required DateTime ScanTime { get; init; }
+            public required DateTime ScanTimeMarket { get; init; }
             public required decimal AvgDollarVolumeDaily20 { get; init; }
             public required WishListItem WishListItem { get; init; }
             public TradePlanInfo? Trade { get; set; }

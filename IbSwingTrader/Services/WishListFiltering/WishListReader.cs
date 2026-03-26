@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using IbSwingTrader.Infrastructure.JsonHelpers;
 using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models.Tickers;
 
@@ -8,11 +9,17 @@ namespace IbSwingTrader.Services.WishListFiltering
         ITextLogger logger) : IWishListReader
     {
         private readonly ITextLogger _logger = logger;
-        
+
         private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
         {
             PropertyNameCaseInsensitive = true
         };
+
+        static WishListReader()
+        {
+            _jsonSerializerOptions.Converters.Add(new FlexibleDateTimeConverter());
+            _jsonSerializerOptions.Converters.Add(new FlexibleNullableDateTimeConverter());
+        }
 
         public async Task<List<WishListItem>> ReadAsync(string filePath)
         {

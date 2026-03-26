@@ -31,7 +31,7 @@ namespace IbSwingTrader.Infrastructure.JsonHelpers
                 value,
                 Formats,
                 CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                DateTimeStyles.AllowWhiteSpaces,
                 out var result))
             {
                 return result;
@@ -40,7 +40,7 @@ namespace IbSwingTrader.Infrastructure.JsonHelpers
             if (DateTime.TryParse(
                 value,
                 CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                DateTimeStyles.AllowWhiteSpaces,
                 out result))
             {
                 return result;
@@ -54,7 +54,7 @@ namespace IbSwingTrader.Infrastructure.JsonHelpers
             DateTime value,
             JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString("O", CultureInfo.InvariantCulture));
+            writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture));
         }
     }
 }

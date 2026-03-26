@@ -1,51 +1,60 @@
 ﻿using IbSwingTrader.Interfaces;
 using IbSwingTrader.Models.Tickers;
 
-namespace IbSwingTrader.Infrastructure.Persistence
+namespace IbSwingTrader.Services.WishListFiltering
 {
     public class WishListMerger : IWishListMerger
     {
         public List<WishListItem> Merge(
             List<WishListItem> currentItems,
-            List<WishListItem> newItems,
-            DateTime marketNow)
+            List<WishListItem> newItems)
         {
             ArgumentNullException.ThrowIfNull(currentItems);
             ArgumentNullException.ThrowIfNull(newItems);
 
-            var currentMap = currentItems.ToDictionary(
+            var result = currentItems.ToDictionary(
                 x => x.Ticker,
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
-            var result = new List<WishListItem>(newItems.Count);
-
             foreach (var newItem in newItems)
             {
-                if (currentMap.TryGetValue(newItem.Ticker, out var existing))
+                if (result.TryGetValue(newItem.Ticker, out var existing))
                 {
-                    newItem.FirstSeenMarketTime =
-                        existing.FirstSeenMarketTime
+                    var firstSeen = existing.FirstSeenMarketTime
                         ?? existing.Scan?.ScanTimeMarket
-                        ?? marketNow;
+                        ?? newItem.FirstSeenMarketTime
+                        ?? newItem.Scan.ScanTimeMarket;
 
-                    newItem.LastEvaluatedMarketTime = marketNow;
+                    existing.Scan = newItem.Scan;
+                    existing.Score = newItem.Score;
+                    existing.Context = newItem.Context;
 
-                    newItem.ExpectedBarsToTarget ??= existing.ExpectedBarsToTarget;
-                    newItem.ExpectedTargetMarketTime ??= existing.ExpectedTargetMarketTime;
+                    existing.FirstSeenMarketTime = firstSeen;
+                    existing.LastEvaluatedMarketTime =
+                        newItem.LastEvaluatedMarketTime
+                        ?? (DateTime?)newItem.Scan.ScanTimeMarket
+                        ?? existing.LastEvaluatedMarketTime;
+
+                    existing.ExpectedBarsToTarget =
+                        newItem.ExpectedBarsToTarget
+                        ?? existing.ExpectedBarsToTarget;
+
+                    existing.ExpectedTargetMarketTime =
+                        newItem.ExpectedTargetMarketTime
+                        ?? existing.ExpectedTargetMarketTime;
                 }
                 else
                 {
-                    newItem.FirstSeenMarketTime = marketNow;
-                    newItem.LastEvaluatedMarketTime = marketNow;
+                    newItem.FirstSeenMarketTime ??= newItem.Scan.ScanTimeMarket;
+                    newItem.LastEvaluatedMarketTime ??= newItem.Scan.ScanTimeMarket;
+                    result[newItem.Ticker] = newItem;
                 }
-
-                result.Add(newItem);
             }
 
             return
             [
-                .. result
+                .. result.Values
                     .OrderByDescending(x => x.Score.Score)
                     .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
             ];
