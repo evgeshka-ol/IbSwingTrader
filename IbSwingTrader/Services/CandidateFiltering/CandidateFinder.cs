@@ -294,7 +294,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             };
         }
 
-        private static WishListItem BuildWishListItem(
+        private WishListItem BuildWishListItem(
             StockInfo stock,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
@@ -303,7 +303,25 @@ namespace IbSwingTrader.Services.CandidateFiltering
             string scanTimeZone,
             WishListScoreResult wishScore)
         {
-            var targetForecast = CalculateWishListTargetForecast(snapshot, candles, scanTimeMarket);
+            _logger.Info(
+                $"WishList item build started: {stock.Ticker}. " +
+                $"DailyMaSignedDistancePct={snapshot.Current.DailyMaSignedDistancePct}, " +
+                $"WeeklyMaSignedDistancePct={snapshot.Current.WeeklyMaSignedDistancePct}, " +
+                $"DailyMaDelta3={snapshot.DailyMaDelta3}, " +
+                $"H4MaDelta3={snapshot.H4MaDelta3}, " +
+                $"DailyRsiDelta3={snapshot.DailyRsiDelta3}, " +
+                $"DailyMacdDelta3={snapshot.DailyMacdDelta3}");
+
+            var targetForecast = CalculateWishListTargetForecast(
+                stock.Ticker,
+                snapshot,
+                candles,
+                scanTimeMarket);
+
+            _logger.Info(
+                $"WishList item build completed: {stock.Ticker}. " +
+                $"ExpectedBarsToTarget={targetForecast.ExpectedBarsToTarget?.ToString() ?? "null"}, " +
+                $"ExpectedTargetMarketTime={targetForecast.ExpectedTargetMarketTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
 
             return new WishListItem
             {
@@ -395,36 +413,83 @@ namespace IbSwingTrader.Services.CandidateFiltering
             };
         }
 
-        private static (int? ExpectedBarsToTarget, DateTime? ExpectedTargetMarketTime) CalculateWishListTargetForecast(
+        private (int? ExpectedBarsToTarget, DateTime? ExpectedTargetMarketTime) CalculateWishListTargetForecast(
+            string ticker,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
             DateTime scanTimeMarket)
         {
             var currentDistancePct = snapshot.Current.DailyMaSignedDistancePct;
 
+            _logger.Info(
+                $"WishList forecast input: {ticker}. " +
+                $"CurrentDailyDistancePct={currentDistancePct}, " +
+                $"DailyMaDelta3={snapshot.DailyMaDelta3}, " +
+                $"H4MaDelta3={snapshot.H4MaDelta3}, " +
+                $"DailyRsiDelta3={snapshot.DailyRsiDelta3}, " +
+                $"DailyMacdDelta3={snapshot.DailyMacdDelta3}");
+
             if (currentDistancePct >= 0m)
-                return (0, scanTimeMarket);
-
-            var progressPerBar = snapshot.DailyMaDelta3 / 3m;
-
-            if (progressPerBar <= 0m && snapshot.H4MaDelta3 > 0m)
             {
-                progressPerBar = snapshot.H4MaDelta3 / 3m;
+                _logger.Info($"WishList forecast: {ticker} reached/exceeded daily mid already.");
+                return (0, scanTimeMarket);
             }
 
+            decimal progressPerBar = 0m;
+            string progressSource = "none";
+
+            if (snapshot.DailyMaDelta3 > 0m)
+            {
+                progressPerBar = snapshot.DailyMaDelta3 / 3m;
+                progressSource = "daily-ma";
+            }
+            else if (snapshot.H4MaDelta3 > 0m)
+            {
+                progressPerBar = snapshot.H4MaDelta3 / 3m;
+                progressSource = "h4-ma";
+            }
+            else if (snapshot.DailyRsiDelta3 > 0m || snapshot.DailyMacdDelta3 > 0m)
+            {
+                progressPerBar = Math.Abs(currentDistancePct) / 12m;
+                progressSource = "daily-rsi-macd-fallback";
+            }
+
+            _logger.Info(
+                $"WishList forecast progress: {ticker}. " +
+                $"ProgressSource={progressSource}, " +
+                $"ProgressPerBar={progressPerBar}");
+
             if (progressPerBar <= 0m)
+            {
+                _logger.Info($"WishList forecast failed: {ticker}. No positive progress signal.");
                 return (null, null);
+            }
 
             var remainingDistancePct = Math.Abs(currentDistancePct);
             var expectedBars = (int)Math.Ceiling((double)(remainingDistancePct / progressPerBar));
 
+            _logger.Info(
+                $"WishList forecast raw result: {ticker}. " +
+                $"RemainingDistancePct={remainingDistancePct}, " +
+                $"ExpectedBarsRaw={expectedBars}");
+
             if (expectedBars <= 0)
+            {
+                _logger.Info($"WishList forecast normalized to zero bars: {ticker}.");
                 return (0, scanTimeMarket);
+            }
 
             var cappedBars = Math.Min(expectedBars, 60);
             var step = EstimateMarketBarStep(candles);
+            var expectedTargetMarketTime = scanTimeMarket.Add(step * cappedBars);
 
-            return (cappedBars, scanTimeMarket.Add(step * cappedBars));
+            _logger.Info(
+                $"WishList forecast final result: {ticker}. " +
+                $"ExpectedBarsCapped={cappedBars}, " +
+                $"Step={step}, " +
+                $"ExpectedTargetMarketTime={expectedTargetMarketTime:yyyy-MM-dd HH:mm:ss}");
+
+            return (cappedBars, expectedTargetMarketTime);
         }
 
         private static TimeSpan EstimateMarketBarStep(List<Candle> candles)
@@ -455,22 +520,22 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 return 0m;
 
             var lastTime = candles[^1].Time;
-            var fromTime = lastTime.AddDays(-days);
+            var start = lastTime.AddDays(-days);
 
-            var window = candles
-                .Where(x => x.Time >= fromTime)
+            var range = candles
+                .Where(x => x.Time >= start)
                 .ToList();
 
-            if (window.Count == 0)
+            if (range.Count == 0)
                 return 0m;
 
-            var highest = window.Max(x => x.High);
-            var lastClose = candles[^1].Close;
+            var highest = range.Max(x => x.High);
+            var close = candles[^1].Close;
 
-            if (highest == 0m)
+            if (highest <= 0m)
                 return 0m;
 
-            return (lastClose - highest) / highest * 100m;
+            return (close - highest) / highest * 100m;
         }
 
         private static decimal CalculateVolumeRatio20(List<Candle> candles)
@@ -478,151 +543,193 @@ namespace IbSwingTrader.Services.CandidateFiltering
             if (candles.Count < 21)
                 return 0m;
 
-            var lastVolume = candles[^1].Volume;
-            var avgVolume = candles.Skip(Math.Max(0, candles.Count - 21)).Take(20).Average(x => x.Volume);
+            var currentVolume = candles[^1].Volume;
 
-            if (avgVolume == 0m)
+            var avgVolume20 = candles
+                .Skip(candles.Count - 21)
+                .Take(20)
+                .Average(x => x.Volume);
+
+            if (avgVolume20 <= 0m)
                 return 0m;
 
-            return lastVolume / avgVolume;
+            return currentVolume / avgVolume20;
         }
 
-        private static decimal CalculateAtrRatio(List<Candle> candles, int period)
+        private static decimal CalculateAtrRatio(List<Candle> candles, int length)
         {
-            if (candles.Count < period + 1)
+            if (candles.Count < length + 1)
                 return 0m;
 
-            var ranges = new List<decimal>();
+            var trueRanges = new List<decimal>();
 
-            for (var i = candles.Count - period; i < candles.Count; i++)
+            for (int i = candles.Count - length; i < candles.Count; i++)
             {
                 var current = candles[i];
-                var previousClose = candles[i - 1].Close;
+                var prevClose = candles[i - 1].Close;
 
                 var tr = Math.Max(
                     current.High - current.Low,
                     Math.Max(
-                        Math.Abs(current.High - previousClose),
-                        Math.Abs(current.Low - previousClose)));
+                        Math.Abs(current.High - prevClose),
+                        Math.Abs(current.Low - prevClose)));
 
-                ranges.Add(tr);
+                trueRanges.Add(tr);
             }
 
-            var atr = ranges.Average();
-            var lastClose = candles[^1].Close;
-
-            if (lastClose == 0m)
+            if (trueRanges.Count == 0)
                 return 0m;
 
-            return atr / lastClose;
+            var atr = trueRanges.Average();
+            var close = candles[^1].Close;
+
+            if (close == 0m)
+                return 0m;
+
+            return atr / close * 100m;
         }
 
         private static decimal CalculateDailyPullback10d(List<Candle> candles)
         {
-            var daily = candles
-                .GroupBy(x => x.Time.Date)
-                .Select(g => new
-                {
-                    Date = g.Key,
-                    High = g.Max(x => x.High),
-                    Close = g.OrderBy(x => x.Time).Last().Close
-                })
-                .OrderBy(x => x.Date)
-                .ToList();
+            var dailyBars = BuildDailyBars(candles);
 
-            if (daily.Count == 0)
+            if (dailyBars.Count == 0)
                 return 0m;
 
-            var window = daily.TakeLast(10).ToList();
-            var highest = window.Max(x => x.High);
-            var lastClose = daily[^1].Close;
+            var range = dailyBars.TakeLast(10).ToList();
+            var highest = range.Max(x => x.High);
+            var close = dailyBars[^1].Close;
 
-            if (highest == 0m)
+            if (highest <= 0m)
                 return 0m;
 
-            return (lastClose - highest) / highest * 100m;
+            return (close - highest) / highest * 100m;
         }
 
-        private static decimal CalculateSmaSignedDistancePct(List<Candle> candles, int period)
+        private static decimal CalculateSmaSignedDistancePct(List<Candle> candles, int length)
         {
-            if (candles.Count < period)
+            if (candles.Count < length)
                 return 0m;
 
-            var sma = candles.TakeLast(period).Average(x => x.Close);
-            var lastClose = candles[^1].Close;
+            var sma = candles
+                .TakeLast(length)
+                .Average(x => x.Close);
 
             if (sma == 0m)
                 return 0m;
 
-            return (lastClose - sma) / sma * 100m;
+            var close = candles[^1].Close;
+            return (close - sma) / sma * 100m;
         }
 
-        private static decimal CalculateWeeklyMacdHistDelta(List<Candle> candles)
+        private static decimal? CalculateWeeklyMacdHistDelta(List<Candle> candles)
         {
-            var weekly = candles
-                .GroupBy(x => GetWeekStart(x.Time.Date))
-                .Select(g => new Candle
-                {
-                    Time = g.Max(x => x.Time),
-                    Open = g.OrderBy(x => x.Time).First().Open,
-                    High = g.Max(x => x.High),
-                    Low = g.Min(x => x.Low),
-                    Close = g.OrderBy(x => x.Time).Last().Close,
-                    Volume = g.Sum(x => x.Volume),
-                    Timeframe = Timeframe.W1
-                })
-                .OrderBy(x => x.Time)
+            var weeklyCloses = BuildWeeklyBars(candles)
+                .Select(x => x.Close)
                 .ToList();
 
-            if (weekly.Count < 10)
-                return 0m;
+            var macdSeries = BuildMacdSeries(weeklyCloses);
 
-            var macd = CalculateMacdHistogram(weekly);
+            if (macdSeries.Count < 2)
+                return null;
 
-            if (macd.Count < 2)
-                return 0m;
+            var currentHist = macdSeries[^1].Macd - macdSeries[^1].Signal;
+            var prevHist = macdSeries[^2].Macd - macdSeries[^2].Signal;
 
-            return macd[^1] - macd[^2];
+            return currentHist - prevHist;
         }
 
-        private static List<decimal> CalculateMacdHistogram(List<Candle> candles)
+        private static List<Candle> BuildDailyBars(List<Candle> candles)
         {
-            var closes = candles.Select(x => x.Close).ToList();
+            var result = new List<Candle>();
 
-            var ema12 = CalculateEmaSeries(closes, 12);
-            var ema26 = CalculateEmaSeries(closes, 26);
-
-            var macdLine = ema12.Zip(ema26, (a, b) => a - b).ToList();
-            var signal = CalculateEmaSeries(macdLine, 9);
-
-            return macdLine.Zip(signal, (m, s) => m - s).ToList();
-        }
-
-        private static List<decimal> CalculateEmaSeries(List<decimal> values, int period)
-        {
-            var result = new List<decimal>();
-
-            if (values.Count == 0)
-                return result;
-
-            var multiplier = 2m / (period + 1);
-            var ema = values[0];
-
-            result.Add(ema);
-
-            for (var i = 1; i < values.Count; i++)
+            foreach (var group in candles.GroupBy(x => x.Time.Date).OrderBy(x => x.Key))
             {
-                ema = ((values[i] - ema) * multiplier) + ema;
-                result.Add(ema);
+                var ordered = group.OrderBy(x => x.Time).ToList();
+
+                result.Add(new Candle
+                {
+                    Timeframe = Timeframe.D1,
+                    Time = group.Key,
+                    Open = ordered[0].Open,
+                    High = ordered.Max(x => x.High),
+                    Low = ordered.Min(x => x.Low),
+                    Close = ordered[^1].Close,
+                    Volume = ordered.Sum(x => x.Volume)
+                });
             }
 
             return result;
         }
 
-        private static DateTime GetWeekStart(DateTime date)
+        private static List<Candle> BuildWeeklyBars(List<Candle> candles)
         {
-            var diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
-            return date.AddDays(-diff).Date;
+            var result = new List<Candle>();
+
+            foreach (var group in candles
+                .GroupBy(x => StartOfWeek(x.Time.Date))
+                .OrderBy(x => x.Key))
+            {
+                var ordered = group.OrderBy(x => x.Time).ToList();
+
+                result.Add(new Candle
+                {
+                    Timeframe = Timeframe.W1,
+                    Time = group.Key,
+                    Open = ordered[0].Open,
+                    High = ordered.Max(x => x.High),
+                    Low = ordered.Min(x => x.Low),
+                    Close = ordered[^1].Close,
+                    Volume = ordered.Sum(x => x.Volume)
+                });
+            }
+
+            return result;
+        }
+
+        private static DateTime StartOfWeek(DateTime value)
+        {
+            var diff = (7 + (value.DayOfWeek - DayOfWeek.Monday)) % 7;
+            return value.AddDays(-diff).Date;
+        }
+
+        private static List<MacdPoint> BuildMacdSeries(List<decimal> closes)
+        {
+            var result = new List<MacdPoint>();
+
+            if (closes.Count == 0)
+                return result;
+
+            decimal? ema12 = null;
+            decimal? ema26 = null;
+            decimal? signal = null;
+
+            const decimal k12 = 2m / 13m;
+            const decimal k26 = 2m / 27m;
+            const decimal k9 = 2m / 10m;
+
+            foreach (var close in closes)
+            {
+                ema12 = ema12 == null ? close : ema12.Value + (close - ema12.Value) * k12;
+                ema26 = ema26 == null ? close : ema26.Value + (close - ema26.Value) * k26;
+
+                var macd = ema12.Value - ema26.Value;
+                signal = signal == null ? macd : signal.Value + (macd - signal.Value) * k9;
+
+                result.Add(new MacdPoint
+                {
+                    Macd = macd,
+                    Signal = signal.Value
+                });
+            }
+
+            return result;
+        }
+
+        private sealed class MacdPoint
+        {
+            public decimal Macd { get; init; }
+            public decimal Signal { get; init; }
         }
 
         private static decimal CalculateAverageDollarVolumeDaily20(List<Candle> candles)
@@ -631,8 +738,9 @@ namespace IbSwingTrader.Services.CandidateFiltering
                 .GroupBy(x => x.Time.Date)
                 .Select(g =>
                 {
-                    var dayClose = g.OrderBy(x => x.Time).Last().Close;
-                    var dayVolume = g.Sum(x => x.Volume);
+                    var ordered = g.OrderBy(x => x.Time).ToList();
+                    var dayClose = ordered[^1].Close;
+                    var dayVolume = ordered.Sum(x => x.Volume);
                     return dayClose * dayVolume;
                 })
                 .TakeLast(20)
