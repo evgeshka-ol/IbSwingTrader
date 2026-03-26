@@ -298,18 +298,17 @@ namespace IbSwingTrader.MarketData.IB
             int bars,
             int attempt)
         {
-            _logger.Info(
+            _logger.Debug(
                 $"GetCandles called for {contract.Symbol}, attempt {attempt}");
 
             var reqId = Interlocked.Increment(ref _nextRequestId);
 
-            var endTime = endTimeUtc.ToIbEndTime();
             var duration = timeframe.ToIBDuration(bars);
             var barSize = timeframe.ToIBBarSize();
             var timeout = timeframe.GetHistoricalTimeout(bars);
 
             _logger.Info(
-                $"Sending reqHistoricalData: symbol={contract.Symbol}, reqId={reqId}, end={endTime}, duration={duration}, barSize={barSize}, timeout={timeout.TotalSeconds}s");
+                $"Sending reqHistoricalData: symbol={contract.Symbol}, reqId={reqId}, end={endTimeUtc.ToUaTimeFormat()}, duration={duration}, barSize={barSize}, timeout={timeout.TotalSeconds}s");
 
             var tcs = new TaskCompletionSource<List<Candle>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -324,7 +323,7 @@ namespace IbSwingTrader.MarketData.IB
                 Client.reqHistoricalData(
                     reqId,
                     contract,
-                    endTime,
+                    endTimeUtc.ToIbEndTime(),
                     duration,
                     barSize,
                     "TRADES",
