@@ -7,10 +7,14 @@ namespace IbSwingTrader.Infrastructure.Logging
 {
     public class WishListResultWriter(
         IMarketSettingsProvider marketSettingsProvider,
+        IWishListReader wishListReader,
+        IWishListMerger wishListMerger,
         ITextLogger logger,
         ICompositePropertyJsonBuilder jsonBuilder) : IWishListResultWriter
     {
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
+        private readonly IWishListReader _wishListReader = wishListReader;
+        private readonly IWishListMerger _wishListMerger = wishListMerger;
         private readonly ITextLogger _logger = logger;
         private readonly ICompositePropertyJsonBuilder _jsonBuilder = jsonBuilder;
 
@@ -24,18 +28,25 @@ namespace IbSwingTrader.Infrastructure.Logging
                 Directory.CreateDirectory(folder);
 
             var marketSettings = _marketSettingsProvider.Get();
-            var scanTimeMarket = GetMarketNow(marketSettings.Timezone);
+            var marketNow = GetMarketNow(marketSettings.Timezone);
 
             foreach (var item in items)
             {
-                item.Scan.ScanTimeMarket = scanTimeMarket;
+                item.Scan.ScanTimeMarket = marketNow;
                 item.Scan.ScanTimeZone = marketSettings.Timezone;
             }
 
-            var json = BuildJson(items);
+            var currentItems = await _wishListReader.ReadAsync(filePath);
+            var mergedItems = _wishListMerger.Merge(currentItems, items, marketNow);
+
+            var json = BuildJson(mergedItems);
             await File.WriteAllTextAsync(filePath, json);
 
-            _logger.Info($"Wish list saved: {filePath}");
+            _logger.Info(
+                $"Wish list saved: {filePath}. " +
+                $"Current items: {currentItems.Count}, " +
+                $"New items: {items.Count}, " +
+                $"Merged items: {mergedItems.Count}");
         }
 
         private string BuildJson(IEnumerable<WishListItem> items)

@@ -38,8 +38,6 @@ namespace IbSwingTrader.Commands
             await _wishListWriter.WriteAsync(wishListPath, result.WishList);
             await _candidateWriter.WriteAsync(candidatesPath, result.Candidates);
 
-            _logger.Info($"Wish list saved: {wishListPath}");
-            _logger.Info($"Candidates saved: {candidatesPath}");
             _logger.Info(
                 $"GetCandidates completed. " +
                 $"Wish list count: {result.WishList.Count}, " +

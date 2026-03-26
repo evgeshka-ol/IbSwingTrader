@@ -2,6 +2,7 @@
 using IbSwingTrader.Commands;
 using IbSwingTrader.Infrastructure.Historical;
 using IbSwingTrader.Infrastructure.Logging;
+using IbSwingTrader.Infrastructure.Persistence;
 using IbSwingTrader.Infrastructure.Settings;
 using IbSwingTrader.Interfaces;
 using IbSwingTrader.MarketData.Csv;
@@ -79,6 +80,8 @@ namespace IbSwingTrader.Infrastructure.Bootstrap
             // wish list
             services.AddSingleton<IWishListFilter, WishListFilter>();
             services.AddSingleton<IWishListScore, WishListScore>();
+            services.AddSingleton<IWishListReader, WishListReader>();
+            services.AddSingleton<IWishListMerger, WishListMerger>();
 
             // candidate search
             services.AddSingleton<ICandidateSignalAnalyzer, CandidateSignalAnalyzer>();

@@ -132,7 +132,7 @@ namespace IbSwingTrader.Services.CandidateEvaluation
         {
             price = 0m;
 
-            if (item.ExpectedTargetTimeNy.HasValue)
+            if (item.ExpectedTargetMarketTime.HasValue)
                 return false;
 
             return false;
