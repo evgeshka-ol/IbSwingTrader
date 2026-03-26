@@ -4,9 +4,9 @@ using IbSwingTrader.Models;
 namespace IbSwingTrader.Services.WishListFiltering
 {
     public class WishListFilter(
-            ITextLogger logger,
-            IGetCandidatesSettingsProvider settingsProvider,
-            INumberTextFormatter fmt) : IWishListFilter
+        ITextLogger logger,
+        IGetCandidatesSettingsProvider settingsProvider,
+        INumberTextFormatter fmt) : IWishListFilter
     {
         private readonly ITextLogger _logger = logger;
         private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
@@ -22,32 +22,32 @@ namespace IbSwingTrader.Services.WishListFiltering
 
             if (avgDollarVolumeDaily20 < s.MinDollarVolume)
             {
-                _logger.Info($"WishList rejected: dollar volume {_fmt.Generic(avgDollarVolumeDaily20)} < {_fmt.Generic(s.MinDollarVolume)}");
+                _logger.Info(
+                    $"WishList rejected: dollar volume {_fmt.Generic(avgDollarVolumeDaily20)} < {_fmt.Generic(s.MinDollarVolume)}");
                 return false;
             }
 
-            if (f.DistanceTo20dHigh > s.MaxDistanceTo20dHigh)
+            if (f.DailyMaSignedDistancePct >= 0m)
+            {
+                _logger.Info(
+                    $"WishList rejected: price is not below daily Bollinger mid. " +
+                    $"Ticker price={_fmt.Generic(price)}, daily distance={_fmt.Generic(f.DailyMaSignedDistancePct)}%");
                 return false;
+            }
 
-            if (f.DistanceTo52wHigh > s.MaxDistanceTo52wHigh)
+            if (!f.WeeklyMaSignedDistancePct.HasValue)
+            {
+                _logger.Info("WishList rejected: weekly Bollinger mid is unavailable.");
                 return false;
+            }
 
-            if (f.DailyMaSignedDistancePct > s.MaxDailyMaSignedDistancePct)
+            if (f.WeeklyMaSignedDistancePct.Value >= 0m)
+            {
+                _logger.Info(
+                    $"WishList rejected: price is not below weekly Bollinger mid. " +
+                    $"Ticker price={_fmt.Generic(price)}, weekly distance={_fmt.Generic(f.WeeklyMaSignedDistancePct.Value)}%");
                 return false;
-
-            if (f.DailyRSI14 < s.MinDailyRsi14 || f.DailyRSI14 > s.MaxDailyRsi14)
-                return false;
-
-            if (f.DailyMACDLineMinusSignal > s.MaxDailyMacdLineMinusSignal)
-                return false;
-
-            if (f.WeeklyMaSignedDistancePct.HasValue &&
-                f.WeeklyMaSignedDistancePct.Value < s.MinWeeklyMaSignedDistancePct)
-                return false;
-
-            if (f.WeeklyRSI14.HasValue &&
-                f.WeeklyRSI14.Value < s.MinWeeklyRsi14)
-                return false;
+            }
 
             return true;
         }

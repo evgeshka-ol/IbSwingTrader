@@ -21,19 +21,22 @@ namespace IbSwingTrader.Services.WishListFiltering
             {
                 if (result.TryGetValue(newItem.Ticker, out var existing))
                 {
-                    var firstSeen = existing.FirstSeenMarketTime
+                    var restoredFirstSeen =
+                        existing.FirstSeenMarketTime
                         ?? existing.Scan?.ScanTimeMarket
-                        ?? newItem.FirstSeenMarketTime
-                        ?? newItem.Scan.ScanTimeMarket;
+                        ?? newItem.Scan?.ScanTimeMarket;
 
-                    existing.Scan = newItem.Scan;
-                    existing.Score = newItem.Score;
-                    existing.Context = newItem.Context;
-
-                    existing.FirstSeenMarketTime = firstSeen;
-                    existing.LastEvaluatedMarketTime =
+                    var currentRunMarketTime =
                         newItem.LastEvaluatedMarketTime
-                        ?? (DateTime?)newItem.Scan.ScanTimeMarket
+                        ?? newItem.Scan?.ScanTimeMarket;
+
+                    existing.Scan = newItem.Scan!;
+                    existing.Score = newItem.Score!;
+                    existing.Context = newItem.Context!;
+
+                    existing.FirstSeenMarketTime = restoredFirstSeen;
+                    existing.LastEvaluatedMarketTime =
+                        currentRunMarketTime
                         ?? existing.LastEvaluatedMarketTime;
 
                     existing.ExpectedBarsToTarget =
@@ -46,8 +49,11 @@ namespace IbSwingTrader.Services.WishListFiltering
                 }
                 else
                 {
-                    newItem.FirstSeenMarketTime ??= newItem.Scan.ScanTimeMarket;
-                    newItem.LastEvaluatedMarketTime ??= newItem.Scan.ScanTimeMarket;
+                    newItem.FirstSeenMarketTime ??= newItem.Scan?.ScanTimeMarket;
+                    newItem.LastEvaluatedMarketTime ??=
+                        newItem.LastEvaluatedMarketTime
+                        ?? newItem.Scan?.ScanTimeMarket;
+
                     result[newItem.Ticker] = newItem;
                 }
             }
