@@ -162,6 +162,8 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     .ToList();
 
             var mergedWishList = _wishListMerger.Merge(currentWishList, scannedWishListItems);
+            var forecastedCount = mergedWishList.Count(x => x.ExpectedBarsToTarget != null);
+            _logger.Info($"WishList merged. Total={mergedWishList.Count}, WithForecast={forecastedCount}");
 
             var mergedMap = mergedWishList.ToDictionary(
                 x => x.Ticker,
@@ -215,6 +217,9 @@ namespace IbSwingTrader.Services.CandidateFiltering
             var finalWishList = mergedWishList
                 .Where(x => !promotedTickers.Contains(x.Ticker))
                 .ToList();
+
+            var finalForecastedCount = finalWishList.Count(x => x.ExpectedBarsToTarget != null);
+            _logger.Info($"WishList final. Total={finalWishList.Count}, WithForecast={finalForecastedCount}");
 
             return new CandidateSearchResult
             {
