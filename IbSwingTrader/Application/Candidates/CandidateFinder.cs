@@ -96,9 +96,31 @@ namespace IbSwingTrader.Application.Candidates
                             start,
                             end);
 
-                        if (candles != null && finderSettings.CandleCount > 0 && candles.Count > finderSettings.CandleCount)
+                        if (candles != null &&
+                            finderSettings.CandleCount > 0 &&
+                            candles.Count > finderSettings.CandleCount)
                         {
-                            candles = candles.TakeLast(finderSettings.CandleCount).ToList();
+                            var trimmedCandles = candles
+                                .TakeLast(finderSettings.CandleCount)
+                                .ToList();
+
+                            var trimmedWeeklyBars = BuildWeeklyBars(trimmedCandles);
+
+                            if (trimmedWeeklyBars.Count >= 20)
+                            {
+                                candles = trimmedCandles;
+
+                                _logger.Info(
+                                    $"Ticker history trimmed: {stock.Ticker}. " +
+                                    $"H4={candles.Count}, W1={trimmedWeeklyBars.Count}");
+                            }
+                            else
+                            {
+                                _logger.Info(
+                                    $"Ticker history trim skipped: {stock.Ticker}. " +
+                                    $"RequestedH4={finderSettings.CandleCount}, " +
+                                    $"TrimmedW1={trimmedWeeklyBars.Count} is too short for weekly analysis.");
+                            }
                         }
                     }
                     catch (Exception ex)
