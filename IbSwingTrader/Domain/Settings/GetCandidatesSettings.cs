@@ -67,6 +67,15 @@ namespace IbSwingTrader.Domain.Settings
         public decimal StopBufferMultiplier { get; set; } = 0.99m;
         public decimal FallbackStopMultiplier { get; set; } = 0.97m;
         public decimal RiskRewardRatio { get; set; } = 2.0m;
+        public int EntryLookbackHours { get; set; } = 48;
+        public int EntryMaLength { get; set; } = 20;
+        public int EntryAtrLength { get; set; } = 12;
+        public int EntryMacdSignalLookbackBars { get; set; } = 4;
+        public int MinimumEntryCandles { get; set; } = 35;
+        public decimal EntryMeanReversionWeight { get; set; } = 0.35m;
+        public decimal EntryMomentumAtrMultiplier { get; set; } = 0.80m;
+        public decimal EntryPullbackAtrFraction { get; set; } = 0.25m;
+        public decimal MinimumEntryDiscountPct { get; set; } = 0.001m;
     }
 
     public class CandidateFilterSettings

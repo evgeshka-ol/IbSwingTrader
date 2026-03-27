@@ -190,6 +190,7 @@ namespace IbSwingTrader.Application.Candidates
                         new WishListContext
                         {
                             Stock = stock,
+                            Contract = contract,
                             Preset = preset,
                             Snapshot = snapshot,
                             Candles = candles,
@@ -227,7 +228,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                TryAddCandidate(
+                await TryAddCandidate(
                     candidateResults,
                     mergedWishItem,
                     ctx,
@@ -252,7 +253,7 @@ namespace IbSwingTrader.Application.Candidates
                     if (firstSeenDate != null && firstSeenDate.Value < todayMarketDate)
                         continue;
 
-                    TryAddCandidate(
+                    await TryAddCandidate(
                         candidateResults,
                         mergedWishItem,
                         ctx,
@@ -337,7 +338,7 @@ namespace IbSwingTrader.Application.Candidates
             }
         }
 
-        private void TryAddCandidate(
+        private async Task TryAddCandidate(
             Dictionary<string, CandidateDetails> candidateResults,
             WishListItem mergedWishItem,
             WishListContext ctx,
@@ -345,7 +346,7 @@ namespace IbSwingTrader.Application.Candidates
             string bucketName,
             string rejectionLogPrefix)
         {
-            var trade = ctx.Trade ??= BuildTradePlan(ctx);
+            var trade = ctx.Trade ??= await BuildTradePlan(ctx);
 
             if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
             {
@@ -374,9 +375,29 @@ namespace IbSwingTrader.Application.Candidates
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
         }
 
-        private TradePlanInfo BuildTradePlan(WishListContext ctx)
+        private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx)
         {
-            var trade = _tradeBuilder.Build(ctx.Candles);
+            var tradeSettings = _getCandidatesSettingsProvider.Get().TradePlan;
+            List<Candle>? entryCandles = null;
+
+            try
+            {
+                var end = DateTime.UtcNow;
+                var start = end.AddHours(-tradeSettings.EntryLookbackHours);
+
+                entryCandles = await _historicalData.GetCandlesRange(
+                    ctx.Stock.Ticker,
+                    ctx.Contract,
+                    Timeframe.M15,
+                    start,
+                    end);
+            }
+            catch (Exception ex)
+            {
+                _logger.Info($"M15 entry history load failed for {ctx.Stock.Ticker}. {ex.Message}");
+            }
+
+            var trade = _tradeBuilder.Build(ctx.Candles, entryCandles);
 
             return new TradePlanInfo
             {
@@ -911,6 +932,7 @@ namespace IbSwingTrader.Application.Candidates
         private sealed class WishListContext
         {
             public required StockInfo Stock { get; init; }
+            public required Contract Contract { get; init; }
             public required PresetScanCode Preset { get; init; }
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
