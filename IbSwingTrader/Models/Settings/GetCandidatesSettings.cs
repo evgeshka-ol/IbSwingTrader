@@ -11,8 +11,8 @@
         public WishListFilterSettings WishListFilter { get; set; } = new();
         public EntryFilterSettings EntryFilter { get; set; } = new();
         public CandidateFilterSettings CandidateFilter { get; set; } = new();
-        public CandidateFinderSettings Finder { get; set; } = new();
-        public StockPreFilterSettings PreFilter { get; set; } = new();
+        public FinderSettings Finder { get; set; } = new();
+        public PreFilterSettings PreFilter { get; set; } = new();
         public TradePlanSettings TradePlan { get; set; } = new();
     }
 
@@ -77,14 +77,15 @@
         public decimal MaxAtrRatio { get; set; } = 0.20m;
     }
 
-    public class CandidateFinderSettings
+    public class FinderSettings
     {
         public int CandleCount { get; set; } = 300;
         public int MinimumCandles { get; set; } = 60;
         public int AvgVolumePeriod { get; set; } = 20;
+        public int LookbackCalendarDays { get; set; } = 240;
     }
 
-    public class StockPreFilterSettings
+    public class PreFilterSettings
     {
         public string RequiredCurrency { get; set; } = "USD";
         public List<string> DenyList { get; set; } = [];

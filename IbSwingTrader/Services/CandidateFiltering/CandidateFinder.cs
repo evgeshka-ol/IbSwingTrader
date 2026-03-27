@@ -44,9 +44,19 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
         public async Task<CandidateSearchResult> FindAsync()
         {
+            var getCandidatesSettings = _getCandidatesSettingsProvider.Get();
+            var finderSettings = getCandidatesSettings.Finder;
+
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
             var todayMarketDate = marketNow.Date;
+
+            _logger.Info(
+                $"CandidateFinder settings: " +
+                $"LookbackCalendarDays={finderSettings.LookbackCalendarDays}, " +
+                $"MinimumCandles={finderSettings.MinimumCandles}, " +
+                $"AvgVolumePeriod={finderSettings.AvgVolumePeriod}, " +
+                $"CandleCount={finderSettings.CandleCount}");
 
             var wishListPath = _pathService.GetWishListFile();
             var currentWishList = await _wishListReader.ReadAsync(wishListPath);
@@ -80,7 +90,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     try
                     {
                         var end = DateTime.UtcNow;
-                        var start = end.AddDays(-60);
+                        var start = end.AddDays(-finderSettings.LookbackCalendarDays);
 
                         candles = await _historicalData.GetCandlesRange(
                             stock.Ticker,
@@ -88,6 +98,11 @@ namespace IbSwingTrader.Services.CandidateFiltering
                             Timeframe.H4,
                             start,
                             end);
+
+                        if (candles != null && finderSettings.CandleCount > 0 && candles.Count > finderSettings.CandleCount)
+                        {
+                            candles = candles.TakeLast(finderSettings.CandleCount).ToList();
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -95,11 +110,20 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         continue;
                     }
 
-                    if (candles == null || candles.Count < 80)
+                    if (candles == null || candles.Count < finderSettings.MinimumCandles)
                     {
-                        _logger.Info($"Skipping {stock.Ticker}: not enough candles ({candles?.Count ?? 0}).");
+                        _logger.Info(
+                            $"Skipping {stock.Ticker}: not enough candles " +
+                            $"({candles?.Count ?? 0} < {finderSettings.MinimumCandles}).");
                         continue;
                     }
+
+                    var dailyBars = BuildDailyBars(candles);
+                    var weeklyBars = BuildWeeklyBars(candles);
+
+                    _logger.Info(
+                        $"Ticker history prepared: {stock.Ticker}. " +
+                        $"H4={candles.Count}, D1={dailyBars.Count}, W1={weeklyBars.Count}");
 
                     CandidateSignalSnapshot snapshot;
 
@@ -114,7 +138,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     }
 
                     var lastPrice = candles[^1].Close;
-                    var avgDollarVolumeDaily20 = CalculateAverageDollarVolumeDaily20(candles);
+                    var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
 
                     _logger.Info(
                         $"Processing ticker ({stock.Ticker}), " +
@@ -122,9 +146,10 @@ namespace IbSwingTrader.Services.CandidateFiltering
                         $"stock type ({stock.StockType}), " +
                         $"trading class ({stock.TradingClass}), " +
                         $"exchange ({stock.Exchange}), " +
-                        $"rank ({stock.Rank})");
+                        $"rank ({stock.Rank}), " +
+                        $"avgDollarVolume={avgDollarVolume}");
 
-                    if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolumeDaily20))
+                    if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
                     {
                         _logger.Info($"Wish list rejected: {stock.Ticker}");
                         continue;
@@ -150,19 +175,19 @@ namespace IbSwingTrader.Services.CandidateFiltering
                             Snapshot = snapshot,
                             Candles = candles,
                             ScanTimeMarket = marketNow,
-                            AvgDollarVolumeDaily20 = avgDollarVolumeDaily20,
+                            AvgDollarVolumeDaily = avgDollarVolume,
                             WishListItem = wishListItem
                         });
                 }
             }
 
-            var scannedWishListItems =
-                scannedWishListContexts.Values
-                    .Select(x => x.WishListItem)
-                    .ToList();
+            var scannedWishListItems = scannedWishListContexts.Values
+                .Select(x => x.WishListItem)
+                .ToList();
 
             var mergedWishList = _wishListMerger.Merge(currentWishList, scannedWishListItems);
             var forecastedCount = mergedWishList.Count(x => x.ExpectedBarsToTarget != null);
+
             _logger.Info($"WishList merged. Total={mergedWishList.Count}, WithForecast={forecastedCount}");
 
             var mergedMap = mergedWishList.ToDictionary(
@@ -185,7 +210,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
                 var trade = ctx.Trade ??= BuildTradePlan(ctx);
 
-                if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily20))
+                if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
                 {
                     _logger.Info($"Entry rejected after wish list pass: {ctx.Stock.Ticker}");
                     continue;
@@ -568,7 +593,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
 
             var trueRanges = new List<decimal>();
 
-            for (int i = candles.Count - length; i < candles.Count; i++)
+            for (var i = candles.Count - length; i < candles.Count; i++)
             {
                 var current = candles[i];
                 var prevClose = candles[i - 1].Close;
@@ -616,9 +641,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             if (candles.Count < length)
                 return 0m;
 
-            var sma = candles
-                .TakeLast(length)
-                .Average(x => x.Close);
+            var sma = candles.TakeLast(length).Average(x => x.Close);
 
             if (sma == 0m)
                 return 0m;
@@ -731,14 +754,10 @@ namespace IbSwingTrader.Services.CandidateFiltering
             return result;
         }
 
-        private sealed class MacdPoint
+        private static decimal CalculateAverageDollarVolumeDaily(List<Candle> candles, int period)
         {
-            public decimal Macd { get; init; }
-            public decimal Signal { get; init; }
-        }
+            var actualPeriod = Math.Max(1, period);
 
-        private static decimal CalculateAverageDollarVolumeDaily20(List<Candle> candles)
-        {
             var dailyDollarVolumes = candles
                 .GroupBy(x => x.Time.Date)
                 .Select(g =>
@@ -748,7 +767,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
                     var dayVolume = ordered.Sum(x => x.Volume);
                     return dayClose * dayVolume;
                 })
-                .TakeLast(20)
+                .TakeLast(actualPeriod)
                 .ToList();
 
             if (dailyDollarVolumes.Count == 0)
@@ -819,6 +838,12 @@ namespace IbSwingTrader.Services.CandidateFiltering
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
         }
 
+        private sealed class MacdPoint
+        {
+            public decimal Macd { get; init; }
+            public decimal Signal { get; init; }
+        }
+
         private sealed class WishListContext
         {
             public required StockInfo Stock { get; init; }
@@ -826,7 +851,7 @@ namespace IbSwingTrader.Services.CandidateFiltering
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
             public required DateTime ScanTimeMarket { get; init; }
-            public required decimal AvgDollarVolumeDaily20 { get; init; }
+            public required decimal AvgDollarVolumeDaily { get; init; }
             public required WishListItem WishListItem { get; init; }
             public TradePlanInfo? Trade { get; set; }
         }
