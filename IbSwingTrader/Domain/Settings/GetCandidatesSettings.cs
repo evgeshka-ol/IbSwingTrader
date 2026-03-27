@@ -75,7 +75,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal EntryMeanReversionWeight { get; set; } = 0.35m;
         public decimal EntryMomentumAtrMultiplier { get; set; } = 0.80m;
         public decimal EntryPullbackAtrFraction { get; set; } = 0.25m;
-        public decimal MinimumEntryDiscountPct { get; set; } = 0.001m;
+        public decimal MinimumEntryDiscountPct { get; set; } = 0.0025m;
+        public decimal MinimumEntryDiscountAtrFraction { get; set; } = 0.15m;
+        public decimal MinimumRiskPct { get; set; } = 0.006m;
+        public decimal MinimumRiskAtrMultiplier { get; set; } = 0.90m;
     }
 
     public class CandidateFilterSettings

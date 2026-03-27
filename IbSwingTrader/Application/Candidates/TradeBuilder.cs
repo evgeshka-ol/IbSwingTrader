@@ -23,9 +23,19 @@ namespace IbSwingTrader.Application.Candidates
 
             var entry = BuildEntryPrice(last.Close, entryCandles, settings);
             var stop = recentLow * settings.StopBufferMultiplier;
+            var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
             if (stop >= entry)
                 stop = entry * settings.FallbackStopMultiplier;
+
+            var maxAllowedStop = entry - riskFloor;
+            if (maxAllowedStop > 0m && stop > maxAllowedStop)
+            {
+                _logger.Info(
+                    $"Trade stop widened to satisfy minimum risk floor. " +
+                    $"OriginalStop={stop}, AdjustedStop={maxAllowedStop}, RiskFloor={riskFloor}");
+                stop = maxAllowedStop;
+            }
 
             var risk = entry - stop;
             var exit = entry + risk * settings.RiskRewardRatio;
@@ -103,7 +113,11 @@ namespace IbSwingTrader.Application.Candidates
                 atr * settings.EntryPullbackAtrFraction,
                 Math.Abs(distanceToMean) * 0.20m);
 
-            var discountFloor = current * (1m - settings.MinimumEntryDiscountPct);
+            var minimumDiscount = Math.Max(
+                current * settings.MinimumEntryDiscountPct,
+                atr * settings.MinimumEntryDiscountAtrFraction);
+
+            var discountFloor = current - minimumDiscount;
             var projectedEntry = projectedPrice < current
                 ? projectedPrice
                 : Math.Min(pullbackEntry, discountFloor);
@@ -125,9 +139,30 @@ namespace IbSwingTrader.Application.Candidates
                 $"Trade entry from M15 forecast. " +
                 $"Current={current}, Mean={mean}, DistanceToMean={distanceToMean}, " +
                 $"ATR={atr}, MacdHist={currentHist}, MacdSlope={histSlope}, " +
-                $"ProjectedPrice={projectedPrice}, LimitEntry={entry}");
+                $"ProjectedPrice={projectedPrice}, MinDiscount={minimumDiscount}, LimitEntry={entry}");
 
             return entry > 0m ? entry : fallbackEntry;
+        }
+
+        private decimal CalculateRiskFloor(
+            decimal entry,
+            List<Candle>? entryCandles,
+            TradePlanSettings settings)
+        {
+            var percentFloor = entry * settings.MinimumRiskPct;
+            var atrFloor = 0m;
+
+            if (entryCandles != null && entryCandles.Count >= settings.EntryAtrLength + 1)
+            {
+                var ordered = entryCandles
+                    .OrderBy(x => x.Time)
+                    .ToList();
+
+                var atr = CalculateAtr(ordered, settings.EntryAtrLength);
+                atrFloor = atr * settings.MinimumRiskAtrMultiplier;
+            }
+
+            return Math.Max(percentFloor, atrFloor);
         }
 
         private static decimal CalculateAtr(List<Candle> candles, int length)
