@@ -1,5 +1,4 @@
 ﻿using System.Globalization;
-using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {

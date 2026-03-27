@@ -1,4 +1,3 @@
-﻿using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {

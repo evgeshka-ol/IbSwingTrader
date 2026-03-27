@@ -1,6 +1,4 @@
 ﻿using System.Text;
-using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {

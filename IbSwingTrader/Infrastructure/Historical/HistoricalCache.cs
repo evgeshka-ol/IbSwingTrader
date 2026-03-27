@@ -1,7 +1,5 @@
 ﻿using System.Text;
 using System.Text.Json;
-using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {

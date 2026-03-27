@@ -154,7 +154,7 @@
         },
 
         "Finder": {
-            "CandleCount": 300,
+            "CandleCount": 600,
             "MinimumCandles": 60,
             "AvgVolumePeriod": 20,
             "LookbackCalendarDays": 240

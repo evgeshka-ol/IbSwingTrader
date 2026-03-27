@@ -1,7 +1,5 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Infrastructure.Settings
 {

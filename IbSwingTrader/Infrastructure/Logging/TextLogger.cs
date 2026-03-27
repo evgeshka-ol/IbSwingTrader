@@ -1,7 +1,4 @@
 ﻿using System.Text;
-using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models;
-using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {

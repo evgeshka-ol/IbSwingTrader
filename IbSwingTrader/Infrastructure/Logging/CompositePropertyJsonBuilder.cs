@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Globalization;
 using System.Text.Json.Nodes;
-using IbSwingTrader.Interfaces;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {

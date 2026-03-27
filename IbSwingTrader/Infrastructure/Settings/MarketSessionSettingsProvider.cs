@@ -1,5 +1,3 @@
-﻿using IbSwingTrader.Interfaces;
-using IbSwingTrader.Models.Settings;
 
 namespace IbSwingTrader.Infrastructure.Settings
 {
