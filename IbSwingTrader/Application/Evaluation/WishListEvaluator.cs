@@ -115,6 +115,13 @@ namespace IbSwingTrader.Application.Evaluation
                 snapshot.DailyRsiDelta3 <= settings.MinDailyRsiDelta3ToKeep &&
                 snapshot.DailyMacdDelta3 <= settings.MinDailyMacdDelta3ToKeep;
 
+            if (item.ExpectedBarsToTarget == null && hasNoImprovement)
+            {
+                return Remove(
+                    item,
+                    "No target forecast and no positive improvement signal");
+            }
+
             if (ageDays >= settings.MaxDaysInWishListWithoutImprovement && hasNoImprovement)
             {
                 return Remove(
