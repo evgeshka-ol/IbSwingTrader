@@ -227,33 +227,41 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                var trade = ctx.Trade ??= BuildTradePlan(ctx);
+                TryAddCandidate(
+                    candidateResults,
+                    mergedWishItem,
+                    ctx,
+                    marketTimezone,
+                    bucketName: "candidates",
+                    rejectionLogPrefix: "Entry rejected after wish list pass");
+            }
 
-                if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
+            if (candidateResults.Count == 0)
+            {
+                _logger.Info(
+                    "No entry candidates from aged wish list items. " +
+                    "Trying same-day market-scan fallback.");
+
+                foreach (var ctx in scannedWishListContexts.Values)
                 {
-                    _logger.Info($"Entry rejected after wish list pass: {ctx.Stock.Ticker}");
-                    continue;
+                    if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
+                        continue;
+
+                    var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+
+                    if (firstSeenDate != null && firstSeenDate.Value < todayMarketDate)
+                        continue;
+
+                    TryAddCandidate(
+                        candidateResults,
+                        mergedWishItem,
+                        ctx,
+                        marketTimezone,
+                        bucketName: "fallback candidates",
+                        rejectionLogPrefix: "Entry rejected after same-day fallback");
                 }
 
-                var entryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
-                var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
-                var finalScore = dailyScore + weeklyScore + entryScore;
-
-                var candidateItem = BuildCandidateItem(
-                    ctx.Stock,
-                    ctx.Preset,
-                    ctx.Snapshot,
-                    ctx.Candles,
-                    trade,
-                    ctx.ScanTimeMarket,
-                    marketTimezone,
-                    dailyScore,
-                    weeklyScore,
-                    entryScore,
-                    finalScore);
-
-                AddOrReplaceHigherScore(candidateResults, candidateItem, "candidates");
+                _logger.Info($"Same-day market-scan fallback completed. Candidates={candidateResults.Count}");
             }
 
             var promotedTickers = candidateResults.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -327,6 +335,43 @@ namespace IbSwingTrader.Application.Candidates
                 results[item.Ticker] = item;
                 _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.Scan.PresetScanCode}");
             }
+        }
+
+        private void TryAddCandidate(
+            Dictionary<string, CandidateDetails> candidateResults,
+            WishListItem mergedWishItem,
+            WishListContext ctx,
+            string marketTimezone,
+            string bucketName,
+            string rejectionLogPrefix)
+        {
+            var trade = ctx.Trade ??= BuildTradePlan(ctx);
+
+            if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
+            {
+                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
+                return;
+            }
+
+            var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+            var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
+            var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
+            var finalScore = dailyScore + weeklyScore + entryScore;
+
+            var candidateItem = BuildCandidateItem(
+                ctx.Stock,
+                ctx.Preset,
+                ctx.Snapshot,
+                ctx.Candles,
+                trade,
+                ctx.ScanTimeMarket,
+                marketTimezone,
+                dailyScore,
+                weeklyScore,
+                entryScore,
+                finalScore);
+
+            AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
         }
 
         private TradePlanInfo BuildTradePlan(WishListContext ctx)
