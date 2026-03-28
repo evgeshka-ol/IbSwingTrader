@@ -12,7 +12,9 @@ if (args.Length == 0)
     logger.Info("Usage:");
     logger.Info("  build-dataset <trades.csv> <dataset.csv>");
     logger.Info("  get-candidates");
-    logger.Info("  evaluate-tickers");
+    logger.Info("  evaluate-candidates");
+    logger.Info("  evaluate-wishlist");
+    logger.Info("  evaluate-tickers  (alias for evaluate-wishlist)");
     logger.Info("  get-scanner-params");
     logger.Info("  download-fundamental-snapshot");
     return;
@@ -36,7 +38,14 @@ switch (command)
 
     case "evaluate-candidates":
         await services
-            .GetRequiredService<EvaluateTickersCommand>()
+            .GetRequiredService<EvaluateCandidatesCommand>()
+            .RunAsync();
+        break;
+
+    case "evaluate-wishlist":
+    case "evaluate-tickers":
+        await services
+            .GetRequiredService<EvaluateWishlistCommand>()
             .RunAsync();
         break;
 

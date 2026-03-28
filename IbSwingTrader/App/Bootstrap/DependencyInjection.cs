@@ -89,7 +89,8 @@ namespace IbSwingTrader.App.Bootstrap
             // commands
             services.AddTransient<BuildDatasetCommand>();
             services.AddTransient<GetCandidatesCommand>();
-            services.AddTransient<EvaluateTickersCommand>();
+            services.AddTransient<EvaluateCandidatesCommand>();
+            services.AddTransient<EvaluateWishlistCommand>();
             services.AddTransient<GetScannerParamsCommand>();
             services.AddTransient<DownloadFundamentalSnapshotCommand>();
 

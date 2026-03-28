@@ -1,35 +1,27 @@
-using IbSwingTrader.Common.Time;
-
 namespace IbSwingTrader.App.Commands
 {
-    public class EvaluateTickersCommand(
+    public class EvaluateCandidatesCommand(
         ITwsConnection twsConnection,
         ICandidateEvaluator candidateEvaluator,
-        IWishListEvaluator wishListEvaluator,
         IJsonFileService jsonFileService,
         ICandidateEvaluationCsvService candidateCsvService,
-        IWishListResultWriter wishListWriter,
         IProcessedCandidateFilesService processedFilesService,
         IFileHashService fileHashService,
         ITextLogger logger,
         IAgentPathService pathService,
         ICandidateEvaluationSettingsProvider evaluationSettingsProvider,
-        ITwsSettingsProvider twsSettingsProvider,
-        IMarketSettingsProvider marketSettingsProvider) : ICommand
+        ITwsSettingsProvider twsSettingsProvider) : ICommand
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
-        private readonly IWishListEvaluator _wishListEvaluator = wishListEvaluator;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICandidateEvaluationCsvService _candidateCsvService = candidateCsvService;
-        private readonly IWishListResultWriter _wishListWriter = wishListWriter;
         private readonly IProcessedCandidateFilesService _processedFilesService = processedFilesService;
         private readonly IFileHashService _fileHashService = fileHashService;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ICandidateEvaluationSettingsProvider _evaluationSettingsProvider = evaluationSettingsProvider;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
-        private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
 
         public async Task RunAsync()
         {
@@ -39,7 +31,6 @@ namespace IbSwingTrader.App.Commands
             var candidatesFolder = _pathService.GetCandidatesFolder();
             var evaluationsFolder = _pathService.GetEvaluationsFolder();
             var manifestPath = _pathService.GetProcessedCandidateFilesManifest();
-            var wishListPath = _pathService.GetWishListFile();
 
             EnsureConnected(twsSettings.ConnectTimeoutSeconds);
 
@@ -52,9 +43,7 @@ namespace IbSwingTrader.App.Commands
                 manifestPath,
                 evaluationSettings.SearchPattern);
 
-            await EvaluateWishListAsync(wishListPath);
-
-            _logger.Info("Ticker evaluation pipeline completed.");
+            _logger.Info("Candidate evaluation completed.");
         }
 
         private async Task EvaluateCandidateFilesAsync(
@@ -90,8 +79,6 @@ namespace IbSwingTrader.App.Commands
 
             if (manifestChanged)
                 await _processedFilesService.WriteAsync(manifestPath, manifest);
-
-            _logger.Info("Candidate files evaluation completed.");
         }
 
         private async Task<bool> ProcessCandidateFileAsync(
@@ -150,67 +137,6 @@ namespace IbSwingTrader.App.Commands
             return true;
         }
 
-        private async Task EvaluateWishListAsync(string wishListPath)
-        {
-            if (!File.Exists(wishListPath))
-            {
-                _logger.Info("Wish list file not found. Skipping wish list evaluation.");
-                return;
-            }
-
-            var items = await _jsonFileService.ReadAsync<List<WishListItem>>(wishListPath);
-
-            if (items == null || items.Count == 0)
-            {
-                _logger.Info("Wish list is empty. Skipping wish list evaluation.");
-                return;
-            }
-
-            var marketNow = GetMarketNow(_marketSettingsProvider.Get().Timezone);
-            var todayMarketDate = marketNow.Date;
-
-            var todayItems = new List<WishListItem>();
-            var oldItems = new List<WishListItem>();
-
-            foreach (var item in items)
-            {
-                if (item.Scan.ScanTimeMarket.Date >= todayMarketDate)
-                    todayItems.Add(item);
-                else
-                    oldItems.Add(item);
-            }
-
-            _logger.Info(
-                $"Wish list items loaded: total={items.Count}, today={todayItems.Count}, old={oldItems.Count}");
-
-            if (oldItems.Count == 0)
-            {
-                _logger.Info("No old wish list items to evaluate.");
-                return;
-            }
-
-            var evaluations = await _wishListEvaluator.EvaluateAsync(oldItems);
-
-            var removeKeys = evaluations
-                .Where(x => x.RemoveFromWishList)
-                .Select(x => BuildWishListKey(x.Ticker, x.ScanTimeNy))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var keptOldItems = oldItems
-                .Where(x => !removeKeys.Contains(BuildWishListKey(x.Ticker, x.Scan.ScanTimeMarket)))
-                .ToList();
-
-            var updatedItems = todayItems
-                .Concat(keptOldItems)
-                .OrderByDescending(x => x.Scan.ScanTimeMarket)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            await _wishListWriter.WriteAsync(wishListPath, updatedItems);
-
-            LogWishListSummary(evaluations, items.Count, updatedItems.Count);
-        }
-
         private void EnsureConnected(int timeoutSeconds)
         {
             if (_twsConnection.IsConnected)
@@ -248,43 +174,10 @@ namespace IbSwingTrader.App.Commands
                 $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} NoData={noData} Errors={errors}");
         }
 
-        private void LogWishListSummary(
-            List<WishListEvaluationResult> results,
-            int originalCount,
-            int updatedCount)
-        {
-            var removed = results.Count(x => x.RemoveFromWishList);
-            var kept = results.Count - removed;
-
-            var groupedReasons = results
-                .Where(x => x.RemoveFromWishList)
-                .GroupBy(x => string.IsNullOrWhiteSpace(x.Reason) ? "(no reason)" : x.Reason!)
-                .OrderByDescending(x => x.Count())
-                .Select(x => $"{x.Key}={x.Count()}")
-                .ToList();
-
-            var reasonsText = groupedReasons.Count == 0
-                ? "none"
-                : string.Join(", ", groupedReasons);
-
-            _logger.Info(
-                $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Removed={removed} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
-        }
-
         private static string BuildCandidateOutputCsvFileName(string inputFileName)
         {
             var nameWithoutExtension = Path.GetFileNameWithoutExtension(inputFileName);
             return $"evaluation_{nameWithoutExtension}.csv";
-        }
-
-        private static string BuildWishListKey(string ticker, DateTime scanTimeNy)
-        {
-            return $"{ticker}__{scanTimeNy:yyyyMMddHHmmss}";
-        }
-
-        private static DateTime GetMarketNow(string timezoneId)
-        {
-            return MarketTime.Now(timezoneId);
         }
     }
 }
