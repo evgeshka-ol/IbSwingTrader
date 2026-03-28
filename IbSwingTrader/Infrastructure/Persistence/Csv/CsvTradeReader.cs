@@ -24,6 +24,8 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
 
             var startRow = settings.HasHeader ? 1 : 0;
             var trades = new List<TradeRecord>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var duplicateCount = 0;
 
             for (int rowIndex = startRow; rowIndex < lines.Length; rowIndex++)
             {
@@ -73,7 +75,7 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                         "dd.MM.yyyy H:mm:ss",
                         CultureInfo.InvariantCulture);
 
-                    trades.Add(new TradeRecord
+                    var trade = new TradeRecord
                     {
                         Ticker = ticker,
                         IsShort = isShort,
@@ -83,7 +85,17 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                         ExitPrice = exitPrice,
                         ProfitPercent = profitPercent,
                         HoldDays = holdDays
-                    });
+                    };
+
+                    var dedupKey = BuildDedupKey(trade);
+
+                    if (!seen.Add(dedupKey))
+                    {
+                        duplicateCount++;
+                        continue;
+                    }
+
+                    trades.Add(trade);
                 }
                 catch (Exception ex)
                 {
@@ -91,6 +103,12 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                         $"CSV parse error at line {rowIndex + 1}: {ex.Message}",
                         ex);
                 }
+            }
+
+            if (duplicateCount > 0)
+            {
+                Console.WriteLine(
+                    $"CsvTradeReader: skipped duplicate trades: {duplicateCount}");
             }
 
             return trades
@@ -198,6 +216,13 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                 "0" => false,
                 _ => throw new FormatException($"Invalid IsShort value '{value}'. Expected 0 or 1.")
             };
+        }
+
+        private static string BuildDedupKey(TradeRecord trade)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{trade.Ticker}|{trade.IsShort}|{trade.EntryTimeMarket:yyyyMMddHHmmss}|{trade.ExitTimeMarket:yyyyMMddHHmmss}|{trade.EntryPrice:F4}|{trade.ExitPrice:F4}");
         }
     }
 }
