@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Evaluation
 {
@@ -58,7 +59,7 @@ namespace IbSwingTrader.Application.Evaluation
 
             var contract = await _contractResolver.ResolveStockAsync(item.Ticker);
 
-            var end = DateTime.UtcNow;
+            var end = MarketTime.Now();
             var start = end.AddDays(-settings.HistoryDaysToLoad);
 
             var candles = await _historicalDataService.GetCandlesRange(
@@ -81,7 +82,7 @@ namespace IbSwingTrader.Application.Evaluation
                 _ => 0m
             };
 
-            var ageDays = (DateTime.UtcNow.Date - item.Scan.ScanTimeMarket.Date).TotalDays;
+            var ageDays = (MarketTime.Now().Date - item.Scan.ScanTimeMarket.Date).TotalDays;
 
             var dropFromReferencePct = 0m;
             if (TryEstimateReferencePrice(item, out var referencePrice) && referencePrice > 0m)

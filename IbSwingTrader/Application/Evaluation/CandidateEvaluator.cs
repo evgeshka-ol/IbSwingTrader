@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Evaluation
 {
@@ -48,7 +49,7 @@ namespace IbSwingTrader.Application.Evaluation
 
             var start = candidate.Scan.ScanTimeMarket;
             var requestedEnd = candidate.Scan.ScanTimeMarket.Add(MaxEvaluationWindow);
-            var availableNow = DateTime.UtcNow - FreshDataSafetyLag;
+            var availableNow = MarketTime.Now() - FreshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
             result.EvaluationStartTime = start;

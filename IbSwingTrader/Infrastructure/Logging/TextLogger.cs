@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
@@ -22,7 +23,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             _logFilePath = Path.Combine(
                 logsFolder,
-                $"log-{DateTime.UtcNow:yyyyMMdd_HHmm}.log");
+                $"log-{MarketTime.Now():yyyyMMdd_HHmm}.log");
         }
 
         public void EmptyLine()
@@ -129,13 +130,13 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private static string BuildConsoleLine(string level, string message)
         {
-            var time = DateTime.UtcNow.ToString("HH:mm:ss");
+            var time = MarketTime.Now().ToString("HH:mm:ss");
             return $"{time} [{level}] | {message}";
         }
 
         private static string BuildFileLine(string consoleLine)
         {
-            return $"{DateTime.UtcNow:O} {consoleLine}";
+            return $"{MarketTime.Now():yyyy-MM-ddTHH:mm:ss.fffffff} {consoleLine}";
         }
 
         private void AppendRawLine(string line)

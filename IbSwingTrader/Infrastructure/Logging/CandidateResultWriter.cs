@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
@@ -69,8 +70,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private static DateTime GetMarketNow(string timezoneId)
         {
-            var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
+            return MarketTime.Now(timezoneId);
         }
     }
 }

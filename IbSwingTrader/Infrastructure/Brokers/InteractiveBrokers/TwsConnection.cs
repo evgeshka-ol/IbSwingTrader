@@ -749,7 +749,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
             var candle = new Candle
             {
-                Time = TwsTimeParser.ParseToUtc(bar.Time),
+                Time = TwsTimeParser.ParseMarketTime(bar.Time),
                 Open = (decimal)bar.Open,
                 High = (decimal)bar.High,
                 Low = (decimal)bar.Low,

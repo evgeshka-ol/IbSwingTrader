@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.App.Commands
 {
@@ -18,7 +19,7 @@ namespace IbSwingTrader.App.Commands
         {
             var result = await _finder.FindAsync();
 
-            var now = DateTime.UtcNow;
+            var now = MarketTime.Now();
             var stamp = now.ToString("yyyyMMdd_HHmm");
 
             var candidatesFolder = _pathService.GetCandidatesFolder();

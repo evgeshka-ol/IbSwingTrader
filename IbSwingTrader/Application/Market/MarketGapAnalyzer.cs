@@ -149,7 +149,7 @@ namespace IbSwingTrader.Application.Market
                 return null;
 
             var groupedByLocalDay = recentCandles
-                .GroupBy(x => TimeZoneInfo.ConvertTimeFromUtc(x.Time, timeZone).Date)
+                .GroupBy(x => x.Time.Date)
                 .OrderByDescending(x => x.Key)
                 .Take(ObservedLookbackDays)
                 .ToList();
@@ -165,8 +165,7 @@ namespace IbSwingTrader.Application.Market
             foreach (var dayGroup in groupedByLocalDay)
             {
                 var localSlots = dayGroup
-                    .Select(x => TimeZoneInfo.ConvertTimeFromUtc(x.Time, timeZone))
-                    .Select(TimeOnly.FromDateTime)
+                    .Select(x => TimeOnly.FromDateTime(x.Time))
                     .Where(x => IsAllowedLocalTime(x, useExtendedHours))
                     .Distinct()
                     .OrderBy(x => x)

@@ -1,4 +1,5 @@
 ﻿using IBApi;
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Market
 {
@@ -193,8 +194,8 @@ namespace IbSwingTrader.Application.Market
                     var hasExpectedBars = await _marketCoverageService.HasExpectedBarsBetweenAsync(
                         contract,
                         timeframe,
-                        requestedStart,
-                        leftEnd);
+                        MarketTime.ToUtc(requestedStart),
+                        MarketTime.ToUtc(leftEnd));
 
                     if (hasExpectedBars)
                         ranges.Add(new DateRange(requestedStart, leftEnd));
@@ -210,8 +211,8 @@ namespace IbSwingTrader.Application.Market
                     var hasExpectedBars = await _marketCoverageService.HasExpectedBarsBetweenAsync(
                         contract,
                         timeframe,
-                        rightStart,
-                        requestedEnd);
+                        MarketTime.ToUtc(rightStart),
+                        MarketTime.ToUtc(requestedEnd));
 
                     if (hasExpectedBars)
                         ranges.Add(new DateRange(rightStart, requestedEnd));
@@ -282,8 +283,8 @@ namespace IbSwingTrader.Application.Market
                 var isExpectedGap = await _marketGapAnalyzer.IsExpectedGapAsync(
                     contract,
                     timeframe,
-                    prev,
-                    current);
+                    MarketTime.ToUtc(prev),
+                    MarketTime.ToUtc(current));
 
                 if (isExpectedGap)
                     continue;

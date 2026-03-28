@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Infrastructure.Historical
 {
@@ -53,6 +54,7 @@ namespace IbSwingTrader.Infrastructure.Historical
                 }
 
                 candles = storedCandles
+                    .Select(NormalizeCandleTime)
                     .OrderBy(x => x.Time)
                     .ToList();
 
@@ -92,6 +94,7 @@ namespace IbSwingTrader.Infrastructure.Historical
                 var timeframeKey = BuildTimeframeKey(timeframe);
 
                 file.Timeframes[timeframeKey] = candles
+                    .Select(NormalizeCandleTime)
                     .GroupBy(x => new { x.Timeframe, x.Time })
                     .Select(g => g.First())
                     .OrderBy(x => x.Time)
@@ -131,6 +134,12 @@ namespace IbSwingTrader.Infrastructure.Historical
             }
 
             return sb.ToString();
+        }
+
+        private static Candle NormalizeCandleTime(Candle candle)
+        {
+            candle.Time = MarketTime.Normalize(candle.Time);
+            return candle;
         }
     }
 }

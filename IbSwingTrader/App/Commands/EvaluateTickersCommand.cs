@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.App.Commands
 {
@@ -283,8 +284,7 @@ namespace IbSwingTrader.App.Commands
 
         private static DateTime GetMarketNow(string timezoneId)
         {
-            var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
+            return MarketTime.Now(timezoneId);
         }
     }
 }

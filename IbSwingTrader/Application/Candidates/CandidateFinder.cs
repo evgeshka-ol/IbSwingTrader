@@ -1,4 +1,5 @@
 ﻿using IBApi;
+using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Candidates
 {
@@ -86,7 +87,7 @@ namespace IbSwingTrader.Application.Candidates
 
                     try
                     {
-                        var end = DateTime.UtcNow;
+                        var end = MarketTime.Now();
                         var start = end.AddDays(-finderSettings.LookbackCalendarDays);
 
                         candles = await _historicalData.GetCandlesRange(
@@ -382,7 +383,7 @@ namespace IbSwingTrader.Application.Candidates
 
             try
             {
-                var end = DateTime.UtcNow;
+                var end = MarketTime.Now();
                 var start = end.AddHours(-tradeSettings.EntryLookbackHours);
 
                 entryCandles = await _historicalData.GetCandlesRange(
@@ -919,8 +920,7 @@ namespace IbSwingTrader.Application.Candidates
 
         private static DateTime GetMarketNow(string timezoneId)
         {
-            var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
+            return MarketTime.Now(timezoneId);
         }
 
         private sealed class MacdPoint

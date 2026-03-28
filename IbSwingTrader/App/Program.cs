@@ -34,7 +34,7 @@ switch (command)
             .RunAsync();
         break;
 
-    case "evaluate-tickers":
+    case "evaluate-candidates":
         await services
             .GetRequiredService<EvaluateTickersCommand>()
             .RunAsync();
