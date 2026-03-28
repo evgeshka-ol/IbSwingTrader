@@ -28,6 +28,12 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
+            if (f.DailyMaSignedDistancePct < s.MinCurrentDailyMaSignedDistancePct)
+            {
+                _logger.Info("Entry rejected: current daily MA position is too weak.");
+                return false;
+            }
+
             var dailyTurnCount = 0;
             if (snapshot.DailyMaDelta3 > s.MinDailyMaDelta3) dailyTurnCount++;
             if (snapshot.DailyRsiDelta3 > s.MinDailyRsiDelta3) dailyTurnCount++;
@@ -53,6 +59,19 @@ namespace IbSwingTrader.Application.Candidates
             if (f.DailyRSI14 < s.MinCurrentDailyRsi14)
             {
                 _logger.Info("Entry rejected: current daily RSI too weak.");
+                return false;
+            }
+
+            if (snapshot.DailyRsiDelta3 < s.MinDailyRsiDelta3Strong)
+            {
+                _logger.Info("Entry rejected: daily RSI acceleration is too weak.");
+                return false;
+            }
+
+            if (f.WeeklyMACDLineMinusSignal.HasValue &&
+                f.WeeklyMACDLineMinusSignal.Value > s.MaxCurrentWeeklyMacdLineMinusSignal)
+            {
+                _logger.Info("Entry rejected: weekly MACD is too extended.");
                 return false;
             }
 

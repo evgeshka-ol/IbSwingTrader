@@ -46,9 +46,11 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinDollarVolume { get; set; }
 
         public decimal MaxDistanceTo20dHigh { get; set; }
+        public decimal MinCurrentDailyMaSignedDistancePct { get; set; }
 
         public decimal MinDailyMaDelta3 { get; set; }
         public decimal MinDailyRsiDelta3 { get; set; }
+        public decimal MinDailyRsiDelta3Strong { get; set; }
         public decimal MinDailyMacdDelta3 { get; set; }
         public int MinDailyTurnSignals { get; set; }
 
@@ -58,6 +60,7 @@ namespace IbSwingTrader.Domain.Settings
         public int MinH4TurnSignals { get; set; }
 
         public decimal MinCurrentDailyRsi14 { get; set; }
+        public decimal MaxCurrentWeeklyMacdLineMinusSignal { get; set; } = decimal.MaxValue;
     }
 
     public class TradePlanSettings

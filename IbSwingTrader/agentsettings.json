@@ -135,15 +135,18 @@
         "EntryFilter": {
             "MinDollarVolume": 15000000,
             "MaxDistanceTo20dHigh": -2.5,
+            "MinCurrentDailyMaSignedDistancePct": 0.0,
             "MinDailyMaDelta3": 0.30,
             "MinDailyRsiDelta3": 1.25,
+            "MinDailyRsiDelta3Strong": 5.0,
             "MinDailyMacdDelta3": 0.03,
             "MinDailyTurnSignals": 2,
             "MinH4MaDelta3": 0.20,
             "MinH4RsiDelta3": 2.0,
             "MinH4MacdDelta3": 0.03,
             "MinH4TurnSignals": 2,
-            "MinCurrentDailyRsi14": 40.0
+            "MinCurrentDailyRsi14": 40.0,
+            "MaxCurrentWeeklyMacdLineMinusSignal": 0.5
         },
 
         "CandidateFilter": {
