@@ -4,6 +4,7 @@ namespace IbSwingTrader.Domain.Dataset
     {
         public bool IsRealTrade { get; set; }
         public int EntryShiftBars { get; set; }
+        public decimal? EntryShiftFraction { get; set; }
 
         public bool ExitSameDayOrNextDay => HoldDays <= 1;
 

@@ -72,14 +72,14 @@
 
     "BuildDataset": {
         "MinimumCandlesRequired": 60,
-        "IncludeSyntheticTrades": false,
+        "IncludeSyntheticTrades": true,
         "MaxParallelTickers": 3,
         "HistoryWarmupDays": 120,
         "FuturePaddingDays": 21,
+        "SyntheticEntryFractions": [ 0.25, 0.5, 0.75 ],
         "TickerAliases": {
             "NYCB": "FLG"
-        },
-        "EntryShifts": [ -12, -9, -6, -3, 0 ]
+        }
     },
 
     "FeatureCalculation": {

@@ -17,11 +17,10 @@ namespace IbSwingTrader.Application.Dataset
             List<Candle> candles)
         {
             var rows = new List<TradeDatasetRow>();
+            var settings = _settingsProvider.Get();
 
             if (candles == null || candles.Count == 0)
                 return rows;
-
-            var entryShifts = _settingsProvider.Get().EntryShifts;
 
             for (int t = 0; t < trades.Count; t++)
             {
@@ -53,34 +52,26 @@ namespace IbSwingTrader.Application.Dataset
 
                 var candlePriceReal = candles[entryIndexReal].Close;
                 var splitFactor = DetectSplitFactor(trade.EntryPrice, candlePriceReal);
+                var entryVariants = BuildEntryVariants(
+                    trade,
+                    candles,
+                    entryIndexReal,
+                    exitIndexReal,
+                    settings.IncludeSyntheticTrades);
 
-                foreach (var shift in entryShifts)
+                foreach (var variant in entryVariants)
                 {
-                    int entryIndex = entryIndexReal + shift;
+                    int entryIndex = variant.EntryIndex;
                     int exitIndex = exitIndexReal;
-
-                    if (entryIndex < 0)
-                    {
-                        _logger.Info(
-                            $"Trade {t}: Shift {shift} leads to entry index {entryIndex} before first candle");
-                        continue;
-                    }
-
-                    if (entryIndex >= candles.Count)
-                    {
-                        _logger.Info(
-                            $"Trade {t}: Shift {shift} leads to entry index {entryIndex} after last candle");
-                        continue;
-                    }
 
                     if (exitIndex < entryIndex)
                     {
                         _logger.Info(
-                            $"Trade {t}: Shift {shift} leads to exit index {exitIndex} before entry index {entryIndex}");
+                            $"Trade {t}: Shift {variant.ShiftBars} leads to exit index {exitIndex} before entry index {entryIndex}");
                         continue;
                     }
 
-                    var entryTime = shift == 0
+                    var entryTime = variant.IsRealTrade
                         ? trade.EntryTimeMarket
                         : candles[entryIndex].Time;
 
@@ -89,7 +80,7 @@ namespace IbSwingTrader.Application.Dataset
                     if (entryTime >= exitTime)
                     {
                         _logger.Info(
-                            $"Trade {t}: Shift {shift} leads to entry time {entryTime} after or equal to exit time {exitTime}");
+                            $"Trade {t}: Shift {variant.ShiftBars} leads to entry time {entryTime} after or equal to exit time {exitTime}");
                         continue;
                     }
 
@@ -97,11 +88,11 @@ namespace IbSwingTrader.Application.Dataset
                     if (holdHours < 4m)
                     {
                         _logger.Info(
-                            $"Trade {t}: Shift {shift} leads to hold time {_fmt.Hours(holdHours)} hours, less than 4 hours");
+                            $"Trade {t}: Shift {variant.ShiftBars} leads to hold time {_fmt.Hours(holdHours)} hours, less than 4 hours");
                         continue;
                     }
 
-                    decimal entryPrice = shift == 0
+                    decimal entryPrice = variant.IsRealTrade
                         ? trade.EntryPrice / splitFactor
                         : candles[entryIndex].Close;
 
@@ -122,8 +113,9 @@ namespace IbSwingTrader.Application.Dataset
                         ProfitPercent = side * (exitPrice - entryPrice) / entryPrice * 100m,
                         HoldDays = (exitTime.Date - entryTime.Date).Days,
 
-                        IsRealTrade = shift == 0,
-                        EntryShiftBars = shift
+                        IsRealTrade = variant.IsRealTrade,
+                        EntryShiftBars = variant.ShiftBars,
+                        EntryShiftFraction = variant.ShiftFraction
                     };
 
                     FillSeries(row, candles, entryIndex, exitIndex);
@@ -137,6 +129,56 @@ namespace IbSwingTrader.Application.Dataset
                 .ThenByDescending(x => x.ProfitPercent)
                 .ThenBy(x => x.HoldDays)
                 .ToList();
+        }
+
+        private List<EntryVariant> BuildEntryVariants(
+            TradeRecord trade,
+            List<Candle> candles,
+            int entryIndexReal,
+            int exitIndexReal,
+            bool includeSyntheticTrades)
+        {
+            var variants = new List<EntryVariant>
+            {
+                new(entryIndexReal, 0, 0m, true)
+            };
+
+            if (!includeSyntheticTrades || exitIndexReal <= entryIndexReal)
+                return variants;
+
+            var fractions = _settingsProvider.Get()
+                .SyntheticEntryFractions
+                .Where(x => x > 0m && x < 1m)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
+            if (fractions.Count == 0)
+                return variants;
+
+            var usedIndexes = new HashSet<int> { entryIndexReal };
+            var holdTicks = trade.ExitTimeMarket.Ticks - trade.EntryTimeMarket.Ticks;
+
+            foreach (var fraction in fractions)
+            {
+                var shiftTicks = (long)Math.Round(holdTicks * fraction, MidpointRounding.AwayFromZero);
+                var targetTime = trade.EntryTimeMarket.AddTicks(shiftTicks);
+                var entryIndex = FindFirstBarIndexAtOrAfter(candles, targetTime);
+
+                if (entryIndex <= entryIndexReal || entryIndex >= candles.Count || entryIndex > exitIndexReal)
+                    continue;
+
+                if (!usedIndexes.Add(entryIndex))
+                    continue;
+
+                variants.Add(new EntryVariant(
+                    entryIndex,
+                    entryIndex - entryIndexReal,
+                    fraction,
+                    false));
+            }
+
+            return variants;
         }
 
         private void FillSeries(
@@ -304,5 +346,35 @@ namespace IbSwingTrader.Application.Dataset
 
             return right;
         }
+
+        private static int FindFirstBarIndexAtOrAfter(List<Candle> candles, DateTime time)
+        {
+            int left = 0;
+            int right = candles.Count - 1;
+            int answer = candles.Count;
+
+            while (left <= right)
+            {
+                int mid = left + ((right - left) >> 1);
+
+                if (candles[mid].Time >= time)
+                {
+                    answer = mid;
+                    right = mid - 1;
+                }
+                else
+                {
+                    left = mid + 1;
+                }
+            }
+
+            return answer;
+        }
+
+        private sealed record EntryVariant(
+            int EntryIndex,
+            int ShiftBars,
+            decimal ShiftFraction,
+            bool IsRealTrade);
     }
 }
