@@ -144,7 +144,15 @@ namespace IbSwingTrader.Application.Market
                 });
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
+                {
                     allCandles.AddRange(chunkCandles);
+                }
+                else if (timeframe == Timeframe.H4 && allCandles.Count == 0)
+                {
+                    _logger.Error(
+                        $"Historical range aborted after first failed chunk: {symbol}, tf={timeframe}, start={currentChunkStart:yyyy-MM-dd HH:mm:ss}, end={currentChunkEnd:yyyy-MM-dd HH:mm:ss}");
+                    break;
+                }
 
                 chunkStart = chunkEnd;
             }
