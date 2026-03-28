@@ -15,8 +15,6 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                 throw new FileNotFoundException($"CSV file not found: {path}", path);
 
             var settings = _settingsProvider.Get();
-            var marketSettings = _marketSettingsProvider.Get();
-            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(marketSettings.Timezone);
             var map = BuildMap(settings);
 
             var lines = File.ReadAllLines(path);
@@ -75,16 +73,13 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                         "dd.MM.yyyy H:mm:ss",
                         CultureInfo.InvariantCulture);
 
-                    var entryUtc = TimeZoneInfo.ConvertTimeToUtc(entryLocal, timeZone);
-                    var exitUtc = TimeZoneInfo.ConvertTimeToUtc(exitLocal, timeZone);
-
                     trades.Add(new TradeRecord
                     {
                         Ticker = ticker,
                         IsShort = isShort,
-                        EntryTimeUtc = entryUtc,
+                        EntryTimeMarket = entryLocal,
                         EntryPrice = entryPrice,
-                        ExitTimeUtc = exitUtc,
+                        ExitTimeMarket = exitLocal,
                         ExitPrice = exitPrice,
                         ProfitPercent = profitPercent,
                         HoldDays = holdDays
@@ -100,7 +95,7 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
 
             return trades
                 .OrderBy(x => x.Ticker)
-                .ThenBy(x => x.EntryTimeUtc)
+                .ThenBy(x => x.EntryTimeMarket)
                 .ToList();
         }
 

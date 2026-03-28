@@ -104,8 +104,8 @@ namespace IbSwingTrader.App.Commands
                 if (!string.Equals(originalTicker, requestTicker, StringComparison.OrdinalIgnoreCase))
                     _logger.Info($"Ticker remapped: {originalTicker} → {requestTicker}");
 
-                var earliest = tickerTrades.Min(t => t.EntryTimeUtc);
-                var latest = tickerTrades.Max(t => t.ExitTimeUtc);
+                var earliest = tickerTrades.Min(t => t.EntryTimeMarket);
+                var latest = tickerTrades.Max(t => t.ExitTimeMarket);
 
                 var start = earliest.AddDays(-_buildDataset.HistoryWarmupDays);
                 var end = latest.AddDays(_buildDataset.FuturePaddingDays);

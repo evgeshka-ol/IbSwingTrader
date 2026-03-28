@@ -27,20 +27,20 @@ namespace IbSwingTrader.Application.Dataset
             {
                 var trade = trades[t];
 
-                var entryIndexReal = FindBarIndex(candles, trade.EntryTimeUtc);
-                var exitIndexReal = FindBarIndex(candles, trade.ExitTimeUtc);
+                var entryIndexReal = FindBarIndex(candles, trade.EntryTimeMarket);
+                var exitIndexReal = FindBarIndex(candles, trade.ExitTimeMarket);
 
                 if (entryIndexReal < 0)
                 {
                     _logger.Info(
-                        $"Trade {t}: Entry time {trade.EntryTimeUtc} is before first candle {candles[0].Time}");
+                        $"Trade {t}: Entry time {trade.EntryTimeMarket} is before first candle {candles[0].Time}");
                     continue;
                 }
 
                 if (exitIndexReal < 0)
                 {
                     _logger.Info(
-                        $"Trade {t}: Exit time {trade.ExitTimeUtc} is before first candle {candles[0].Time}");
+                        $"Trade {t}: Exit time {trade.ExitTimeMarket} is before first candle {candles[0].Time}");
                     continue;
                 }
 
@@ -81,10 +81,10 @@ namespace IbSwingTrader.Application.Dataset
                     }
 
                     var entryTime = shift == 0
-                        ? trade.EntryTimeUtc
+                        ? trade.EntryTimeMarket
                         : candles[entryIndex].Time;
 
-                    var exitTime = trade.ExitTimeUtc;
+                    var exitTime = trade.ExitTimeMarket;
 
                     if (entryTime >= exitTime)
                     {
@@ -113,10 +113,10 @@ namespace IbSwingTrader.Application.Dataset
                         Ticker = trade.Ticker,
                         IsShort = trade.IsShort,
 
-                        EntryTimeUtc = entryTime,
+                        EntryTimeMarket = entryTime,
                         EntryPrice = entryPrice,
 
-                        ExitTimeUtc = exitTime,
+                        ExitTimeMarket = exitTime,
                         ExitPrice = exitPrice,
 
                         ProfitPercent = side * (exitPrice - entryPrice) / entryPrice * 100m,
