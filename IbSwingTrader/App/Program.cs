@@ -14,7 +14,6 @@ if (args.Length == 0)
     logger.Info("  get-candidates");
     logger.Info("  evaluate-candidates");
     logger.Info("  evaluate-wishlist");
-    logger.Info("  evaluate-tickers  (alias for evaluate-wishlist)");
     logger.Info("  get-scanner-params");
     logger.Info("  download-fundamental-snapshot");
     return;
@@ -43,7 +42,6 @@ switch (command)
         break;
 
     case "evaluate-wishlist":
-    case "evaluate-tickers":
         await services
             .GetRequiredService<EvaluateWishlistCommand>()
             .RunAsync();
