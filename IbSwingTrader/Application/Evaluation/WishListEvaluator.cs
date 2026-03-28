@@ -69,7 +69,14 @@ namespace IbSwingTrader.Application.Evaluation
                 start,
                 end);
 
-            if (candles == null || candles.Count < 80)
+            if (candles == null || candles.Count == 0)
+            {
+                _logger.Warning(
+                    $"Wish list evaluation deferred for {item.Ticker}: no historical candles returned.");
+                return Defer(item, "Historical data unavailable, deferred until next run");
+            }
+
+            if (candles.Count < 80)
             {
                 return Remove(item, "Not enough fresh candles to re-evaluate wish list item");
             }
@@ -159,6 +166,18 @@ namespace IbSwingTrader.Application.Evaluation
                 ScanTimeNy = item.Scan.ScanTimeMarket,
                 RemoveFromWishList = false,
                 Decision = "Keep",
+                Reason = reason
+            };
+        }
+
+        private static WishListEvaluationResult Defer(WishListItem item, string reason)
+        {
+            return new WishListEvaluationResult
+            {
+                Ticker = item.Ticker,
+                ScanTimeNy = item.Scan.ScanTimeMarket,
+                RemoveFromWishList = false,
+                Decision = "Deferred",
                 Reason = reason
             };
         }

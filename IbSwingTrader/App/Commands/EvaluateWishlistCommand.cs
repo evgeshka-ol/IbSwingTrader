@@ -118,7 +118,8 @@ namespace IbSwingTrader.App.Commands
             int updatedCount)
         {
             var removed = results.Count(x => x.RemoveFromWishList);
-            var kept = results.Count - removed;
+            var deferred = results.Count(x => string.Equals(x.Decision, "Deferred", StringComparison.OrdinalIgnoreCase));
+            var kept = results.Count - removed - deferred;
 
             var groupedReasons = results
                 .Where(x => x.RemoveFromWishList)
@@ -132,7 +133,7 @@ namespace IbSwingTrader.App.Commands
                 : string.Join(", ", groupedReasons);
 
             _logger.Info(
-                $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Removed={removed} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
+                $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Deferred={deferred} Removed={removed} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
         }
 
         private static string BuildWishListKey(string ticker, DateTime scanTimeNy)
