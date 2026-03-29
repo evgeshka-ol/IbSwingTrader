@@ -14,6 +14,7 @@ if (args.Length == 0)
     logger.Info("  get-candidates");
     logger.Info("  evaluate-candidates");
     logger.Info("  evaluate-wishlist");
+    logger.Info("  clean-up");
     logger.Info("  get-scanner-params");
     logger.Info("  download-fundamental-snapshot");
     return;
@@ -44,6 +45,12 @@ switch (command)
     case "evaluate-wishlist":
         await services
             .GetRequiredService<EvaluateWishlistCommand>()
+            .RunAsync();
+        break;
+
+    case "clean-up":
+        await services
+            .GetRequiredService<CleanUpCommand>()
             .RunAsync();
         break;
 

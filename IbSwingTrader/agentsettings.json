@@ -199,6 +199,25 @@
         "MinDailyMacdDelta3ToKeep": 0.0
     },
 
+    "CleanUp": {
+        "RemoveEvaluatedCandidates": true,
+        "CandidateOutcomesToRemove": [
+            "Loss",
+            "Win",
+            "NoEntry",
+            "NoData",
+            "NoDataAfterScan",
+            "InsufficientFutureData"
+        ],
+        "RemoveStaleWishListItems": true,
+        "RemoveWishListWithoutTargetOlderThanDays": 14,
+        "RemoveWishListPastExpectedTargetGraceDays": 2,
+        "DeleteLogsOlderThanCutoff": true,
+        "DeleteLegacyCandidatesOlderThanCutoff": true,
+        "DeleteLegacyEvaluationsOlderThanCutoff": true,
+        "FileRetentionDays": 30
+    },
+
     "CsvTradeReader": {
         "Separator": ";",
         "HasHeader": true,
