@@ -45,6 +45,9 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0)
                 return;
 
+            if (!File.Exists(evaluationsPath))
+                await _candidateCsvService.WriteAsync(evaluationsPath, []);
+
             var evaluationKeys = await LoadEvaluationKeysAsync(evaluationsPath);
             var pending = candidates
                 .Where(x => !evaluationKeys.Contains(BuildCandidateKey(x)))
