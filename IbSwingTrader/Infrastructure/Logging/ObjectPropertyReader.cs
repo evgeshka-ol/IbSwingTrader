@@ -6,17 +6,21 @@ namespace IbSwingTrader.Infrastructure.Logging
     {
         public PropertyInfo[] GetOrderedProperties(Type type)
         {
-            var baseProps = type.BaseType?
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .OrderBy(p => p.MetadataToken)
-                ?? Enumerable.Empty<PropertyInfo>();
+            ArgumentNullException.ThrowIfNull(type);
 
-            var ownProps = type
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .OrderBy(p => p.MetadataToken);
+            var hierarchy = new Stack<Type>();
+            var current = type;
 
-            return baseProps
-                .Concat(ownProps)
+            while (current != null && current != typeof(object))
+            {
+                hierarchy.Push(current);
+                current = current.BaseType;
+            }
+
+            return hierarchy
+                .SelectMany(x => x
+                    .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                    .OrderBy(p => p.MetadataToken))
                 .ToArray();
         }
     }
