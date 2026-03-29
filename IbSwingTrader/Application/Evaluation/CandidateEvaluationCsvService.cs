@@ -34,24 +34,6 @@ namespace IbSwingTrader.Application.Evaluation
             if (!hasTargetFile)
             {
                 sb.AppendLine(string.Join(";", properties.Select(x => Escape(x.Name))));
-
-                var legacyFolder = _pathService.GetLegacyEvaluationsFolder();
-                if (Directory.Exists(legacyFolder))
-                {
-                    foreach (var legacyFile in Directory
-                                 .GetFiles(legacyFolder, "*.csv", SearchOption.TopDirectoryOnly)
-                                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
-                    {
-                        var lines = await File.ReadAllLinesAsync(legacyFile, Encoding.UTF8);
-                        foreach (var line in lines.Skip(1))
-                        {
-                            if (!string.IsNullOrWhiteSpace(line))
-                                sb.AppendLine(line);
-                        }
-                    }
-
-                    _logger.Info($"Seeded aggregated evaluations from legacy files: {legacyFolder}");
-                }
             }
 
             foreach (var record in records)

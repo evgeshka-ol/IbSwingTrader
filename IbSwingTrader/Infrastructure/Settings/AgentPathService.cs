@@ -21,9 +21,6 @@ namespace IbSwingTrader.Infrastructure.Settings
         public string GetCandidatesFile() => Combine(_paths.CandidatesFile);
         public string GetEvaluationsFile() => Combine(_paths.EvaluationsFile);
         public string GetWishListFile() => Combine(_paths.WishListFile);
-        public string GetLegacyCandidatesFolder() => Combine(_paths.LegacyCandidatesFolder);
-        public string GetLegacyEvaluationsFolder() => Combine(_paths.LegacyEvaluationsFolder);
-        public string GetLegacyWishListFile() => Combine(_paths.LegacyWishListFile);
 
         public string GetProcessedCandidateFilesManifest() =>
             Combine(_paths.ProcessedCandidateFilesManifest);

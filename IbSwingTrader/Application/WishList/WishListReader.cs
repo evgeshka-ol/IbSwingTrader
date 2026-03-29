@@ -26,18 +26,8 @@ namespace IbSwingTrader.Application.WishList
 
             if (!File.Exists(filePath))
             {
-                var legacyPath = _pathService.GetLegacyWishListFile();
-
-                if (File.Exists(legacyPath))
-                {
-                    _logger.Info($"Wish list file not found. Falling back to legacy file: {legacyPath}");
-                    filePath = legacyPath;
-                }
-                else
-                {
-                    _logger.Info($"Wish list file not found. Starting from empty state: {filePath}");
-                    return [];
-                }
+                _logger.Info($"Wish list file not found. Starting from empty state: {filePath}");
+                return [];
             }
 
             var json = await File.ReadAllTextAsync(filePath);

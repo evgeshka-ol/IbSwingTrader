@@ -41,38 +41,12 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
-            var existing = await LoadExistingCandidatesAsync(filePath);
+            var existing = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
             var merged = MergeCandidates(existing, candidates);
             var json = BuildJson(merged);
             await File.WriteAllTextAsync(filePath, json);
 
             _logger.Info($"Candidate results saved: {filePath}");
-        }
-
-        private async Task<List<CandidateDetails>> LoadExistingCandidatesAsync(string filePath)
-        {
-            if (File.Exists(filePath))
-                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
-
-            var legacyFolder = _pathService.GetLegacyCandidatesFolder();
-            if (!Directory.Exists(legacyFolder))
-                return [];
-
-            var result = new List<CandidateDetails>();
-
-            foreach (var legacyFile in Directory
-                         .GetFiles(legacyFolder, "*.json", SearchOption.TopDirectoryOnly)
-                         .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
-            {
-                var items = await _jsonFileService.ReadAsync<List<CandidateDetails>>(legacyFile);
-                if (items != null && items.Count > 0)
-                    result.AddRange(items);
-            }
-
-            if (result.Count > 0)
-                _logger.Info($"Seeded aggregated candidates from legacy files: {result.Count}");
-
-            return result;
         }
 
         private static List<CandidateDetails> MergeCandidates(

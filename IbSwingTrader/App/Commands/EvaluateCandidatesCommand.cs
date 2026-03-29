@@ -102,28 +102,7 @@ namespace IbSwingTrader.App.Commands
 
         private async Task<List<CandidateDetails>> LoadCandidatesAsync(string candidatesPath)
         {
-            if (File.Exists(candidatesPath))
-                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
-
-            var legacyFolder = _pathService.GetLegacyCandidatesFolder();
-            if (!Directory.Exists(legacyFolder))
-                return [];
-
-            var result = new List<CandidateDetails>();
-
-            foreach (var legacyFile in Directory
-                         .GetFiles(legacyFolder, "*.json", SearchOption.TopDirectoryOnly)
-                         .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
-            {
-                var items = await _jsonFileService.ReadAsync<List<CandidateDetails>>(legacyFile);
-                if (items != null && items.Count > 0)
-                    result.AddRange(items);
-            }
-
-            return result
-                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.OrderByDescending(y => y.Scan.ScanTimeMarket).First())
-                .ToList();
+            return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
         }
 
         private async Task<HashSet<string>> LoadEvaluationKeysAsync(string evaluationsPath)
@@ -132,17 +111,6 @@ namespace IbSwingTrader.App.Commands
 
             if (File.Exists(evaluationsPath))
                 await AddEvaluationKeysFromCsvAsync(evaluationsPath, result);
-
-            var legacyFolder = _pathService.GetLegacyEvaluationsFolder();
-            if (Directory.Exists(legacyFolder))
-            {
-                foreach (var legacyFile in Directory
-                             .GetFiles(legacyFolder, "*.csv", SearchOption.TopDirectoryOnly)
-                             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
-                {
-                    await AddEvaluationKeysFromCsvAsync(legacyFile, result);
-                }
-            }
 
             return result;
         }
