@@ -102,7 +102,20 @@ namespace IbSwingTrader.App.Commands
 
         private async Task<List<CandidateDetails>> LoadCandidatesAsync(string candidatesPath)
         {
-            return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
+            if (!File.Exists(candidatesPath))
+                return [];
+
+            var json = await File.ReadAllTextAsync(candidatesPath);
+            if (string.IsNullOrWhiteSpace(json))
+                return [];
+
+            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
+
+            if (firstNonWhitespace == '[')
+                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
+
+            var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
+            return document?.Candidates ?? [];
         }
 
         private async Task<HashSet<string>> LoadEvaluationKeysAsync(string evaluationsPath)

@@ -37,7 +37,8 @@ namespace IbSwingTrader.App.Commands
             var candidatesPath = _pathService.GetCandidatesFile();
             var evaluationsPath = _pathService.GetEvaluationsFile();
 
-            var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
+            var candidateDocument = await LoadCandidateDocumentAsync(candidatesPath);
+            var candidates = candidateDocument.Candidates;
             if (candidates.Count == 0 || !File.Exists(evaluationsPath))
                 return 0;
 
@@ -60,12 +61,62 @@ namespace IbSwingTrader.App.Commands
             if (removed <= 0)
                 return 0;
 
-            await _jsonFileService.WriteAsync(candidatesPath, filtered);
+            candidateDocument.Candidates = filtered;
+            candidateDocument.Summary = BuildSummary(filtered);
+            await _jsonFileService.WriteAsync(candidatesPath, candidateDocument);
 
             _logger.Info(
                 $"Candidates cleaned: removed={removed}, kept={filtered.Count}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
 
             return removed;
+        }
+
+        private async Task<CandidateFileDocument> LoadCandidateDocumentAsync(string candidatesPath)
+        {
+            if (!File.Exists(candidatesPath))
+                return new CandidateFileDocument();
+
+            var json = await File.ReadAllTextAsync(candidatesPath);
+            if (string.IsNullOrWhiteSpace(json))
+                return new CandidateFileDocument();
+
+            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
+
+            if (firstNonWhitespace == '[')
+            {
+                var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
+                return new CandidateFileDocument
+                {
+                    Candidates = candidates
+                };
+            }
+
+            return await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath)
+                ?? new CandidateFileDocument();
+        }
+
+        private static List<CandidateSummaryItem> BuildSummary(List<CandidateDetails> candidates)
+        {
+            if (candidates.Count == 0)
+                return [];
+
+            var latestScanTime = candidates.Max(x => x.Scan.ScanTimeMarket);
+
+            return candidates
+                .Where(x => x.Scan.ScanTimeMarket == latestScanTime)
+                .OrderByDescending(x => x.Score.Score)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => new CandidateSummaryItem
+                {
+                    Ticker =
+                        $"{x.Ticker} " +
+                        $"{x.TradePlan.EntryPrice:0.##} " +
+                        $"{x.TradePlan.ExitPrice:0.##} " +
+                        $"{x.TradePlan.StopLoss:0.##} " +
+                        $"{x.TradePlan.ProfitPercent:0.##}%/" +
+                        $"{x.TradePlan.LossPercent:0.##}%"
+                })
+                .ToList();
         }
 
         private async Task<int> CleanWishListAsync(CleanUpSettings settings, DateTime marketNow)

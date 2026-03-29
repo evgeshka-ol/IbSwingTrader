@@ -41,9 +41,10 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
-            var existing = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
+            var existing = await LoadCandidatesAsync(filePath);
             var merged = MergeCandidates(existing, candidates);
-            var json = BuildJson(merged);
+            var summary = BuildSummary(candidates);
+            var json = BuildJson(summary, merged);
             await File.WriteAllTextAsync(filePath, json);
 
             _logger.Info($"Candidate results saved: {filePath}");
@@ -74,17 +75,63 @@ namespace IbSwingTrader.Infrastructure.Logging
                 $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
         }
 
-        private string BuildJson(IEnumerable<CandidateDetails> candidates)
+        private async Task<List<CandidateDetails>> LoadCandidatesAsync(string filePath)
         {
-            var array = new JsonArray();
+            if (!File.Exists(filePath))
+                return [];
+
+            var json = await File.ReadAllTextAsync(filePath);
+            if (string.IsNullOrWhiteSpace(json))
+                return [];
+
+            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
+
+            if (firstNonWhitespace == '[')
+                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
+
+            var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(filePath);
+            return document?.Candidates ?? [];
+        }
+
+        private string BuildJson(
+            IEnumerable<CandidateSummaryItem> summary,
+            IEnumerable<CandidateDetails> candidates)
+        {
+            var root = new JsonObject();
+            var summaryArray = new JsonArray();
+            var candidatesArray = new JsonArray();
+
+            foreach (var item in summary)
+                summaryArray.Add(_jsonBuilder.BuildObject(item));
 
             foreach (var candidate in candidates)
-                array.Add(_jsonBuilder.BuildObject(candidate));
+                candidatesArray.Add(_jsonBuilder.BuildObject(candidate));
 
-            return array.ToJsonString(new JsonSerializerOptions
+            root["Summary"] = summaryArray;
+            root["Candidates"] = candidatesArray;
+
+            return root.ToJsonString(new JsonSerializerOptions
             {
                 WriteIndented = true
             });
+        }
+
+        private List<CandidateSummaryItem> BuildSummary(IEnumerable<CandidateDetails> candidates)
+        {
+            return candidates
+                .OrderByDescending(x => x.Score.Score)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => new CandidateSummaryItem
+                {
+                    Ticker =
+                        $"{x.Ticker} " +
+                        $"{_fmt.Price(x.TradePlan.EntryPrice)} " +
+                        $"{_fmt.Price(x.TradePlan.ExitPrice)} " +
+                        $"{_fmt.Price(x.TradePlan.StopLoss)} " +
+                        $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
+                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%"
+                })
+                .ToList();
         }
 
         private void WriteCandidateToConsole(CandidateDetails candidate)

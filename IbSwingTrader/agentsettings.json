@@ -202,12 +202,7 @@
     "CleanUp": {
         "RemoveEvaluatedCandidates": true,
         "CandidateOutcomesToRemove": [
-            "Loss",
-            "Win",
-            "NoEntry",
-            "NoData",
-            "NoDataAfterScan",
-            "InsufficientFutureData"
+            "Loss"
         ],
         "RemoveStaleWishListItems": true,
         "RemoveWishListWithoutTargetOlderThanDays": 14,
@@ -215,7 +210,7 @@
         "DeleteLogsOlderThanCutoff": true,
         "DeleteLegacyCandidatesOlderThanCutoff": true,
         "DeleteLegacyEvaluationsOlderThanCutoff": true,
-        "FileRetentionDays": 30
+        "FileRetentionDays": 3
     },
 
     "CsvTradeReader": {
