@@ -6,9 +6,12 @@ namespace IbSwingTrader.Abstractions.Settings
         string GetTradesFile();
         string GetDatasetFile();
         string GetCacheFolder();
-        string GetCandidatesFolder();
-        string GetEvaluationsFolder();
+        string GetCandidatesFile();
+        string GetEvaluationsFile();
         string GetWishListFile();
+        string GetLegacyCandidatesFolder();
+        string GetLegacyEvaluationsFolder();
+        string GetLegacyWishListFile();
         string GetProcessedCandidateFilesManifest();
         string GetLogsFolder();
     }

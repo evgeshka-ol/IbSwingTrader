@@ -3,8 +3,10 @@
 namespace IbSwingTrader.Application.WishList
 {
     public class WishListReader(
+        IAgentPathService pathService,
         ITextLogger logger) : IWishListReader
     {
+        private readonly IAgentPathService _pathService = pathService;
         private readonly ITextLogger _logger = logger;
 
         private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
@@ -24,8 +26,18 @@ namespace IbSwingTrader.Application.WishList
 
             if (!File.Exists(filePath))
             {
-                _logger.Info($"Wish list file not found. Starting from empty state: {filePath}");
-                return [];
+                var legacyPath = _pathService.GetLegacyWishListFile();
+
+                if (File.Exists(legacyPath))
+                {
+                    _logger.Info($"Wish list file not found. Falling back to legacy file: {legacyPath}");
+                    filePath = legacyPath;
+                }
+                else
+                {
+                    _logger.Info($"Wish list file not found. Starting from empty state: {filePath}");
+                    return [];
+                }
             }
 
             var json = await File.ReadAllTextAsync(filePath);

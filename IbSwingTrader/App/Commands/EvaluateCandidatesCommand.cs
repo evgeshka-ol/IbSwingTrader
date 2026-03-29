@@ -5,136 +5,59 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluator candidateEvaluator,
         IJsonFileService jsonFileService,
         ICandidateEvaluationCsvService candidateCsvService,
-        IProcessedCandidateFilesService processedFilesService,
-        IFileHashService fileHashService,
         ITextLogger logger,
         IAgentPathService pathService,
-        ICandidateEvaluationSettingsProvider evaluationSettingsProvider,
         ITwsSettingsProvider twsSettingsProvider) : ICommand
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICandidateEvaluationCsvService _candidateCsvService = candidateCsvService;
-        private readonly IProcessedCandidateFilesService _processedFilesService = processedFilesService;
-        private readonly IFileHashService _fileHashService = fileHashService;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
-        private readonly ICandidateEvaluationSettingsProvider _evaluationSettingsProvider = evaluationSettingsProvider;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
 
         public async Task RunAsync()
         {
-            var evaluationSettings = _evaluationSettingsProvider.Get();
             var twsSettings = _twsSettingsProvider.Get();
 
-            var candidatesFolder = _pathService.GetCandidatesFolder();
-            var evaluationsFolder = _pathService.GetEvaluationsFolder();
-            var manifestPath = _pathService.GetProcessedCandidateFilesManifest();
+            var candidatesPath = _pathService.GetCandidatesFile();
+            var evaluationsPath = _pathService.GetEvaluationsFile();
 
             EnsureConnected(twsSettings.ConnectTimeoutSeconds);
 
-            Directory.CreateDirectory(candidatesFolder);
-            Directory.CreateDirectory(evaluationsFolder);
+            var evaluationsFolder = Path.GetDirectoryName(evaluationsPath);
+            if (!string.IsNullOrWhiteSpace(evaluationsFolder))
+                Directory.CreateDirectory(evaluationsFolder);
 
-            await EvaluateCandidateFilesAsync(
-                candidatesFolder,
-                evaluationsFolder,
-                manifestPath,
-                evaluationSettings.SearchPattern);
+            await EvaluateCandidatesAsync(candidatesPath, evaluationsPath);
 
             _logger.Info("Candidate evaluation completed.");
         }
 
-        private async Task EvaluateCandidateFilesAsync(
-            string candidatesFolder,
-            string evaluationsFolder,
-            string manifestPath,
-            string searchPattern)
+        private async Task EvaluateCandidatesAsync(
+            string candidatesPath,
+            string evaluationsPath)
         {
-            var manifest = await _processedFilesService.ReadAsync(manifestPath);
+            var candidates = await LoadCandidatesAsync(candidatesPath);
+            _logger.Info($"Candidates found: {candidates.Count}");
 
-            var files = Directory
-                .GetFiles(
-                    candidatesFolder,
-                    searchPattern,
-                    SearchOption.TopDirectoryOnly)
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            if (candidates.Count == 0)
+                return;
+
+            var evaluationKeys = await LoadEvaluationKeysAsync(evaluationsPath);
+            var pending = candidates
+                .Where(x => !evaluationKeys.Contains(BuildCandidateKey(x)))
                 .ToList();
 
-            _logger.Info($"Candidate files found: {files.Count}");
+            _logger.Info($"Pending candidates for evaluation: {pending.Count}");
 
-            var manifestChanged = false;
+            if (pending.Count == 0)
+                return;
 
-            foreach (var file in files)
-            {
-                var processed = await ProcessCandidateFileAsync(
-                    file,
-                    evaluationsFolder,
-                    manifestPath,
-                    manifest);
-
-                manifestChanged = manifestChanged || processed;
-            }
-
-            if (manifestChanged)
-                await _processedFilesService.WriteAsync(manifestPath, manifest);
-        }
-
-        private async Task<bool> ProcessCandidateFileAsync(
-            string filePath,
-            string evaluationsFolder,
-            string manifestPath,
-            ProcessedCandidateFilesManifest manifest)
-        {
-            var fileInfo = new FileInfo(filePath);
-            var sha256 = await _fileHashService.ComputeSha256Async(filePath);
-
-            if (_processedFilesService.IsProcessed(manifest, sha256))
-            {
-                _logger.Info($"Skipping already processed file: {fileInfo.Name}");
-                return false;
-            }
-
-            _logger.Info($"Processing candidate file: {fileInfo.Name}");
-
-            var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath);
-
-            if (candidates == null || candidates.Count == 0)
-            {
-                _logger.Warning($"No candidates in file: {fileInfo.Name}");
-                return false;
-            }
-
-            var results = await _candidateEvaluator.EvaluateAsync(candidates);
-
-            var outputFileName = BuildCandidateOutputCsvFileName(fileInfo.Name);
-            var outputFullPath = Path.Combine(evaluationsFolder, outputFileName);
-
-            await _candidateCsvService.WriteAsync(outputFullPath, results);
-
-            _processedFilesService.MarkProcessed(
-                manifest,
-                new ProcessedCandidateFile
-                {
-                    FileName = fileInfo.Name,
-                    FullPath = fileInfo.FullName,
-                    FileSize = fileInfo.Length,
-                    LastWriteTimeUtc = fileInfo.LastWriteTimeUtc,
-                    Sha256 = sha256,
-                    ProcessedAtUtc = DateTime.UtcNow,
-                    CandidateCount = candidates.Count,
-                    EvaluationCount = results.Count,
-                    Status = "Completed",
-                    OutputCsvFileName = outputFileName,
-                    OutputCsvFullPath = outputFullPath
-                });
-
-            await _processedFilesService.WriteAsync(manifestPath, manifest);
-
-            LogCandidateSummary(fileInfo.Name, results);
-
-            return true;
+            var results = await _candidateEvaluator.EvaluateAsync(pending);
+            await _candidateCsvService.WriteAsync(evaluationsPath, results);
+            LogCandidateSummary(Path.GetFileName(candidatesPath), results);
         }
 
         private void EnsureConnected(int timeoutSeconds)
@@ -174,10 +97,87 @@ namespace IbSwingTrader.App.Commands
                 $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} NoData={noData} Errors={errors}");
         }
 
-        private static string BuildCandidateOutputCsvFileName(string inputFileName)
+        private async Task<List<CandidateDetails>> LoadCandidatesAsync(string candidatesPath)
         {
-            var nameWithoutExtension = Path.GetFileNameWithoutExtension(inputFileName);
-            return $"evaluation_{nameWithoutExtension}.csv";
+            if (File.Exists(candidatesPath))
+                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
+
+            var legacyFolder = _pathService.GetLegacyCandidatesFolder();
+            if (!Directory.Exists(legacyFolder))
+                return [];
+
+            var result = new List<CandidateDetails>();
+
+            foreach (var legacyFile in Directory
+                         .GetFiles(legacyFolder, "*.json", SearchOption.TopDirectoryOnly)
+                         .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+            {
+                var items = await _jsonFileService.ReadAsync<List<CandidateDetails>>(legacyFile);
+                if (items != null && items.Count > 0)
+                    result.AddRange(items);
+            }
+
+            return result
+                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.OrderByDescending(y => y.Scan.ScanTimeMarket).First())
+                .ToList();
+        }
+
+        private async Task<HashSet<string>> LoadEvaluationKeysAsync(string evaluationsPath)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (File.Exists(evaluationsPath))
+                await AddEvaluationKeysFromCsvAsync(evaluationsPath, result);
+
+            var legacyFolder = _pathService.GetLegacyEvaluationsFolder();
+            if (Directory.Exists(legacyFolder))
+            {
+                foreach (var legacyFile in Directory
+                             .GetFiles(legacyFolder, "*.csv", SearchOption.TopDirectoryOnly)
+                             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                {
+                    await AddEvaluationKeysFromCsvAsync(legacyFile, result);
+                }
+            }
+
+            return result;
+        }
+
+        private static async Task AddEvaluationKeysFromCsvAsync(
+            string csvPath,
+            HashSet<string> target)
+        {
+            var lines = await File.ReadAllLinesAsync(csvPath);
+            if (lines.Length <= 1)
+                return;
+
+            var headers = lines[0].Split(';');
+            var tickerIndex = Array.FindIndex(headers, x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
+            var scanTimeIndex = Array.FindIndex(headers, x => string.Equals(x, "ScanTimeNy", StringComparison.OrdinalIgnoreCase));
+            var presetIndex = Array.FindIndex(headers, x => string.Equals(x, "PresetScanCode", StringComparison.OrdinalIgnoreCase));
+
+            if (tickerIndex < 0 || scanTimeIndex < 0 || presetIndex < 0)
+                return;
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var parts = line.Split(';');
+                if (parts.Length <= Math.Max(tickerIndex, Math.Max(scanTimeIndex, presetIndex)))
+                    continue;
+
+                target.Add($"{parts[tickerIndex]}|{parts[presetIndex]}|{parts[scanTimeIndex]}");
+            }
+        }
+
+        private static string BuildCandidateKey(CandidateDetails candidate)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
         }
     }
 }

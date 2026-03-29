@@ -18,18 +18,13 @@ namespace IbSwingTrader.App.Commands
         public async Task RunAsync()
         {
             var result = await _finder.FindAsync();
-
-            var now = MarketTime.Now();
-            var stamp = now.ToString("yyyyMMdd_HHmm");
-
-            var candidatesFolder = _pathService.GetCandidatesFolder();
-            Directory.CreateDirectory(candidatesFolder);
-
-            var candidatesPath = Path.Combine(
-                candidatesFolder,
-                $"candidates_{stamp}_MARKET.json");
+            var candidatesPath = _pathService.GetCandidatesFile();
 
             var wishListPath = _pathService.GetWishListFile();
+
+            var candidatesFolder = Path.GetDirectoryName(candidatesPath);
+            if (!string.IsNullOrWhiteSpace(candidatesFolder))
+                Directory.CreateDirectory(candidatesFolder);
 
             var wishListFolder = Path.GetDirectoryName(wishListPath);
             if (!string.IsNullOrWhiteSpace(wishListFolder))

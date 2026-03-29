@@ -6,9 +6,12 @@
         "TradesFile": "trades.csv",
         "DatasetFile": "dataset.csv",
         "CacheFolder": "cache",
-        "CandidatesFolder": "candidates",
-        "EvaluationsFolder": "evaluations",
-        "WishListFile": "wishlist/current.json",
+        "CandidatesFile": "Tickers/candidates.json",
+        "EvaluationsFile": "Tickers/evaluations.csv",
+        "WishListFile": "Tickers/wishlist.json",
+        "LegacyCandidatesFolder": "candidates",
+        "LegacyEvaluationsFolder": "evaluations",
+        "LegacyWishListFile": "wishlist/current.json",
         "ProcessedCandidateFilesManifest": "manifests/processed-candidate-files.json",
         "LogsFolder": "logs"
     },
@@ -247,6 +250,7 @@
     },
 
     "Logging": {
+        "EnableFileLogging": true,
         "FileMinimumLevel": "Info",
         "ConsoleMinimumLevel": "Info",
         "EnableColors": true

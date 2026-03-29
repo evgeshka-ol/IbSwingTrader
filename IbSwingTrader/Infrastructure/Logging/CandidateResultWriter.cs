@@ -5,12 +5,16 @@ using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class CandidateResultWriter(
+        IAgentPathService pathService,
+        IJsonFileService jsonFileService,
         IMarketSettingsProvider marketSettingsProvider,
         ITextLogger logger,
         IConsoleColorWriter console,
         ICompositePropertyJsonBuilder jsonBuilder,
         INumberTextFormatter fmt) : ICandidateResultWriter
     {
+        private readonly IAgentPathService _pathService = pathService;
+        private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IConsoleColorWriter _console = console;
@@ -37,10 +41,63 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
-            var json = BuildJson(candidates);
+            var existing = await LoadExistingCandidatesAsync(filePath);
+            var merged = MergeCandidates(existing, candidates);
+            var json = BuildJson(merged);
             await File.WriteAllTextAsync(filePath, json);
 
             _logger.Info($"Candidate results saved: {filePath}");
+        }
+
+        private async Task<List<CandidateDetails>> LoadExistingCandidatesAsync(string filePath)
+        {
+            if (File.Exists(filePath))
+                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
+
+            var legacyFolder = _pathService.GetLegacyCandidatesFolder();
+            if (!Directory.Exists(legacyFolder))
+                return [];
+
+            var result = new List<CandidateDetails>();
+
+            foreach (var legacyFile in Directory
+                         .GetFiles(legacyFolder, "*.json", SearchOption.TopDirectoryOnly)
+                         .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+            {
+                var items = await _jsonFileService.ReadAsync<List<CandidateDetails>>(legacyFile);
+                if (items != null && items.Count > 0)
+                    result.AddRange(items);
+            }
+
+            if (result.Count > 0)
+                _logger.Info($"Seeded aggregated candidates from legacy files: {result.Count}");
+
+            return result;
+        }
+
+        private static List<CandidateDetails> MergeCandidates(
+            List<CandidateDetails> existing,
+            List<CandidateDetails> incoming)
+        {
+            var map = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in existing)
+                map[BuildCandidateKey(item)] = item;
+
+            foreach (var item in incoming)
+                map[BuildCandidateKey(item)] = item;
+
+            return map.Values
+                .OrderByDescending(x => x.Scan.ScanTimeMarket)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string BuildCandidateKey(CandidateDetails candidate)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
         }
 
         private string BuildJson(IEnumerable<CandidateDetails> candidates)

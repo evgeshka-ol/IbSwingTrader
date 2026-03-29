@@ -18,12 +18,19 @@ namespace IbSwingTrader.Infrastructure.Logging
             _console = console;
             _settings = loggingSettingsProvider.Get();
 
-            var logsFolder = pathService.GetLogsFolder();
-            Directory.CreateDirectory(logsFolder);
+            if (_settings.EnableFileLogging)
+            {
+                var logsFolder = pathService.GetLogsFolder();
+                Directory.CreateDirectory(logsFolder);
 
-            _logFilePath = Path.Combine(
-                logsFolder,
-                $"log-{MarketTime.Now():yyyyMMdd_HHmm}.log");
+                _logFilePath = Path.Combine(
+                    logsFolder,
+                    $"log-{MarketTime.Now():yyyyMMdd_HHmm}.log");
+            }
+            else
+            {
+                _logFilePath = string.Empty;
+            }
         }
 
         public void EmptyLine()
@@ -116,7 +123,8 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private bool ShouldWriteToFile(LogLevel level)
         {
-            return _settings.FileMinimumLevel != LogLevel.None
+            return _settings.EnableFileLogging
+                && _settings.FileMinimumLevel != LogLevel.None
                 && level >= _settings.FileMinimumLevel;
         }
 
