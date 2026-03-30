@@ -90,6 +90,7 @@
         "MinimumCandles": 120,
         "MaxParallelTickers": 2,
         "LocalExtremaLookbackBars": 3,
+        "EpisodeMergeCooldownBars": 8,
         "MaxBarsToPeak": 30,
         "MinRunupPct": 20.0
     },

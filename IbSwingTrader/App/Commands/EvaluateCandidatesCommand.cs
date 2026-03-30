@@ -7,7 +7,8 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluationCsvService candidateCsvService,
         ITextLogger logger,
         IAgentPathService pathService,
-        ITwsSettingsProvider twsSettingsProvider) : ICommand
+        ITwsSettingsProvider twsSettingsProvider,
+        ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider) : ICommand
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
@@ -16,6 +17,7 @@ namespace IbSwingTrader.App.Commands
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
+        private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
 
         public async Task RunAsync()
         {
@@ -48,9 +50,9 @@ namespace IbSwingTrader.App.Commands
             if (!File.Exists(evaluationsPath))
                 await _candidateCsvService.WriteAsync(evaluationsPath, []);
 
-            var evaluationKeys = await LoadEvaluationKeysAsync(evaluationsPath);
+            var evaluationState = await LoadEvaluationStateAsync(evaluationsPath);
             var pending = candidates
-                .Where(x => !evaluationKeys.Contains(BuildCandidateKey(x)))
+                .Where(x => ShouldEvaluate(x, evaluationState))
                 .ToList();
 
             _logger.Info($"Pending candidates for evaluation: {pending.Count}");
@@ -118,19 +120,19 @@ namespace IbSwingTrader.App.Commands
             return document?.Candidates ?? [];
         }
 
-        private async Task<HashSet<string>> LoadEvaluationKeysAsync(string evaluationsPath)
+        private async Task<Dictionary<string, CandidateEvaluationState>> LoadEvaluationStateAsync(string evaluationsPath)
         {
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new Dictionary<string, CandidateEvaluationState>(StringComparer.OrdinalIgnoreCase);
 
             if (File.Exists(evaluationsPath))
-                await AddEvaluationKeysFromCsvAsync(evaluationsPath, result);
+                await AddEvaluationStateFromCsvAsync(evaluationsPath, result);
 
             return result;
         }
 
-        private static async Task AddEvaluationKeysFromCsvAsync(
+        private static async Task AddEvaluationStateFromCsvAsync(
             string csvPath,
-            HashSet<string> target)
+            Dictionary<string, CandidateEvaluationState> target)
         {
             var lines = await File.ReadAllLinesAsync(csvPath);
             if (lines.Length <= 1)
@@ -140,8 +142,10 @@ namespace IbSwingTrader.App.Commands
             var tickerIndex = Array.FindIndex(headers, x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
             var scanTimeIndex = Array.FindIndex(headers, x => string.Equals(x, "ScanTimeNy", StringComparison.OrdinalIgnoreCase));
             var presetIndex = Array.FindIndex(headers, x => string.Equals(x, "PresetScanCode", StringComparison.OrdinalIgnoreCase));
+            var outcomeIndex = Array.FindIndex(headers, x => string.Equals(x, "Outcome", StringComparison.OrdinalIgnoreCase));
+            var evaluationEndTimeIndex = Array.FindIndex(headers, x => string.Equals(x, "EvaluationEndTime", StringComparison.OrdinalIgnoreCase));
 
-            if (tickerIndex < 0 || scanTimeIndex < 0 || presetIndex < 0)
+            if (tickerIndex < 0 || scanTimeIndex < 0 || presetIndex < 0 || outcomeIndex < 0 || evaluationEndTimeIndex < 0)
                 return;
 
             foreach (var line in lines.Skip(1))
@@ -150,11 +154,57 @@ namespace IbSwingTrader.App.Commands
                     continue;
 
                 var parts = line.Split(';');
-                if (parts.Length <= Math.Max(tickerIndex, Math.Max(scanTimeIndex, presetIndex)))
+                if (parts.Length <= Math.Max(evaluationEndTimeIndex, Math.Max(outcomeIndex, Math.Max(tickerIndex, Math.Max(scanTimeIndex, presetIndex)))))
                     continue;
 
-                target.Add($"{parts[tickerIndex]}|{parts[presetIndex]}|{parts[scanTimeIndex]}");
+                var key = $"{parts[tickerIndex]}|{parts[presetIndex]}|{parts[scanTimeIndex]}";
+                var outcome = parts[outcomeIndex];
+                var evaluationEndTime = TryParseDateTime(parts[evaluationEndTimeIndex]);
+
+                target[key] = new CandidateEvaluationState
+                {
+                    Outcome = outcome,
+                    EvaluationEndTime = evaluationEndTime
+                };
             }
+        }
+
+        private bool ShouldEvaluate(
+            CandidateDetails candidate,
+            Dictionary<string, CandidateEvaluationState> evaluationState)
+        {
+            var key = BuildCandidateKey(candidate);
+
+            if (!evaluationState.TryGetValue(key, out var state))
+                return true;
+
+            return !IsFinalOutcome(candidate, state);
+        }
+
+        private bool IsFinalOutcome(
+            CandidateDetails candidate,
+            CandidateEvaluationState state)
+        {
+            if (string.IsNullOrWhiteSpace(state.Outcome))
+                return false;
+
+            if (state.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (state.Outcome is "Win" or "Loss")
+                return true;
+
+            var settings = _candidateEvaluationSettingsProvider.Get();
+            var requestedEnd = candidate.Scan.ScanTimeMarket.AddDays(settings.ForwardEvaluationDays);
+
+            if (!state.EvaluationEndTime.HasValue)
+                return false;
+
+            var reachedFullWindow = state.EvaluationEndTime.Value >= requestedEnd;
+            if (!reachedFullWindow)
+                return false;
+
+            return state.Outcome is "Open" or "NoEntry" or "NoData" or "NoDataAfterScan" or "InsufficientFutureData";
         }
 
         private static string BuildCandidateKey(CandidateDetails candidate)
@@ -162,6 +212,29 @@ namespace IbSwingTrader.App.Commands
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
+        }
+
+        private static DateTime? TryParseDateTime(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            if (DateTime.TryParse(
+                    value,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
+        }
+
+        private sealed class CandidateEvaluationState
+        {
+            public string Outcome { get; set; } = string.Empty;
+            public DateTime? EvaluationEndTime { get; set; }
         }
     }
 }
