@@ -17,6 +17,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<ITwsSettingsProvider, TwsSettingsProvider>();
             services.AddSingleton<IMarketSettingsProvider, MarketSettingsProvider>();
             services.AddSingleton<IBuildDatasetSettingsProvider, BuildDatasetSettingsProvider>();
+            services.AddSingleton<IResearchSettingsProvider, ResearchSettingsProvider>();
             services.AddSingleton<IFeatureCalculationSettingsProvider, FeatureCalculationSettingsProvider>();
             services.AddSingleton<IGetCandidatesSettingsProvider, GetCandidatesSettingsProvider>();
             services.AddSingleton<ICandidateEvaluationSettingsProvider, CandidateEvaluationSettingsProvider>();
@@ -90,6 +91,7 @@ namespace IbSwingTrader.App.Bootstrap
 
             // commands
             services.AddTransient<BuildDatasetCommand>();
+            services.AddTransient<BuildResearchDatasetCommand>();
             services.AddTransient<GetCandidatesCommand>();
             services.AddTransient<EvaluateCandidatesCommand>();
             services.AddTransient<EvaluateWishlistCommand>();

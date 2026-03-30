@@ -11,6 +11,7 @@ if (args.Length == 0)
 {
     logger.Info("Usage:");
     logger.Info("  build-dataset <trades.csv> <dataset.csv>");
+    logger.Info("  build-research-dataset");
     logger.Info("  get-candidates");
     logger.Info("  evaluate-candidates");
     logger.Info("  evaluate-wishlist");
@@ -27,6 +28,12 @@ switch (command)
     case "build-dataset":
         await services
             .GetRequiredService<BuildDatasetCommand>()
+            .RunAsync();
+        break;
+
+    case "build-research-dataset":
+        await services
+            .GetRequiredService<BuildResearchDatasetCommand>()
             .RunAsync();
         break;
 

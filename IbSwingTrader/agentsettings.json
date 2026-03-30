@@ -82,6 +82,18 @@
         }
     },
 
+    "Research": {
+        "Mode": "top_gainers",
+        "Source": "known_tickers",
+        "OutputFile": "datasets/research_top_gainers.csv",
+        "LookbackCalendarDays": 240,
+        "MinimumCandles": 120,
+        "MaxParallelTickers": 2,
+        "LocalExtremaLookbackBars": 3,
+        "MaxBarsToPeak": 30,
+        "MinRunupPct": 20.0
+    },
+
     "FeatureCalculation": {
         "LookbackCandles": 300,
         "AvgVolumeWindow": 20
