@@ -35,11 +35,17 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal MaxDrawdownPct2D { get; set; }
         public decimal MaxDrawdownPct5D { get; set; }
 
+        public decimal MinLowAfterScan { get; set; }
+        public decimal EntryDistanceToMinAfterScanPct { get; set; }
+
         public string? Outcome { get; set; }
         public decimal? RealizedPct { get; set; }
 
         public DateTime? EvaluationStartTime { get; set; }
         public DateTime? EvaluationEndTime { get; set; }
+
+        public decimal MaxHighAfterEntry { get; set; }
+        public decimal ExitDistanceToMaxAfterEntryPct { get; set; }
 
         public decimal MaxHighAfterEntry1D { get; set; }
         public decimal MinLowAfterEntry1D { get; set; }

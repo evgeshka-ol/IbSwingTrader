@@ -85,6 +85,11 @@ namespace IbSwingTrader.Application.Evaluation
                 return result;
             }
 
+            result.MinLowAfterScan = ordered.Min(x => x.Low);
+            result.EntryDistanceToMinAfterScanPct = CalcEntryDistanceToMinPct(
+                candidate.TradePlan.EntryPrice,
+                result.MinLowAfterScan);
+
             var entryPrice = candidate.TradePlan.EntryPrice;
             var exitPrice = candidate.TradePlan.ExitPrice;
             var stopPrice = candidate.TradePlan.StopLoss;
@@ -93,6 +98,7 @@ namespace IbSwingTrader.Application.Evaluation
             if (entryCandle == null)
             {
                 result.EntryTouched = false;
+                LogNoEntryDiagnostics(candidate, ordered, entryPrice);
                 result.Outcome = "NoEntry";
                 return result;
             }
@@ -104,6 +110,14 @@ namespace IbSwingTrader.Application.Evaluation
                 .Where(x => x.Time >= entryCandle.Time)
                 .OrderBy(x => x.Time)
                 .ToList();
+
+            if (afterEntry.Count > 0)
+            {
+                result.MaxHighAfterEntry = afterEntry.Max(x => x.High);
+                result.ExitDistanceToMaxAfterEntryPct = CalcExitDistanceToMaxPct(
+                    exitPrice,
+                    result.MaxHighAfterEntry);
+            }
 
             FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(1), 1);
             FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(2), 2);
@@ -297,6 +311,79 @@ namespace IbSwingTrader.Application.Evaluation
                 return 0m;
 
             return (to - from) / from * 100m;
+        }
+
+        private static decimal CalcEntryDistanceToMinPct(decimal entryPrice, decimal minLowAfterScan)
+        {
+            if (entryPrice <= 0m)
+                return 0m;
+
+            return (entryPrice - minLowAfterScan) / entryPrice * 100m;
+        }
+
+        private static decimal CalcExitDistanceToMaxPct(decimal exitPrice, decimal maxHighAfterEntry)
+        {
+            if (exitPrice <= 0m)
+                return 0m;
+
+            return (maxHighAfterEntry - exitPrice) / exitPrice * 100m;
+        }
+
+        private void LogNoEntryDiagnostics(
+            CandidateDetails candidate,
+            List<Candle> ordered,
+            decimal entryPrice)
+        {
+            if (ordered.Count == 0)
+            {
+                _logger.Info(
+                    $"NoEntry diagnostics for {candidate.Ticker}: no candles after scan. Entry={entryPrice}");
+                return;
+            }
+
+            var minLow = ordered.Min(x => x.Low);
+            var maxHigh = ordered.Max(x => x.High);
+            var nearestIndex = FindNearestCandleIndex(ordered, entryPrice);
+            var from = Math.Max(0, nearestIndex - 2);
+            var to = Math.Min(ordered.Count - 1, nearestIndex + 2);
+
+            _logger.Info(
+                $"NoEntry diagnostics for {candidate.Ticker}: " +
+                $"Entry={entryPrice}, ScanTime={candidate.Scan.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}, " +
+                $"Candles={ordered.Count}, MinLowAfterScan={minLow}, MaxHighAfterScan={maxHigh}");
+
+            for (var i = from; i <= to; i++)
+            {
+                var candle = ordered[i];
+                _logger.Info(
+                    $"NoEntry candle {i}: " +
+                    $"Time={candle.Time:yyyy-MM-dd HH:mm:ss}, " +
+                    $"O={candle.Open}, H={candle.High}, L={candle.Low}, C={candle.Close}");
+            }
+        }
+
+        private static int FindNearestCandleIndex(
+            List<Candle> candles,
+            decimal entryPrice)
+        {
+            var bestIndex = 0;
+            var bestDistance = decimal.MaxValue;
+
+            for (var i = 0; i < candles.Count; i++)
+            {
+                var candle = candles[i];
+                var distance = candle.Low <= entryPrice && candle.High >= entryPrice
+                    ? 0m
+                    : Math.Min(Math.Abs(candle.Low - entryPrice), Math.Abs(candle.High - entryPrice));
+
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+
+            return bestIndex;
         }
 
         private static void FillWindowStatsFromEntry(
