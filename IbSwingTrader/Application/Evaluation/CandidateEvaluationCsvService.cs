@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Collections;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 
@@ -17,26 +18,30 @@ namespace IbSwingTrader.Application.Evaluation
             if (!string.IsNullOrWhiteSpace(dir))
                 Directory.CreateDirectory(dir);
 
-            await AppendRecordsAsync(path, results);
+            await RewriteRecordsAsync(path, results);
         }
 
-        private async Task AppendRecordsAsync<T>(string path, List<T> records)
+        private async Task RewriteRecordsAsync(string path, List<CandidateEvaluationResult> newRecords)
         {
-            var properties = typeof(T)
+            var existingRecords = await ReadExistingRecordsAsync(path);
+            var merged = existingRecords
+                .Concat(newRecords)
+                .GroupBy(BuildKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.Last())
+                .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(x => x.ScanTimeNy)
+                .ToList();
+
+            var properties = typeof(CandidateEvaluationResult)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
                 .Where(x => x.CanRead)
                 .OrderBy(x => x.MetadataToken)
                 .ToArray();
 
             var sb = new StringBuilder();
-            var hasTargetFile = File.Exists(path);
+            sb.AppendLine(string.Join(";", properties.Select(x => Escape(x.Name))));
 
-            if (!hasTargetFile)
-            {
-                sb.AppendLine(string.Join(";", properties.Select(x => Escape(x.Name))));
-            }
-
-            foreach (var record in records)
+            foreach (var record in merged)
             {
                 var values = properties
                     .Select(x => FormatValue(x.GetValue(record)))
@@ -45,10 +50,188 @@ namespace IbSwingTrader.Application.Evaluation
                 sb.AppendLine(string.Join(";", values));
             }
 
-            if (hasTargetFile)
-                await File.AppendAllTextAsync(path, sb.ToString(), Encoding.UTF8);
-            else
-                await File.WriteAllTextAsync(path, sb.ToString(), Encoding.UTF8);
+            await File.WriteAllTextAsync(path, sb.ToString(), Encoding.UTF8);
+        }
+
+        private async Task<List<CandidateEvaluationResult>> ReadExistingRecordsAsync(string path)
+        {
+            if (!File.Exists(path))
+                return [];
+
+            var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8);
+            if (lines.Length <= 1)
+                return [];
+
+            var headers = SplitCsvLine(lines[0]);
+            var headerIndex = headers
+                .Select((name, index) => new { name, index })
+                .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+            var properties = typeof(CandidateEvaluationResult)
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(x => x.CanWrite)
+                .ToArray();
+
+            var records = new List<CandidateEvaluationResult>();
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var values = SplitCsvLine(line);
+                var record = new CandidateEvaluationResult
+                {
+                    Ticker = string.Empty,
+                    PresetScanCode = string.Empty
+                };
+
+                foreach (var property in properties)
+                {
+                    if (!headerIndex.TryGetValue(property.Name, out var index))
+                        continue;
+
+                    if (index >= values.Count)
+                        continue;
+
+                    var raw = values[index];
+                    var parsed = ParseValue(property.PropertyType, raw);
+                    property.SetValue(record, parsed);
+                }
+
+                if (string.IsNullOrWhiteSpace(record.Ticker) || string.IsNullOrWhiteSpace(record.PresetScanCode))
+                    continue;
+
+                records.Add(record);
+            }
+
+            return records;
+        }
+
+        private static object? ParseValue(Type type, string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                if (Nullable.GetUnderlyingType(type) != null)
+                    return null;
+
+                if (type == typeof(string))
+                    return string.Empty;
+
+                return Activator.CreateInstance(type);
+            }
+
+            var targetType = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (targetType == typeof(string))
+                return raw;
+
+            if (targetType == typeof(DateTime))
+            {
+                if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt))
+                    return dt;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : default(DateTime);
+            }
+
+            if (targetType == typeof(DateTimeOffset))
+            {
+                if (DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dto))
+                    return dto;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : default(DateTimeOffset);
+            }
+
+            if (targetType == typeof(decimal))
+            {
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec))
+                    return dec;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0m;
+            }
+
+            if (targetType == typeof(double))
+            {
+                if (double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dbl))
+                    return dbl;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0d;
+            }
+
+            if (targetType == typeof(float))
+            {
+                if (float.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var flt))
+                    return flt;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0f;
+            }
+
+            if (targetType == typeof(int))
+            {
+                if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var i))
+                    return i;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0;
+            }
+
+            if (targetType == typeof(bool))
+            {
+                if (bool.TryParse(raw, out var b))
+                    return b;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : false;
+            }
+
+            if (targetType.IsEnum)
+                return Enum.Parse(targetType, raw, ignoreCase: true);
+
+            return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var result = new List<string>();
+            var sb = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var c = line[i];
+
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (c == ';' && !inQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            result.Add(sb.ToString());
+            return result;
+        }
+
+        private static string BuildKey(CandidateEvaluationResult record)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeNy:O}");
         }
 
         private static string FormatValue(object? value)
@@ -57,6 +240,9 @@ namespace IbSwingTrader.Application.Evaluation
                 return string.Empty;
 
             var type = value.GetType();
+
+            if (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+                return string.Empty;
 
             if (type == typeof(DateTime))
                 return ((DateTime)value).ToString("O", CultureInfo.InvariantCulture);
