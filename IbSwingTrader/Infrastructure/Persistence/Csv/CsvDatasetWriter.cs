@@ -15,7 +15,12 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
 
         public void Write<T>(string path, IEnumerable<T> rows)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
             ArgumentNullException.ThrowIfNull(rows);
+
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(dir))
+                Directory.CreateDirectory(dir);
 
             var list = rows.ToList();
 
