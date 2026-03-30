@@ -215,6 +215,11 @@ namespace IbSwingTrader.App.Commands
             CleanUpSettings settings,
             DateTime marketNow)
         {
+            if (string.Equals(item.LastStatus, "Remove", StringComparison.OrdinalIgnoreCase))
+                return string.IsNullOrWhiteSpace(item.LastStatusReason)
+                    ? "Marked for removal by wish list evaluation"
+                    : $"Marked for removal: {item.LastStatusReason}";
+
             var firstSeen = item.FirstSeenMarketTime ?? item.Scan.ScanTimeMarket;
             var ageDays = (marketNow.Date - firstSeen.Date).TotalDays;
 

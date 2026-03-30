@@ -84,6 +84,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<IWishListEvaluator, WishListEvaluator>();
             services.AddSingleton<IJsonFileService, JsonFileService>();
             services.AddSingleton<ICandidateEvaluationCsvService, CandidateEvaluationCsvService>();
+            services.AddSingleton<IWishListEvaluationCsvService, WishListEvaluationCsvService>();
             services.AddSingleton<IProcessedCandidateFilesService, ProcessedCandidateFilesService>();
             services.AddSingleton<IFileHashService, FileHashService>();
 

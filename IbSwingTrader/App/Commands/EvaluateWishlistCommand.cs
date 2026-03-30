@@ -6,6 +6,7 @@ namespace IbSwingTrader.App.Commands
         ITwsConnection twsConnection,
         IWishListEvaluator wishListEvaluator,
         IJsonFileService jsonFileService,
+        IWishListEvaluationCsvService wishListEvaluationCsvService,
         IWishListResultWriter wishListWriter,
         ITextLogger logger,
         IAgentPathService pathService,
@@ -15,6 +16,7 @@ namespace IbSwingTrader.App.Commands
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly IWishListEvaluator _wishListEvaluator = wishListEvaluator;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly IWishListEvaluationCsvService _wishListEvaluationCsvService = wishListEvaluationCsvService;
         private readonly IWishListResultWriter _wishListWriter = wishListWriter;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -25,15 +27,16 @@ namespace IbSwingTrader.App.Commands
         {
             var twsSettings = _twsSettingsProvider.Get();
             var wishListPath = _pathService.GetWishListFile();
+            var wishListEvaluationsPath = _pathService.GetWishListEvaluationsFile();
 
             EnsureConnected(twsSettings.ConnectTimeoutSeconds);
 
-            await EvaluateWishListAsync(wishListPath);
+            await EvaluateWishListAsync(wishListPath, wishListEvaluationsPath);
 
             _logger.Info("Wish list evaluation pipeline completed.");
         }
 
-        private async Task EvaluateWishListAsync(string wishListPath)
+        private async Task EvaluateWishListAsync(string wishListPath, string wishListEvaluationsPath)
         {
             if (!File.Exists(wishListPath))
             {
@@ -73,21 +76,31 @@ namespace IbSwingTrader.App.Commands
             }
 
             var evaluations = await _wishListEvaluator.EvaluateAsync(oldItems);
+            var evaluationTime = marketNow;
 
-            var removeKeys = evaluations
-                .Where(x => x.RemoveFromWishList)
-                .Select(x => BuildWishListKey(x.Ticker, x.ScanTimeNy))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var evaluationMap = evaluations.ToDictionary(
+                x => BuildWishListKey(x.Ticker, x.ScanTimeNy),
+                x => x,
+                StringComparer.OrdinalIgnoreCase);
 
-            var keptOldItems = oldItems
-                .Where(x => !removeKeys.Contains(BuildWishListKey(x.Ticker, x.Scan.ScanTimeMarket)))
+            var records = oldItems
+                .Select(x => BuildRecord(x, evaluationMap, evaluationTime))
+                .Where(x => x != null)
+                .Cast<WishListEvaluationRecord>()
+                .ToList();
+
+            var updatedOldItems = oldItems
+                .Select(x => ApplyEvaluationResult(x, evaluationMap, evaluationTime))
                 .ToList();
 
             var updatedItems = todayItems
-                .Concat(keptOldItems)
+                .Concat(updatedOldItems)
                 .OrderByDescending(x => x.Scan.ScanTimeMarket)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            if (records.Count > 0)
+                await _wishListEvaluationCsvService.WriteAsync(wishListEvaluationsPath, records);
 
             await _wishListWriter.WriteAsync(wishListPath, updatedItems);
 
@@ -117,9 +130,9 @@ namespace IbSwingTrader.App.Commands
             int originalCount,
             int updatedCount)
         {
-            var removed = results.Count(x => x.RemoveFromWishList);
+            var removeSuggested = results.Count(x => x.RemoveFromWishList);
             var deferred = results.Count(x => string.Equals(x.Decision, "Deferred", StringComparison.OrdinalIgnoreCase));
-            var kept = results.Count - removed - deferred;
+            var kept = results.Count - removeSuggested - deferred;
 
             var groupedReasons = results
                 .Where(x => x.RemoveFromWishList)
@@ -133,12 +146,51 @@ namespace IbSwingTrader.App.Commands
                 : string.Join(", ", groupedReasons);
 
             _logger.Info(
-                $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Deferred={deferred} Removed={removed} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
+                $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Deferred={deferred} RemoveSuggested={removeSuggested} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
         }
 
         private static string BuildWishListKey(string ticker, DateTime scanTimeNy)
         {
             return $"{ticker}__{scanTimeNy:yyyyMMddHHmmss}";
+        }
+
+        private static WishListItem ApplyEvaluationResult(
+            WishListItem item,
+            Dictionary<string, WishListEvaluationResult> evaluationMap,
+            DateTime evaluationTime)
+        {
+            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTimeMarket), out var evaluation))
+                return item;
+
+            item.LastEvaluatedMarketTime = evaluationTime;
+            item.LastStatus = evaluation.Decision;
+            item.LastStatusReason = evaluation.Reason;
+            item.LastStatusMarketTime = evaluationTime;
+
+            return item;
+        }
+
+        private static WishListEvaluationRecord? BuildRecord(
+            WishListItem item,
+            Dictionary<string, WishListEvaluationResult> evaluationMap,
+            DateTime evaluationTime)
+        {
+            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTimeMarket), out var evaluation))
+                return null;
+
+            return new WishListEvaluationRecord
+            {
+                Ticker = item.Ticker,
+                ScanTimeNy = item.Scan.ScanTimeMarket,
+                FirstSeenMarketTime = item.FirstSeenMarketTime,
+                PreviousLastEvaluatedMarketTime = item.LastEvaluatedMarketTime,
+                PreviousDecision = item.LastStatus,
+                PreviousReason = item.LastStatusReason,
+                EvaluatedAtMarketTime = evaluationTime,
+                Decision = evaluation.Decision,
+                Reason = evaluation.Reason,
+                RemoveSuggested = evaluation.RemoveFromWishList
+            };
         }
 
         private static DateTime GetMarketNow(string timezoneId)

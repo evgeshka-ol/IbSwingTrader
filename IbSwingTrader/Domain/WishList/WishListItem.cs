@@ -15,5 +15,11 @@ namespace IbSwingTrader.Domain.WishList
         public DateTime? ExpectedTargetMarketTime { get; set; }
 
         public int? ExpectedBarsToTarget { get; set; }
+
+        public string? LastStatus { get; set; }
+
+        public string? LastStatusReason { get; set; }
+
+        public DateTime? LastStatusMarketTime { get; set; }
     }
 }
