@@ -102,6 +102,9 @@ namespace IbSwingTrader.Application.Evaluation
                 if (string.IsNullOrWhiteSpace(record.Ticker) || string.IsNullOrWhiteSpace(record.PresetScanCode))
                     continue;
 
+                if (record.StrategyVersion <= 0)
+                    record.StrategyVersion = InferStrategyVersion(record);
+
                 records.Add(record);
             }
 
@@ -232,6 +235,17 @@ namespace IbSwingTrader.Application.Evaluation
             return string.Create(
                 CultureInfo.InvariantCulture,
                 $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeNy:O}");
+        }
+
+        private static int InferStrategyVersion(CandidateEvaluationResult record)
+        {
+            if (string.Equals(record.Ticker, "SGML", StringComparison.OrdinalIgnoreCase) &&
+                record.ScanTimeNy.Date == new DateTime(2026, 3, 28))
+            {
+                return 2;
+            }
+
+            return 1;
         }
 
         private static string FormatValue(object? value)

@@ -6,6 +6,7 @@ namespace IbSwingTrader.Domain.Candidates
         public DateTime ScanTimeNy { get; set; }
 
         public required string PresetScanCode { get; set; }
+        public int StrategyVersion { get; set; }
         public decimal CandidateScore { get; set; }
 
         public decimal EntryPrice { get; set; }
