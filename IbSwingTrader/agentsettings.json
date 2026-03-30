@@ -4,7 +4,7 @@
     "Paths": {
         "DataRoot": "..\\..\\..\\..\\Data",
         "TradesFile": "trades.csv",
-        "DatasetFile": "dataset.csv",
+        "DatasetFile": "datasets/trade_dataset.csv",
         "CacheFolder": "cache",
         "CandidatesFile": "Tickers/candidates.json",
         "EvaluationsFile": "Tickers/evaluations.csv",
