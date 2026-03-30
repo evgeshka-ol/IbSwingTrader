@@ -26,6 +26,14 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal DistanceTo52wHigh { get; set; }
 
+        public decimal DailyBollingerUpperDistancePct { get; set; }
+
+        public decimal DailyBollingerBandWidthPct { get; set; }
+
+        public decimal? WeeklyBollingerUpperDistancePct { get; set; }
+
+        public decimal? WeeklyBollingerBandWidthPct { get; set; }
+
         public List<decimal> DailyMaDistances { get; set; } = [];
         public List<decimal> DailyRsiValues { get; set; } = [];
         public List<decimal> DailyMacdValues { get; set; } = [];

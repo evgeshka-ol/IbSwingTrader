@@ -10,10 +10,14 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal MACDLineMinusSignal { get; set; }
 
         public decimal DailyMaSignedDistancePct { get; set; }
+        public decimal DailyBollingerUpperDistancePct { get; set; }
+        public decimal DailyBollingerBandWidthPct { get; set; }
         public decimal DailyRSI14 { get; set; }
         public decimal DailyMACDLineMinusSignal { get; set; }
 
         public decimal? WeeklyMaSignedDistancePct { get; set; }
+        public decimal? WeeklyBollingerUpperDistancePct { get; set; }
+        public decimal? WeeklyBollingerBandWidthPct { get; set; }
         public decimal? WeeklyRSI14 { get; set; }
         public decimal? WeeklyMACDLineMinusSignal { get; set; }
     }

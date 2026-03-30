@@ -9,6 +9,7 @@ namespace IbSwingTrader.Domain.Settings
         public int MinimumCandles { get; set; } = 120;
         public int MaxParallelTickers { get; set; } = 2;
         public int LocalExtremaLookbackBars { get; set; } = 3;
+        public int EpisodeMergeCooldownBars { get; set; } = 8;
         public int MaxBarsToPeak { get; set; } = 30;
         public decimal MinRunupPct { get; set; } = 20m;
     }

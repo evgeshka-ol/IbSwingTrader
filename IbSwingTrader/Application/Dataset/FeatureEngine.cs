@@ -22,11 +22,15 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- Daily ---
                 DailyMaSignedDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
+                DailyBollingerUpperDistancePct = CalcDailyBollingerUpperDistancePct(candles, index, 20, 2m),
+                DailyBollingerBandWidthPct = CalcDailyBollingerBandWidthPct(candles, index, 20, 2m),
                 DailyRSI14 = CalcDailyRsi14(candles, index),
                 DailyMACDLineMinusSignal = CalcDailyMacdLineMinusSignal(candles, index),
 
                 // --- Weekly ---
                 WeeklyMaSignedDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
+                WeeklyBollingerUpperDistancePct = CalcWeeklyBollingerUpperDistancePct(candles, index, 20, 2m),
+                WeeklyBollingerBandWidthPct = CalcWeeklyBollingerBandWidthPct(candles, index, 20, 2m),
                 WeeklyRSI14 = CalcWeeklyRsi14(candles, index),
                 WeeklyMACDLineMinusSignal = CalcWeeklyMacdLineMinusSignal(candles, index)
             };
@@ -135,6 +139,24 @@ namespace IbSwingTrader.Application.Dataset
             return (close - sma) / sma * 100m;
         }
 
+        private static decimal CalcDailyBollingerUpperDistancePct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerUpperDistancePctFromSeries(BuildDailyCloses(candles, i), length, stdDevMultiplier) ?? 0m;
+        }
+
+        private static decimal CalcDailyBollingerBandWidthPct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerBandWidthPctFromSeries(BuildDailyCloses(candles, i), length, stdDevMultiplier) ?? 0m;
+        }
+
         private static decimal? CalcWeeklySmaSignedDistancePct(
             List<Candle> candles,
             int i,
@@ -155,6 +177,24 @@ namespace IbSwingTrader.Application.Dataset
 
             var close = weeklyCloses[^1];
             return (close - sma) / sma * 100m;
+        }
+
+        private static decimal? CalcWeeklyBollingerUpperDistancePct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerUpperDistancePctFromSeries(BuildWeeklyCloses(candles, i), length, stdDevMultiplier);
+        }
+
+        private static decimal? CalcWeeklyBollingerBandWidthPct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerBandWidthPctFromSeries(BuildWeeklyCloses(candles, i), length, stdDevMultiplier);
         }
 
         private static decimal CalcRsiFromCandles(
@@ -293,6 +333,64 @@ namespace IbSwingTrader.Application.Dataset
                 return null;
 
             return macdSeries[^1].Macd - macdSeries[^1].Signal;
+        }
+
+        private static decimal? CalcBollingerUpperDistancePctFromSeries(
+            List<decimal> closes,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            if (closes.Count < length)
+                return null;
+
+            var window = closes.Skip(closes.Count - length).ToList();
+            var sma = window.Average();
+            var stdDev = CalcStandardDeviation(window, sma);
+            var upperBand = sma + stdDevMultiplier * stdDev;
+
+            if (upperBand == 0m)
+                return null;
+
+            var close = closes[^1];
+            return (upperBand - close) / close * 100m;
+        }
+
+        private static decimal? CalcBollingerBandWidthPctFromSeries(
+            List<decimal> closes,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            if (closes.Count < length)
+                return null;
+
+            var window = closes.Skip(closes.Count - length).ToList();
+            var sma = window.Average();
+
+            if (sma == 0m)
+                return null;
+
+            var stdDev = CalcStandardDeviation(window, sma);
+            var upperBand = sma + stdDevMultiplier * stdDev;
+            var lowerBand = sma - stdDevMultiplier * stdDev;
+
+            return (upperBand - lowerBand) / sma * 100m;
+        }
+
+        private static decimal CalcStandardDeviation(List<decimal> values, decimal mean)
+        {
+            if (values.Count == 0)
+                return 0m;
+
+            decimal variance = 0m;
+
+            foreach (var value in values)
+            {
+                var delta = value - mean;
+                variance += delta * delta;
+            }
+
+            variance /= values.Count;
+            return (decimal)Math.Sqrt((double)variance);
         }
 
         private static List<decimal> BuildDailyCloses(List<Candle> candles, int i)

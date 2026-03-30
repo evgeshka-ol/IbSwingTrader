@@ -45,7 +45,7 @@ namespace IbSwingTrader.App.Commands
             var tickers = await LoadKnownTickersAsync();
 
             _logger.Info(
-                $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxBarsToPeak={settings.MaxBarsToPeak}");
+                $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxBarsToPeak={settings.MaxBarsToPeak}, EpisodeMergeCooldownBars={settings.EpisodeMergeCooldownBars}");
             _logger.Info($"Research tickers found: {tickers.Count}");
 
             if (tickers.Count == 0)
@@ -181,25 +181,32 @@ namespace IbSwingTrader.App.Commands
             ResearchSettings settings,
             List<Candle> candles)
         {
-            var rows = new List<ResearchDatasetRow>();
-
             if (candles.Count < settings.MinimumCandles)
-                return rows;
+                return [];
 
-            var i = settings.LocalExtremaLookbackBars;
+            var candidates = BuildEpisodeCandidates(candles, settings);
+            var merged = MergeEpisodeCandidates(candidates, settings.EpisodeMergeCooldownBars);
 
-            while (i < candles.Count - settings.LocalExtremaLookbackBars - 1)
+            return merged
+                .Select(x => BuildRow(ticker, settings, candles, x))
+                .ToList();
+        }
+
+        private static List<ResearchEpisodeCandidate> BuildEpisodeCandidates(
+            List<Candle> candles,
+            ResearchSettings settings)
+        {
+            var episodes = new List<ResearchEpisodeCandidate>();
+
+            for (var i = settings.LocalExtremaLookbackBars; i < candles.Count - settings.LocalExtremaLookbackBars - 1; i++)
             {
                 if (!IsLocalMinimum(candles, i, settings.LocalExtremaLookbackBars))
-                {
-                    i++;
                     continue;
-                }
 
                 var maxForwardIndex = Math.Min(candles.Count - 1, i + settings.MaxBarsToPeak);
                 var peakIndex = i;
                 var peakHigh = candles[i].High;
-                var minLowAfterEntry = candles[i].Low;
+                var minLowAfterReference = candles[i].Low;
 
                 for (var j = i + 1; j <= maxForwardIndex; j++)
                 {
@@ -209,50 +216,92 @@ namespace IbSwingTrader.App.Commands
                         peakIndex = j;
                     }
 
-                    if (candles[j].Low < minLowAfterEntry)
-                        minLowAfterEntry = candles[j].Low;
+                    if (candles[j].Low < minLowAfterReference)
+                        minLowAfterReference = candles[j].Low;
                 }
 
                 var referencePrice = candles[i].Close;
                 if (referencePrice <= 0m || peakIndex <= i)
-                {
-                    i++;
                     continue;
-                }
 
                 var runupPct = (peakHigh - referencePrice) / referencePrice * 100m;
                 if (runupPct < settings.MinRunupPct)
+                    continue;
+
+                var maxDrawdownPct = (minLowAfterReference - referencePrice) / referencePrice * 100m;
+
+                episodes.Add(new ResearchEpisodeCandidate
                 {
-                    i++;
+                    ReferenceIndex = i,
+                    PeakIndex = peakIndex,
+                    PeakHigh = peakHigh,
+                    MinLowAfterReference = minLowAfterReference,
+                    RunupPct = runupPct,
+                    MaxDrawdownPct = maxDrawdownPct
+                });
+            }
+
+            return episodes;
+        }
+
+        private static List<ResearchEpisodeCandidate> MergeEpisodeCandidates(
+            List<ResearchEpisodeCandidate> episodes,
+            int cooldownBars)
+        {
+            if (episodes.Count == 0)
+                return [];
+
+            var ordered = episodes
+                .OrderBy(x => x.ReferenceIndex)
+                .ThenByDescending(x => x.RunupPct)
+                .ToList();
+
+            var result = new List<ResearchEpisodeCandidate>();
+            var clusterBest = ordered[0];
+            var clusterEnd = ordered[0].PeakIndex;
+
+            for (var i = 1; i < ordered.Count; i++)
+            {
+                var next = ordered[i];
+
+                if (next.ReferenceIndex <= clusterEnd + cooldownBars)
+                {
+                    clusterEnd = Math.Max(clusterEnd, next.PeakIndex);
+
+                    if (IsBetterEpisode(next, clusterBest))
+                        clusterBest = next;
+
                     continue;
                 }
 
-                rows.Add(BuildRow(
-                    ticker,
-                    settings,
-                    candles,
-                    i,
-                    peakIndex,
-                    peakHigh,
-                    minLowAfterEntry));
-
-                i = peakIndex + 1;
+                result.Add(clusterBest);
+                clusterBest = next;
+                clusterEnd = next.PeakIndex;
             }
 
-            return rows;
+            result.Add(clusterBest);
+            return result;
+        }
+
+        private static bool IsBetterEpisode(ResearchEpisodeCandidate candidate, ResearchEpisodeCandidate currentBest)
+        {
+            if (candidate.RunupPct != currentBest.RunupPct)
+                return candidate.RunupPct > currentBest.RunupPct;
+
+            if (candidate.MaxDrawdownPct != currentBest.MaxDrawdownPct)
+                return candidate.MaxDrawdownPct > currentBest.MaxDrawdownPct;
+
+            return candidate.ReferenceIndex < currentBest.ReferenceIndex;
         }
 
         private ResearchDatasetRow BuildRow(
             string ticker,
             ResearchSettings settings,
             List<Candle> candles,
-            int referenceIndex,
-            int peakIndex,
-            decimal peakHigh,
-            decimal minLowAfterReference)
+            ResearchEpisodeCandidate episode)
         {
-            var referenceFeatures = _featureEngine.Calculate(candles, referenceIndex + 1);
-            var referencePrice = candles[referenceIndex].Close;
+            var referenceFeatures = _featureEngine.Calculate(candles, episode.ReferenceIndex + 1);
+            var referencePrice = candles[episode.ReferenceIndex].Close;
 
             var row = new ResearchDatasetRow
             {
@@ -260,18 +309,22 @@ namespace IbSwingTrader.App.Commands
                 Mode = settings.Mode,
                 Source = settings.Source,
                 ReferenceType = "OracleBottom",
-                ReferenceTimeMarket = candles[referenceIndex].Time,
+                ReferenceTimeMarket = candles[episode.ReferenceIndex].Time,
                 ReferencePrice = referencePrice,
-                PeakTimeMarket = candles[peakIndex].Time,
-                PeakPrice = peakHigh,
-                RunupPct = referencePrice == 0m ? 0m : (peakHigh - referencePrice) / referencePrice * 100m,
-                BarsToPeak = peakIndex - referenceIndex,
-                MaxDrawdownBeforePeakPct = referencePrice == 0m ? 0m : (minLowAfterReference - referencePrice) / referencePrice * 100m,
+                PeakTimeMarket = candles[episode.PeakIndex].Time,
+                PeakPrice = episode.PeakHigh,
+                RunupPct = episode.RunupPct,
+                BarsToPeak = episode.PeakIndex - episode.ReferenceIndex,
+                MaxDrawdownBeforePeakPct = episode.MaxDrawdownPct,
                 DistanceTo20dHigh = referenceFeatures.DistanceTo20dHigh,
-                DistanceTo52wHigh = referenceFeatures.DistanceTo52wHigh
+                DistanceTo52wHigh = referenceFeatures.DistanceTo52wHigh,
+                DailyBollingerUpperDistancePct = referenceFeatures.DailyBollingerUpperDistancePct,
+                DailyBollingerBandWidthPct = referenceFeatures.DailyBollingerBandWidthPct,
+                WeeklyBollingerUpperDistancePct = referenceFeatures.WeeklyBollingerUpperDistancePct,
+                WeeklyBollingerBandWidthPct = referenceFeatures.WeeklyBollingerBandWidthPct
             };
 
-            FillSeries(row, candles, referenceIndex, peakIndex);
+            FillSeries(row, candles, episode.ReferenceIndex, episode.PeakIndex);
             return row;
         }
 
@@ -421,6 +474,16 @@ namespace IbSwingTrader.App.Commands
                 Ticker = ticker,
                 Problem = problem
             });
+        }
+
+        private sealed class ResearchEpisodeCandidate
+        {
+            public int ReferenceIndex { get; set; }
+            public int PeakIndex { get; set; }
+            public decimal PeakHigh { get; set; }
+            public decimal MinLowAfterReference { get; set; }
+            public decimal RunupPct { get; set; }
+            public decimal MaxDrawdownPct { get; set; }
         }
     }
 }
