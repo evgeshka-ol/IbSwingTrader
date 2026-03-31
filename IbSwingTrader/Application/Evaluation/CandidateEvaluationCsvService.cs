@@ -39,7 +39,7 @@ namespace IbSwingTrader.Application.Evaluation
                 .ToArray();
 
             var sb = new StringBuilder();
-            sb.AppendLine(string.Join(";", properties.Select(x => Escape(x.Name))));
+            sb.AppendLine(string.Join(",", properties.Select(x => Escape(x.Name))));
 
             foreach (var record in merged)
             {
@@ -47,7 +47,7 @@ namespace IbSwingTrader.Application.Evaluation
                     .Select(x => FormatValue(x.GetValue(record)))
                     .Select(Escape);
 
-                sb.AppendLine(string.Join(";", values));
+                sb.AppendLine(string.Join(",", values));
             }
 
             await File.WriteAllTextAsync(path, sb.ToString(), Encoding.UTF8);
@@ -62,7 +62,8 @@ namespace IbSwingTrader.Application.Evaluation
             if (lines.Length <= 1)
                 return [];
 
-            var headers = SplitCsvLine(lines[0]);
+            var delimiter = DetectDelimiter(lines[0]);
+            var headers = SplitCsvLine(lines[0], delimiter);
             var headerIndex = headers
                 .Select((name, index) => new { name, index })
                 .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
@@ -79,7 +80,7 @@ namespace IbSwingTrader.Application.Evaluation
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
 
-                var values = SplitCsvLine(line);
+                var values = SplitCsvLine(line, delimiter);
                 var record = new CandidateEvaluationResult
                 {
                     Ticker = string.Empty,
@@ -191,7 +192,33 @@ namespace IbSwingTrader.Application.Evaluation
             return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
         }
 
-        private static List<string> SplitCsvLine(string line)
+        private static char DetectDelimiter(string line)
+        {
+            var commaCount = 0;
+            var semicolonCount = 0;
+            var inQuotes = false;
+
+            foreach (var c in line)
+            {
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (inQuotes)
+                    continue;
+
+                if (c == ',')
+                    commaCount++;
+                else if (c == ';')
+                    semicolonCount++;
+            }
+
+            return commaCount >= semicolonCount ? ',' : ';';
+        }
+
+        private static List<string> SplitCsvLine(string line, char delimiter)
         {
             var result = new List<string>();
             var sb = new StringBuilder();
@@ -216,7 +243,7 @@ namespace IbSwingTrader.Application.Evaluation
                     continue;
                 }
 
-                if (c == ';' && !inQuotes)
+                if (c == delimiter && !inQuotes)
                 {
                     result.Add(sb.ToString());
                     sb.Clear();
