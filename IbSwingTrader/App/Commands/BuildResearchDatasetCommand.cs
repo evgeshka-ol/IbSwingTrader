@@ -234,7 +234,7 @@ namespace IbSwingTrader.App.Commands
                     return string.Empty;
 
                 if (type == typeof(List<decimal>))
-                    return [];
+                    return new List<decimal>();
 
                 return Activator.CreateInstance(type);
             }
@@ -289,10 +289,9 @@ namespace IbSwingTrader.App.Commands
             if (string.IsNullOrWhiteSpace(trimmed))
                 return [];
 
-            return trimmed
+            return [.. trimmed
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec) ? dec : 0m)
-                .ToList();
+                .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec) ? dec : 0m)];
         }
 
         private static List<string> SplitCsvLine(string line)
@@ -378,9 +377,7 @@ namespace IbSwingTrader.App.Commands
             var candidates = BuildEpisodeCandidates(candles, settings);
             var merged = MergeEpisodeCandidates(candidates, settings.EpisodeMergeCooldownBars);
 
-            return merged
-                .Select(x => BuildRow(ticker, settings, candles, x))
-                .ToList();
+            return [.. merged.Select(x => BuildRow(ticker, settings, candles, x))];
         }
 
         private static List<ResearchEpisodeCandidate> BuildEpisodeCandidates(
