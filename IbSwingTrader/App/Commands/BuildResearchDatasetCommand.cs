@@ -1,4 +1,7 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
 using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.App.Commands
@@ -71,7 +74,16 @@ namespace IbSwingTrader.App.Commands
             }).ToList();
 
             var results = await Task.WhenAll(tasks);
-            var allRows = results.SelectMany(x => x).ToList();
+            var freshRows = results.SelectMany(x => x).ToList();
+            var existingRows = await ReadExistingRowsAsync(outputPath);
+            var allRows = existingRows
+                .Concat(freshRows)
+                .GroupBy(BuildResearchRowKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.Last())
+                .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(x => x.ReferenceTimeMarket)
+                .ThenByDescending(x => x.PeakTimeMarket)
+                .ToList();
 
             _csvWriter.Write(outputPath, allRows);
 
@@ -141,6 +153,185 @@ namespace IbSwingTrader.App.Commands
             return result
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static string BuildResearchRowKey(ResearchDatasetRow row)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{row.Ticker}|{row.Mode}|{row.Source}|{row.ReferenceType}|{row.ReferenceTimeMarket:yyyy-MM-dd HH:mm:ss}|{row.PeakTimeMarket:yyyy-MM-dd HH:mm:ss}");
+        }
+
+        private static async Task<List<ResearchDatasetRow>> ReadExistingRowsAsync(string path)
+        {
+            if (!File.Exists(path))
+                return [];
+
+            var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8);
+            if (lines.Length <= 1)
+                return [];
+
+            var headers = SplitCsvLine(lines[0]);
+            var headerIndex = headers
+                .Select((name, index) => new { name, index })
+                .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+            var properties = typeof(ResearchDatasetRow)
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(x => x.CanWrite)
+                .ToArray();
+
+            var rows = new List<ResearchDatasetRow>();
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var values = SplitCsvLine(line);
+                var row = new ResearchDatasetRow
+                {
+                    Ticker = string.Empty,
+                    Mode = string.Empty,
+                    Source = string.Empty,
+                    ReferenceType = string.Empty
+                };
+
+                foreach (var property in properties)
+                {
+                    if (!headerIndex.TryGetValue(property.Name, out var index))
+                        continue;
+
+                    if (index >= values.Count)
+                        continue;
+
+                    var parsed = ParseValue(property.PropertyType, values[index]);
+                    property.SetValue(row, parsed);
+                }
+
+                if (string.IsNullOrWhiteSpace(row.Ticker) ||
+                    string.IsNullOrWhiteSpace(row.Mode) ||
+                    string.IsNullOrWhiteSpace(row.Source) ||
+                    string.IsNullOrWhiteSpace(row.ReferenceType))
+                {
+                    continue;
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private static object? ParseValue(Type type, string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                if (Nullable.GetUnderlyingType(type) != null)
+                    return null;
+
+                if (type == typeof(string))
+                    return string.Empty;
+
+                if (type == typeof(List<decimal>))
+                    return [];
+
+                return Activator.CreateInstance(type);
+            }
+
+            var targetType = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (targetType == typeof(string))
+                return raw;
+
+            if (targetType == typeof(DateTime))
+            {
+                if (DateTime.TryParseExact(raw, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                    return dt;
+
+                if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out dt))
+                    return dt;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : default(DateTime);
+            }
+
+            if (targetType == typeof(decimal))
+            {
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec))
+                    return dec;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0m;
+            }
+
+            if (targetType == typeof(int))
+            {
+                if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var i))
+                    return i;
+
+                return 0;
+            }
+
+            if (targetType == typeof(List<decimal>))
+                return ParseDecimalList(raw);
+
+            return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
+        }
+
+        private static List<decimal> ParseDecimalList(string raw)
+        {
+            var trimmed = raw.Trim();
+            if (trimmed.Length < 2 || trimmed == "[]")
+                return [];
+
+            if (trimmed[0] == '[' && trimmed[^1] == ']')
+                trimmed = trimmed[1..^1];
+
+            if (string.IsNullOrWhiteSpace(trimmed))
+                return [];
+
+            return trimmed
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec) ? dec : 0m)
+                .ToList();
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var result = new List<string>();
+            var sb = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var c = line[i];
+
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (c == ',' && !inQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            result.Add(sb.ToString());
+            return result;
         }
 
         private async Task<List<ResearchDatasetRow>> ProcessTickerAsync(string ticker, ResearchSettings settings)
