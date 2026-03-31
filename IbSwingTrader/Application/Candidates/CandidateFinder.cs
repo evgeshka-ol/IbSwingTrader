@@ -1,5 +1,6 @@
 ﻿using IBApi;
 using IbSwingTrader.Common.Time;
+using IbSwingTrader.Domain.Settings;
 
 namespace IbSwingTrader.Application.Candidates
 {
@@ -216,18 +217,30 @@ namespace IbSwingTrader.Application.Candidates
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach (var ctx in scannedWishListContexts.Values)
+            foreach (var mergedWishItem in mergedWishList)
             {
-                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
-                    continue;
-
                 var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
 
                 if (firstSeenDate == null || firstSeenDate.Value >= todayMarketDate)
-                {
-                    _logger.Info($"Entry skipped for {ctx.Stock.Ticker}: first seen today in wish list.");
                     continue;
+
+                WishListContext? ctx = null;
+
+                if (scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var scannedCtx))
+                {
+                    ctx = scannedCtx;
                 }
+                else
+                {
+                    ctx = await TryBuildWishListContextFromExistingItem(
+                        mergedWishItem,
+                        marketNow,
+                        marketTimezone,
+                        finderSettings);
+                }
+
+                if (ctx == null)
+                    continue;
 
                 await TryAddCandidate(
                     candidateResults,
@@ -374,6 +387,106 @@ namespace IbSwingTrader.Application.Candidates
                 finalScore);
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+        }
+
+        private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
+            WishListItem item,
+            DateTime marketNow,
+            string marketTimezone,
+            FinderSettings finderSettings)
+        {
+            Contract contract;
+
+            try
+            {
+                contract = await _contractResolver.ResolveStockAsync(item.Ticker);
+            }
+            catch (Exception ex)
+            {
+                _logger.Info($"Skipping {item.Ticker}: failed to resolve contract from wish list. {ex.Message}");
+                return null;
+            }
+
+            List<Candle>? candles;
+
+            try
+            {
+                var end = MarketTime.Now();
+                var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+
+                candles = await _historicalData.GetCandlesRange(
+                    item.Ticker,
+                    contract,
+                    Timeframe.H4,
+                    start,
+                    end);
+
+                if (candles != null &&
+                    finderSettings.CandleCount > 0 &&
+                    candles.Count > finderSettings.CandleCount)
+                {
+                    var trimmedCandles = candles
+                        .TakeLast(finderSettings.CandleCount)
+                        .ToList();
+
+                    var trimmedWeeklyBars = BuildWeeklyBars(trimmedCandles);
+
+                    if (trimmedWeeklyBars.Count >= 20)
+                        candles = trimmedCandles;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Info($"Skipping {item.Ticker}: failed to load wish list candles. {ex.Message}");
+                return null;
+            }
+
+            if (candles == null || candles.Count < finderSettings.MinimumCandles)
+            {
+                _logger.Info(
+                    $"Skipping {item.Ticker}: not enough wish list candles " +
+                    $"({candles?.Count ?? 0} < {finderSettings.MinimumCandles}).");
+                return null;
+            }
+
+            CandidateSignalSnapshot snapshot;
+
+            try
+            {
+                snapshot = _signalAnalyzer.Analyze(candles);
+            }
+            catch (Exception ex)
+            {
+                _logger.Info($"Skipping {item.Ticker}: failed to analyze wish list signals. {ex.Message}");
+                return null;
+            }
+
+            var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
+
+            _logger.Info(
+                $"Aged wish list context rebuilt: {item.Ticker}. " +
+                $"H4={candles.Count}, AvgDollarVolume={avgDollarVolume}");
+
+            return new WishListContext
+            {
+                Stock = new StockInfo
+                {
+                    Ticker = item.Ticker,
+                    Exchange = contract.Exchange ?? string.Empty,
+                    Currency = contract.Currency ?? string.Empty,
+                    TradingClass = contract.TradingClass ?? string.Empty,
+                    ConId = contract.ConId
+                },
+                Contract = contract,
+                Preset = new PresetScanCode(
+                    item.Scan.PresetScanCode,
+                    item.Scan.PresetDescription),
+                Snapshot = snapshot,
+                Candles = candles,
+                ScanTimeMarket = marketNow,
+                AvgDollarVolumeDaily = avgDollarVolume,
+                WishListItem = item
+            };
         }
 
         private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx)
