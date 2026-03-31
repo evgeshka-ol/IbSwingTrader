@@ -4,8 +4,6 @@ namespace IbSwingTrader.Domain.Dataset
     {
         public bool IsShort { get; set; }
 
-        public DateTime EntryDate => EntryTimeMarket.Date;
-
         public DateTime EntryTimeMarket { get; set; }
         public decimal EntryPrice { get; set; }
 
