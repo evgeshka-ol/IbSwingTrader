@@ -15,6 +15,13 @@ namespace IbSwingTrader.Application.Candidates
         {
             var s = _settingsProvider.Get().EntryFilter;
             var f = snapshot.Current;
+            var isRecoveryCandidate =
+                f.DistanceTo20dHigh <= -20m &&
+                snapshot.DailyMaDelta3 > s.MinDailyMaDelta3 &&
+                snapshot.DailyRsiDelta3 > s.MinDailyRsiDelta3 &&
+                f.DailyRSI14 >= 30m &&
+                (!f.WeeklyMACDLineMinusSignal.HasValue ||
+                 f.WeeklyMACDLineMinusSignal.Value <= s.MaxCurrentWeeklyMacdLineMinusSignal);
 
             if (avgDollarVolumeDaily20 < s.MinDollarVolume)
             {
@@ -28,7 +35,7 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            if (f.DailyMaSignedDistancePct < s.MinCurrentDailyMaSignedDistancePct)
+            if (f.DailyMaSignedDistancePct < s.MinCurrentDailyMaSignedDistancePct && !isRecoveryCandidate)
             {
                 _logger.Info("Entry rejected: current daily MA position is too weak.");
                 return false;
@@ -62,7 +69,7 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            if (snapshot.DailyRsiDelta3 < s.MinDailyRsiDelta3Strong)
+            if (snapshot.DailyRsiDelta3 < s.MinDailyRsiDelta3Strong && !isRecoveryCandidate)
             {
                 _logger.Info("Entry rejected: daily RSI acceleration is too weak.");
                 return false;
