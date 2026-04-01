@@ -42,6 +42,22 @@ namespace IbSwingTrader.Application.Candidates
                 score += 12m;
             }
 
+            // Research winners suggest a second archetype besides pure momentum:
+            // deep pullback / recovery names that are still below recent highs but
+            // already show improving daily structure. Keep this as a soft bonus.
+            if (f.DistanceTo20dHigh <= -20m &&
+                snapshot.DailyMaDelta3 > 0m &&
+                snapshot.DailyRsiDelta3 > 0m)
+            {
+                score += 6m;
+
+                if (f.DailyRSI14 >= 35m && f.DailyRSI14 <= 52m)
+                    score += 4m;
+
+                if (!f.WeeklyMACDLineMinusSignal.HasValue || f.WeeklyMACDLineMinusSignal.Value <= 0.5m)
+                    score += 4m;
+            }
+
             if (f.WeeklyMACDLineMinusSignal.HasValue &&
                 f.WeeklyMACDLineMinusSignal.Value > 0.5m)
             {
