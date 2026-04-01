@@ -48,6 +48,10 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal MaxHighAfterEntry { get; set; }
         public decimal ExitDistanceToMaxAfterEntryPct { get; set; }
 
+        public decimal MaxHighAfterExit { get; set; }
+        public decimal TakeProfitOverflowPct { get; set; }
+        public decimal DaysAfterExitToMaxHigh { get; set; }
+
         public decimal MaxHighAfterEntry1D { get; set; }
         public decimal MinLowAfterEntry1D { get; set; }
 

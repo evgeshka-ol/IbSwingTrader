@@ -154,6 +154,7 @@ namespace IbSwingTrader.Application.Evaluation
                 {
                     result.ExitTouched = true;
                     result.ExitTime = candle.Time;
+                    FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                 }
 
                 if (hitStop && result.StopTime == null)
@@ -178,6 +179,7 @@ namespace IbSwingTrader.Application.Evaluation
                         {
                             result.ExitTouched = true;
                             result.ExitTime = resolution.ExitTime ?? candle.Time;
+                            FillAfterExitStats(result, afterEntry, exitPrice, result.ExitTime.Value);
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
                             result.RealizedPct = CalcPct(entryPrice, exitPrice);
@@ -200,6 +202,7 @@ namespace IbSwingTrader.Application.Evaluation
                     {
                         result.ExitTouched = true;
                         result.ExitTime = candle.Time;
+                        FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                         result.ExitBeforeStop = true;
                         result.StopBeforeExit = false;
                         result.RealizedPct = CalcPct(entryPrice, exitPrice);
@@ -223,6 +226,7 @@ namespace IbSwingTrader.Application.Evaluation
                         {
                             result.ExitTouched = true;
                             result.ExitTime = candle.Time;
+                            FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
                             result.RealizedPct = CalcPct(entryPrice, exitPrice);
@@ -257,6 +261,7 @@ namespace IbSwingTrader.Application.Evaluation
                 {
                     result.ExitTouched = true;
                     result.ExitTime = candle.Time;
+                    FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                     result.ExitBeforeStop = true;
                     result.StopBeforeExit = false;
                     result.RealizedPct = CalcPct(entryPrice, exitPrice);
@@ -329,6 +334,30 @@ namespace IbSwingTrader.Application.Evaluation
                 return 0m;
 
             return (maxHighAfterEntry - exitPrice) / exitPrice * 100m;
+        }
+
+        private static void FillAfterExitStats(
+            CandidateEvaluationResult result,
+            List<Candle> afterEntry,
+            decimal exitPrice,
+            DateTime exitTime)
+        {
+            var afterExit = afterEntry
+                .Where(x => x.Time >= exitTime)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (afterExit.Count == 0 || exitPrice <= 0m)
+                return;
+
+            var maxAfterExit = afterExit
+                .OrderByDescending(x => x.High)
+                .ThenBy(x => x.Time)
+                .First();
+
+            result.MaxHighAfterExit = maxAfterExit.High;
+            result.TakeProfitOverflowPct = CalcPct(exitPrice, result.MaxHighAfterExit);
+            result.DaysAfterExitToMaxHigh = (decimal)(maxAfterExit.Time - exitTime).TotalDays;
         }
 
         private void LogNoEntryDiagnostics(
