@@ -248,7 +248,8 @@ namespace IbSwingTrader.App.Commands
             if (lines.Length <= 1)
                 return [];
 
-            var headers = lines[0].Split(';');
+            var delimiter = DetectDelimiter(lines[0]);
+            var headers = SplitCsvLine(lines[0], delimiter);
             var tickerIndex = FindHeaderIndex(headers, "Ticker");
             var scanTimeIndex = FindHeaderIndex(headers, "ScanTimeMarket");
             if (scanTimeIndex < 0)
@@ -266,8 +267,8 @@ namespace IbSwingTrader.App.Commands
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
 
-                var parts = line.Split(';');
-                if (parts.Length <= Math.Max(Math.Max(tickerIndex, scanTimeIndex), Math.Max(presetIndex, outcomeIndex)))
+                var parts = SplitCsvLine(line, delimiter);
+                if (parts.Count <= Math.Max(Math.Max(tickerIndex, scanTimeIndex), Math.Max(presetIndex, outcomeIndex)))
                     continue;
 
                 var outcome = parts[outcomeIndex].Trim();
@@ -283,11 +284,75 @@ namespace IbSwingTrader.App.Commands
             return result;
         }
 
-        private static int FindHeaderIndex(string[] headers, string headerName)
+        private static int FindHeaderIndex(List<string> headers, string headerName)
         {
-            return Array.FindIndex(
-                headers,
+            return headers.FindIndex(
                 x => string.Equals(x, headerName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static char DetectDelimiter(string line)
+        {
+            var commaCount = 0;
+            var semicolonCount = 0;
+            var inQuotes = false;
+
+            foreach (var c in line)
+            {
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (inQuotes)
+                    continue;
+
+                if (c == ',')
+                    commaCount++;
+                else if (c == ';')
+                    semicolonCount++;
+            }
+
+            return commaCount >= semicolonCount ? ',' : ';';
+        }
+
+        private static List<string> SplitCsvLine(string line, char delimiter)
+        {
+            var result = new List<string>();
+            var sb = new System.Text.StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var c = line[i];
+
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (c == delimiter && !inQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            result.Add(sb.ToString());
+            return result;
         }
 
         private static string BuildCandidateKey(string ticker, string presetScanCode, DateTime scanTimeMarket)

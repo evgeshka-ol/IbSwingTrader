@@ -132,8 +132,9 @@ namespace IbSwingTrader.App.Commands
                 var lines = await File.ReadAllLinesAsync(evaluationsPath);
                 if (lines.Length > 1)
                 {
-                    var headers = lines[0].Split(';');
-                    var tickerIndex = Array.FindIndex(headers, x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
+                    var delimiter = DetectDelimiter(lines[0]);
+                    var headers = SplitCsvLine(lines[0], delimiter);
+                    var tickerIndex = headers.FindIndex(x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
 
                     if (tickerIndex >= 0)
                     {
@@ -142,17 +143,15 @@ namespace IbSwingTrader.App.Commands
                             if (string.IsNullOrWhiteSpace(line))
                                 continue;
 
-                            var parts = line.Split(';');
-                            if (parts.Length > tickerIndex && !string.IsNullOrWhiteSpace(parts[tickerIndex]))
+                            var parts = SplitCsvLine(line, delimiter);
+                            if (parts.Count > tickerIndex && !string.IsNullOrWhiteSpace(parts[tickerIndex]))
                                 result.Add(parts[tickerIndex].Trim());
                         }
                     }
                 }
             }
 
-            return result
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return [.. result.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)];
         }
 
         private static string BuildResearchRowKey(ResearchDatasetRow row)
@@ -320,6 +319,74 @@ namespace IbSwingTrader.App.Commands
                 }
 
                 if (c == ',' && !inQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            result.Add(sb.ToString());
+            return result;
+        }
+
+        private static char DetectDelimiter(string line)
+        {
+            var commaCount = 0;
+            var semicolonCount = 0;
+            var inQuotes = false;
+
+            foreach (var c in line)
+            {
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (inQuotes)
+                    continue;
+
+                if (c == ',')
+                    commaCount++;
+                else if (c == ';')
+                    semicolonCount++;
+            }
+
+            return commaCount >= semicolonCount ? ',' : ';';
+        }
+
+        private static List<string> SplitCsvLine(string line, char delimiter)
+        {
+            if (delimiter == ',')
+                return SplitCsvLine(line);
+
+            var result = new List<string>();
+            var sb = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var c = line[i];
+
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (c == delimiter && !inQuotes)
                 {
                     result.Add(sb.ToString());
                     sb.Clear();

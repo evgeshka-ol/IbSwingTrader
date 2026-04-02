@@ -69,6 +69,8 @@ namespace IbSwingTrader.Application.Evaluation
                 .Select((name, index) => new { name, index })
                 .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
 
+            MapLegacyHeaders(headerIndex);
+
             var properties = typeof(CandidateEvaluationResult)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
                 .Where(x => x.CanWrite)
@@ -114,6 +116,15 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             return records;
+        }
+
+        private static void MapLegacyHeaders(Dictionary<string, int> headerIndex)
+        {
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.ScanTimeMarket)) &&
+                headerIndex.TryGetValue("ScanTimeNy", out var scanTimeNyIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.ScanTimeMarket)] = scanTimeNyIndex;
+            }
         }
 
         private static object? ParseValue(Type type, string raw)
