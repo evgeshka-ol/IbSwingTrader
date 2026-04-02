@@ -14,6 +14,7 @@ if (args.Length == 0)
     logger.Info("  build-research-dataset");
     logger.Info("  get-candidates");
     logger.Info("  evaluate-candidates");
+    logger.Info("  normalize-evaluations");
     logger.Info("  evaluate-wishlist");
     logger.Info("  clean-up");
     logger.Info("  get-scanner-params");
@@ -46,6 +47,12 @@ switch (command)
     case "evaluate-candidates":
         await services
             .GetRequiredService<EvaluateCandidatesCommand>()
+            .RunAsync();
+        break;
+
+    case "normalize-evaluations":
+        await services
+            .GetRequiredService<NormalizeEvaluationsCommand>()
             .RunAsync();
         break;
 

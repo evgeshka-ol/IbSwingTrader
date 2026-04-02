@@ -94,6 +94,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddTransient<BuildResearchDatasetCommand>();
             services.AddTransient<GetCandidatesCommand>();
             services.AddTransient<EvaluateCandidatesCommand>();
+            services.AddTransient<NormalizeEvaluationsCommand>();
             services.AddTransient<EvaluateWishlistCommand>();
             services.AddTransient<CleanUpCommand>();
             services.AddTransient<GetScannerParamsCommand>();
