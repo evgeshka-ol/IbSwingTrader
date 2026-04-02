@@ -21,3 +21,6 @@ Data/
 *.csv
 
 TWS/
+
+# Codex
+.codex
