@@ -250,7 +250,9 @@ namespace IbSwingTrader.App.Commands
 
             var headers = lines[0].Split(';');
             var tickerIndex = FindHeaderIndex(headers, "Ticker");
-            var scanTimeIndex = FindHeaderIndex(headers, "ScanTimeNy");
+            var scanTimeIndex = FindHeaderIndex(headers, "ScanTimeMarket");
+            if (scanTimeIndex < 0)
+                scanTimeIndex = FindHeaderIndex(headers, "ScanTimeNy");
             var presetIndex = FindHeaderIndex(headers, "PresetScanCode");
             var outcomeIndex = FindHeaderIndex(headers, "Outcome");
 

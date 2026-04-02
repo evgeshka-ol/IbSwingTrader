@@ -42,7 +42,7 @@ namespace IbSwingTrader.Application.Evaluation
                     results.Add(new WishListEvaluationResult
                     {
                         Ticker = item.Ticker,
-                        ScanTimeNy = item.Scan.ScanTimeMarket,
+                        ScanTimeMarket = item.Scan.ScanTimeMarket,
                         RemoveFromWishList = false,
                         Decision = "Keep",
                         Reason = $"CandidateEvaluation error: {ex.Message}"
@@ -163,7 +163,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeNy = item.Scan.ScanTimeMarket,
+                ScanTimeMarket = item.Scan.ScanTimeMarket,
                 RemoveFromWishList = false,
                 Decision = "Keep",
                 Reason = reason
@@ -175,7 +175,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeNy = item.Scan.ScanTimeMarket,
+                ScanTimeMarket = item.Scan.ScanTimeMarket,
                 RemoveFromWishList = false,
                 Decision = "Deferred",
                 Reason = reason
@@ -187,7 +187,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeNy = item.Scan.ScanTimeMarket,
+                ScanTimeMarket = item.Scan.ScanTimeMarket,
                 RemoveFromWishList = true,
                 Decision = "Remove",
                 Reason = reason

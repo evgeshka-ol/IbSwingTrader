@@ -44,6 +44,7 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateDetails candidate)
         {
             var result = CreateBaseResult(candidate);
+            result.EvaluatedAtMarketTime = MarketTime.Now();
 
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
 
@@ -85,6 +86,9 @@ namespace IbSwingTrader.Application.Evaluation
                 return result;
             }
 
+            result.ScanPrice = ordered[0].Open;
+            result.CurrentPrice = ordered[^1].Close;
+            result.ScanMovePct = CalcPct(result.ScanPrice, result.CurrentPrice);
             result.MinLowAfterScan = ordered.Min(x => x.Low);
             result.EntryDistanceToMinAfterScanPct = CalcEntryDistanceToMinPct(
                 candidate.TradePlan.EntryPrice,
@@ -112,38 +116,7 @@ namespace IbSwingTrader.Application.Evaluation
                 .ToList();
 
             if (afterEntry.Count > 0)
-            {
-                result.MaxHighAfterEntry = afterEntry.Max(x => x.High);
-                result.ExitDistanceToMaxAfterEntryPct = CalcExitDistanceToMaxPct(
-                    exitPrice,
-                    result.MaxHighAfterEntry);
-            }
-
-            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(1), 1);
-            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(2), 2);
-            FillWindowStatsFromEntry(result, afterEntry, entryPrice, TimeSpan.FromDays(5), 5);
-
-            result.Target3Pct1DHit = result.MaxMovePct1D >= 3m;
-            result.Target5Pct1DHit = result.MaxMovePct1D >= 5m;
-            result.Target7Pct1DHit = result.MaxMovePct1D >= 7m;
-            result.Target10Pct1DHit = result.MaxMovePct1D >= 10m;
-            result.Target15Pct1DHit = result.MaxMovePct1D >= 15m;
-
-            result.Target3Pct2DHit = result.MaxMovePct2D >= 3m;
-            result.Target5Pct2DHit = result.MaxMovePct2D >= 5m;
-            result.Target7Pct2DHit = result.MaxMovePct2D >= 7m;
-            result.Target10Pct2DHit = result.MaxMovePct2D >= 10m;
-            result.Target15Pct2DHit = result.MaxMovePct2D >= 15m;
-
-            result.Target3Pct5DHit = result.MaxMovePct5D >= 3m;
-            result.Target5Pct5DHit = result.MaxMovePct5D >= 5m;
-            result.Target7Pct5DHit = result.MaxMovePct5D >= 7m;
-            result.Target10Pct5DHit = result.MaxMovePct5D >= 10m;
-            result.Target15Pct5DHit = result.MaxMovePct5D >= 15m;
-
-            result.HitPlus5BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 5m, 5m);
-            result.HitPlus7BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 7m, 5m);
-            result.HitPlus10BeforeMinus5 = HitTargetBeforeStop(afterEntry, entryPrice, 10m, 5m);
+                result.DaysAfterEntry = (decimal)(afterEntry[^1].Time - entryCandle.Time).TotalDays;
 
             foreach (var candle in afterEntry)
             {
@@ -279,7 +252,8 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.Scan.ScanTimeMarket,
+                ScanTimeMarket = candidate.Scan.ScanTimeMarket,
+                EvaluatedAtMarketTime = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 StrategyVersion = 2,
                 CandidateScore = candidate.Score.Score,
@@ -296,7 +270,8 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeNy = candidate.Scan.ScanTimeMarket,
+                ScanTimeMarket = candidate.Scan.ScanTimeMarket,
+                EvaluatedAtMarketTime = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 StrategyVersion = 2,
                 CandidateScore = candidate.Score.Score,
@@ -328,14 +303,6 @@ namespace IbSwingTrader.Application.Evaluation
             return (entryPrice - minLowAfterScan) / entryPrice * 100m;
         }
 
-        private static decimal CalcExitDistanceToMaxPct(decimal exitPrice, decimal maxHighAfterEntry)
-        {
-            if (exitPrice <= 0m)
-                return 0m;
-
-            return (maxHighAfterEntry - exitPrice) / exitPrice * 100m;
-        }
-
         private static void FillAfterExitStats(
             CandidateEvaluationResult result,
             List<Candle> afterEntry,
@@ -355,8 +322,7 @@ namespace IbSwingTrader.Application.Evaluation
                 .ThenBy(x => x.Time)
                 .First();
 
-            result.MaxHighAfterExit = maxAfterExit.High;
-            result.TakeProfitOverflowPct = CalcPct(exitPrice, result.MaxHighAfterExit);
+            result.TakeProfitOverflowPct = CalcPct(exitPrice, maxAfterExit.High);
             result.DaysAfterExitToMaxHigh = (decimal)(maxAfterExit.Time - exitTime).TotalDays;
         }
 
@@ -417,92 +383,5 @@ namespace IbSwingTrader.Application.Evaluation
             return bestIndex;
         }
 
-        private static void FillWindowStatsFromEntry(
-            CandidateEvaluationResult result,
-            List<Candle> candlesAfterEntry,
-            decimal entryPrice,
-            TimeSpan window,
-            int days)
-        {
-            var entryTime = result.EntryTime;
-            if (entryTime == null)
-                return;
-
-            var end = entryTime.Value.Add(window);
-
-            var range = candlesAfterEntry
-                .Where(x => x.Time <= end)
-                .ToList();
-
-            if (range.Count == 0)
-                return;
-
-            var maxHigh = range.Max(x => x.High);
-            var minLow = range.Min(x => x.Low);
-
-            var maxMovePct = CalcPct(entryPrice, maxHigh);
-            var maxDrawdownPct = CalcPct(entryPrice, minLow);
-
-            switch (days)
-            {
-                case 1:
-                    result.MaxHighAfterEntry1D = maxHigh;
-                    result.MinLowAfterEntry1D = minLow;
-                    result.MaxMovePct1D = maxMovePct;
-                    result.MaxDrawdownPct1D = maxDrawdownPct;
-                    break;
-
-                case 2:
-                    result.MaxHighAfterEntry2D = maxHigh;
-                    result.MinLowAfterEntry2D = minLow;
-                    result.MaxMovePct2D = maxMovePct;
-                    result.MaxDrawdownPct2D = maxDrawdownPct;
-                    break;
-
-                case 5:
-                    result.MaxHighAfterEntry5D = maxHigh;
-                    result.MinLowAfterEntry5D = minLow;
-                    result.MaxMovePct5D = maxMovePct;
-                    result.MaxDrawdownPct5D = maxDrawdownPct;
-                    break;
-            }
-        }
-
-        private static bool? HitTargetBeforeStop(
-            List<Candle> candlesAfterEntry,
-            decimal entryPrice,
-            decimal targetPct,
-            decimal stopPct)
-        {
-            var targetPrice = entryPrice * (1m + targetPct / 100m);
-            var stopPrice = entryPrice * (1m - stopPct / 100m);
-
-            foreach (var candle in candlesAfterEntry)
-            {
-                var hitTarget = TouchesPrice(candle, targetPrice);
-                var hitStop = TouchesPrice(candle, stopPrice);
-
-                if (hitTarget && hitStop)
-                {
-                    if (candle.Close > candle.Open)
-                        return true;
-
-                    if (candle.Close < candle.Open)
-                        return false;
-
-                    var closeToTarget = Math.Abs(candle.Close - targetPrice);
-                    var closeToStop = Math.Abs(candle.Close - stopPrice);
-                    return closeToTarget < closeToStop;
-                }
-
-                if (hitTarget)
-                    return true;
-
-                if (hitStop)
-                    return false;
-            }
-
-            return null;
-        }
     }
 }

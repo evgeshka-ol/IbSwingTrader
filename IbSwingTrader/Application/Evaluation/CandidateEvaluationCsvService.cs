@@ -29,7 +29,8 @@ namespace IbSwingTrader.Application.Evaluation
                 .GroupBy(BuildKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.Last())
                 .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.ScanTimeNy)
+                .ThenByDescending(x => x.ScanTimeMarket)
+                .ThenByDescending(x => x.EvaluatedAtMarketTime)
                 .ToList();
 
             var properties = typeof(CandidateEvaluationResult)
@@ -102,6 +103,9 @@ namespace IbSwingTrader.Application.Evaluation
 
                 if (string.IsNullOrWhiteSpace(record.Ticker) || string.IsNullOrWhiteSpace(record.PresetScanCode))
                     continue;
+
+                if (record.EvaluatedAtMarketTime == default)
+                    record.EvaluatedAtMarketTime = record.EvaluationEndTime ?? record.ScanTimeMarket;
 
                 if (record.StrategyVersion <= 0)
                     record.StrategyVersion = InferStrategyVersion(record);
@@ -261,13 +265,13 @@ namespace IbSwingTrader.Application.Evaluation
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeNy:O}");
+                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeMarket:O}|{record.EvaluatedAtMarketTime:O}");
         }
 
         private static int InferStrategyVersion(CandidateEvaluationResult record)
         {
             if (string.Equals(record.Ticker, "SGML", StringComparison.OrdinalIgnoreCase) &&
-                record.ScanTimeNy.Date == new DateTime(2026, 3, 28))
+                record.ScanTimeMarket.Date == new DateTime(2026, 3, 28))
             {
                 return 2;
             }

@@ -79,7 +79,7 @@ namespace IbSwingTrader.App.Commands
             var evaluationTime = marketNow;
 
             var evaluationMap = evaluations.ToDictionary(
-                x => BuildWishListKey(x.Ticker, x.ScanTimeNy),
+                x => BuildWishListKey(x.Ticker, x.ScanTimeMarket),
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
@@ -149,9 +149,9 @@ namespace IbSwingTrader.App.Commands
                 $"Wish list evaluation completed. Evaluated={results.Count} Kept={kept} Deferred={deferred} RemoveSuggested={removeSuggested} Before={originalCount} After={updatedCount} Reasons: {reasonsText}");
         }
 
-        private static string BuildWishListKey(string ticker, DateTime scanTimeNy)
+        private static string BuildWishListKey(string ticker, DateTime scanTimeMarket)
         {
-            return $"{ticker}__{scanTimeNy:yyyyMMddHHmmss}";
+            return $"{ticker}__{scanTimeMarket:yyyyMMddHHmmss}";
         }
 
         private static WishListItem ApplyEvaluationResult(
@@ -181,7 +181,7 @@ namespace IbSwingTrader.App.Commands
             return new WishListEvaluationRecord
             {
                 Ticker = item.Ticker,
-                ScanTimeNy = item.Scan.ScanTimeMarket,
+                ScanTimeMarket = item.Scan.ScanTimeMarket,
                 FirstSeenMarketTime = item.FirstSeenMarketTime,
                 PreviousLastEvaluatedMarketTime = item.LastEvaluatedMarketTime,
                 PreviousDecision = item.LastStatus,
