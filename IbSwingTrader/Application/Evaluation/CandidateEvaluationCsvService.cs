@@ -12,6 +12,11 @@ namespace IbSwingTrader.Application.Evaluation
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITextLogger _logger = logger;
 
+        public Task<List<CandidateEvaluationResult>> ReadAsync(string path)
+        {
+            return ReadExistingRecordsAsync(path);
+        }
+
         public async Task WriteAsync(string path, List<CandidateEvaluationResult> results)
         {
             var dir = Path.GetDirectoryName(path);

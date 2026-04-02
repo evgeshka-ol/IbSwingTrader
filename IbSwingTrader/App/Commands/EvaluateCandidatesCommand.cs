@@ -48,7 +48,27 @@ namespace IbSwingTrader.App.Commands
             if (!File.Exists(evaluationsPath))
                 await _candidateCsvService.WriteAsync(evaluationsPath, []);
 
-            var pending = candidates;
+            var existingEvaluations = await _candidateCsvService.ReadAsync(evaluationsPath);
+            var canonicalByScanKey = existingEvaluations
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x
+                        .OrderBy(y => y.EvaluatedAtMarketTime)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var pending = new List<CandidateDetails>();
+
+            foreach (var candidate in candidates)
+            {
+                var scanKey = BuildScanKey(candidate);
+
+                if (canonicalByScanKey.TryGetValue(scanKey, out var canonical))
+                    ApplyCanonicalSnapshot(candidate, canonical);
+
+                pending.Add(candidate);
+            }
 
             _logger.Info($"Pending candidates for evaluation: {pending.Count}");
 
@@ -56,6 +76,16 @@ namespace IbSwingTrader.App.Commands
                 return;
 
             var results = await _candidateEvaluator.EvaluateAsync(pending);
+
+            foreach (var result in results)
+            {
+                if (canonicalByScanKey.TryGetValue(BuildScanKey(result), out var canonical))
+                {
+                    result.StrategyVersion = canonical.StrategyVersion;
+                    result.CandidateScore = canonical.CandidateScore;
+                }
+            }
+
             await _candidateCsvService.WriteAsync(evaluationsPath, results);
             LogCandidateSummary(Path.GetFileName(candidatesPath), results);
         }
@@ -113,6 +143,40 @@ namespace IbSwingTrader.App.Commands
 
             var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
             return document?.Candidates ?? [];
+        }
+
+        private static void ApplyCanonicalSnapshot(
+            CandidateDetails candidate,
+            CandidateEvaluationResult canonical)
+        {
+            candidate.TradePlan.EntryPrice = canonical.EntryPrice;
+            candidate.TradePlan.ExitPrice = canonical.ExitPrice;
+            candidate.TradePlan.StopLoss = canonical.StopLoss;
+            candidate.TradePlan.ProfitPercent = CalcPct(canonical.EntryPrice, canonical.ExitPrice);
+            candidate.TradePlan.LossPercent = CalcPct(canonical.EntryPrice, canonical.StopLoss);
+            candidate.Score.Score = canonical.CandidateScore;
+        }
+
+        private static string BuildScanKey(CandidateDetails candidate)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
+        }
+
+        private static string BuildScanKey(CandidateEvaluationResult result)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
+        }
+
+        private static decimal CalcPct(decimal from, decimal to)
+        {
+            if (from == 0m)
+                return 0m;
+
+            return (to - from) / from * 100m;
         }
 
     }
