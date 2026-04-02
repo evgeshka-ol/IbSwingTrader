@@ -57,10 +57,10 @@ namespace IbSwingTrader.Infrastructure.Logging
             var map = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in existing)
-                map[BuildCandidateKey(item)] = item;
+                UpsertCandidate(map, item, preferIncomingOnSameScan: true);
 
             foreach (var item in incoming)
-                map[BuildCandidateKey(item)] = item;
+                UpsertCandidate(map, item, preferIncomingOnSameScan: false);
 
             return map.Values
                 .OrderByDescending(x => x.Scan.ScanTimeMarket)
@@ -68,11 +68,34 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .ToList();
         }
 
-        private static string BuildCandidateKey(CandidateDetails candidate)
+        private static void UpsertCandidate(
+            Dictionary<string, CandidateDetails> map,
+            CandidateDetails candidate,
+            bool preferIncomingOnSameScan)
+        {
+            var key = BuildCandidateOperationKey(candidate);
+
+            if (!map.TryGetValue(key, out var existing))
+            {
+                map[key] = candidate;
+                return;
+            }
+
+            var keepIncoming =
+                candidate.Scan.ScanTimeMarket < existing.Scan.ScanTimeMarket ||
+                (candidate.Scan.ScanTimeMarket == existing.Scan.ScanTimeMarket &&
+                 preferIncomingOnSameScan &&
+                 candidate.Score.Score >= existing.Score.Score);
+
+            if (keepIncoming)
+                map[key] = candidate;
+        }
+
+        private static string BuildCandidateOperationKey(CandidateDetails candidate)
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
+                $"{candidate.Ticker}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
         }
 
         private async Task<List<CandidateDetails>> LoadCandidatesAsync(string filePath)

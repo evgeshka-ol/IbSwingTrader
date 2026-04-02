@@ -328,28 +328,37 @@ namespace IbSwingTrader.Application.Candidates
             CandidateDetails item,
             string bucketName)
         {
-            if (results.TryGetValue(item.Ticker, out var existing))
+            var operationKey = BuildCandidateOperationKey(item);
+
+            if (results.TryGetValue(operationKey, out var existing))
             {
                 if (item.Score.Score > existing.Score.Score)
                 {
-                    results[item.Ticker] = item;
+                    results[operationKey] = item;
 
                     _logger.Info(
-                        $"Ticker {item.Ticker} replaced existing {bucketName} item with higher score. " +
+                        $"Ticker {item.Ticker} replaced existing {bucketName} operation with higher score. " +
                         $"Old preset: {existing.Scan.PresetScanCode}, new preset: {item.Scan.PresetScanCode}");
                 }
                 else
                 {
                     _logger.Info(
-                        $"Ticker {item.Ticker} already exists in {bucketName}. " +
+                        $"Ticker {item.Ticker} already exists in {bucketName} with the same trade plan. " +
                         $"Keeping existing item from preset {existing.Scan.PresetScanCode}");
                 }
             }
             else
             {
-                results[item.Ticker] = item;
+                results[operationKey] = item;
                 _logger.Info($"Ticker {item.Ticker} added to {bucketName}. Preset: {item.Scan.PresetScanCode}");
             }
+        }
+
+        private static string BuildCandidateOperationKey(CandidateDetails item)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{item.Ticker}|{item.TradePlan.EntryPrice:G29}|{item.TradePlan.ExitPrice:G29}|{item.TradePlan.StopLoss:G29}");
         }
 
         private async Task TryAddCandidate(
