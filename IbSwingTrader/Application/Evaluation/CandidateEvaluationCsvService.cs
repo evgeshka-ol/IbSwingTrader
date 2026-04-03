@@ -117,6 +117,7 @@ namespace IbSwingTrader.Application.Evaluation
                 if (record.StrategyVersion <= 0)
                     record.StrategyVersion = InferStrategyVersion(record);
 
+                CanonicalizeRecord(record);
                 records.Add(record);
             }
 
@@ -195,6 +196,9 @@ namespace IbSwingTrader.Application.Evaluation
                 if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var i))
                     return i;
 
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec))
+                    return (int)decimal.Truncate(dec);
+
                 return Nullable.GetUnderlyingType(type) != null ? null : 0;
             }
 
@@ -210,6 +214,23 @@ namespace IbSwingTrader.Application.Evaluation
                 return Enum.Parse(targetType, raw, ignoreCase: true);
 
             return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
+        }
+
+        private static void CanonicalizeRecord(CandidateEvaluationResult record)
+        {
+            record.ScanMovePct = RoundNullable(record.ScanMovePct);
+            record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
+            record.RealizedPct = RoundNullable(record.RealizedPct);
+        }
+
+        private static decimal Round(decimal value)
+        {
+            return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal? RoundNullable(decimal? value)
+        {
+            return value.HasValue ? Round(value.Value) : null;
         }
 
         private static char DetectDelimiter(string line)

@@ -33,7 +33,7 @@ namespace IbSwingTrader.Domain.Candidates
 
         public string? Outcome { get; set; }
         public decimal? RealizedPct { get; set; }
-        public decimal? DaysAfterEntry { get; set; }
+        public int? DaysAfterEntry { get; set; }
 
         public DateTime? EvaluationStartTime { get; set; }
         public DateTime? EvaluationEndTime { get; set; }

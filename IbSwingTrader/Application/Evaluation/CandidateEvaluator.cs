@@ -88,11 +88,12 @@ namespace IbSwingTrader.Application.Evaluation
 
             result.ScanPrice = ordered[0].Open;
             result.CurrentPrice = ordered[^1].Close;
-            result.ScanMovePct = CalcPct(result.ScanPrice, result.CurrentPrice);
+            result.ScanMovePct = RoundPct(CalcPct(result.ScanPrice, result.CurrentPrice));
             result.MinLowAfterScan = ordered.Min(x => x.Low);
-            result.EntryDistanceToMinAfterScanPct = CalcEntryDistanceToMinPct(
-                candidate.TradePlan.EntryPrice,
-                result.MinLowAfterScan);
+            result.EntryDistanceToMinAfterScanPct = RoundPct(
+                CalcEntryDistanceToMinPct(
+                    candidate.TradePlan.EntryPrice,
+                    result.MinLowAfterScan));
 
             var entryPrice = candidate.TradePlan.EntryPrice;
             var exitPrice = candidate.TradePlan.ExitPrice;
@@ -116,7 +117,7 @@ namespace IbSwingTrader.Application.Evaluation
                 .ToList();
 
             if (afterEntry.Count > 0)
-                result.DaysAfterEntry = (decimal)(afterEntry[^1].Time - entryCandle.Time).TotalDays;
+                result.DaysAfterEntry = (afterEntry[^1].Time.Date - entryCandle.Time.Date).Days;
 
             foreach (var candle in afterEntry)
             {
@@ -155,7 +156,7 @@ namespace IbSwingTrader.Application.Evaluation
                             FillAfterExitStats(result, afterEntry, exitPrice, result.ExitTime.Value);
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
-                            result.RealizedPct = CalcPct(entryPrice, exitPrice);
+                            result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
                             result.Outcome = "Win";
                         }
                         else
@@ -164,7 +165,7 @@ namespace IbSwingTrader.Application.Evaluation
                             result.StopTime = resolution.StopTime ?? candle.Time;
                             result.StopBeforeExit = true;
                             result.ExitBeforeStop = false;
-                            result.RealizedPct = CalcPct(entryPrice, stopPrice);
+                            result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
                             result.Outcome = "Loss";
                         }
 
@@ -178,7 +179,7 @@ namespace IbSwingTrader.Application.Evaluation
                         FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                         result.ExitBeforeStop = true;
                         result.StopBeforeExit = false;
-                        result.RealizedPct = CalcPct(entryPrice, exitPrice);
+                        result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
                         result.Outcome = "Win";
                     }
                     else if (candle.Close < candle.Open)
@@ -187,7 +188,7 @@ namespace IbSwingTrader.Application.Evaluation
                         result.StopTime = candle.Time;
                         result.StopBeforeExit = true;
                         result.ExitBeforeStop = false;
-                        result.RealizedPct = CalcPct(entryPrice, stopPrice);
+                        result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
                         result.Outcome = "Loss";
                     }
                     else
@@ -202,7 +203,7 @@ namespace IbSwingTrader.Application.Evaluation
                             FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                             result.ExitBeforeStop = true;
                             result.StopBeforeExit = false;
-                            result.RealizedPct = CalcPct(entryPrice, exitPrice);
+                            result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
                             result.Outcome = "Win";
                         }
                         else
@@ -211,7 +212,7 @@ namespace IbSwingTrader.Application.Evaluation
                             result.StopTime = candle.Time;
                             result.StopBeforeExit = true;
                             result.ExitBeforeStop = false;
-                            result.RealizedPct = CalcPct(entryPrice, stopPrice);
+                            result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
                             result.Outcome = "Loss";
                         }
                     }
@@ -225,7 +226,7 @@ namespace IbSwingTrader.Application.Evaluation
                     result.StopTime = candle.Time;
                     result.StopBeforeExit = true;
                     result.ExitBeforeStop = false;
-                    result.RealizedPct = CalcPct(entryPrice, stopPrice);
+                    result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
                     result.Outcome = "Loss";
                     return result;
                 }
@@ -237,7 +238,7 @@ namespace IbSwingTrader.Application.Evaluation
                     FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
                     result.ExitBeforeStop = true;
                     result.StopBeforeExit = false;
-                    result.RealizedPct = CalcPct(entryPrice, exitPrice);
+                    result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
                     result.Outcome = "Win";
                     return result;
                 }
@@ -301,6 +302,11 @@ namespace IbSwingTrader.Application.Evaluation
                 return 0m;
 
             return (entryPrice - minLowAfterScan) / entryPrice * 100m;
+        }
+
+        private static decimal RoundPct(decimal value)
+        {
+            return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         private static void FillAfterExitStats(
