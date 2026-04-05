@@ -41,8 +41,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
-            var existing = await LoadCandidatesAsync(filePath);
-            var merged = MergeCandidates(existing, candidates);
+            var existingDocument = await LoadDocumentAsync(filePath);
+            var merged = MergeCandidates(existingDocument.Candidates, candidates);
             var summary = BuildSummary(candidates);
             var json = BuildJson(summary, merged);
             await File.WriteAllTextAsync(filePath, json);
@@ -98,22 +98,26 @@ namespace IbSwingTrader.Infrastructure.Logging
                 $"{candidate.Ticker}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
         }
 
-        private async Task<List<CandidateDetails>> LoadCandidatesAsync(string filePath)
+        private async Task<CandidateFileDocument> LoadDocumentAsync(string filePath)
         {
             if (!File.Exists(filePath))
-                return [];
+                return new CandidateFileDocument();
 
             var json = await File.ReadAllTextAsync(filePath);
             if (string.IsNullOrWhiteSpace(json))
-                return [];
+                return new CandidateFileDocument();
 
             var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
 
             if (firstNonWhitespace == '[')
-                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? [];
+            {
+                return new CandidateFileDocument
+                {
+                    Candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? []
+                };
+            }
 
-            var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(filePath);
-            return document?.Candidates ?? [];
+            return await _jsonFileService.ReadAsync<CandidateFileDocument>(filePath) ?? new CandidateFileDocument();
         }
 
         private string BuildJson(
@@ -144,15 +148,23 @@ namespace IbSwingTrader.Infrastructure.Logging
             return candidates
                 .OrderByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x => new CandidateSummaryItem
+                .Select(x =>
                 {
-                    Ticker =
+                    var ticker =
                         $"{x.Ticker} " +
                         $"{_fmt.Price(x.TradePlan.EntryPrice)} " +
                         $"{_fmt.Price(x.TradePlan.ExitPrice)} " +
                         $"{_fmt.Price(x.TradePlan.StopLoss)} " +
                         $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
-                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%"
+                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%";
+
+                    commentsByTicker.TryGetValue(ticker, out var comment);
+
+                    return new CandidateSummaryItem
+                    {
+                        Ticker = ticker,
+                        Comment = string.Empty
+                    };
                 })
                 .ToList();
         }
