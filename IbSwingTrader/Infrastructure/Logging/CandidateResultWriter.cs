@@ -158,8 +158,6 @@ namespace IbSwingTrader.Infrastructure.Logging
                         $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
                         $"{_fmt.Percent(x.TradePlan.LossPercent)}%";
 
-                    commentsByTicker.TryGetValue(ticker, out var comment);
-
                     return new CandidateSummaryItem
                     {
                         Ticker = ticker,
