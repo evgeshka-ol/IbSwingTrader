@@ -260,7 +260,12 @@ namespace IbSwingTrader.App.Commands
             if (tickerIndex < 0 || scanTimeIndex < 0 || presetIndex < 0 || outcomeIndex < 0)
                 return [];
 
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var latestByCandidate = new Dictionary<string, (string Outcome, DateTime EvaluatedAtMarketTime)>(
+                StringComparer.OrdinalIgnoreCase);
+
+            var evaluatedAtIndex = FindHeaderIndex(headers, "EvaluatedAtMarketTime");
+            if (evaluatedAtIndex < 0)
+                evaluatedAtIndex = FindHeaderIndex(headers, "EvaluationEndTime");
 
             foreach (var line in lines.Skip(1))
             {
@@ -271,17 +276,31 @@ namespace IbSwingTrader.App.Commands
                 if (parts.Count <= Math.Max(Math.Max(tickerIndex, scanTimeIndex), Math.Max(presetIndex, outcomeIndex)))
                     continue;
 
-                var outcome = parts[outcomeIndex].Trim();
-                if (!outcomes.Contains(outcome))
-                    continue;
-
                 if (!DateTime.TryParse(parts[scanTimeIndex], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var scanTime))
                     continue;
 
-                result.Add(BuildCandidateKey(parts[tickerIndex], parts[presetIndex], scanTime));
+                var evaluatedAt = scanTime;
+                if (evaluatedAtIndex >= 0 &&
+                    evaluatedAtIndex < parts.Count &&
+                    DateTime.TryParse(parts[evaluatedAtIndex], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedEvaluatedAt))
+                {
+                    evaluatedAt = parsedEvaluatedAt;
+                }
+
+                var candidateKey = BuildCandidateKey(parts[tickerIndex], parts[presetIndex], scanTime);
+                var outcome = parts[outcomeIndex].Trim();
+
+                if (!latestByCandidate.TryGetValue(candidateKey, out var existing) ||
+                    evaluatedAt > existing.EvaluatedAtMarketTime)
+                {
+                    latestByCandidate[candidateKey] = (outcome, evaluatedAt);
+                }
             }
 
-            return result;
+            return latestByCandidate
+                .Where(x => outcomes.Contains(x.Value.Outcome))
+                .Select(x => x.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
         private static int FindHeaderIndex(List<string> headers, string headerName)
