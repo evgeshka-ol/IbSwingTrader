@@ -38,11 +38,15 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var risk = entry - stop;
-            var exit = entry + risk * settings.RiskRewardRatio;
+            var rawExit = entry + risk * settings.RiskRewardRatio;
+            var targetProfitPct = ResolveTargetProfitPct(candles, entry, settings);
+            var cappedExit = entry * (1m + targetProfitPct);
+            var exit = Math.Min(rawExit, cappedExit);
 
             _logger.Info(
                 $"Trade plan built. " +
-                $"Entry={entry}, Stop={stop}, Exit={exit}, Risk={risk}");
+                $"Entry={entry}, Stop={stop}, Exit={exit}, Risk={risk}, RawExit={rawExit}, " +
+                $"TargetProfitPct={targetProfitPct}, MaxProfitPct={settings.MaxProfitPct}");
 
             return new TradePlan
             {
@@ -163,6 +167,54 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return Math.Max(percentFloor, atrFloor);
+        }
+
+        private decimal ResolveTargetProfitPct(
+            List<Candle> candles,
+            decimal entry,
+            TradePlanSettings settings)
+        {
+            var defaultPct = Clamp(
+                settings.DefaultProfitPct,
+                settings.MinProfitPct,
+                settings.MaxProfitPct);
+
+            if (candles.Count < 3)
+                return defaultPct;
+
+            var lookback = candles
+                .TakeLast(Math.Min(settings.H4TargetLookbackBars, candles.Count))
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (lookback.Count < 3)
+                return defaultPct;
+
+            decimal? nearestResistance = null;
+
+            for (var i = 1; i < lookback.Count - 1; i++)
+            {
+                var previous = lookback[i - 1];
+                var current = lookback[i];
+                var next = lookback[i + 1];
+
+                var isSwingHigh = current.High >= previous.High && current.High > next.High;
+                if (!isSwingHigh || current.High <= entry)
+                    continue;
+
+                if (!nearestResistance.HasValue || current.High < nearestResistance.Value)
+                    nearestResistance = current.High;
+            }
+
+            if (!nearestResistance.HasValue)
+                return defaultPct;
+
+            var resistancePct = (nearestResistance.Value - entry) / entry;
+
+            return Clamp(
+                resistancePct,
+                settings.MinProfitPct,
+                settings.MaxProfitPct);
         }
 
         private static decimal CalculateAtr(List<Candle> candles, int length)

@@ -70,6 +70,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal StopBufferMultiplier { get; set; } = 0.99m;
         public decimal FallbackStopMultiplier { get; set; } = 0.97m;
         public decimal RiskRewardRatio { get; set; } = 2.0m;
+        public decimal DefaultProfitPct { get; set; } = 0.05m;
+        public decimal MinProfitPct { get; set; } = 0.03m;
+        public decimal MaxProfitPct { get; set; } = 0.10m;
+        public int H4TargetLookbackBars { get; set; } = 24;
         public int EntryLookbackHours { get; set; } = 48;
         public int EntryMaLength { get; set; } = 20;
         public int EntryAtrLength { get; set; } = 12;

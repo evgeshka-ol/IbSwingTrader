@@ -188,7 +188,11 @@
             "StopLookbackBars": 5,
             "StopBufferMultiplier": 0.99,
             "FallbackStopMultiplier": 0.97,
-            "RiskRewardRatio": 2.0
+            "RiskRewardRatio": 2.0,
+            "DefaultProfitPct": 0.05,
+            "MinProfitPct": 0.03,
+            "MaxProfitPct": 0.10,
+            "H4TargetLookbackBars": 24
         }
     },
 

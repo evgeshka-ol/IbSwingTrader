@@ -257,7 +257,7 @@ namespace IbSwingTrader.Application.Evaluation
                 ScanTimeMarket = candidate.Scan.ScanTimeMarket,
                 EvaluatedAtMarketTime = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
-                StrategyVersion = 2,
+                StrategyVersion = 4,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
                 ExitPrice = candidate.TradePlan.ExitPrice,
