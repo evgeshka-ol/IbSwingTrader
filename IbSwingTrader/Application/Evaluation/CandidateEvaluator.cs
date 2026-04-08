@@ -86,18 +86,19 @@ namespace IbSwingTrader.Application.Evaluation
                 return result;
             }
 
+            var entryPrice = candidate.TradePlan.EntryPrice;
+            var exitPrice = candidate.TradePlan.ExitPrice;
+            var stopPrice = candidate.TradePlan.StopLoss;
+
             result.ScanPrice = ordered[0].Open;
             result.CurrentPrice = ordered[^1].Close;
             result.ScanMovePct = RoundPct(CalcPct(result.ScanPrice, result.CurrentPrice));
+            result.CurrentPct = RoundPct(CalcPct(entryPrice, result.CurrentPrice));
             result.MinLowAfterScan = ordered.Min(x => x.Low);
             result.EntryDistanceToMinAfterScanPct = RoundPct(
                 CalcEntryDistanceToMinPct(
                     candidate.TradePlan.EntryPrice,
                     result.MinLowAfterScan));
-
-            var entryPrice = candidate.TradePlan.EntryPrice;
-            var exitPrice = candidate.TradePlan.ExitPrice;
-            var stopPrice = candidate.TradePlan.StopLoss;
 
             var entryCandle = ordered.FirstOrDefault(x => TouchesPrice(x, entryPrice));
             if (entryCandle == null)

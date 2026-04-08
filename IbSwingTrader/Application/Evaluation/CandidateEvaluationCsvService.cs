@@ -219,6 +219,7 @@ namespace IbSwingTrader.Application.Evaluation
         private static void CanonicalizeRecord(CandidateEvaluationResult record)
         {
             record.ScanMovePct = RoundNullable(record.ScanMovePct);
+            record.CurrentPct = RoundNullable(record.CurrentPct);
             record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
             record.RealizedPct = RoundNullable(record.RealizedPct);
         }

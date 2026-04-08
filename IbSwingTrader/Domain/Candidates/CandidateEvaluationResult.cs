@@ -16,6 +16,7 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal ScanPrice { get; set; }
         public decimal CurrentPrice { get; set; }
         public decimal? ScanMovePct { get; set; }
+        public decimal? CurrentPct { get; set; }
 
         public bool EntryTouched { get; set; }
         public bool ExitTouched { get; set; }
