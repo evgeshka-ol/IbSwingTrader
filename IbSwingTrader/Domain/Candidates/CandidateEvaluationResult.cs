@@ -17,6 +17,10 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal CurrentPrice { get; set; }
         public decimal? ScanMovePct { get; set; }
         public decimal? CurrentPct { get; set; }
+        public decimal? MaxUpPct { get; set; }
+        public DateTime? MaxUpTime { get; set; }
+        public decimal? MaxDownPct { get; set; }
+        public DateTime? MaxDownTime { get; set; }
 
         public bool EntryTouched { get; set; }
         public bool ExitTouched { get; set; }

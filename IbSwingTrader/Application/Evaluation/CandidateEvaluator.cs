@@ -118,7 +118,10 @@ namespace IbSwingTrader.Application.Evaluation
                 .ToList();
 
             if (afterEntry.Count > 0)
+            {
                 result.DaysAfterEntry = (afterEntry[^1].Time.Date - entryCandle.Time.Date).Days;
+                FillExcursionStats(result, entryPrice, afterEntry);
+            }
 
             foreach (var candle in afterEntry)
             {
@@ -257,7 +260,7 @@ namespace IbSwingTrader.Application.Evaluation
                 ScanTimeMarket = candidate.Scan.ScanTimeMarket,
                 EvaluatedAtMarketTime = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
-                StrategyVersion = 4,
+                StrategyVersion = 6,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
                 ExitPrice = candidate.TradePlan.ExitPrice,
@@ -275,7 +278,7 @@ namespace IbSwingTrader.Application.Evaluation
                 ScanTimeMarket = candidate.Scan.ScanTimeMarket,
                 EvaluatedAtMarketTime = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
-                StrategyVersion = 2,
+                StrategyVersion = 6,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
                 ExitPrice = candidate.TradePlan.ExitPrice,
@@ -308,6 +311,30 @@ namespace IbSwingTrader.Application.Evaluation
         private static decimal RoundPct(decimal value)
         {
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static void FillExcursionStats(
+            CandidateEvaluationResult result,
+            decimal entryPrice,
+            List<Candle> afterEntry)
+        {
+            if (entryPrice <= 0m || afterEntry.Count == 0)
+                return;
+
+            var maxUpCandle = afterEntry
+                .OrderByDescending(x => x.High)
+                .ThenBy(x => x.Time)
+                .First();
+
+            var maxDownCandle = afterEntry
+                .OrderBy(x => x.Low)
+                .ThenBy(x => x.Time)
+                .First();
+
+            result.MaxUpPct = RoundPct(CalcPct(entryPrice, maxUpCandle.High));
+            result.MaxUpTime = maxUpCandle.Time;
+            result.MaxDownPct = RoundPct(CalcPct(entryPrice, maxDownCandle.Low));
+            result.MaxDownTime = maxDownCandle.Time;
         }
 
         private static void FillAfterExitStats(

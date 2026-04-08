@@ -220,6 +220,8 @@ namespace IbSwingTrader.Application.Evaluation
         {
             record.ScanMovePct = RoundNullable(record.ScanMovePct);
             record.CurrentPct = RoundNullable(record.CurrentPct);
+            record.MaxUpPct = RoundNullable(record.MaxUpPct);
+            record.MaxDownPct = RoundNullable(record.MaxDownPct);
             record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
             record.RealizedPct = RoundNullable(record.RealizedPct);
         }
