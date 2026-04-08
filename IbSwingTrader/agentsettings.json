@@ -192,7 +192,10 @@
             "DefaultProfitPct": 0.05,
             "MinProfitPct": 0.03,
             "MaxProfitPct": 0.10,
-            "H4TargetLookbackBars": 24
+            "H4TargetLookbackBars": 24,
+            "EntryPullbackAtrFraction": 0.15,
+            "MinimumEntryDiscountPct": 0.0015,
+            "MinimumEntryDiscountAtrFraction": 0.08
         }
     },
 
