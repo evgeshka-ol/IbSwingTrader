@@ -246,6 +246,7 @@ namespace IbSwingTrader.Application.Candidates
                     candidateResults,
                     mergedWishItem,
                     ctx,
+                    isFromWishlist: true,
                     marketTimezone,
                     bucketName: "candidates",
                     rejectionLogPrefix: "Entry rejected after wish list pass");
@@ -271,6 +272,7 @@ namespace IbSwingTrader.Application.Candidates
                         candidateResults,
                         mergedWishItem,
                         ctx,
+                        isFromWishlist: false,
                         marketTimezone,
                         bucketName: "fallback candidates",
                         rejectionLogPrefix: "Entry rejected after same-day fallback");
@@ -365,6 +367,7 @@ namespace IbSwingTrader.Application.Candidates
             Dictionary<string, CandidateDetails> candidateResults,
             WishListItem mergedWishItem,
             WishListContext ctx,
+            bool isFromWishlist,
             string marketTimezone,
             string bucketName,
             string rejectionLogPrefix)
@@ -384,6 +387,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var candidateItem = BuildCandidateItem(
                 ctx.Stock,
+                isFromWishlist,
                 ctx.Preset,
                 ctx.Snapshot,
                 ctx.Candles,
@@ -594,6 +598,7 @@ namespace IbSwingTrader.Application.Candidates
 
         private static CandidateDetails BuildCandidateItem(
             StockInfo stock,
+            bool isFromWishlist,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
@@ -608,6 +613,7 @@ namespace IbSwingTrader.Application.Candidates
             return new CandidateDetails
             {
                 Ticker = stock.Ticker,
+                IsFromWishlist = isFromWishlist,
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,
