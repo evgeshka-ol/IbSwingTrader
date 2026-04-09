@@ -92,6 +92,7 @@ namespace IbSwingTrader.App.Commands
         {
             var key = BuildEvaluationKey(evaluation);
             candidateIndex.TryGetValue(key, out var candidate);
+            var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
 
             var positivePotentialPct = Round(Math.Max(evaluation.MaxUpPct ?? 0m, 0m));
             var negativePotentialPct = Round(Math.Abs(Math.Min(evaluation.MaxDownPct ?? 0m, 0m)));
@@ -107,7 +108,7 @@ namespace IbSwingTrader.App.Commands
                 Ticker = evaluation.Ticker,
                 ScanTimeMarket = evaluation.ScanTimeMarket,
                 PresetScanCode = evaluation.PresetScanCode,
-                IsFromWishlist = evaluation.IsFromWishlist,
+                IsFromWishlist = isFromWishlist,
                 Outcome = evaluation.Outcome ?? string.Empty,
                 StrategyVersion = evaluation.StrategyVersion,
                 EvaluatedAtMarketTime = evaluation.EvaluatedAtMarketTime,
