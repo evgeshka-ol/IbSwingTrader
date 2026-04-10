@@ -10,7 +10,6 @@ namespace IbSwingTrader.App.Commands
         ITextLogger logger) : ICommand
     {
         private const decimal MinInterestingAmplitudePct = 5m;
-        private const decimal MinPositivePotentialPct = 3m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
@@ -33,15 +32,6 @@ namespace IbSwingTrader.App.Commands
                 return;
             }
 
-            var latestEvaluations = evaluations
-                .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x
-                    .OrderByDescending(GetEvaluationSortTime)
-                    .First())
-                .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.ScanTimeMarket)
-                .ToList();
-
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
                 .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
@@ -52,22 +42,23 @@ namespace IbSwingTrader.App.Commands
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var rows = latestEvaluations
+            var rows = evaluations
                 .Select(x => BuildRow(x, candidateIndex))
-                .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(GetGroupPriority)
+                .ThenByDescending(x => x.AmplitudePct)
+                .ThenByDescending(x => x.PositivePotentialPct)
                 .ThenByDescending(x => x.ScanTimeMarket)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             _csvWriter.Write(outputPath, rows);
 
-            _logger.Info($"Latest evaluations: {latestEvaluations.Count}");
+            _logger.Info($"Evaluation rows: {evaluations.Count}");
             _logger.Info($"Rows with active candidate snapshot: {rows.Count(x => x.HasActiveCandidateSnapshot)}");
             _logger.Info($"Evaluation dataset saved: {outputPath}");
-            _logger.Info($"Group Dead: {rows.Count(x => x.GroupLabel == "Dead")}");
-            _logger.Info($"Group Wishlist: {rows.Count(x => x.GroupLabel == "Wishlist")}");
             _logger.Info($"Group TradeCandidate: {rows.Count(x => x.GroupLabel == "TradeCandidate")}");
-            _logger.Info($"Group NoEntry: {rows.Count(x => x.GroupLabel == "NoEntry")}");
-            _logger.Info($"Group Incomplete: {rows.Count(x => x.GroupLabel == "Incomplete")}");
+            _logger.Info($"Group Wishlist: {rows.Count(x => x.GroupLabel == "Wishlist")}");
+            _logger.Info($"Group FilterReference: {rows.Count(x => x.GroupLabel == "FilterReference")}");
         }
 
         private async Task<List<CandidateDetails>> LoadCurrentCandidatesAsync()
@@ -96,7 +87,13 @@ namespace IbSwingTrader.App.Commands
 
             var positivePotentialPct = Round(Math.Max(evaluation.MaxUpPct ?? 0m, 0m));
             var negativePotentialPct = Round(Math.Abs(Math.Min(evaluation.MaxDownPct ?? 0m, 0m)));
-            var amplitudePct = Round(positivePotentialPct + negativePotentialPct);
+            var amplitudePct = Round(CalculateAmplitudePct(
+                evaluation.ScanPrice,
+                evaluation.EntryPrice,
+                evaluation.MaxUpPct,
+                evaluation.MaxUpTime,
+                evaluation.MaxDownPct,
+                evaluation.MaxDownTime));
 
             var daysToMaxUpFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MaxUpTime);
             var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, evaluation.MaxUpTime);
@@ -117,6 +114,7 @@ namespace IbSwingTrader.App.Commands
                 EntryPrice = evaluation.EntryPrice,
                 ExitPrice = evaluation.ExitPrice,
                 StopLoss = evaluation.StopLoss,
+                ScanPrice = evaluation.ScanPrice,
                 PlannedProfitPct = Round(CalcPctOrZero(evaluation.EntryPrice, evaluation.ExitPrice)),
                 PlannedLossPct = Round(CalcPctOrZero(evaluation.EntryPrice, evaluation.StopLoss)),
                 ScanMovePct = evaluation.ScanMovePct,
@@ -134,7 +132,7 @@ namespace IbSwingTrader.App.Commands
                 DaysToMaxDownFromScan = daysToMaxDownFromScan,
                 DaysToMaxDownFromEntry = daysToMaxDownFromEntry,
                 MaxDownBeforeMaxUp = CompareTimes(evaluation.MaxDownTime, evaluation.MaxUpTime),
-                GroupLabel = Classify(evaluation, positivePotentialPct, amplitudePct, daysToMaxUpFromScan),
+                GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 HasActiveCandidateSnapshot = candidate != null,
                 CandidateScore = candidate?.Score.Score,
                 WeeklyScore = candidate?.Score.WeeklyScore,
@@ -164,11 +162,6 @@ namespace IbSwingTrader.App.Commands
             return $"{row.Ticker}|{row.Scan.PresetScanCode}|{row.Scan.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
         }
 
-        private static DateTime GetEvaluationSortTime(CandidateEvaluationResult row)
-        {
-            return row.EvaluationEndTime ?? row.EvaluatedAtMarketTime;
-        }
-
         private static int? DiffDays(DateTime from, DateTime? to)
         {
             if (!to.HasValue)
@@ -194,29 +187,29 @@ namespace IbSwingTrader.App.Commands
         }
 
         private static string Classify(
-            CandidateEvaluationResult evaluation,
-            decimal positivePotentialPct,
             decimal amplitudePct,
             int? daysToMaxUpFromScan)
         {
-            if (!evaluation.EntryTouched || evaluation.EntryTime == null)
-                return "NoEntry";
-
-            if (!evaluation.MaxUpPct.HasValue || !evaluation.MaxDownPct.HasValue)
-                return "Incomplete";
-
-            if (positivePotentialPct < MinPositivePotentialPct ||
+            if (!daysToMaxUpFromScan.HasValue ||
+                daysToMaxUpFromScan.Value < 0 ||
                 amplitudePct < MinInterestingAmplitudePct)
             {
-                return "Dead";
+                return "FilterReference";
             }
-
-            if (!daysToMaxUpFromScan.HasValue)
-                return "Incomplete";
 
             return daysToMaxUpFromScan.Value <= MaxTradeDaysToMaxUpFromScan
                 ? "TradeCandidate"
                 : "Wishlist";
+        }
+
+        private static int GetGroupPriority(EvaluationDatasetRow row)
+        {
+            return row.GroupLabel switch
+            {
+                "TradeCandidate" => 0,
+                "Wishlist" => 1,
+                _ => 2
+            };
         }
 
         private static decimal CalcPctOrZero(decimal from, decimal to)
@@ -225,6 +218,36 @@ namespace IbSwingTrader.App.Commands
                 return 0m;
 
             return ((to - from) / from) * 100m;
+        }
+
+        private static decimal CalculateAmplitudePct(
+            decimal scanPrice,
+            decimal entryPrice,
+            decimal? maxUpPct,
+            DateTime? maxUpTime,
+            decimal? maxDownPct,
+            DateTime? maxDownTime)
+        {
+            var positivePotentialPct = Math.Max(maxUpPct ?? 0m, 0m);
+            var negativePotentialPct = Math.Abs(Math.Min(maxDownPct ?? 0m, 0m));
+
+            if (positivePotentialPct <= 0m)
+                return 0m;
+
+            if (maxUpTime.HasValue &&
+                maxDownTime.HasValue &&
+                maxUpTime.Value < maxDownTime.Value)
+            {
+                var maxPrice = entryPrice > 0m
+                    ? entryPrice * (1m + (positivePotentialPct / 100m))
+                    : 0m;
+
+                return scanPrice > 0m && maxPrice > 0m
+                    ? CalcPctOrZero(scanPrice, maxPrice)
+                    : positivePotentialPct;
+            }
+
+            return positivePotentialPct + negativePotentialPct;
         }
 
         private static decimal Round(decimal value)

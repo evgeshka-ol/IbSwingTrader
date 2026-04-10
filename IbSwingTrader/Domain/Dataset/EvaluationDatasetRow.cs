@@ -24,6 +24,8 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal StopLoss { get; set; }
 
+        public decimal ScanPrice { get; set; }
+
         public decimal PlannedProfitPct { get; set; }
 
         public decimal PlannedLossPct { get; set; }
