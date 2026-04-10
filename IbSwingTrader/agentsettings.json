@@ -147,7 +147,7 @@
 
         "EntryFilter": {
             "MinDollarVolume": 15000000,
-            "MaxDistanceTo20dHigh": -2.5,
+            "MaxDistanceTo20dHigh": -5.0,
             "MinCurrentDailyMaSignedDistancePct": -1.0,
             "MinDailyMaDelta3": 0.30,
             "MinDailyRsiDelta3": 1.25,
@@ -193,9 +193,9 @@
             "MinProfitPct": 0.03,
             "MaxProfitPct": 0.10,
             "H4TargetLookbackBars": 24,
-            "EntryPullbackAtrFraction": 0.15,
+            "EntryPullbackAtrFraction": 0.20,
             "MinimumEntryDiscountPct": 0.0015,
-            "MinimumEntryDiscountAtrFraction": 0.08
+            "MinimumEntryDiscountAtrFraction": 0.10
         }
     },
 
