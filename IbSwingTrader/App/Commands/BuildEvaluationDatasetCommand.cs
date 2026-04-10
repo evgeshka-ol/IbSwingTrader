@@ -44,6 +44,12 @@ namespace IbSwingTrader.App.Commands
 
             var rows = evaluations
                 .Select(x => BuildRow(x, candidateIndex))
+                .GroupBy(x => BuildDatasetKey(x), StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.AmplitudePct)
+                    .ThenByDescending(r => r.PositivePotentialPct)
+                    .ThenByDescending(r => r.EvaluatedAtMarketTime)
+                    .First())
                 .OrderBy(GetGroupPriority)
                 .ThenByDescending(x => x.AmplitudePct)
                 .ThenByDescending(x => x.PositivePotentialPct)
@@ -160,6 +166,11 @@ namespace IbSwingTrader.App.Commands
         private static string BuildCandidateKey(CandidateDetails row)
         {
             return $"{row.Ticker}|{row.Scan.PresetScanCode}|{row.Scan.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
+        }
+
+        private static string BuildDatasetKey(EvaluationDatasetRow row)
+        {
+            return $"{row.Ticker}|{row.GroupLabel}";
         }
 
         private static int? DiffDays(DateTime from, DateTime? to)
