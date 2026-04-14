@@ -120,7 +120,7 @@ namespace IbSwingTrader.Application.Evaluation
             if (afterEntry.Count > 0)
             {
                 result.DaysAfterEntry = (afterEntry[^1].Time.Date - entryCandle.Time.Date).Days;
-                FillExcursionStats(result, entryPrice, afterEntry);
+                FillExcursionStats(result, result.ScanPrice, afterEntry);
             }
 
             foreach (var candle in afterEntry)
@@ -317,10 +317,10 @@ namespace IbSwingTrader.Application.Evaluation
 
         private static void FillExcursionStats(
             CandidateEvaluationResult result,
-            decimal entryPrice,
+            decimal scanPrice,
             List<Candle> afterEntry)
         {
-            if (entryPrice <= 0m || afterEntry.Count == 0)
+            if (scanPrice <= 0m || afterEntry.Count == 0)
                 return;
 
             var maxUpCandle = afterEntry
@@ -333,9 +333,9 @@ namespace IbSwingTrader.Application.Evaluation
                 .ThenBy(x => x.Time)
                 .First();
 
-            result.MaxUpPct = RoundPct(CalcPct(entryPrice, maxUpCandle.High));
+            result.MaxUpPct = RoundPct(CalcPct(scanPrice, maxUpCandle.High));
             result.MaxUpTime = maxUpCandle.Time;
-            result.MaxDownPct = RoundPct(CalcPct(entryPrice, maxDownCandle.Low));
+            result.MaxDownPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
             result.MaxDownTime = maxDownCandle.Time;
         }
 

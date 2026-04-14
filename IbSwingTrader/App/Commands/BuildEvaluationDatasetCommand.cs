@@ -249,13 +249,7 @@ namespace IbSwingTrader.App.Commands
                 maxDownTime.HasValue &&
                 maxUpTime.Value < maxDownTime.Value)
             {
-                var maxPrice = entryPrice > 0m
-                    ? entryPrice * (1m + (positivePotentialPct / 100m))
-                    : 0m;
-
-                return scanPrice > 0m && maxPrice > 0m
-                    ? CalcPctOrZero(scanPrice, maxPrice)
-                    : positivePotentialPct;
+                return positivePotentialPct;
             }
 
             return positivePotentialPct + negativePotentialPct;

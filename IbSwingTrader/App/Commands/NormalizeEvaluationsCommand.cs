@@ -113,9 +113,9 @@ namespace IbSwingTrader.App.Commands
                 .ThenBy(x => x.Time)
                 .First();
 
-            record.MaxUpPct = RoundNullable(CalcPct(record.EntryPrice, maxUp.High));
+            record.MaxUpPct = RoundNullable(CalcPct(record.ScanPrice, maxUp.High));
             record.MaxUpTime = maxUp.Time;
-            record.MaxDownPct = RoundNullable(CalcPct(record.EntryPrice, maxDown.Low));
+            record.MaxDownPct = RoundNullable(CalcPct(record.ScanPrice, maxDown.Low));
             record.MaxDownTime = maxDown.Time;
         }
 
