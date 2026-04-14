@@ -74,6 +74,13 @@ namespace IbSwingTrader.Application.Candidates
                 .ToList();
 
             var current = ordered[^1].Close;
+
+            if (settings.UseCurrentPriceAsEntry)
+            {
+                _logger.Info($"Trade entry set to current M15 close. Current={current}");
+                return current > 0m ? current : fallbackEntry;
+            }
+
             var mean = ordered
                 .TakeLast(settings.EntryMaLength)
                 .Average(x => x.Close);

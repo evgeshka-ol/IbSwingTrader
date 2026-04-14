@@ -30,6 +30,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MaxDistanceTo52wHigh { get; set; }
 
         public decimal MaxDailyMaSignedDistancePct { get; set; }
+        public decimal MaxWeeklyMaSignedDistancePct { get; set; }
 
         public decimal MinWeeklyMaSignedDistancePct { get; set; }
 
@@ -65,6 +66,7 @@ namespace IbSwingTrader.Domain.Settings
 
     public class TradePlanSettings
     {
+        public bool UseCurrentPriceAsEntry { get; set; } = false;
         public int MinimumCandles { get; set; } = 10;
         public int StopLookbackBars { get; set; } = 5;
         public decimal StopBufferMultiplier { get; set; } = 0.99m;

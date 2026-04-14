@@ -25,10 +25,10 @@ namespace IbSwingTrader.Application.WishList
                 return false;
             }
 
-            if (f.DailyMaSignedDistancePct >= 0m)
+            if (f.DailyMaSignedDistancePct > s.MaxDailyMaSignedDistancePct)
             {
                 _logger.Info(
-                    $"WishList rejected: price is not below daily Bollinger mid. " +
+                    $"WishList rejected: price is too far above daily Bollinger mid. " +
                     $"Ticker price={_fmt.Generic(price)}, daily distance={_fmt.Generic(f.DailyMaSignedDistancePct)}%");
                 return false;
             }
@@ -39,10 +39,10 @@ namespace IbSwingTrader.Application.WishList
                 return false;
             }
 
-            if (f.WeeklyMaSignedDistancePct.Value >= 0m)
+            if (f.WeeklyMaSignedDistancePct.Value > s.MaxWeeklyMaSignedDistancePct)
             {
                 _logger.Info(
-                    $"WishList rejected: price is not below weekly Bollinger mid. " +
+                    $"WishList rejected: price is too far above weekly Bollinger mid. " +
                     $"Ticker price={_fmt.Generic(price)}, weekly distance={_fmt.Generic(f.WeeklyMaSignedDistancePct.Value)}%");
                 return false;
             }
