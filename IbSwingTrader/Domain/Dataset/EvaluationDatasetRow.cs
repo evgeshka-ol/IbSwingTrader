@@ -18,6 +18,10 @@ namespace IbSwingTrader.Domain.Dataset
 
         public int? DaysAfterEntry { get; set; }
 
+        public required string GroupLabel { get; set; }
+
+        public decimal AmplitudePct { get; set; }
+
         public decimal EntryPrice { get; set; }
 
         public decimal ExitPrice { get; set; }
@@ -48,8 +52,6 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal NegativePotentialPct { get; set; }
 
-        public decimal AmplitudePct { get; set; }
-
         public int? DaysToMaxUpFromScan { get; set; }
 
         public int? DaysToMaxUpFromEntry { get; set; }
@@ -59,8 +61,6 @@ namespace IbSwingTrader.Domain.Dataset
         public int? DaysToMaxDownFromEntry { get; set; }
 
         public bool? MaxDownBeforeMaxUp { get; set; }
-
-        public required string GroupLabel { get; set; }
 
         public bool HasActiveCandidateSnapshot { get; set; }
 
