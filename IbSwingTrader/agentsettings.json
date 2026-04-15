@@ -198,6 +198,45 @@
             "EntryPullbackAtrFraction": 0.20,
             "MinimumEntryDiscountPct": 0.0015,
             "MinimumEntryDiscountAtrFraction": 0.10
+        },
+
+        "NextDayRanking": {
+            "EntryScoreWeight": 0.35,
+            "CandidateScoreWeight": 0.20,
+            "TrendPositionWeight": 0.15,
+            "DailyTrendPositionWeight": 0.10,
+            "AtrRatioWeight": 0.10,
+            "BbMidWeight": 0.05,
+            "PresetWeight": 0.05,
+
+            "EntryScoreNormMax": 120.0,
+            "CandidateScoreNormMax": 140.0,
+            "TrendPositionNormMax": 10.0,
+            "DailyTrendPositionNormMax": 6.0,
+            "AtrRatioNormMax": 4.0,
+            "BbMidNormMax": 8.0,
+
+            "EntryScoreBonusThreshold": 100.0,
+            "EntryScoreBonus": 0.08,
+            "TrendPositionBonusThreshold": 6.0,
+            "TrendPositionBonus": 0.05,
+            "DailyTrendPositionBonusThreshold": 3.0,
+            "DailyTrendPositionBonus": 0.05,
+            "AtrRatioBonusThreshold": 2.8,
+            "AtrRatioBonus": 0.05,
+
+            "DailyTrendNegativePenaltyThreshold": 0.0,
+            "DailyTrendNegativePenalty": 0.08,
+            "BbMidNegativePenaltyThreshold": 0.0,
+            "BbMidNegativePenalty": 0.05,
+
+            "HotByVolumePresetBonus": 1.0,
+            "MostActivePresetBonus": 0.9,
+            "TopPercGainPresetBonus": 0.7,
+            "TopPercLosePresetBonus": 0.4,
+            "TopOpenPercGainPresetBonus": 0.2,
+            "TopOpenPercLosePresetBonus": 0.1,
+            "DefaultPresetBonus": 0.0
         }
     },
 

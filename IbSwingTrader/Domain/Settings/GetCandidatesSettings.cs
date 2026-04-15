@@ -14,6 +14,7 @@ namespace IbSwingTrader.Domain.Settings
         public FinderSettings Finder { get; set; } = new();
         public PreFilterSettings PreFilter { get; set; } = new();
         public TradePlanSettings TradePlan { get; set; } = new();
+        public NextDayRankingSettings NextDayRanking { get; set; } = new();
     }
 
     public class ScanCodeSettings
@@ -88,6 +89,46 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinimumEntryDiscountAtrFraction { get; set; } = 0.15m;
         public decimal MinimumRiskPct { get; set; } = 0.006m;
         public decimal MinimumRiskAtrMultiplier { get; set; } = 0.90m;
+    }
+
+    public class NextDayRankingSettings
+    {
+        public decimal EntryScoreWeight { get; set; } = 0.35m;
+        public decimal CandidateScoreWeight { get; set; } = 0.20m;
+        public decimal TrendPositionWeight { get; set; } = 0.15m;
+        public decimal DailyTrendPositionWeight { get; set; } = 0.10m;
+        public decimal AtrRatioWeight { get; set; } = 0.10m;
+        public decimal BbMidWeight { get; set; } = 0.05m;
+        public decimal PresetWeight { get; set; } = 0.05m;
+
+        public decimal EntryScoreNormMax { get; set; } = 120m;
+        public decimal CandidateScoreNormMax { get; set; } = 140m;
+        public decimal TrendPositionNormMax { get; set; } = 10m;
+        public decimal DailyTrendPositionNormMax { get; set; } = 6m;
+        public decimal AtrRatioNormMax { get; set; } = 4m;
+        public decimal BbMidNormMax { get; set; } = 8m;
+
+        public decimal EntryScoreBonusThreshold { get; set; } = 100m;
+        public decimal EntryScoreBonus { get; set; } = 0.08m;
+        public decimal TrendPositionBonusThreshold { get; set; } = 6m;
+        public decimal TrendPositionBonus { get; set; } = 0.05m;
+        public decimal DailyTrendPositionBonusThreshold { get; set; } = 3m;
+        public decimal DailyTrendPositionBonus { get; set; } = 0.05m;
+        public decimal AtrRatioBonusThreshold { get; set; } = 2.8m;
+        public decimal AtrRatioBonus { get; set; } = 0.05m;
+
+        public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
+        public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;
+        public decimal BbMidNegativePenaltyThreshold { get; set; } = 0m;
+        public decimal BbMidNegativePenalty { get; set; } = 0.05m;
+
+        public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
+        public decimal MostActivePresetBonus { get; set; } = 0.9m;
+        public decimal TopPercGainPresetBonus { get; set; } = 0.7m;
+        public decimal TopPercLosePresetBonus { get; set; } = 0.4m;
+        public decimal TopOpenPercGainPresetBonus { get; set; } = 0.2m;
+        public decimal TopOpenPercLosePresetBonus { get; set; } = 0.1m;
+        public decimal DefaultPresetBonus { get; set; } = 0m;
     }
 
     public class CandidateFilterSettings

@@ -40,6 +40,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly ITextLogger _logger = logger;
+        private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -601,7 +602,7 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private static CandidateDetails BuildCandidateItem(
+        private CandidateDetails BuildCandidateItem(
             StockInfo stock,
             bool isFromWishlist,
             PresetScanCode preset,
@@ -655,7 +656,7 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private static decimal CalculateNextDayRank(
+        private decimal CalculateNextDayRank(
             string presetScanCode,
             decimal candidateScore,
             decimal weeklyScore,
@@ -664,57 +665,58 @@ namespace IbSwingTrader.Application.Candidates
             CandidateSignalSnapshot snapshot,
             List<Candle> candles)
         {
+            var s = _nextDayRankingSettings;
             var diagnostics = BuildDiagnostics(snapshot, candles);
 
-            var entryScoreNorm = Clamp01(entryScore / 120m);
-            var candidateScoreNorm = Clamp01(candidateScore / 140m);
-            var trendPositionNorm = Clamp01(diagnostics.TrendPosition / 10m);
-            var dailyTrendPositionNorm = Clamp01(diagnostics.DailyTrendPosition / 6m);
-            var atrRatioNorm = Clamp01(diagnostics.ATRRatio / 4m);
-            var bbMidNorm = Clamp01(diagnostics.BBMidSignedDistancePct / 8m);
-            var presetBonus = ResolvePresetBonus(presetScanCode);
+            var entryScoreNorm = Clamp01(entryScore / s.EntryScoreNormMax);
+            var candidateScoreNorm = Clamp01(candidateScore / s.CandidateScoreNormMax);
+            var trendPositionNorm = Clamp01(diagnostics.TrendPosition / s.TrendPositionNormMax);
+            var dailyTrendPositionNorm = Clamp01(diagnostics.DailyTrendPosition / s.DailyTrendPositionNormMax);
+            var atrRatioNorm = Clamp01(diagnostics.ATRRatio / s.AtrRatioNormMax);
+            var bbMidNorm = Clamp01(diagnostics.BBMidSignedDistancePct / s.BbMidNormMax);
+            var presetBonus = ResolvePresetBonus(presetScanCode, s);
 
             var score =
-                0.35m * entryScoreNorm +
-                0.20m * candidateScoreNorm +
-                0.15m * trendPositionNorm +
-                0.10m * dailyTrendPositionNorm +
-                0.10m * atrRatioNorm +
-                0.05m * bbMidNorm +
-                0.05m * presetBonus;
+                s.EntryScoreWeight * entryScoreNorm +
+                s.CandidateScoreWeight * candidateScoreNorm +
+                s.TrendPositionWeight * trendPositionNorm +
+                s.DailyTrendPositionWeight * dailyTrendPositionNorm +
+                s.AtrRatioWeight * atrRatioNorm +
+                s.BbMidWeight * bbMidNorm +
+                s.PresetWeight * presetBonus;
 
-            if (entryScore >= 100m)
-                score += 0.08m;
+            if (entryScore >= s.EntryScoreBonusThreshold)
+                score += s.EntryScoreBonus;
 
-            if (diagnostics.TrendPosition >= 6m)
-                score += 0.05m;
+            if (diagnostics.TrendPosition >= s.TrendPositionBonusThreshold)
+                score += s.TrendPositionBonus;
 
-            if (diagnostics.DailyTrendPosition >= 3m)
-                score += 0.05m;
+            if (diagnostics.DailyTrendPosition >= s.DailyTrendPositionBonusThreshold)
+                score += s.DailyTrendPositionBonus;
 
-            if (diagnostics.ATRRatio >= 2.8m)
-                score += 0.05m;
+            if (diagnostics.ATRRatio >= s.AtrRatioBonusThreshold)
+                score += s.AtrRatioBonus;
 
-            if (diagnostics.DailyTrendPosition < 0m)
-                score -= 0.08m;
+            if (diagnostics.DailyTrendPosition < s.DailyTrendNegativePenaltyThreshold)
+                score -= s.DailyTrendNegativePenalty;
 
-            if (diagnostics.BBMidSignedDistancePct < 0m)
-                score -= 0.05m;
+            if (diagnostics.BBMidSignedDistancePct < s.BbMidNegativePenaltyThreshold)
+                score -= s.BbMidNegativePenalty;
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
 
-        private static decimal ResolvePresetBonus(string presetScanCode)
+        private static decimal ResolvePresetBonus(string presetScanCode, NextDayRankingSettings settings)
         {
             return presetScanCode switch
             {
-                "HOT_BY_VOLUME" => 1.0m,
-                "MOST_ACTIVE" => 0.9m,
-                "TOP_PERC_GAIN" => 0.7m,
-                "TOP_PERC_LOSE" => 0.4m,
-                "TOP_OPEN_PERC_GAIN" => 0.2m,
-                "TOP_OPEN_PERC_LOSE" => 0.1m,
-                _ => 0m
+                "HOT_BY_VOLUME" => settings.HotByVolumePresetBonus,
+                "MOST_ACTIVE" => settings.MostActivePresetBonus,
+                "TOP_PERC_GAIN" => settings.TopPercGainPresetBonus,
+                "TOP_PERC_LOSE" => settings.TopPercLosePresetBonus,
+                "TOP_OPEN_PERC_GAIN" => settings.TopOpenPercGainPresetBonus,
+                "TOP_OPEN_PERC_LOSE" => settings.TopOpenPercLosePresetBonus,
+                _ => settings.DefaultPresetBonus
             };
         }
 
