@@ -292,7 +292,12 @@ namespace IbSwingTrader.Application.Candidates
 
             return new CandidateSearchResult
             {
-                Candidates = [.. candidateResults.Values.OrderByDescending(x => x.Score.Score)],
+                Candidates =
+                [
+                    .. candidateResults.Values
+                        .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                        .ThenByDescending(x => x.Score.Score)
+                ],
                 WishList = finalWishList
             };
         }
@@ -610,6 +615,15 @@ namespace IbSwingTrader.Application.Candidates
             decimal entryScore,
             decimal finalScore)
         {
+            var nextDayRank = CalculateNextDayRank(
+                preset.ScanCode,
+                finalScore,
+                weeklyScore,
+                dailyScore,
+                entryScore,
+                snapshot,
+                candles);
+
             return new CandidateDetails
             {
                 Ticker = stock.Ticker,
@@ -624,6 +638,7 @@ namespace IbSwingTrader.Application.Candidates
                 Score = new ScoreInfo
                 {
                     Score = finalScore,
+                    NextDayRank = nextDayRank,
                     WeeklyScore = weeklyScore,
                     DailyScore = dailyScore,
                     EntryScore = entryScore
@@ -638,6 +653,80 @@ namespace IbSwingTrader.Application.Candidates
                 TradePlan = trade,
                 Diagnostics = BuildDiagnostics(snapshot, candles)
             };
+        }
+
+        private static decimal CalculateNextDayRank(
+            string presetScanCode,
+            decimal candidateScore,
+            decimal weeklyScore,
+            decimal dailyScore,
+            decimal entryScore,
+            CandidateSignalSnapshot snapshot,
+            List<Candle> candles)
+        {
+            var diagnostics = BuildDiagnostics(snapshot, candles);
+
+            var entryScoreNorm = Clamp01(entryScore / 120m);
+            var candidateScoreNorm = Clamp01(candidateScore / 140m);
+            var trendPositionNorm = Clamp01(diagnostics.TrendPosition / 10m);
+            var dailyTrendPositionNorm = Clamp01(diagnostics.DailyTrendPosition / 6m);
+            var atrRatioNorm = Clamp01(diagnostics.ATRRatio / 4m);
+            var bbMidNorm = Clamp01(diagnostics.BBMidSignedDistancePct / 8m);
+            var presetBonus = ResolvePresetBonus(presetScanCode);
+
+            var score =
+                0.35m * entryScoreNorm +
+                0.20m * candidateScoreNorm +
+                0.15m * trendPositionNorm +
+                0.10m * dailyTrendPositionNorm +
+                0.10m * atrRatioNorm +
+                0.05m * bbMidNorm +
+                0.05m * presetBonus;
+
+            if (entryScore >= 100m)
+                score += 0.08m;
+
+            if (diagnostics.TrendPosition >= 6m)
+                score += 0.05m;
+
+            if (diagnostics.DailyTrendPosition >= 3m)
+                score += 0.05m;
+
+            if (diagnostics.ATRRatio >= 2.8m)
+                score += 0.05m;
+
+            if (diagnostics.DailyTrendPosition < 0m)
+                score -= 0.08m;
+
+            if (diagnostics.BBMidSignedDistancePct < 0m)
+                score -= 0.05m;
+
+            return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal ResolvePresetBonus(string presetScanCode)
+        {
+            return presetScanCode switch
+            {
+                "HOT_BY_VOLUME" => 1.0m,
+                "MOST_ACTIVE" => 0.9m,
+                "TOP_PERC_GAIN" => 0.7m,
+                "TOP_PERC_LOSE" => 0.4m,
+                "TOP_OPEN_PERC_GAIN" => 0.2m,
+                "TOP_OPEN_PERC_LOSE" => 0.1m,
+                _ => 0m
+            };
+        }
+
+        private static decimal Clamp01(decimal value)
+        {
+            if (value <= 0m)
+                return 0m;
+
+            if (value >= 1m)
+                return 1m;
+
+            return value;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(

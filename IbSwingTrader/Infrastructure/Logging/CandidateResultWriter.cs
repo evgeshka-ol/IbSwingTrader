@@ -146,7 +146,8 @@ namespace IbSwingTrader.Infrastructure.Logging
         private List<CandidateSummaryItem> BuildSummary(IEnumerable<CandidateDetails> candidates)
         {
             return candidates
-                .OrderByDescending(x => x.Score.Score)
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x =>
                 {
@@ -156,7 +157,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                         $"{_fmt.Price(x.TradePlan.ExitPrice)} " +
                         $"{_fmt.Price(x.TradePlan.StopLoss)} " +
                         $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
-                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%";
+                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%" +
+                        $" rank={_fmt.Generic(x.Score.NextDayRank ?? 0m)}";
 
                     return new CandidateSummaryItem
                     {
