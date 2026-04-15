@@ -8,7 +8,10 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
         private readonly ITextLogger _logger = logger;
 
-        public TradePlan Build(List<Candle> candles, List<Candle>? entryCandles = null)
+        public TradePlan Build(
+            List<Candle> candles,
+            List<Candle>? entryCandles = null,
+            decimal? entryDiscountOverridePct = null)
         {
             var settings = _settingsProvider.Get().TradePlan;
 
@@ -21,7 +24,7 @@ namespace IbSwingTrader.Application.Candidates
                 .Skip(Math.Max(0, candles.Count - settings.StopLookbackBars))
                 .Min(x => x.Low);
 
-            var entry = BuildEntryPrice(last.Close, entryCandles, settings);
+            var entry = BuildEntryPrice(last.Close, entryCandles, settings, entryDiscountOverridePct);
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -59,10 +62,20 @@ namespace IbSwingTrader.Application.Candidates
         private decimal BuildEntryPrice(
             decimal fallbackEntry,
             List<Candle>? entryCandles,
-            TradePlanSettings settings)
+            TradePlanSettings settings,
+            decimal? entryDiscountOverridePct)
         {
             if (entryCandles == null || entryCandles.Count < settings.MinimumEntryCandles)
             {
+                if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value > 0m)
+                {
+                    var discountedFallback = fallbackEntry * (1m - entryDiscountOverridePct.Value);
+                    _logger.Info(
+                        $"Trade entry deep-pullback fallback to discounted H4 close. " +
+                        $"Fallback={fallbackEntry}, DiscountPct={entryDiscountOverridePct.Value}, Entry={discountedFallback}");
+                    return discountedFallback > 0m ? discountedFallback : fallbackEntry;
+                }
+
                 _logger.Info(
                     $"Trade entry fallback to last H4 close. " +
                     $"M15 candles={(entryCandles?.Count ?? 0)} is below required {settings.MinimumEntryCandles}.");
@@ -74,6 +87,15 @@ namespace IbSwingTrader.Application.Candidates
                 .ToList();
 
             var current = ordered[^1].Close;
+
+            if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value > 0m)
+            {
+                var discountedEntry = current * (1m - entryDiscountOverridePct.Value);
+                _logger.Info(
+                    $"Trade entry set to discounted current price for deep-pullback candidate. " +
+                    $"Current={current}, DiscountPct={entryDiscountOverridePct.Value}, Entry={discountedEntry}");
+                return discountedEntry > 0m ? discountedEntry : fallbackEntry;
+            }
 
             if (settings.UseCurrentPriceAsEntry)
             {

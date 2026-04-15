@@ -3,6 +3,9 @@ namespace IbSwingTrader.Abstractions.Candidates
 {
     public interface ITradeBuilder
     {
-        TradePlan Build(List<Candle> candles, List<Candle>? entryCandles = null);
+        TradePlan Build(
+            List<Candle> candles,
+            List<Candle>? entryCandles = null,
+            decimal? entryDiscountOverridePct = null);
     }
 }

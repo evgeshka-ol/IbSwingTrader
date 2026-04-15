@@ -151,6 +151,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x =>
                 {
+                    var candidateType = x.NeedsDeeperEntry ? " deep-entry" : string.Empty;
                     var ticker =
                         $"{x.Ticker} " +
                         $"{_fmt.Price(x.TradePlan.EntryPrice)} " +
@@ -158,7 +159,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                         $"{_fmt.Price(x.TradePlan.StopLoss)} " +
                         $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
                         $"{_fmt.Percent(x.TradePlan.LossPercent)}%" +
-                        $" rank={_fmt.Generic(x.Score.NextDayRank ?? 0m)}";
+                        $" rank={_fmt.Generic(x.Score.NextDayRank ?? 0m)}" +
+                        $"{candidateType}";
 
                     return new CandidateSummaryItem
                     {

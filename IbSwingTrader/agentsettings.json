@@ -197,7 +197,18 @@
             "H4TargetLookbackBars": 24,
             "EntryPullbackAtrFraction": 0.20,
             "MinimumEntryDiscountPct": 0.0015,
-            "MinimumEntryDiscountAtrFraction": 0.10
+            "MinimumEntryDiscountAtrFraction": 0.10,
+            "DeepPullbackEntry": {
+                "Enabled": true,
+                "MinSignalsRequired": 3,
+                "DistanceTo20dHighThreshold": -14.0,
+                "DailyTrendPositionThreshold": 1.0,
+                "TrendPositionThreshold": 5.0,
+                "DailyRsi14Threshold": 46.0,
+                "EntryDiscountPct": 0.03,
+                "HighAtrEntryDiscountPct": 0.04,
+                "HighAtrRatioThreshold": 3.0
+            }
         },
 
         "NextDayRanking": {

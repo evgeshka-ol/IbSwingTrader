@@ -386,6 +386,8 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
+            var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+            var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
@@ -394,10 +396,12 @@ namespace IbSwingTrader.Application.Candidates
             var candidateItem = BuildCandidateItem(
                 ctx.Stock,
                 isFromWishlist,
+                needsDeeperEntry,
                 ctx.Preset,
                 ctx.Snapshot,
                 ctx.Candles,
                 trade,
+                diagnostics,
                 ctx.ScanTimeMarket,
                 marketTimezone,
                 dailyScore,
@@ -530,7 +534,8 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info($"M15 entry history load failed for {ctx.Stock.Ticker}. {ex.Message}");
             }
 
-            var trade = _tradeBuilder.Build(ctx.Candles, entryCandles);
+            var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles);
+            var trade = _tradeBuilder.Build(ctx.Candles, entryCandles, entryDiscountOverridePct);
 
             return new TradePlanInfo
             {
@@ -605,10 +610,12 @@ namespace IbSwingTrader.Application.Candidates
         private CandidateDetails BuildCandidateItem(
             StockInfo stock,
             bool isFromWishlist,
+            bool needsDeeperEntry,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
             TradePlanInfo trade,
+            CandidateDiagnostics diagnostics,
             DateTime scanTimeMarket,
             string scanTimeZone,
             decimal dailyScore,
@@ -629,6 +636,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 Ticker = stock.Ticker,
                 IsFromWishlist = isFromWishlist,
+                NeedsDeeperEntry = needsDeeperEntry,
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,
@@ -652,7 +660,7 @@ namespace IbSwingTrader.Application.Candidates
                     Notes = BuildCandidateNotes(snapshot)
                 },
                 TradePlan = trade,
-                Diagnostics = BuildDiagnostics(snapshot, candles)
+                Diagnostics = diagnostics
             };
         }
 
@@ -729,6 +737,46 @@ namespace IbSwingTrader.Application.Candidates
                 return 1m;
 
             return value;
+        }
+
+        private bool ResolveNeedsDeeperEntry(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.DeepPullbackEntry;
+            if (!settings.Enabled)
+                return false;
+
+            var signals = 0;
+
+            if (snapshot.Current.DistanceTo20dHigh <= settings.DistanceTo20dHighThreshold)
+                signals++;
+
+            if (diagnostics.DailyTrendPosition <= settings.DailyTrendPositionThreshold)
+                signals++;
+
+            if (diagnostics.TrendPosition <= settings.TrendPositionThreshold)
+                signals++;
+
+            if (snapshot.Current.DailyRSI14 <= settings.DailyRsi14Threshold)
+                signals++;
+
+            return signals >= settings.MinSignalsRequired;
+        }
+
+        private decimal? ResolveDeepPullbackEntryDiscountPct(
+            CandidateSignalSnapshot snapshot,
+            List<Candle> candles)
+        {
+            var diagnostics = BuildDiagnostics(snapshot, candles);
+            if (!ResolveNeedsDeeperEntry(snapshot, diagnostics))
+                return null;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.DeepPullbackEntry;
+
+            return diagnostics.ATRRatio >= settings.HighAtrRatioThreshold
+                ? settings.HighAtrEntryDiscountPct
+                : settings.EntryDiscountPct;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(

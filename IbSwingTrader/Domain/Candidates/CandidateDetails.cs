@@ -4,6 +4,8 @@ namespace IbSwingTrader.Domain.Candidates
     {
         public bool IsFromWishlist { get; set; }
 
+        public bool NeedsDeeperEntry { get; set; }
+
         public required ScanInfo Scan { get; set; }
 
         public required ScoreInfo Score { get; set; }
