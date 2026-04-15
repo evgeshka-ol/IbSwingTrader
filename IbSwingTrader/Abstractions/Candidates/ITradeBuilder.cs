@@ -6,6 +6,9 @@ namespace IbSwingTrader.Abstractions.Candidates
         TradePlan Build(
             List<Candle> candles,
             List<Candle>? entryCandles = null,
-            decimal? entryDiscountOverridePct = null);
+            decimal? entryDiscountOverridePct = null,
+            decimal? defaultProfitPctOverride = null,
+            decimal? minProfitPctOverride = null,
+            decimal? maxProfitPctOverride = null);
     }
 }

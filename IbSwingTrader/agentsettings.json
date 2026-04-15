@@ -208,6 +208,17 @@
                 "EntryDiscountPct": 0.03,
                 "HighAtrEntryDiscountPct": 0.04,
                 "HighAtrRatioThreshold": 3.0
+            },
+            "MomentumExit": {
+                "Enabled": true,
+                "MinSignalsRequired": 3,
+                "EntryScoreThreshold": 100.0,
+                "TrendPositionThreshold": 6.0,
+                "DailyTrendPositionThreshold": 3.0,
+                "AtrRatioThreshold": 2.8,
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.05,
+                "MaxProfitPct": 0.12
             }
         },
 

@@ -11,7 +11,10 @@ namespace IbSwingTrader.Application.Candidates
         public TradePlan Build(
             List<Candle> candles,
             List<Candle>? entryCandles = null,
-            decimal? entryDiscountOverridePct = null)
+            decimal? entryDiscountOverridePct = null,
+            decimal? defaultProfitPctOverride = null,
+            decimal? minProfitPctOverride = null,
+            decimal? maxProfitPctOverride = null)
         {
             var settings = _settingsProvider.Get().TradePlan;
 
@@ -42,7 +45,13 @@ namespace IbSwingTrader.Application.Candidates
 
             var risk = entry - stop;
             var rawExit = entry + risk * settings.RiskRewardRatio;
-            var targetProfitPct = ResolveTargetProfitPct(candles, entry, settings);
+            var targetProfitPct = ResolveTargetProfitPct(
+                candles,
+                entry,
+                settings,
+                defaultProfitPctOverride,
+                minProfitPctOverride,
+                maxProfitPctOverride);
             var cappedExit = entry * (1m + targetProfitPct);
             var exit = Math.Min(rawExit, cappedExit);
 
@@ -55,7 +64,8 @@ namespace IbSwingTrader.Application.Candidates
             {
                 Entry = entry,
                 Stop = stop,
-                Exit = exit
+                Exit = exit,
+                ExitProfile = defaultProfitPctOverride.HasValue ? "momentum" : "standard"
             };
         }
 
@@ -201,12 +211,19 @@ namespace IbSwingTrader.Application.Candidates
         private decimal ResolveTargetProfitPct(
             List<Candle> candles,
             decimal entry,
-            TradePlanSettings settings)
+            TradePlanSettings settings,
+            decimal? defaultProfitPctOverride,
+            decimal? minProfitPctOverride,
+            decimal? maxProfitPctOverride)
         {
+            var minProfitPct = minProfitPctOverride ?? settings.MinProfitPct;
+            var maxProfitPct = maxProfitPctOverride ?? settings.MaxProfitPct;
+            var defaultProfitPct = defaultProfitPctOverride ?? settings.DefaultProfitPct;
+
             var defaultPct = Clamp(
-                settings.DefaultProfitPct,
-                settings.MinProfitPct,
-                settings.MaxProfitPct);
+                defaultProfitPct,
+                minProfitPct,
+                maxProfitPct);
 
             if (candles.Count < 3)
                 return defaultPct;
@@ -242,8 +259,8 @@ namespace IbSwingTrader.Application.Candidates
 
             return Clamp(
                 resistancePct,
-                settings.MinProfitPct,
-                settings.MaxProfitPct);
+                minProfitPct,
+                maxProfitPct);
         }
 
         private static decimal CalculateAtr(List<Candle> candles, int length)

@@ -6,6 +6,8 @@ namespace IbSwingTrader.Domain.Candidates
 
         public bool NeedsDeeperEntry { get; set; }
 
+        public bool NeedsMomentumExit { get; set; }
+
         public required ScanInfo Scan { get; set; }
 
         public required ScoreInfo Score { get; set; }

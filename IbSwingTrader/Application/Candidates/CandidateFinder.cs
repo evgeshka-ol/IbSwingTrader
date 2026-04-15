@@ -393,10 +393,13 @@ namespace IbSwingTrader.Application.Candidates
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
             var finalScore = dailyScore + weeklyScore + entryScore;
 
+            var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
+
             var candidateItem = BuildCandidateItem(
                 ctx.Stock,
                 isFromWishlist,
                 needsDeeperEntry,
+                needsMomentumExit,
                 ctx.Preset,
                 ctx.Snapshot,
                 ctx.Candles,
@@ -535,7 +538,18 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles);
-            var trade = _tradeBuilder.Build(ctx.Candles, entryCandles, entryDiscountOverridePct);
+            var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+            var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+            var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
+            var momentumExit = needsMomentumExit ? tradeSettings.MomentumExit : null;
+
+            var trade = _tradeBuilder.Build(
+                ctx.Candles,
+                entryCandles,
+                entryDiscountOverridePct,
+                momentumExit?.DefaultProfitPct,
+                momentumExit?.MinProfitPct,
+                momentumExit?.MaxProfitPct);
 
             return new TradePlanInfo
             {
@@ -543,7 +557,8 @@ namespace IbSwingTrader.Application.Candidates
                 ExitPrice = trade.Exit,
                 StopLoss = trade.Stop,
                 ProfitPercent = CalculatePercent(trade.Entry, trade.Exit),
-                LossPercent = CalculatePercent(trade.Entry, trade.Stop)
+                LossPercent = CalculatePercent(trade.Entry, trade.Stop),
+                ExitProfile = trade.ExitProfile
             };
         }
 
@@ -611,6 +626,7 @@ namespace IbSwingTrader.Application.Candidates
             StockInfo stock,
             bool isFromWishlist,
             bool needsDeeperEntry,
+            bool needsMomentumExit,
             PresetScanCode preset,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
@@ -637,6 +653,7 @@ namespace IbSwingTrader.Application.Candidates
                 Ticker = stock.Ticker,
                 IsFromWishlist = isFromWishlist,
                 NeedsDeeperEntry = needsDeeperEntry,
+                NeedsMomentumExit = needsMomentumExit,
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,
@@ -759,6 +776,32 @@ namespace IbSwingTrader.Application.Candidates
                 signals++;
 
             if (snapshot.Current.DailyRSI14 <= settings.DailyRsi14Threshold)
+                signals++;
+
+            return signals >= settings.MinSignalsRequired;
+        }
+
+        private bool ResolveNeedsMomentumExit(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.MomentumExit;
+            if (!settings.Enabled)
+                return false;
+
+            var signals = 0;
+
+            if (entryScore >= settings.EntryScoreThreshold)
+                signals++;
+
+            if (diagnostics.TrendPosition >= settings.TrendPositionThreshold)
+                signals++;
+
+            if (diagnostics.DailyTrendPosition >= settings.DailyTrendPositionThreshold)
+                signals++;
+
+            if (diagnostics.ATRRatio >= settings.AtrRatioThreshold)
                 signals++;
 
             return signals >= settings.MinSignalsRequired;

@@ -90,6 +90,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinimumRiskPct { get; set; } = 0.006m;
         public decimal MinimumRiskAtrMultiplier { get; set; } = 0.90m;
         public DeepPullbackEntrySettings DeepPullbackEntry { get; set; } = new();
+        public MomentumExitSettings MomentumExit { get; set; } = new();
     }
 
     public class DeepPullbackEntrySettings
@@ -103,6 +104,19 @@ namespace IbSwingTrader.Domain.Settings
         public decimal EntryDiscountPct { get; set; } = 0.03m;
         public decimal HighAtrEntryDiscountPct { get; set; } = 0.04m;
         public decimal HighAtrRatioThreshold { get; set; } = 3m;
+    }
+
+    public class MomentumExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public int MinSignalsRequired { get; set; } = 3;
+        public decimal EntryScoreThreshold { get; set; } = 100m;
+        public decimal TrendPositionThreshold { get; set; } = 6m;
+        public decimal DailyTrendPositionThreshold { get; set; } = 3m;
+        public decimal AtrRatioThreshold { get; set; } = 2.8m;
+        public decimal DefaultProfitPct { get; set; } = 0.08m;
+        public decimal MinProfitPct { get; set; } = 0.05m;
+        public decimal MaxProfitPct { get; set; } = 0.12m;
     }
 
     public class NextDayRankingSettings

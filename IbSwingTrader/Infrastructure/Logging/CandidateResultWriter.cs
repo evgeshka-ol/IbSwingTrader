@@ -151,7 +151,10 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x =>
                 {
-                    var candidateType = x.NeedsDeeperEntry ? " deep-entry" : string.Empty;
+                    var candidateType =
+                        x.NeedsDeeperEntry ? " deep-entry" :
+                        x.NeedsMomentumExit ? " momentum-exit" :
+                        string.Empty;
                     var ticker =
                         $"{x.Ticker} " +
                         $"{_fmt.Price(x.TradePlan.EntryPrice)} " +

@@ -11,5 +11,7 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal ProfitPercent { get; set; }
 
         public decimal LossPercent { get; set; }
+
+        public string? ExitProfile { get; set; }
     }
 }
