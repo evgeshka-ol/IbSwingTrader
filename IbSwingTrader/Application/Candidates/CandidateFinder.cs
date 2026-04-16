@@ -21,6 +21,7 @@ namespace IbSwingTrader.Application.Candidates
         IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
+        INumberTextFormatter fmt,
         ITextLogger logger) : ICandidateFinder
     {
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
@@ -39,6 +40,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
+        private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
 
@@ -169,7 +171,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"trading class ({stock.TradingClass}), " +
                         $"exchange ({stock.Exchange}), " +
                         $"rank ({stock.Rank}), " +
-                        $"avgDollarVolume={avgDollarVolume}");
+                        $"avgDollarVolume={_fmt.Generic(avgDollarVolume)}");
 
                     if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
                     {
@@ -573,12 +575,12 @@ namespace IbSwingTrader.Application.Candidates
         {
             _logger.Info(
                 $"WishList item build started: {stock.Ticker}. " +
-                $"DailyMaSignedDistancePct={snapshot.Current.DailyMaSignedDistancePct}, " +
-                $"WeeklyMaSignedDistancePct={snapshot.Current.WeeklyMaSignedDistancePct}, " +
-                $"DailyMaDelta3={snapshot.DailyMaDelta3}, " +
-                $"H4MaDelta3={snapshot.H4MaDelta3}, " +
-                $"DailyRsiDelta3={snapshot.DailyRsiDelta3}, " +
-                $"DailyMacdDelta3={snapshot.DailyMacdDelta3}");
+                $"DailyMaSignedDistancePct={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}, " +
+                $"WeeklyMaSignedDistancePct={_fmt.Generic(snapshot.Current.WeeklyMaSignedDistancePct ?? 0m)}, " +
+                $"DailyMaDelta3={_fmt.Generic(snapshot.DailyMaDelta3)}, " +
+                $"H4MaDelta3={_fmt.Generic(snapshot.H4MaDelta3)}, " +
+                $"DailyRsiDelta3={_fmt.Generic(snapshot.DailyRsiDelta3)}, " +
+                $"DailyMacdDelta3={_fmt.Generic(snapshot.DailyMacdDelta3)}");
 
             var targetForecast = CalculateWishListTargetForecast(
                 stock.Ticker,

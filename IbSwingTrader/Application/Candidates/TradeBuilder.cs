@@ -3,9 +3,11 @@ namespace IbSwingTrader.Application.Candidates
 {
     public class TradeBuilder(
         IGetCandidatesSettingsProvider settingsProvider,
+        INumberTextFormatter fmt,
         ITextLogger logger) : ITradeBuilder
     {
         private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
+        private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
 
         public TradePlan Build(
@@ -39,7 +41,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"Trade stop widened to satisfy minimum risk floor. " +
-                    $"OriginalStop={stop}, AdjustedStop={maxAllowedStop}, RiskFloor={riskFloor}");
+                    $"OriginalStop={_fmt.Price(stop)}, AdjustedStop={_fmt.Price(maxAllowedStop)}, RiskFloor={_fmt.Price(riskFloor)}");
                 stop = maxAllowedStop;
             }
 
@@ -57,8 +59,8 @@ namespace IbSwingTrader.Application.Candidates
 
             _logger.Info(
                 $"Trade plan built. " +
-                $"Entry={entry}, Stop={stop}, Exit={exit}, Risk={risk}, RawExit={rawExit}, " +
-                $"TargetProfitPct={targetProfitPct}, MaxProfitPct={settings.MaxProfitPct}");
+                $"Entry={_fmt.Price(entry)}, Stop={_fmt.Price(stop)}, Exit={_fmt.Price(exit)}, Risk={_fmt.Price(risk)}, RawExit={_fmt.Price(rawExit)}, " +
+                $"TargetProfitPct={_fmt.Percent(targetProfitPct)}, MaxProfitPct={_fmt.Percent(maxProfitPctOverride ?? settings.MaxProfitPct)}");
 
             return new TradePlan
             {
@@ -82,7 +84,7 @@ namespace IbSwingTrader.Application.Candidates
                     var discountedFallback = fallbackEntry * (1m - entryDiscountOverridePct.Value);
                     _logger.Info(
                         $"Trade entry deep-pullback fallback to discounted H4 close. " +
-                        $"Fallback={fallbackEntry}, DiscountPct={entryDiscountOverridePct.Value}, Entry={discountedFallback}");
+                        $"Fallback={_fmt.Price(fallbackEntry)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedFallback)}");
                     return discountedFallback > 0m ? discountedFallback : fallbackEntry;
                 }
 
@@ -103,13 +105,13 @@ namespace IbSwingTrader.Application.Candidates
                 var discountedEntry = current * (1m - entryDiscountOverridePct.Value);
                 _logger.Info(
                     $"Trade entry set to discounted current price for deep-pullback candidate. " +
-                    $"Current={current}, DiscountPct={entryDiscountOverridePct.Value}, Entry={discountedEntry}");
+                    $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedEntry)}");
                 return discountedEntry > 0m ? discountedEntry : fallbackEntry;
             }
 
             if (settings.UseCurrentPriceAsEntry)
             {
-                _logger.Info($"Trade entry set to current M15 close. Current={current}");
+                _logger.Info($"Trade entry set to current M15 close. Current={_fmt.Price(current)}");
                 return current > 0m ? current : fallbackEntry;
             }
 
@@ -172,7 +174,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"Trade entry fallback to last H4 close. " +
-                    $"Computed entry bounds are invalid: min={minEntry}, max={maxEntry}.");
+                    $"Computed entry bounds are invalid: min={_fmt.Price(minEntry)}, max={_fmt.Price(maxEntry)}.");
                 return fallbackEntry;
             }
 
@@ -180,9 +182,9 @@ namespace IbSwingTrader.Application.Candidates
 
             _logger.Info(
                 $"Trade entry from M15 forecast. " +
-                $"Current={current}, Mean={mean}, DistanceToMean={distanceToMean}, " +
-                $"ATR={atr}, MacdHist={currentHist}, MacdSlope={histSlope}, " +
-                $"ProjectedPrice={projectedPrice}, MinDiscount={minimumDiscount}, LimitEntry={entry}");
+                $"Current={_fmt.Price(current)}, Mean={_fmt.Price(mean)}, DistanceToMean={_fmt.Price(distanceToMean)}, " +
+                $"ATR={_fmt.Price(atr)}, MacdHist={_fmt.Generic(currentHist)}, MacdSlope={_fmt.Generic(histSlope)}, " +
+                $"ProjectedPrice={_fmt.Price(projectedPrice)}, MinDiscount={_fmt.Price(minimumDiscount)}, LimitEntry={_fmt.Price(entry)}");
 
             return entry > 0m ? entry : fallbackEntry;
         }
