@@ -61,15 +61,18 @@ namespace IbSwingTrader.App.Commands
                 .ToList();
 
             var removed = candidates.Count - filtered.Count;
-            if (removed <= 0)
+            var rebuiltSummary = BuildSummary(filtered);
+            var summaryChanged = !AreSummariesEqual(candidateDocument.Summary, rebuiltSummary);
+
+            if (removed <= 0 && !summaryChanged)
                 return 0;
 
             candidateDocument.Candidates = filtered;
-            candidateDocument.Summary = BuildSummary(filtered);
+            candidateDocument.Summary = rebuiltSummary;
             await _jsonFileService.WriteAsync(candidatesPath, candidateDocument);
 
             _logger.Info(
-                $"Candidates cleaned: removed={removed}, kept={filtered.Count}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
+                $"Candidates cleaned: removed={removed}, kept={filtered.Count}, summaryChanged={summaryChanged}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
 
             return removed;
         }
@@ -143,7 +146,8 @@ namespace IbSwingTrader.App.Commands
 
             return candidates
                 .Where(x => x.Scan.ScanTimeMarket == latestScanTime)
-                .OrderByDescending(x => x.Score.Score)
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x => new CandidateSummaryItem
                 {
@@ -156,6 +160,28 @@ namespace IbSwingTrader.App.Commands
                         $"{x.TradePlan.LossPercent:0.##}%"
                 })
                 .ToList();
+        }
+
+        private static bool AreSummariesEqual(
+            List<CandidateSummaryItem>? left,
+            List<CandidateSummaryItem>? right)
+        {
+            left ??= [];
+            right ??= [];
+
+            if (left.Count != right.Count)
+                return false;
+
+            for (var i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i].Ticker, right[i].Ticker, StringComparison.Ordinal) ||
+                    !string.Equals(left[i].Comment, right[i].Comment, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private async Task<int> CleanWishListAsync(CleanUpSettings settings, DateTime marketNow)
