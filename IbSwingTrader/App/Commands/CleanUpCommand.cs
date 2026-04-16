@@ -4,12 +4,14 @@ using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.App.Commands
 {
     public class CleanUpCommand(
+        ICandidateEvaluationCsvService candidateEvaluationCsvService,
         IJsonFileService jsonFileService,
         ITextLogger logger,
         IAgentPathService pathService,
         ICleanUpSettingsProvider cleanUpSettingsProvider,
         IMarketSettingsProvider marketSettingsProvider) : ICommand
     {
+        private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -22,11 +24,12 @@ namespace IbSwingTrader.App.Commands
             var marketNow = MarketTime.Now(_marketSettingsProvider.Get().Timezone);
 
             var candidatesRemoved = await CleanCandidatesAsync(settings);
+            var evaluationsRemoved = await CleanEvaluationsAsync(settings);
             var wishListRemoved = await CleanWishListAsync(settings, marketNow);
             var deletedFiles = CleanOldFiles(settings, marketNow);
 
             _logger.Info(
-                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles}");
+                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} EvaluationsRemoved={evaluationsRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles}");
         }
 
         private async Task<int> CleanCandidatesAsync(CleanUpSettings settings)
@@ -67,6 +70,42 @@ namespace IbSwingTrader.App.Commands
 
             _logger.Info(
                 $"Candidates cleaned: removed={removed}, kept={filtered.Count}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
+
+            return removed;
+        }
+
+        private async Task<int> CleanEvaluationsAsync(CleanUpSettings settings)
+        {
+            if (!settings.RemoveEvaluationReportRows)
+                return 0;
+
+            var evaluationsPath = _pathService.GetEvaluationsFile();
+            if (!File.Exists(evaluationsPath))
+                return 0;
+
+            var removableOutcomes = settings.EvaluationOutcomesToRemove
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (removableOutcomes.Count == 0)
+                return 0;
+
+            var records = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
+            if (records.Count == 0)
+                return 0;
+
+            var filtered = records
+                .Where(x => !removableOutcomes.Contains(x.Outcome ?? string.Empty))
+                .ToList();
+
+            var removed = records.Count - filtered.Count;
+            if (removed <= 0)
+                return 0;
+
+            await _candidateEvaluationCsvService.WriteAsync(evaluationsPath, filtered);
+
+            _logger.Info(
+                $"Evaluation report cleaned: removed={removed}, kept={filtered.Count}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
 
             return removed;
         }

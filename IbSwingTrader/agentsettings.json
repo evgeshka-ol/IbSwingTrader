@@ -288,6 +288,12 @@
             "Loss"
         ],
         "RemoveStaleWishListItems": true,
+        "RemoveEvaluationReportRows": true,
+        "EvaluationOutcomesToRemove": [
+            "NoData",
+            "NoDataAfterScan",
+            "InsufficientFutureData"
+        ],
         "RemoveWishListWithoutTargetOlderThanDays": 14,
         "RemoveWishListPastExpectedTargetGraceDays": 2,
         "DeleteLogsOlderThanCutoff": true,

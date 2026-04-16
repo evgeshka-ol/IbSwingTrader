@@ -16,6 +16,15 @@ namespace IbSwingTrader.Domain.Settings
 
         public bool RemoveStaleWishListItems { get; set; } = true;
 
+        public bool RemoveEvaluationReportRows { get; set; } = true;
+
+        public List<string> EvaluationOutcomesToRemove { get; set; } =
+        [
+            "NoData",
+            "NoDataAfterScan",
+            "InsufficientFutureData"
+        ];
+
         public int RemoveWishListWithoutTargetOlderThanDays { get; set; } = 14;
 
         public int RemoveWishListPastExpectedTargetGraceDays { get; set; } = 2;
