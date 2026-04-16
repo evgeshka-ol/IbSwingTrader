@@ -91,14 +91,14 @@ namespace IbSwingTrader.App.Commands
             candidateIndex.TryGetValue(key, out var candidate);
             var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
 
-            var positivePotentialPct = Round(Math.Max(evaluation.MaxUpPct ?? 0m, 0m));
-            var negativePotentialPct = Round(Math.Abs(Math.Min(evaluation.MaxDownPct ?? 0m, 0m)));
+            var positivePotentialPct = Round(Math.Max(evaluation.MaxPct ?? 0m, 0m));
+            var negativePotentialPct = Round(Math.Abs(Math.Min(evaluation.MinPct ?? 0m, 0m)));
             var amplitudePct = Round(CalculateAmplitudePct(
                 evaluation.ScanPrice,
                 evaluation.EntryPrice,
-                evaluation.MaxUpPct,
+                evaluation.MaxPct,
                 evaluation.MaxUpTime,
-                evaluation.MaxDownPct,
+                evaluation.MinPct,
                 evaluation.MaxDownTime));
 
             var daysToMaxUpFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MaxUpTime);
@@ -126,9 +126,9 @@ namespace IbSwingTrader.App.Commands
                 ScanMovePct = evaluation.ScanMovePct,
                 CurrentPct = evaluation.CurrentPct,
                 EntryDistanceToMinAfterScanPct = evaluation.EntryDistanceToMinAfterScanPct,
-                MaxUpPct = evaluation.MaxUpPct,
+                MaxPct = evaluation.MaxPct,
                 MaxUpTime = evaluation.MaxUpTime,
-                MaxDownPct = evaluation.MaxDownPct,
+                MinPct = evaluation.MinPct,
                 MaxDownTime = evaluation.MaxDownTime,
                 PositivePotentialPct = positivePotentialPct,
                 NegativePotentialPct = negativePotentialPct,

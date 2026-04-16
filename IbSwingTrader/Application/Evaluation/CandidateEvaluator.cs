@@ -333,9 +333,9 @@ namespace IbSwingTrader.Application.Evaluation
                 .ThenBy(x => x.Time)
                 .First();
 
-            result.MaxUpPct = RoundPct(CalcPct(scanPrice, maxUpCandle.High));
+            result.MaxPct = RoundPct(CalcPct(scanPrice, maxUpCandle.High));
             result.MaxUpTime = maxUpCandle.Time;
-            result.MaxDownPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
+            result.MinPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
             result.MaxDownTime = maxDownCandle.Time;
         }
 

@@ -40,11 +40,11 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal EntryDistanceToMinAfterScanPct { get; set; }
 
-        public decimal? MaxUpPct { get; set; }
+        public decimal? MaxPct { get; set; }
 
         public DateTime? MaxUpTime { get; set; }
 
-        public decimal? MaxDownPct { get; set; }
+        public decimal? MinPct { get; set; }
 
         public DateTime? MaxDownTime { get; set; }
 

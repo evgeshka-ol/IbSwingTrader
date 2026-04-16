@@ -131,6 +131,18 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 headerIndex[nameof(CandidateEvaluationResult.ScanTimeMarket)] = scanTimeNyIndex;
             }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.MaxPct)) &&
+                headerIndex.TryGetValue("MaxUpPct", out var maxUpPctIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.MaxPct)] = maxUpPctIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.MinPct)) &&
+                headerIndex.TryGetValue("MaxDownPct", out var maxDownPctIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.MinPct)] = maxDownPctIndex;
+            }
         }
 
         private static object? ParseValue(Type type, string raw)
@@ -220,8 +232,8 @@ namespace IbSwingTrader.Application.Evaluation
         {
             record.ScanMovePct = RoundNullable(record.ScanMovePct);
             record.CurrentPct = RoundNullable(record.CurrentPct);
-            record.MaxUpPct = RoundNullable(record.MaxUpPct);
-            record.MaxDownPct = RoundNullable(record.MaxDownPct);
+            record.MaxPct = RoundNullable(record.MaxPct);
+            record.MinPct = RoundNullable(record.MinPct);
             record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
             record.RealizedPct = RoundNullable(record.RealizedPct);
         }
