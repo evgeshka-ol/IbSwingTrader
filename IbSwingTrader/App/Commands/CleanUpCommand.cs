@@ -7,6 +7,7 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
         BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
         IJsonFileService jsonFileService,
+        INumberTextFormatter fmt,
         ITextLogger logger,
         IAgentPathService pathService,
         ICleanUpSettingsProvider cleanUpSettingsProvider,
@@ -15,6 +16,7 @@ namespace IbSwingTrader.App.Commands
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
         private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ICleanUpSettingsProvider _cleanUpSettingsProvider = cleanUpSettingsProvider;
@@ -163,7 +165,7 @@ namespace IbSwingTrader.App.Commands
                 ?? new CandidateFileDocument();
         }
 
-        private static List<CandidateSummaryItem> BuildSummary(List<CandidateDetails> candidates)
+        private List<CandidateSummaryItem> BuildSummary(List<CandidateDetails> candidates)
         {
             if (candidates.Count == 0)
                 return [];
@@ -177,15 +179,27 @@ namespace IbSwingTrader.App.Commands
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x => new CandidateSummaryItem
                 {
-                    Ticker =
-                        $"{x.Ticker} " +
-                        $"{x.TradePlan.EntryPrice:0.##} " +
-                        $"{x.TradePlan.ExitPrice:0.##} " +
-                        $"{x.TradePlan.StopLoss:0.##} " +
-                        $"{x.TradePlan.ProfitPercent:0.##}%/" +
-                        $"{x.TradePlan.LossPercent:0.##}%"
+                    Ticker = BuildSummaryTickerText(x)
                 })
                 .ToList();
+        }
+
+        private string BuildSummaryTickerText(CandidateDetails candidate)
+        {
+            var candidateType =
+                candidate.NeedsDeeperEntry ? " deep-entry" :
+                candidate.NeedsMomentumExit ? " momentum-exit" :
+                string.Empty;
+
+            return
+                $"{candidate.Ticker} " +
+                $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
+                $"{_fmt.Price(candidate.TradePlan.ExitPrice)} " +
+                $"{_fmt.Price(candidate.TradePlan.StopLoss)} " +
+                $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
+                $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
+                $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
+                $"{candidateType}";
         }
 
         private static bool AreSummariesEqual(
