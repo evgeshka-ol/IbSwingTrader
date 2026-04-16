@@ -5,6 +5,7 @@ namespace IbSwingTrader.App.Commands
 {
     public class CleanUpCommand(
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
+        BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
         IJsonFileService jsonFileService,
         ITextLogger logger,
         IAgentPathService pathService,
@@ -12,6 +13,7 @@ namespace IbSwingTrader.App.Commands
         IMarketSettingsProvider marketSettingsProvider) : ICommand
     {
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
+        private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -25,6 +27,7 @@ namespace IbSwingTrader.App.Commands
 
             var candidatesRemoved = await CleanCandidatesAsync(settings);
             var evaluationsRemoved = await CleanEvaluationsAsync(settings);
+            await SyncEvaluationDatasetAsync(evaluationsRemoved > 0);
             var wishListRemoved = await CleanWishListAsync(settings, marketNow);
             var deletedFiles = CleanOldFiles(settings, marketNow);
 
@@ -75,6 +78,29 @@ namespace IbSwingTrader.App.Commands
                 $"Candidates cleaned: removed={removed}, kept={filtered.Count}, summaryChanged={summaryChanged}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
 
             return removed;
+        }
+
+        private async Task SyncEvaluationDatasetAsync(bool evaluationsChanged)
+        {
+            if (!evaluationsChanged)
+                return;
+
+            var evaluationsPath = _pathService.GetEvaluationsFile();
+            var datasetPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+
+            var evaluations = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
+            if (evaluations.Count > 0)
+            {
+                await _buildEvaluationDatasetCommand.RunAsync();
+                return;
+            }
+
+            if (!File.Exists(datasetPath))
+                return;
+
+            File.Delete(datasetPath);
+            _logger.Info($"Evaluation dataset deleted: {datasetPath}");
         }
 
         private async Task<int> CleanEvaluationsAsync(CleanUpSettings settings)
