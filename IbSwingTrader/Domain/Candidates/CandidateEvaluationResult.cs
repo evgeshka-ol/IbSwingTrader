@@ -24,8 +24,8 @@ namespace IbSwingTrader.Domain.Candidates
         public bool ExitTouched { get; set; }
         public bool StopTouched { get; set; }
 
-        public DateTime? MaxUpTime { get; set; }
-        public DateTime? MaxDownTime { get; set; }
+        public DateTime? MaxTime { get; set; }
+        public DateTime? MinTime { get; set; }
 
         public DateTime? EntryTime { get; set; }
         public DateTime? ExitTime { get; set; }

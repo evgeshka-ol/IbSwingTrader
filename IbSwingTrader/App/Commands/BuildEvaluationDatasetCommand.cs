@@ -97,14 +97,14 @@ namespace IbSwingTrader.App.Commands
                 evaluation.ScanPrice,
                 evaluation.EntryPrice,
                 evaluation.MaxPct,
-                evaluation.MaxUpTime,
+                evaluation.MaxTime,
                 evaluation.MinPct,
-                evaluation.MaxDownTime));
+                evaluation.MinTime));
 
-            var daysToMaxUpFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MaxUpTime);
-            var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, evaluation.MaxUpTime);
-            var daysToMaxDownFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MaxDownTime);
-            var daysToMaxDownFromEntry = DiffDays(evaluation.EntryTime, evaluation.MaxDownTime);
+            var daysToMaxUpFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MaxTime);
+            var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, evaluation.MaxTime);
+            var daysToMaxDownFromScan = DiffDays(evaluation.ScanTimeMarket, evaluation.MinTime);
+            var daysToMaxDownFromEntry = DiffDays(evaluation.EntryTime, evaluation.MinTime);
 
             return new EvaluationDatasetRow
             {
@@ -127,9 +127,9 @@ namespace IbSwingTrader.App.Commands
                 CurrentPct = evaluation.CurrentPct,
                 EntryDistanceToMinAfterScanPct = evaluation.EntryDistanceToMinAfterScanPct,
                 MaxPct = evaluation.MaxPct,
-                MaxUpTime = evaluation.MaxUpTime,
+                MaxTime = evaluation.MaxTime,
                 MinPct = evaluation.MinPct,
-                MaxDownTime = evaluation.MaxDownTime,
+                MinTime = evaluation.MinTime,
                 PositivePotentialPct = positivePotentialPct,
                 NegativePotentialPct = negativePotentialPct,
                 AmplitudePct = amplitudePct,
@@ -137,7 +137,7 @@ namespace IbSwingTrader.App.Commands
                 DaysToMaxUpFromEntry = daysToMaxUpFromEntry,
                 DaysToMaxDownFromScan = daysToMaxDownFromScan,
                 DaysToMaxDownFromEntry = daysToMaxDownFromEntry,
-                MaxDownBeforeMaxUp = CompareTimes(evaluation.MaxDownTime, evaluation.MaxUpTime),
+                MaxDownBeforeMaxUp = CompareTimes(evaluation.MinTime, evaluation.MaxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 HasActiveCandidateSnapshot = candidate != null,
                 CandidateScore = candidate?.Score.Score,

@@ -114,9 +114,9 @@ namespace IbSwingTrader.App.Commands
                 .First();
 
             record.MaxPct = RoundNullable(CalcPct(record.ScanPrice, maxUp.High));
-            record.MaxUpTime = maxUp.Time;
+            record.MaxTime = maxUp.Time;
             record.MinPct = RoundNullable(CalcPct(record.ScanPrice, maxDown.Low));
-            record.MaxDownTime = maxDown.Time;
+            record.MinTime = maxDown.Time;
         }
 
         private static decimal CalcPct(decimal from, decimal to)

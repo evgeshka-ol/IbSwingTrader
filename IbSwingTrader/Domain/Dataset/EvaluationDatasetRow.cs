@@ -42,11 +42,11 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal? MaxPct { get; set; }
 
-        public DateTime? MaxUpTime { get; set; }
+        public DateTime? MaxTime { get; set; }
 
         public decimal? MinPct { get; set; }
 
-        public DateTime? MaxDownTime { get; set; }
+        public DateTime? MinTime { get; set; }
 
         public decimal PositivePotentialPct { get; set; }
 

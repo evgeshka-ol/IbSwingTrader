@@ -334,9 +334,9 @@ namespace IbSwingTrader.Application.Evaluation
                 .First();
 
             result.MaxPct = RoundPct(CalcPct(scanPrice, maxUpCandle.High));
-            result.MaxUpTime = maxUpCandle.Time;
+            result.MaxTime = maxUpCandle.Time;
             result.MinPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
-            result.MaxDownTime = maxDownCandle.Time;
+            result.MinTime = maxDownCandle.Time;
         }
 
         private static void FillAfterExitStats(

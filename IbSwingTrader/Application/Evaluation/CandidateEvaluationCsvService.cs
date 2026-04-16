@@ -143,6 +143,18 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 headerIndex[nameof(CandidateEvaluationResult.MinPct)] = maxDownPctIndex;
             }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.MaxTime)) &&
+                headerIndex.TryGetValue("MaxUpTime", out var maxUpTimeIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.MaxTime)] = maxUpTimeIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.MinTime)) &&
+                headerIndex.TryGetValue("MaxDownTime", out var maxDownTimeIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.MinTime)] = maxDownTimeIndex;
+            }
         }
 
         private static object? ParseValue(Type type, string raw)
