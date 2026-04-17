@@ -186,6 +186,7 @@
 
         "TradePlan": {
             "UseCurrentPriceAsEntry": true,
+            "BaselineEntryDiscountPct": 0.003,
             "MinimumCandles": 10,
             "StopLookbackBars": 5,
             "StopBufferMultiplier": 0.99,
@@ -216,9 +217,10 @@
                 "TrendPositionThreshold": 6.0,
                 "DailyTrendPositionThreshold": 3.0,
                 "AtrRatioThreshold": 2.8,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.05,
-                "MaxProfitPct": 0.12
+                "DefaultProfitPct": 0.06,
+                "MinProfitPct": 0.04,
+                "MaxProfitPct": 0.09,
+                "ExitPriceBufferPct": 0.001
             }
         },
 

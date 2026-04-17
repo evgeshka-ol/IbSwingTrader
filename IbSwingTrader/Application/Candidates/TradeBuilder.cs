@@ -57,6 +57,20 @@ namespace IbSwingTrader.Application.Candidates
             var cappedExit = entry * (1m + targetProfitPct);
             var exit = Math.Min(rawExit, cappedExit);
 
+            var momentumSettings = settings.MomentumExit;
+            var isMomentumExit = defaultProfitPctOverride.HasValue;
+            if (isMomentumExit && momentumSettings.ExitPriceBufferPct > 0m)
+            {
+                var bufferedExit = exit * (1m - momentumSettings.ExitPriceBufferPct);
+                if (bufferedExit > entry)
+                {
+                    _logger.Info(
+                        $"Trade momentum exit buffered below target. " +
+                        $"OriginalExit={_fmt.Price(exit)}, BufferedExit={_fmt.Price(bufferedExit)}, BufferPct={_fmt.Percent(momentumSettings.ExitPriceBufferPct)}");
+                    exit = bufferedExit;
+                }
+            }
+
             _logger.Info(
                 $"Trade plan built. " +
                 $"Entry={_fmt.Price(entry)}, Stop={_fmt.Price(stop)}, Exit={_fmt.Price(exit)}, Risk={_fmt.Price(risk)}, RawExit={_fmt.Price(rawExit)}, " +
@@ -111,8 +125,15 @@ namespace IbSwingTrader.Application.Candidates
 
             if (settings.UseCurrentPriceAsEntry)
             {
-                _logger.Info($"Trade entry set to current M15 close. Current={_fmt.Price(current)}");
-                return current > 0m ? current : fallbackEntry;
+                var baselineDiscountPct = Math.Max(settings.BaselineEntryDiscountPct, 0m);
+                var discountedCurrent = baselineDiscountPct > 0m
+                    ? current * (1m - baselineDiscountPct)
+                    : current;
+
+                _logger.Info(
+                    $"Trade entry set to discounted current M15 close. " +
+                    $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(baselineDiscountPct)}, Entry={_fmt.Price(discountedCurrent)}");
+                return discountedCurrent > 0m ? discountedCurrent : fallbackEntry;
             }
 
             var mean = ordered

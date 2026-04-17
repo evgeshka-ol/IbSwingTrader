@@ -68,6 +68,7 @@ namespace IbSwingTrader.Domain.Settings
     public class TradePlanSettings
     {
         public bool UseCurrentPriceAsEntry { get; set; } = false;
+        public decimal BaselineEntryDiscountPct { get; set; } = 0.003m;
         public int MinimumCandles { get; set; } = 10;
         public int StopLookbackBars { get; set; } = 5;
         public decimal StopBufferMultiplier { get; set; } = 0.99m;
@@ -114,9 +115,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal TrendPositionThreshold { get; set; } = 6m;
         public decimal DailyTrendPositionThreshold { get; set; } = 3m;
         public decimal AtrRatioThreshold { get; set; } = 2.8m;
-        public decimal DefaultProfitPct { get; set; } = 0.08m;
-        public decimal MinProfitPct { get; set; } = 0.05m;
-        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal DefaultProfitPct { get; set; } = 0.06m;
+        public decimal MinProfitPct { get; set; } = 0.04m;
+        public decimal MaxProfitPct { get; set; } = 0.09m;
+        public decimal ExitPriceBufferPct { get; set; } = 0.001m;
     }
 
     public class NextDayRankingSettings
