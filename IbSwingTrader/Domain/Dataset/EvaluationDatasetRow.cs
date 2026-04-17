@@ -48,6 +48,18 @@ namespace IbSwingTrader.Domain.Dataset
 
         public DateTime? MinTime { get; set; }
 
+        public decimal? MaxPctBeforeEntry { get; set; }
+
+        public DateTime? MaxTimeBeforeEntry { get; set; }
+
+        public decimal? MinPctBeforeEntry { get; set; }
+
+        public DateTime? MinTimeBeforeEntry { get; set; }
+
+        public decimal? EntryUndercutBeforeEntryAbs { get; set; }
+
+        public decimal? EntryUndercutBeforeEntryPct { get; set; }
+
         public decimal PositivePotentialPct { get; set; }
 
         public decimal NegativePotentialPct { get; set; }
@@ -59,6 +71,22 @@ namespace IbSwingTrader.Domain.Dataset
         public int? DaysToMaxDownFromScan { get; set; }
 
         public int? DaysToMaxDownFromEntry { get; set; }
+
+        public decimal? ExitMissAbs { get; set; }
+
+        public decimal? ExitMissPct { get; set; }
+
+        public bool NearTakeProfitMiss { get; set; }
+
+        public decimal? PostMaxDrawdownPct { get; set; }
+
+        public string ExtremumOrder { get; set; } = string.Empty;
+
+        public int? MinutesFromMinToMax { get; set; }
+
+        public int? MinutesFromEntryToMax { get; set; }
+
+        public int? MinutesFromEntryToMin { get; set; }
 
         public bool? MaxDownBeforeMaxUp { get; set; }
 

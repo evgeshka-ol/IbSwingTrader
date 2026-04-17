@@ -112,6 +112,8 @@ namespace IbSwingTrader.Application.Evaluation
             result.EntryTouched = true;
             result.EntryTime = entryCandle.Time;
 
+            FillBeforeEntryStats(result, result.ScanPrice, ordered, entryCandle.Time);
+
             var afterEntry = ordered
                 .Where(x => x.Time >= entryCandle.Time)
                 .OrderBy(x => x.Time)
@@ -120,7 +122,7 @@ namespace IbSwingTrader.Application.Evaluation
             if (afterEntry.Count > 0)
             {
                 result.DaysAfterEntry = (afterEntry[^1].Time.Date - entryCandle.Time.Date).Days;
-                FillExcursionStats(result, result.ScanPrice, afterEntry);
+                FillExcursionStats(result, result.ScanPrice, entryPrice, exitPrice, afterEntry);
             }
 
             foreach (var candle in afterEntry)
@@ -318,6 +320,8 @@ namespace IbSwingTrader.Application.Evaluation
         private static void FillExcursionStats(
             CandidateEvaluationResult result,
             decimal scanPrice,
+            decimal entryPrice,
+            decimal exitPrice,
             List<Candle> afterEntry)
         {
             if (scanPrice <= 0m || afterEntry.Count == 0)
@@ -337,6 +341,51 @@ namespace IbSwingTrader.Application.Evaluation
             result.MaxTime = maxUpCandle.Time;
             result.MinPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
             result.MinTime = maxDownCandle.Time;
+            result.ExtremumOrder = GetExtremumOrder(result.MinTime, result.MaxTime);
+            result.MinutesFromMinToMax = DiffMinutes(result.MinTime, result.MaxTime);
+            result.MinutesFromEntryToMax = DiffMinutes(result.EntryTime, result.MaxTime);
+            result.MinutesFromEntryToMin = DiffMinutes(result.EntryTime, result.MinTime);
+            result.PostMaxDrawdownPct = RoundNullable(CalculatePostMaxDrawdownPct(maxUpCandle, afterEntry));
+            FillExitMissStats(result, maxUpCandle.High, exitPrice);
+        }
+
+        private static void FillBeforeEntryStats(
+            CandidateEvaluationResult result,
+            decimal scanPrice,
+            List<Candle> ordered,
+            DateTime entryTime)
+        {
+            if (scanPrice <= 0m || ordered.Count == 0)
+                return;
+
+            var beforeEntry = ordered
+                .Where(x => x.Time <= entryTime)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (beforeEntry.Count == 0)
+                return;
+
+            var maxBeforeEntry = beforeEntry
+                .OrderByDescending(x => x.High)
+                .ThenBy(x => x.Time)
+                .First();
+
+            var minBeforeEntry = beforeEntry
+                .OrderBy(x => x.Low)
+                .ThenBy(x => x.Time)
+                .First();
+
+            result.MaxPctBeforeEntry = RoundPct(CalcPct(scanPrice, maxBeforeEntry.High));
+            result.MaxTimeBeforeEntry = maxBeforeEntry.Time;
+            result.MinPctBeforeEntry = RoundPct(CalcPct(scanPrice, minBeforeEntry.Low));
+            result.MinTimeBeforeEntry = minBeforeEntry.Time;
+
+            var entryUndercutAbs = Math.Max(result.EntryPrice - minBeforeEntry.Low, 0m);
+            result.EntryUndercutBeforeEntryAbs = RoundPct(entryUndercutAbs);
+            result.EntryUndercutBeforeEntryPct = entryUndercutAbs > 0m
+                ? RoundPct((entryUndercutAbs / result.EntryPrice) * 100m)
+                : 0m;
         }
 
         private static void FillAfterExitStats(
@@ -360,6 +409,81 @@ namespace IbSwingTrader.Application.Evaluation
 
             result.TakeProfitOverflowPct = CalcPct(exitPrice, maxAfterExit.High);
             result.DaysAfterExitToMaxHigh = (decimal)(maxAfterExit.Time - exitTime).TotalDays;
+        }
+
+        private static void FillExitMissStats(
+            CandidateEvaluationResult result,
+            decimal maxHighAfterEntry,
+            decimal exitPrice)
+        {
+            if (result.ExitTouched || exitPrice <= 0m)
+            {
+                result.ExitMissAbs = null;
+                result.ExitMissPct = null;
+                result.NearTakeProfitMiss = false;
+                return;
+            }
+
+            var missAbs = Math.Max(exitPrice - maxHighAfterEntry, 0m);
+            var missPct = exitPrice > 0m
+                ? (missAbs / exitPrice) * 100m
+                : 0m;
+
+            result.ExitMissAbs = RoundPct(missAbs);
+            result.ExitMissPct = RoundPct(missPct);
+            result.NearTakeProfitMiss = missAbs > 0m && (missAbs <= 0.01m || missPct <= 0.1m);
+        }
+
+        private static decimal? CalculatePostMaxDrawdownPct(Candle maxUpCandle, List<Candle> afterEntry)
+        {
+            if (maxUpCandle.High <= 0m)
+                return null;
+
+            var afterMax = afterEntry
+                .Where(x => x.Time >= maxUpCandle.Time)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (afterMax.Count == 0)
+                return null;
+
+            var minLowAfterMax = afterMax.Min(x => x.Low);
+            return ((maxUpCandle.High - minLowAfterMax) / maxUpCandle.High) * 100m;
+        }
+
+        private static string GetExtremumOrder(DateTime? minTime, DateTime? maxTime)
+        {
+            if (minTime.HasValue && maxTime.HasValue)
+            {
+                if (minTime.Value < maxTime.Value)
+                    return "MinFirst";
+
+                if (maxTime.Value < minTime.Value)
+                    return "MaxFirst";
+
+                return "SameBar";
+            }
+
+            if (minTime.HasValue)
+                return "OnlyMin";
+
+            if (maxTime.HasValue)
+                return "OnlyMax";
+
+            return "Unknown";
+        }
+
+        private static int? DiffMinutes(DateTime? from, DateTime? to)
+        {
+            if (!from.HasValue || !to.HasValue)
+                return null;
+
+            return (int)Math.Round((to.Value - from.Value).TotalMinutes, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal? RoundNullable(decimal? value)
+        {
+            return value.HasValue ? RoundPct(value.Value) : null;
         }
 
         private void LogNoEntryDiagnostics(

@@ -93,6 +93,8 @@ namespace IbSwingTrader.App.Commands
             if (!record.EntryTouched || !record.EntryTime.HasValue)
                 return;
 
+            FillBeforeEntryStats(record, ordered, record.EntryTime.Value);
+
             var afterEntry = ordered
                 .Where(x => x.Time >= record.EntryTime.Value)
                 .OrderBy(x => x.Time)
@@ -117,6 +119,116 @@ namespace IbSwingTrader.App.Commands
             record.MaxTime = maxUp.Time;
             record.MinPct = RoundNullable(CalcPct(record.ScanPrice, maxDown.Low));
             record.MinTime = maxDown.Time;
+            record.ExtremumOrder = GetExtremumOrder(record.MinTime, record.MaxTime);
+            record.MinutesFromMinToMax = DiffMinutes(record.MinTime, record.MaxTime);
+            record.MinutesFromEntryToMax = DiffMinutes(record.EntryTime, record.MaxTime);
+            record.MinutesFromEntryToMin = DiffMinutes(record.EntryTime, record.MinTime);
+            record.PostMaxDrawdownPct = RoundNullable(CalculatePostMaxDrawdownPct(maxUp, afterEntry));
+            FillExitMissStats(record, maxUp.High);
+        }
+
+        private static void FillBeforeEntryStats(
+            CandidateEvaluationResult record,
+            List<Candle> ordered,
+            DateTime entryTime)
+        {
+            var beforeEntry = ordered
+                .Where(x => x.Time <= entryTime)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (beforeEntry.Count == 0 || record.ScanPrice <= 0m)
+                return;
+
+            var maxBeforeEntry = beforeEntry
+                .OrderByDescending(x => x.High)
+                .ThenBy(x => x.Time)
+                .First();
+
+            var minBeforeEntry = beforeEntry
+                .OrderBy(x => x.Low)
+                .ThenBy(x => x.Time)
+                .First();
+
+            record.MaxPctBeforeEntry = RoundNullable(CalcPct(record.ScanPrice, maxBeforeEntry.High));
+            record.MaxTimeBeforeEntry = maxBeforeEntry.Time;
+            record.MinPctBeforeEntry = RoundNullable(CalcPct(record.ScanPrice, minBeforeEntry.Low));
+            record.MinTimeBeforeEntry = minBeforeEntry.Time;
+
+            var entryUndercutAbs = Math.Max(record.EntryPrice - minBeforeEntry.Low, 0m);
+            record.EntryUndercutBeforeEntryAbs = RoundNullable(entryUndercutAbs);
+            record.EntryUndercutBeforeEntryPct = record.EntryPrice > 0m
+                ? RoundNullable((entryUndercutAbs / record.EntryPrice) * 100m)
+                : null;
+        }
+
+        private static void FillExitMissStats(
+            CandidateEvaluationResult record,
+            decimal maxHighAfterEntry)
+        {
+            if (record.ExitTouched || record.ExitPrice <= 0m)
+            {
+                record.ExitMissAbs = null;
+                record.ExitMissPct = null;
+                record.NearTakeProfitMiss = false;
+                return;
+            }
+
+            var missAbs = Math.Max(record.ExitPrice - maxHighAfterEntry, 0m);
+            var missPct = record.ExitPrice > 0m
+                ? (missAbs / record.ExitPrice) * 100m
+                : 0m;
+
+            record.ExitMissAbs = RoundNullable(missAbs);
+            record.ExitMissPct = RoundNullable(missPct);
+            record.NearTakeProfitMiss = missAbs > 0m && (missAbs <= 0.01m || missPct <= 0.1m);
+        }
+
+        private static decimal? CalculatePostMaxDrawdownPct(Candle maxUp, List<Candle> afterEntry)
+        {
+            if (maxUp.High <= 0m)
+                return null;
+
+            var afterMax = afterEntry
+                .Where(x => x.Time >= maxUp.Time)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (afterMax.Count == 0)
+                return null;
+
+            var minLowAfterMax = afterMax.Min(x => x.Low);
+            return ((maxUp.High - minLowAfterMax) / maxUp.High) * 100m;
+        }
+
+        private static string GetExtremumOrder(DateTime? minTime, DateTime? maxTime)
+        {
+            if (minTime.HasValue && maxTime.HasValue)
+            {
+                if (minTime.Value < maxTime.Value)
+                    return "MinFirst";
+
+                if (maxTime.Value < minTime.Value)
+                    return "MaxFirst";
+
+                return "SameBar";
+            }
+
+            if (minTime.HasValue)
+                return "OnlyMin";
+
+            if (maxTime.HasValue)
+                return "OnlyMax";
+
+            return "Unknown";
+        }
+
+        private static int? DiffMinutes(DateTime? from, DateTime? to)
+        {
+            if (!from.HasValue || !to.HasValue)
+                return null;
+
+            return (int)Math.Round((to.Value - from.Value).TotalMinutes, MidpointRounding.AwayFromZero);
         }
 
         private static decimal CalcPct(decimal from, decimal to)
@@ -140,9 +252,9 @@ namespace IbSwingTrader.App.Commands
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
-        private static decimal? RoundNullable(decimal value)
+        private static decimal? RoundNullable(decimal? value)
         {
-            return Round(value);
+            return value.HasValue ? Round(value.Value) : null;
         }
     }
 }

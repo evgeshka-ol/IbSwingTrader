@@ -246,8 +246,15 @@ namespace IbSwingTrader.Application.Evaluation
             record.CurrentPct = RoundNullable(record.CurrentPct);
             record.MaxPct = RoundNullable(record.MaxPct);
             record.MinPct = RoundNullable(record.MinPct);
+            record.MaxPctBeforeEntry = RoundNullable(record.MaxPctBeforeEntry);
+            record.MinPctBeforeEntry = RoundNullable(record.MinPctBeforeEntry);
             record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
+            record.EntryUndercutBeforeEntryAbs = RoundNullable(record.EntryUndercutBeforeEntryAbs);
+            record.EntryUndercutBeforeEntryPct = RoundNullable(record.EntryUndercutBeforeEntryPct);
             record.RealizedPct = RoundNullable(record.RealizedPct);
+            record.ExitMissAbs = RoundNullable(record.ExitMissAbs);
+            record.ExitMissPct = RoundNullable(record.ExitMissPct);
+            record.PostMaxDrawdownPct = RoundNullable(record.PostMaxDrawdownPct);
         }
 
         private static decimal Round(decimal value)

@@ -20,12 +20,16 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? CurrentPct { get; set; }
         public decimal? MaxPct { get; set; }
         public decimal? MinPct { get; set; }
+        public decimal? MaxPctBeforeEntry { get; set; }
+        public decimal? MinPctBeforeEntry { get; set; }
         public bool EntryTouched { get; set; }
         public bool ExitTouched { get; set; }
         public bool StopTouched { get; set; }
 
         public DateTime? MaxTime { get; set; }
         public DateTime? MinTime { get; set; }
+        public DateTime? MaxTimeBeforeEntry { get; set; }
+        public DateTime? MinTimeBeforeEntry { get; set; }
 
         public DateTime? EntryTime { get; set; }
         public DateTime? ExitTime { get; set; }
@@ -36,10 +40,20 @@ namespace IbSwingTrader.Domain.Candidates
 
         public decimal MinLowAfterScan { get; set; }
         public decimal EntryDistanceToMinAfterScanPct { get; set; }
+        public decimal? EntryUndercutBeforeEntryAbs { get; set; }
+        public decimal? EntryUndercutBeforeEntryPct { get; set; }
 
         public string? Outcome { get; set; }
         public decimal? RealizedPct { get; set; }
         public int? DaysAfterEntry { get; set; }
+        public decimal? ExitMissAbs { get; set; }
+        public decimal? ExitMissPct { get; set; }
+        public bool NearTakeProfitMiss { get; set; }
+        public decimal? PostMaxDrawdownPct { get; set; }
+        public string? ExtremumOrder { get; set; }
+        public int? MinutesFromMinToMax { get; set; }
+        public int? MinutesFromEntryToMax { get; set; }
+        public int? MinutesFromEntryToMin { get; set; }
 
         public DateTime? EvaluationStartTime { get; set; }
         public DateTime? EvaluationEndTime { get; set; }
