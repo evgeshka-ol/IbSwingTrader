@@ -146,6 +146,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DailyTrendPositionBonus { get; set; } = 0.05m;
         public decimal AtrRatioBonusThreshold { get; set; } = 2.8m;
         public decimal AtrRatioBonus { get; set; } = 0.05m;
+        public decimal DeeperEntryBonus { get; set; } = 0.10m;
+        public decimal MomentumExitPenalty { get; set; } = 0.05m;
 
         public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
         public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;

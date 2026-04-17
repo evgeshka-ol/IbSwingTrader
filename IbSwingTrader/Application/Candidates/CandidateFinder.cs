@@ -647,6 +647,8 @@ namespace IbSwingTrader.Application.Candidates
                 weeklyScore,
                 dailyScore,
                 entryScore,
+                needsDeeperEntry,
+                needsMomentumExit,
                 snapshot,
                 candles);
 
@@ -689,6 +691,8 @@ namespace IbSwingTrader.Application.Candidates
             decimal weeklyScore,
             decimal dailyScore,
             decimal entryScore,
+            bool needsDeeperEntry,
+            bool needsMomentumExit,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles)
         {
@@ -723,6 +727,12 @@ namespace IbSwingTrader.Application.Candidates
 
             if (diagnostics.ATRRatio >= s.AtrRatioBonusThreshold)
                 score += s.AtrRatioBonus;
+
+            if (needsDeeperEntry)
+                score += s.DeeperEntryBonus;
+
+            if (needsMomentumExit)
+                score -= s.MomentumExitPenalty;
 
             if (diagnostics.DailyTrendPosition < s.DailyTrendNegativePenaltyThreshold)
                 score -= s.DailyTrendNegativePenalty;
