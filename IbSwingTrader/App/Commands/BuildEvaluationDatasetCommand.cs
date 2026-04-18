@@ -12,6 +12,7 @@ namespace IbSwingTrader.App.Commands
     {
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
+        private const int ProgressLogInterval = 250;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
@@ -26,6 +27,9 @@ namespace IbSwingTrader.App.Commands
             var outputPath = Path.GetFullPath(
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
 
+            _logger.Info("Building evaluation dataset...");
+            _logger.Info($"Evaluations source: {evaluationsPath}");
+
             var evaluations = await _evaluationCsvService.ReadAsync(evaluationsPath);
 
             if (evaluations.Count == 0)
@@ -33,6 +37,8 @@ namespace IbSwingTrader.App.Commands
                 _logger.Error("No evaluations found.");
                 return;
             }
+
+            _logger.Info($"Evaluations loaded: {evaluations.Count}");
 
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
@@ -46,9 +52,18 @@ namespace IbSwingTrader.App.Commands
 
             var rows = new List<EvaluationDatasetRow>();
 
-            foreach (var evaluation in evaluations)
+            for (var i = 0; i < evaluations.Count; i++)
             {
+                var evaluation = evaluations[i];
                 rows.Add(BuildRow(evaluation, candidateIndex));
+
+                var processed = i + 1;
+                if (processed == 1 ||
+                    processed == evaluations.Count ||
+                    processed % ProgressLogInterval == 0)
+                {
+                    _logger.Info($"Evaluation dataset progress: {processed}/{evaluations.Count}");
+                }
             }
 
             rows = rows
