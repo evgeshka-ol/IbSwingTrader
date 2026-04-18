@@ -1,12 +1,14 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
+using IbSwingTrader.Domain.Settings;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class CandidateResultWriter(
         IAgentPathService pathService,
         IJsonFileService jsonFileService,
+        IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
         IMarketSettingsProvider marketSettingsProvider,
         ITextLogger logger,
         IConsoleColorWriter console,
@@ -15,6 +17,7 @@ namespace IbSwingTrader.Infrastructure.Logging
     {
         private readonly IAgentPathService _pathService = pathService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IConsoleColorWriter _console = console;
@@ -151,10 +154,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x =>
                 {
-                    var candidateType =
-                        x.NeedsDeeperEntry ? " deep-entry" :
-                        x.NeedsMomentumExit ? " momentum-exit" :
-                        string.Empty;
+                    var markers = BuildSummaryMarkers(x);
                     var ticker =
                         $"{x.Ticker} " +
                         $"{_fmt.Price(x.TradePlan.EntryPrice)} " +
@@ -163,7 +163,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                         $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
                         $"{_fmt.Percent(x.TradePlan.LossPercent)}%" +
                         $" rank={_fmt.Generic(x.Score.NextDayRank ?? 0m)}" +
-                        $"{candidateType}";
+                        $"{markers}";
 
                     return new CandidateSummaryItem
                     {
@@ -172,6 +172,63 @@ namespace IbSwingTrader.Infrastructure.Logging
                     };
                 })
                 .ToList();
+        }
+
+        private string BuildSummaryMarkers(CandidateDetails candidate)
+        {
+            var markers = new List<string>();
+
+            if (candidate.NeedsDeeperEntry)
+                markers.Add("deep-entry");
+
+            if (candidate.NeedsMomentumExit)
+                markers.Add("momentum-exit");
+
+            if (IsStrongMinFirstProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("strong");
+            }
+            else if (IsWeakDeepPullbackProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("weak-deep");
+            }
+
+            return markers.Count == 0
+                ? string.Empty
+                : $" {string.Join(" ", markers)}";
+        }
+
+        private bool IsStrongMinFirstProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.StrongMinFirstExit;
+            if (!settings.Enabled || candidate.NeedsDeeperEntry || candidate.NeedsMomentumExit)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.DailyTrendPositionThreshold &&
+                   diagnostics.TrendPosition >= settings.TrendPositionThreshold &&
+                   diagnostics.ATRRatio <= settings.MaxAtrRatio &&
+                   context.DistanceTo20dHigh <= settings.MaxDistanceTo20dHigh;
+        }
+
+        private bool IsWeakDeepPullbackProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            if (diagnostics == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.WeakDeepPullbackExit;
+            if (!settings.Enabled || !candidate.NeedsDeeperEntry)
+                return false;
+
+            return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio;
         }
 
         private void WriteCandidateToConsole(CandidateDetails candidate)

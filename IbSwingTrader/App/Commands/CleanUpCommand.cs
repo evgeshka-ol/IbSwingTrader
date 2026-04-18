@@ -1,5 +1,6 @@
 using System.Globalization;
 using IbSwingTrader.Common.Time;
+using IbSwingTrader.Domain.Settings;
 
 namespace IbSwingTrader.App.Commands
 {
@@ -11,6 +12,7 @@ namespace IbSwingTrader.App.Commands
         ITextLogger logger,
         IAgentPathService pathService,
         ICleanUpSettingsProvider cleanUpSettingsProvider,
+        IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
         IMarketSettingsProvider marketSettingsProvider) : ICommand
     {
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
@@ -20,6 +22,7 @@ namespace IbSwingTrader.App.Commands
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ICleanUpSettingsProvider _cleanUpSettingsProvider = cleanUpSettingsProvider;
+        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
 
         public async Task RunAsync()
@@ -186,11 +189,6 @@ namespace IbSwingTrader.App.Commands
 
         private string BuildSummaryTickerText(CandidateDetails candidate)
         {
-            var candidateType =
-                candidate.NeedsDeeperEntry ? " deep-entry" :
-                candidate.NeedsMomentumExit ? " momentum-exit" :
-                string.Empty;
-
             return
                 $"{candidate.Ticker} " +
                 $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
@@ -199,7 +197,64 @@ namespace IbSwingTrader.App.Commands
                 $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
                 $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
                 $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
-                $"{candidateType}";
+                $"{BuildSummaryMarkers(candidate)}";
+        }
+
+        private string BuildSummaryMarkers(CandidateDetails candidate)
+        {
+            var markers = new List<string>();
+
+            if (candidate.NeedsDeeperEntry)
+                markers.Add("deep-entry");
+
+            if (candidate.NeedsMomentumExit)
+                markers.Add("momentum-exit");
+
+            if (IsStrongMinFirstProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("strong");
+            }
+            else if (IsWeakDeepPullbackProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("weak-deep");
+            }
+
+            return markers.Count == 0
+                ? string.Empty
+                : $" {string.Join(" ", markers)}";
+        }
+
+        private bool IsStrongMinFirstProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.StrongMinFirstExit;
+            if (!settings.Enabled || candidate.NeedsDeeperEntry || candidate.NeedsMomentumExit)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.DailyTrendPositionThreshold &&
+                   diagnostics.TrendPosition >= settings.TrendPositionThreshold &&
+                   diagnostics.ATRRatio <= settings.MaxAtrRatio &&
+                   context.DistanceTo20dHigh <= settings.MaxDistanceTo20dHigh;
+        }
+
+        private bool IsWeakDeepPullbackProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            if (diagnostics == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.WeakDeepPullbackExit;
+            if (!settings.Enabled || !candidate.NeedsDeeperEntry)
+                return false;
+
+            return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio;
         }
 
         private static bool AreSummariesEqual(
