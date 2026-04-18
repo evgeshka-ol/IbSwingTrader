@@ -20,6 +20,8 @@ namespace IbSwingTrader.Domain.Dataset
 
         public required string GroupLabel { get; set; }
 
+        public string ExtremumOrder { get; set; } = string.Empty;
+
         public decimal AmplitudePct { get; set; }
 
         public decimal EntryPrice { get; set; }
@@ -79,8 +81,6 @@ namespace IbSwingTrader.Domain.Dataset
         public bool NearTakeProfitMiss { get; set; }
 
         public decimal? PostMaxDrawdownPct { get; set; }
-
-        public string ExtremumOrder { get; set; } = string.Empty;
 
         public int? MinutesFromMinToMax { get; set; }
 
