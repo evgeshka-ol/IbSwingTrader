@@ -22,6 +22,12 @@ namespace IbSwingTrader.Domain.Dataset
 
         public string ExtremumOrder { get; set; } = string.Empty;
 
+        public string MinDepthGroup { get; set; } = string.Empty;
+
+        public string MaxStrengthGroup { get; set; } = string.Empty;
+
+        public string ExtremumSubgroup { get; set; } = string.Empty;
+
         public decimal AmplitudePct { get; set; }
 
         public decimal EntryPrice { get; set; }

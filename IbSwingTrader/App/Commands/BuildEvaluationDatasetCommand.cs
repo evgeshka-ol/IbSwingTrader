@@ -133,6 +133,9 @@ namespace IbSwingTrader.App.Commands
             var minutesFromMinToMax = cacheMetrics?.MinutesFromMinToMax ?? evaluation.MinutesFromMinToMax;
             var minutesFromEntryToMax = cacheMetrics?.MinutesFromEntryToMax ?? evaluation.MinutesFromEntryToMax;
             var minutesFromEntryToMin = cacheMetrics?.MinutesFromEntryToMin ?? evaluation.MinutesFromEntryToMin;
+            var minDepthGroup = GetMinDepthGroup(minPct);
+            var maxStrengthGroup = GetMaxStrengthGroup(maxPct);
+            var extremumSubgroup = BuildExtremumSubgroup(extremumOrder, minDepthGroup, maxStrengthGroup);
 
             var positivePotentialPct = Round(Math.Max(maxPct ?? 0m, 0m));
             var negativePotentialPct = Round(Math.Abs(Math.Min(minPct ?? 0m, 0m)));
@@ -191,6 +194,9 @@ namespace IbSwingTrader.App.Commands
                 NearTakeProfitMiss = nearTakeProfitMiss,
                 PostMaxDrawdownPct = postMaxDrawdownPct,
                 ExtremumOrder = extremumOrder,
+                MinDepthGroup = minDepthGroup,
+                MaxStrengthGroup = maxStrengthGroup,
+                ExtremumSubgroup = extremumSubgroup,
                 MinutesFromMinToMax = minutesFromMinToMax,
                 MinutesFromEntryToMax = minutesFromEntryToMax,
                 MinutesFromEntryToMin = minutesFromEntryToMin,
@@ -462,6 +468,49 @@ namespace IbSwingTrader.App.Commands
                 return "OnlyMax";
 
             return "Unknown";
+        }
+
+        private static string GetMinDepthGroup(decimal? minPct)
+        {
+            if (!minPct.HasValue)
+                return "Unknown";
+
+            var drawdownPct = Math.Abs(Math.Min(minPct.Value, 0m));
+
+            if (drawdownPct < 2m)
+                return "Shallow";
+
+            if (drawdownPct < 5m)
+                return "Medium";
+
+            return "Deep";
+        }
+
+        private static string GetMaxStrengthGroup(decimal? maxPct)
+        {
+            if (!maxPct.HasValue)
+                return "Unknown";
+
+            var upsidePct = Math.Max(maxPct.Value, 0m);
+
+            if (upsidePct < 5m)
+                return "Weak";
+
+            if (upsidePct < 10m)
+                return "Strong";
+
+            return "Explosive";
+        }
+
+        private static string BuildExtremumSubgroup(
+            string extremumOrder,
+            string minDepthGroup,
+            string maxStrengthGroup)
+        {
+            if (string.IsNullOrWhiteSpace(extremumOrder))
+                return "Unknown";
+
+            return $"{extremumOrder}_{minDepthGroup}_{maxStrengthGroup}";
         }
 
         private static decimal? CalculatePostMaxDrawdownPct(Candle maxCandle, List<Candle> afterEntry)
