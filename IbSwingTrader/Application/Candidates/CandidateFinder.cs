@@ -542,16 +542,48 @@ namespace IbSwingTrader.Application.Candidates
             var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles);
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+            var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
             var momentumExit = needsMomentumExit ? tradeSettings.MomentumExit : null;
+
+            decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
+            decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
+            decimal? maxProfitPctOverride = momentumExit?.MaxProfitPct;
+
+            if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
+            {
+                var weakSettings = tradeSettings.WeakDeepPullbackExit;
+                defaultProfitPctOverride = weakSettings.DefaultProfitPct;
+                minProfitPctOverride = weakSettings.MinProfitPct;
+                maxProfitPctOverride = weakSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan weak deep-pullback profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(weakSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(weakSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(weakSettings.MaxProfitPct)}");
+            }
+            else if (IsStrongMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
+            {
+                var strongSettings = tradeSettings.StrongMinFirstExit;
+                defaultProfitPctOverride = strongSettings.DefaultProfitPct;
+                minProfitPctOverride = strongSettings.MinProfitPct;
+                maxProfitPctOverride = strongSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan strong MinFirst profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(strongSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(strongSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(strongSettings.MaxProfitPct)}");
+            }
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
                 entryCandles,
                 entryDiscountOverridePct,
-                momentumExit?.DefaultProfitPct,
-                momentumExit?.MinProfitPct,
-                momentumExit?.MaxProfitPct);
+                defaultProfitPctOverride,
+                minProfitPctOverride,
+                maxProfitPctOverride);
 
             return new TradePlanInfo
             {
@@ -734,6 +766,12 @@ namespace IbSwingTrader.Application.Candidates
             if (needsMomentumExit)
                 score -= s.MomentumExitPenalty;
 
+            if (IsStrongMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
+                score += s.StrongMinFirstBonus;
+
+            if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
+                score -= s.WeakDeepPullbackPenalty;
+
             if (diagnostics.DailyTrendPosition < s.DailyTrendNegativePenaltyThreshold)
                 score -= s.DailyTrendNegativePenalty;
 
@@ -832,6 +870,35 @@ namespace IbSwingTrader.Application.Candidates
             return diagnostics.ATRRatio >= settings.HighAtrRatioThreshold
                 ? settings.HighAtrEntryDiscountPct
                 : settings.EntryDiscountPct;
+        }
+
+        private bool IsStrongMinFirstProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry,
+            bool needsMomentumExit)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.StrongMinFirstExit;
+            if (!settings.Enabled || needsDeeperEntry || needsMomentumExit)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.DailyTrendPositionThreshold &&
+                   diagnostics.TrendPosition >= settings.TrendPositionThreshold &&
+                   diagnostics.ATRRatio <= settings.MaxAtrRatio &&
+                   snapshot.Current.DistanceTo20dHigh <= settings.MaxDistanceTo20dHigh;
+        }
+
+        private bool IsWeakDeepPullbackProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.WeakDeepPullbackExit;
+            if (!settings.Enabled || !needsDeeperEntry)
+                return false;
+
+            return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(

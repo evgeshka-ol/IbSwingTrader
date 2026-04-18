@@ -92,6 +92,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinimumRiskAtrMultiplier { get; set; } = 0.90m;
         public DeepPullbackEntrySettings DeepPullbackEntry { get; set; } = new();
         public MomentumExitSettings MomentumExit { get; set; } = new();
+        public StrongMinFirstExitSettings StrongMinFirstExit { get; set; } = new();
+        public WeakDeepPullbackExitSettings WeakDeepPullbackExit { get; set; } = new();
     }
 
     public class DeepPullbackEntrySettings
@@ -121,6 +123,28 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ExitPriceBufferPct { get; set; } = 0.001m;
     }
 
+    public class StrongMinFirstExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal DailyTrendPositionThreshold { get; set; } = 2m;
+        public decimal TrendPositionThreshold { get; set; } = 4m;
+        public decimal MaxAtrRatio { get; set; } = 3m;
+        public decimal MaxDistanceTo20dHigh { get; set; } = -5m;
+        public decimal DefaultProfitPct { get; set; } = 0.07m;
+        public decimal MinProfitPct { get; set; } = 0.05m;
+        public decimal MaxProfitPct { get; set; } = 0.12m;
+    }
+
+    public class WeakDeepPullbackExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MaxDailyTrendPosition { get; set; } = 1m;
+        public decimal MinAtrRatio { get; set; } = 3m;
+        public decimal DefaultProfitPct { get; set; } = 0.04m;
+        public decimal MinProfitPct { get; set; } = 0.03m;
+        public decimal MaxProfitPct { get; set; } = 0.06m;
+    }
+
     public class NextDayRankingSettings
     {
         public decimal EntryScoreWeight { get; set; } = 0.35m;
@@ -148,6 +172,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal AtrRatioBonus { get; set; } = 0.05m;
         public decimal DeeperEntryBonus { get; set; } = 0.10m;
         public decimal MomentumExitPenalty { get; set; } = 0.05m;
+        public decimal StrongMinFirstBonus { get; set; } = 0.08m;
+        public decimal WeakDeepPullbackPenalty { get; set; } = 0.12m;
 
         public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
         public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;

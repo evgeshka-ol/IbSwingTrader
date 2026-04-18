@@ -221,6 +221,24 @@
                 "MinProfitPct": 0.04,
                 "MaxProfitPct": 0.09,
                 "ExitPriceBufferPct": 0.001
+            },
+            "StrongMinFirstExit": {
+                "Enabled": true,
+                "DailyTrendPositionThreshold": 2.0,
+                "TrendPositionThreshold": 4.0,
+                "MaxAtrRatio": 3.0,
+                "MaxDistanceTo20dHigh": -5.0,
+                "DefaultProfitPct": 0.07,
+                "MinProfitPct": 0.05,
+                "MaxProfitPct": 0.12
+            },
+            "WeakDeepPullbackExit": {
+                "Enabled": true,
+                "MaxDailyTrendPosition": 1.0,
+                "MinAtrRatio": 3.0,
+                "DefaultProfitPct": 0.04,
+                "MinProfitPct": 0.03,
+                "MaxProfitPct": 0.06
             }
         },
 
@@ -250,6 +268,8 @@
             "AtrRatioBonus": 0.05,
             "DeeperEntryBonus": 0.10,
             "MomentumExitPenalty": 0.05,
+            "StrongMinFirstBonus": 0.08,
+            "WeakDeepPullbackPenalty": 0.12,
 
             "DailyTrendNegativePenaltyThreshold": 0.0,
             "DailyTrendNegativePenalty": 0.08,
