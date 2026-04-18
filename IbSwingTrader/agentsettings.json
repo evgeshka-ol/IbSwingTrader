@@ -191,6 +191,7 @@
             "StopLookbackBars": 5,
             "StopBufferMultiplier": 0.99,
             "FallbackStopMultiplier": 0.97,
+            "MaxLossPct": 0.10,
             "RiskRewardRatio": 2.0,
             "DefaultProfitPct": 0.05,
             "MinProfitPct": 0.03,

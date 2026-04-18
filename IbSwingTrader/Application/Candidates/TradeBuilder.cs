@@ -45,6 +45,15 @@ namespace IbSwingTrader.Application.Candidates
                 stop = maxAllowedStop;
             }
 
+            var minAllowedStop = entry * (1m - Math.Max(settings.MaxLossPct, 0m));
+            if (minAllowedStop > 0m && stop < minAllowedStop)
+            {
+                _logger.Info(
+                    $"Trade stop tightened to respect max loss cap. " +
+                    $"OriginalStop={_fmt.Price(stop)}, AdjustedStop={_fmt.Price(minAllowedStop)}, MaxLossPct={_fmt.Percent(settings.MaxLossPct)}");
+                stop = minAllowedStop;
+            }
+
             var risk = entry - stop;
             var rawExit = entry + risk * settings.RiskRewardRatio;
             var targetProfitPct = ResolveTargetProfitPct(
