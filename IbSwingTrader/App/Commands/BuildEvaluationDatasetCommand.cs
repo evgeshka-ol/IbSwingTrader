@@ -74,9 +74,10 @@ namespace IbSwingTrader.App.Commands
                     .ThenByDescending(r => r.EvaluatedAtMarketTime)
                     .First())
                 .OrderBy(GetGroupPriority)
-                .ThenByDescending(x => x.AmplitudePct)
-                .ThenByDescending(x => x.PositivePotentialPct)
                 .ThenByDescending(x => x.ScanTimeMarket)
+                .ThenBy(GetOutcomePriority)
+                .ThenBy(GetExtremumOrderPriority)
+                .ThenBy(x => x.ExtremumSubgroup, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -392,6 +393,30 @@ namespace IbSwingTrader.App.Commands
                 "TradeCandidate" => 0,
                 "Wishlist" => 1,
                 _ => 2
+            };
+        }
+
+        private static int GetOutcomePriority(EvaluationDatasetRow row)
+        {
+            return row.Outcome switch
+            {
+                "Win" => 0,
+                "NoEntry" => 1,
+                "Loss" => 2,
+                "Open" => 3,
+                "InsufficientFutureData" => 4,
+                _ => 5
+            };
+        }
+
+        private static int GetExtremumOrderPriority(EvaluationDatasetRow row)
+        {
+            return row.ExtremumOrder switch
+            {
+                "MinFirst" => 0,
+                "MaxFirst" => 1,
+                "SameBar" => 2,
+                _ => 3
             };
         }
 
