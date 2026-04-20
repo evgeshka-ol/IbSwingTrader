@@ -160,6 +160,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.10m;
         public decimal MinProfitPct { get; set; } = 0.08m;
         public decimal MaxProfitPct { get; set; } = 0.18m;
+        public decimal MaxLossPct { get; set; } = 0.05m;
     }
 
     public class DeepParabolicExpansionExitSettings
@@ -173,6 +174,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.08m;
         public decimal MinProfitPct { get; set; } = 0.06m;
         public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal MaxLossPct { get; set; } = 0.06m;
     }
 
     public class NextDayRankingSettings

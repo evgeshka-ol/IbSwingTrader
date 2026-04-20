@@ -16,7 +16,8 @@ namespace IbSwingTrader.Application.Candidates
             decimal? entryDiscountOverridePct = null,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
-            decimal? maxProfitPctOverride = null)
+            decimal? maxProfitPctOverride = null,
+            decimal? maxLossPctOverride = null)
         {
             var settings = _settingsProvider.Get().TradePlan;
 
@@ -45,12 +46,13 @@ namespace IbSwingTrader.Application.Candidates
                 stop = maxAllowedStop;
             }
 
-            var minAllowedStop = entry * (1m - Math.Max(settings.MaxLossPct, 0m));
+            var effectiveMaxLossPct = Math.Max(maxLossPctOverride ?? settings.MaxLossPct, 0m);
+            var minAllowedStop = entry * (1m - effectiveMaxLossPct);
             if (minAllowedStop > 0m && stop < minAllowedStop)
             {
                 _logger.Info(
                     $"Trade stop tightened to respect max loss cap. " +
-                    $"OriginalStop={_fmt.Price(stop)}, AdjustedStop={_fmt.Price(minAllowedStop)}, MaxLossPct={_fmt.Percent(settings.MaxLossPct)}");
+                    $"OriginalStop={_fmt.Price(stop)}, AdjustedStop={_fmt.Price(minAllowedStop)}, MaxLossPct={_fmt.Percent(effectiveMaxLossPct)}");
                 stop = minAllowedStop;
             }
 

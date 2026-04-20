@@ -9,6 +9,7 @@ namespace IbSwingTrader.Abstractions.Candidates
             decimal? entryDiscountOverridePct = null,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
-            decimal? maxProfitPctOverride = null);
+            decimal? maxProfitPctOverride = null,
+            decimal? maxLossPctOverride = null);
     }
 }

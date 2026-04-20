@@ -551,6 +551,7 @@ namespace IbSwingTrader.Application.Candidates
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
             decimal? maxProfitPctOverride = momentumExit?.MaxProfitPct;
+            decimal? maxLossPctOverride = null;
 
             if (isParabolicExpansion)
             {
@@ -558,12 +559,14 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride = parabolicSettings.DefaultProfitPct;
                 minProfitPctOverride = parabolicSettings.MinProfitPct;
                 maxProfitPctOverride = parabolicSettings.MaxProfitPct;
+                maxLossPctOverride = parabolicSettings.MaxLossPct;
 
                 _logger.Info(
                     $"Trade plan parabolic expansion profile applied for {ctx.Stock.Ticker}. " +
                     $"DefaultProfitPct={_fmt.Percent(parabolicSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(parabolicSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(parabolicSettings.MaxProfitPct)}");
+                    $"MaxProfitPct={_fmt.Percent(parabolicSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(parabolicSettings.MaxLossPct)}");
             }
             else if (isDeepParabolicExpansion)
             {
@@ -571,12 +574,14 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride = deepParabolicSettings.DefaultProfitPct;
                 minProfitPctOverride = deepParabolicSettings.MinProfitPct;
                 maxProfitPctOverride = deepParabolicSettings.MaxProfitPct;
+                maxLossPctOverride = deepParabolicSettings.MaxLossPct;
 
                 _logger.Info(
                     $"Trade plan deep parabolic profile applied for {ctx.Stock.Ticker}. " +
                     $"DefaultProfitPct={_fmt.Percent(deepParabolicSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(deepParabolicSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(deepParabolicSettings.MaxProfitPct)}");
+                    $"MaxProfitPct={_fmt.Percent(deepParabolicSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(deepParabolicSettings.MaxLossPct)}");
             }
             else if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
             {
@@ -611,7 +616,8 @@ namespace IbSwingTrader.Application.Candidates
                 entryDiscountOverridePct,
                 defaultProfitPctOverride,
                 minProfitPctOverride,
-                maxProfitPctOverride);
+                maxProfitPctOverride,
+                maxLossPctOverride);
 
             return new TradePlanInfo
             {

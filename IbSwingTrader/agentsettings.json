@@ -269,7 +269,8 @@
                 "MinVolumeRatio20": 0.8,
                 "DefaultProfitPct": 0.10,
                 "MinProfitPct": 0.08,
-                "MaxProfitPct": 0.18
+                "MaxProfitPct": 0.18,
+                "MaxLossPct": 0.05
             },
             "DeepParabolicExpansionExit": {
                 "Enabled": true,
@@ -280,7 +281,8 @@
                 "MinVolumeRatio20": 0.8,
                 "DefaultProfitPct": 0.08,
                 "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.14
+                "MaxProfitPct": 0.14,
+                "MaxLossPct": 0.06
             }
         },
 
