@@ -95,6 +95,8 @@ namespace IbSwingTrader.Domain.Settings
         public MomentumExitSettings MomentumExit { get; set; } = new();
         public StrongMinFirstExitSettings StrongMinFirstExit { get; set; } = new();
         public WeakDeepPullbackExitSettings WeakDeepPullbackExit { get; set; } = new();
+        public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
+        public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
     }
 
     public class DeepPullbackEntrySettings
@@ -146,6 +148,33 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MaxProfitPct { get; set; } = 0.06m;
     }
 
+    public class ParabolicExpansionExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinDailyTrendPosition { get; set; } = 10m;
+        public decimal MinTrendPosition { get; set; } = 12m;
+        public decimal MinAtrRatio { get; set; } = 3m;
+        public decimal MinDailyRsi14 { get; set; } = 65m;
+        public decimal MaxDistanceTo20dHigh { get; set; } = -15m;
+        public decimal MinVolumeRatio20 { get; set; } = 0.8m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.08m;
+        public decimal MaxProfitPct { get; set; } = 0.18m;
+    }
+
+    public class DeepParabolicExpansionExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinDailyTrendPosition { get; set; } = 6m;
+        public decimal MinTrendPosition { get; set; } = 8m;
+        public decimal MinAtrRatio { get; set; } = 4m;
+        public decimal MinDailyRsi14 { get; set; } = 60m;
+        public decimal MinVolumeRatio20 { get; set; } = 0.8m;
+        public decimal DefaultProfitPct { get; set; } = 0.08m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
+    }
+
     public class NextDayRankingSettings
     {
         public decimal EntryScoreWeight { get; set; } = 0.35m;
@@ -175,6 +204,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MomentumExitPenalty { get; set; } = 0.05m;
         public decimal StrongMinFirstBonus { get; set; } = 0.08m;
         public decimal WeakDeepPullbackPenalty { get; set; } = 0.12m;
+        public decimal ParabolicExpansionBonus { get; set; } = 0.10m;
+        public decimal DeepParabolicExpansionBonus { get; set; } = 0.06m;
 
         public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
         public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;

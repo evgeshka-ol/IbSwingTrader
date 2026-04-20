@@ -545,12 +545,40 @@ namespace IbSwingTrader.Application.Candidates
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
             var momentumExit = needsMomentumExit ? tradeSettings.MomentumExit : null;
+            var isParabolicExpansion = IsParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
+            var isDeepParabolicExpansion = IsDeepParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
             decimal? maxProfitPctOverride = momentumExit?.MaxProfitPct;
 
-            if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
+            if (isParabolicExpansion)
+            {
+                var parabolicSettings = tradeSettings.ParabolicExpansionExit;
+                defaultProfitPctOverride = parabolicSettings.DefaultProfitPct;
+                minProfitPctOverride = parabolicSettings.MinProfitPct;
+                maxProfitPctOverride = parabolicSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan parabolic expansion profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(parabolicSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(parabolicSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(parabolicSettings.MaxProfitPct)}");
+            }
+            else if (isDeepParabolicExpansion)
+            {
+                var deepParabolicSettings = tradeSettings.DeepParabolicExpansionExit;
+                defaultProfitPctOverride = deepParabolicSettings.DefaultProfitPct;
+                minProfitPctOverride = deepParabolicSettings.MinProfitPct;
+                maxProfitPctOverride = deepParabolicSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan deep parabolic profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(deepParabolicSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(deepParabolicSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(deepParabolicSettings.MaxProfitPct)}");
+            }
+            else if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
             {
                 var weakSettings = tradeSettings.WeakDeepPullbackExit;
                 defaultProfitPctOverride = weakSettings.DefaultProfitPct;
@@ -769,6 +797,12 @@ namespace IbSwingTrader.Application.Candidates
             if (IsStrongMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
                 score += s.StrongMinFirstBonus;
 
+            if (IsParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
+                score += s.ParabolicExpansionBonus;
+
+            if (IsDeepParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry))
+                score += s.DeepParabolicExpansionBonus;
+
             if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
                 score -= s.WeakDeepPullbackPenalty;
 
@@ -899,6 +933,40 @@ namespace IbSwingTrader.Application.Candidates
 
             return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
                    diagnostics.ATRRatio >= settings.MinAtrRatio;
+        }
+
+        private bool IsParabolicExpansionProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry,
+            bool needsMomentumExit)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ParabolicExpansionExit;
+            if (!settings.Enabled || needsDeeperEntry || !needsMomentumExit)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   snapshot.Current.DistanceTo20dHigh >= settings.MaxDistanceTo20dHigh &&
+                   diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
+        }
+
+        private bool IsDeepParabolicExpansionProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.DeepParabolicExpansionExit;
+            if (!settings.Enabled || !needsDeeperEntry)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(

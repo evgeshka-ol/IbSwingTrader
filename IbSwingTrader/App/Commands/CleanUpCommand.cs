@@ -210,7 +210,15 @@ namespace IbSwingTrader.App.Commands
             if (candidate.NeedsMomentumExit)
                 markers.Add("momentum-exit");
 
-            if (IsStrongMinFirstProxy(candidate))
+            if (IsParabolicExpansionProxy(candidate))
+            {
+                markers.Add("parabolic-expansion");
+            }
+            else if (IsDeepParabolicExpansionProxy(candidate))
+            {
+                markers.Add("deep-parabolic");
+            }
+            else if (IsStrongMinFirstProxy(candidate))
             {
                 markers.Add("minfirst");
                 markers.Add("strong");
@@ -255,6 +263,43 @@ namespace IbSwingTrader.App.Commands
 
             return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
                    diagnostics.ATRRatio >= settings.MinAtrRatio;
+        }
+
+        private bool IsParabolicExpansionProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ParabolicExpansionExit;
+            if (!settings.Enabled || candidate.NeedsDeeperEntry || !candidate.NeedsMomentumExit)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   context.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   context.DistanceTo20dHigh >= settings.MaxDistanceTo20dHigh &&
+                   diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
+        }
+
+        private bool IsDeepParabolicExpansionProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.DeepParabolicExpansionExit;
+            if (!settings.Enabled || !candidate.NeedsDeeperEntry)
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   context.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
         }
 
         private static bool AreSummariesEqual(

@@ -83,29 +83,19 @@
     },
 
     "BuildEvaluationDataset": {
-        "MinScanTimeMarket": null,
+        "MinScanTimeMarket": "2026-04-01",
         "SortColumns": [
             {
-                "Column": "GroupLabel",
-                "OrderedValues": [ "TradeCandidate", "Wishlist", "FilterReference" ]
+                "Column": "ExtremumSubgroup",
+                "OrderedValues": [ "MinFirst_MicroDip_Parabolic", "MinFirst_Shallow_Parabolic", "MinFirst_Deep_Parabolic", "MinFirst_NoDip_Parabolic", "MinFirst_Deep_Explosive", "MinFirst_Medium_Parabolic" ]
             },
             {
                 "Column": "ScanTimeMarket",
                 "Descending": true
             },
             {
-                "Column": "Outcome",
-                "OrderedValues": [ "Win", "NoEntry", "Loss", "Open", "InsufficientFutureData" ]
-            },
-            {
-                "Column": "ExtremumOrder",
-                "OrderedValues": [ "MinFirst", "MaxFirst", "SameBar" ]
-            },
-            {
-                "Column": "ExtremumSubgroup"
-            },
-            {
-                "Column": "Ticker"
+                "Column": "AmplitudePct",
+                "Descending": true
             }
         ]
     },
@@ -268,6 +258,29 @@
                 "DefaultProfitPct": 0.04,
                 "MinProfitPct": 0.03,
                 "MaxProfitPct": 0.06
+            },
+            "ParabolicExpansionExit": {
+                "Enabled": true,
+                "MinDailyTrendPosition": 10.0,
+                "MinTrendPosition": 12.0,
+                "MinAtrRatio": 3.0,
+                "MinDailyRsi14": 65.0,
+                "MaxDistanceTo20dHigh": -15.0,
+                "MinVolumeRatio20": 0.8,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.08,
+                "MaxProfitPct": 0.18
+            },
+            "DeepParabolicExpansionExit": {
+                "Enabled": true,
+                "MinDailyTrendPosition": 6.0,
+                "MinTrendPosition": 8.0,
+                "MinAtrRatio": 4.0,
+                "MinDailyRsi14": 60.0,
+                "MinVolumeRatio20": 0.8,
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.14
             }
         },
 
@@ -299,6 +312,8 @@
             "MomentumExitPenalty": 0.05,
             "StrongMinFirstBonus": 0.08,
             "WeakDeepPullbackPenalty": 0.12,
+            "ParabolicExpansionBonus": 0.10,
+            "DeepParabolicExpansionBonus": 0.06,
 
             "DailyTrendNegativePenaltyThreshold": 0.0,
             "DailyTrendNegativePenalty": 0.08,
