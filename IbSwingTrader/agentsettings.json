@@ -82,6 +82,34 @@
         }
     },
 
+    "BuildEvaluationDataset": {
+        "MinScanTimeMarket": null,
+        "SortColumns": [
+            {
+                "Column": "GroupLabel",
+                "OrderedValues": [ "TradeCandidate", "Wishlist", "FilterReference" ]
+            },
+            {
+                "Column": "ScanTimeMarket",
+                "Descending": true
+            },
+            {
+                "Column": "Outcome",
+                "OrderedValues": [ "Win", "NoEntry", "Loss", "Open", "InsufficientFutureData" ]
+            },
+            {
+                "Column": "ExtremumOrder",
+                "OrderedValues": [ "MinFirst", "MaxFirst", "SameBar" ]
+            },
+            {
+                "Column": "ExtremumSubgroup"
+            },
+            {
+                "Column": "Ticker"
+            }
+        ]
+    },
+
     "Research": {
         "Mode": "top_gainers",
         "Source": "known_tickers",

@@ -8,6 +8,7 @@ namespace IbSwingTrader.App.Commands
         IHistoricalCache historicalCache,
         ICsvWriter csvWriter,
         IAgentPathService pathService,
+        IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
         ITextLogger logger) : ICommand
     {
         private const decimal MinInterestingAmplitudePct = 5m;
@@ -19,10 +20,12 @@ namespace IbSwingTrader.App.Commands
         private readonly IHistoricalCache _historicalCache = historicalCache;
         private readonly ICsvWriter _csvWriter = csvWriter;
         private readonly IAgentPathService _pathService = pathService;
+        private readonly IBuildEvaluationDatasetSettingsProvider _buildEvaluationDatasetSettingsProvider = buildEvaluationDatasetSettingsProvider;
         private readonly ITextLogger _logger = logger;
 
         public async Task RunAsync()
         {
+            var settings = _buildEvaluationDatasetSettingsProvider.Get();
             var evaluationsPath = _pathService.GetEvaluationsFile();
             var outputPath = Path.GetFullPath(
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
@@ -31,6 +34,12 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Evaluations source: {evaluationsPath}");
 
             var evaluations = await _evaluationCsvService.ReadAsync(evaluationsPath);
+            if (settings.MinScanTimeMarket.HasValue)
+            {
+                evaluations = evaluations
+                    .Where(x => x.ScanTimeMarket >= settings.MinScanTimeMarket.Value)
+                    .ToList();
+            }
 
             if (evaluations.Count == 0)
             {
@@ -39,6 +48,8 @@ namespace IbSwingTrader.App.Commands
             }
 
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
+            if (settings.MinScanTimeMarket.HasValue)
+                _logger.Info($"MinScanTimeMarket filter: {settings.MinScanTimeMarket.Value:yyyy-MM-dd HH:mm:ss}");
 
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
@@ -73,13 +84,9 @@ namespace IbSwingTrader.App.Commands
                     .ThenByDescending(r => r.PositivePotentialPct)
                     .ThenByDescending(r => r.EvaluatedAtMarketTime)
                     .First())
-                .OrderBy(GetGroupPriority)
-                .ThenByDescending(x => x.ScanTimeMarket)
-                .ThenBy(GetOutcomePriority)
-                .ThenBy(GetExtremumOrderPriority)
-                .ThenBy(x => x.ExtremumSubgroup, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            rows.Sort((left, right) => CompareRows(left, right, settings));
 
             _csvWriter.Write(outputPath, rows);
 
@@ -394,6 +401,96 @@ namespace IbSwingTrader.App.Commands
                 "Wishlist" => 1,
                 _ => 2
             };
+        }
+
+        private static int CompareRows(
+            EvaluationDatasetRow left,
+            EvaluationDatasetRow right,
+            BuildEvaluationDatasetSettings settings)
+        {
+            foreach (var sortColumn in settings.SortColumns ?? [])
+            {
+                var comparison = CompareByColumn(left, right, sortColumn);
+                if (comparison != 0)
+                    return comparison;
+            }
+
+            return string.Compare(left.Ticker, right.Ticker, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int CompareByColumn(
+            EvaluationDatasetRow left,
+            EvaluationDatasetRow right,
+            BuildEvaluationDatasetSortColumnSettings sortColumn)
+        {
+            if (string.IsNullOrWhiteSpace(sortColumn.Column))
+                return 0;
+
+            var orderedValues = sortColumn.OrderedValues ?? [];
+            var descending = sortColumn.Descending;
+
+            int comparison;
+
+            switch (sortColumn.Column)
+            {
+                case nameof(EvaluationDatasetRow.GroupLabel):
+                    comparison = CompareString(left.GroupLabel, right.GroupLabel, orderedValues);
+                    break;
+                case nameof(EvaluationDatasetRow.ScanTimeMarket):
+                    comparison = left.ScanTimeMarket.CompareTo(right.ScanTimeMarket);
+                    break;
+                case nameof(EvaluationDatasetRow.Outcome):
+                    comparison = CompareString(left.Outcome, right.Outcome, orderedValues);
+                    break;
+                case nameof(EvaluationDatasetRow.ExtremumOrder):
+                    comparison = CompareString(left.ExtremumOrder, right.ExtremumOrder, orderedValues);
+                    break;
+                case nameof(EvaluationDatasetRow.ExtremumSubgroup):
+                    comparison = CompareString(left.ExtremumSubgroup, right.ExtremumSubgroup, orderedValues);
+                    break;
+                case nameof(EvaluationDatasetRow.Ticker):
+                    comparison = CompareString(left.Ticker, right.Ticker, orderedValues);
+                    break;
+                default:
+                    comparison = 0;
+                    break;
+            }
+
+            if (comparison == 0)
+                return 0;
+
+            return descending ? -comparison : comparison;
+        }
+
+        private static int CompareString(
+            string? left,
+            string? right,
+            List<string> orderedValues)
+        {
+            var leftValue = left ?? string.Empty;
+            var rightValue = right ?? string.Empty;
+
+            if (orderedValues.Count > 0)
+            {
+                var leftIndex = GetOrderedValueIndex(leftValue, orderedValues);
+                var rightIndex = GetOrderedValueIndex(rightValue, orderedValues);
+                var orderedComparison = leftIndex.CompareTo(rightIndex);
+                if (orderedComparison != 0)
+                    return orderedComparison;
+            }
+
+            return string.Compare(leftValue, rightValue, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int GetOrderedValueIndex(string value, List<string> orderedValues)
+        {
+            for (var i = 0; i < orderedValues.Count; i++)
+            {
+                if (string.Equals(orderedValues[i], value, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return int.MaxValue;
         }
 
         private static int GetOutcomePriority(EvaluationDatasetRow row)

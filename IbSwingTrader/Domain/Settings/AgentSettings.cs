@@ -10,6 +10,7 @@ namespace IbSwingTrader.Domain.Settings
         public MarketSessionsSettings MarketSessions { get; set; } = new();
 
         public BuildDatasetSettings BuildDataset { get; set; } = new();
+        public BuildEvaluationDatasetSettings BuildEvaluationDataset { get; set; } = new();
         public ResearchSettings Research { get; set; } = new();
         public FeatureCalculationSettings FeatureCalculation { get; set; } = new();
 
