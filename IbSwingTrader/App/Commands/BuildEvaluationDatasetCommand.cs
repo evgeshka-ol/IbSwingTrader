@@ -500,7 +500,13 @@ namespace IbSwingTrader.App.Commands
             if (!minPct.HasValue)
                 return "Unknown";
 
-            var drawdownPct = Math.Abs(Math.Min(minPct.Value, 0m));
+            if (minPct.Value >= 0m)
+                return "NoDip";
+
+            var drawdownPct = Math.Abs(minPct.Value);
+
+            if (drawdownPct < 1m)
+                return "MicroDip";
 
             if (drawdownPct < 2m)
                 return "Shallow";
@@ -524,7 +530,10 @@ namespace IbSwingTrader.App.Commands
             if (upsidePct < 10m)
                 return "Strong";
 
-            return "Explosive";
+            if (upsidePct < 20m)
+                return "Explosive";
+
+            return "Parabolic";
         }
 
         private static string BuildExtremumSubgroup(
