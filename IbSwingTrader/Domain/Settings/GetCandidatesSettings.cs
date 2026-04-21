@@ -74,6 +74,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal StopBufferMultiplier { get; set; } = 0.99m;
         public decimal FallbackStopMultiplier { get; set; } = 0.97m;
         public decimal MaxLossPct { get; set; } = 0.10m;
+        public bool CapLossToTargetProfitForFastTrades { get; set; } = true;
+        public decimal FastTradeProfitPctThreshold { get; set; } = 0.05m;
         public decimal RiskRewardRatio { get; set; } = 2.0m;
         public decimal DefaultProfitPct { get; set; } = 0.05m;
         public decimal MinProfitPct { get; set; } = 0.03m;

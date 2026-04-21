@@ -46,7 +46,32 @@ namespace IbSwingTrader.Application.Candidates
                 stop = maxAllowedStop;
             }
 
+            var targetProfitPct = ResolveTargetProfitPct(
+                candles,
+                entry,
+                settings,
+                defaultProfitPctOverride,
+                minProfitPctOverride,
+                maxProfitPctOverride);
+
             var effectiveMaxLossPct = Math.Max(maxLossPctOverride ?? settings.MaxLossPct, 0m);
+            var isFastTrade =
+                defaultProfitPctOverride.HasValue ||
+                targetProfitPct <= settings.FastTradeProfitPctThreshold;
+
+            if (settings.CapLossToTargetProfitForFastTrades && isFastTrade)
+            {
+                var cappedFastTradeLossPct = Math.Min(effectiveMaxLossPct, Math.Max(targetProfitPct, 0m));
+                if (cappedFastTradeLossPct < effectiveMaxLossPct)
+                {
+                    _logger.Info(
+                        $"Trade stop tightened to not exceed target profit for fast trade. " +
+                        $"OriginalMaxLossPct={_fmt.Percent(effectiveMaxLossPct)}, AdjustedMaxLossPct={_fmt.Percent(cappedFastTradeLossPct)}, " +
+                        $"TargetProfitPct={_fmt.Percent(targetProfitPct)}");
+                    effectiveMaxLossPct = cappedFastTradeLossPct;
+                }
+            }
+
             var minAllowedStop = entry * (1m - effectiveMaxLossPct);
             if (minAllowedStop > 0m && stop < minAllowedStop)
             {
@@ -58,13 +83,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var risk = entry - stop;
             var rawExit = entry + risk * settings.RiskRewardRatio;
-            var targetProfitPct = ResolveTargetProfitPct(
-                candles,
-                entry,
-                settings,
-                defaultProfitPctOverride,
-                minProfitPctOverride,
-                maxProfitPctOverride);
             var cappedExit = entry * (1m + targetProfitPct);
             var exit = Math.Min(rawExit, cappedExit);
 
