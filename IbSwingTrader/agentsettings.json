@@ -86,10 +86,6 @@
         "MinScanTimeMarket": "2026-04-01",
         "SortColumns": [
             {
-                "Column": "Outcome",
-                "OrderedValues": [ "Win", "Loss", "Open", "NoEntry" ]
-            },
-            {
                 "Column": "ScanTimeMarket",
                 "Descending": true
             },
