@@ -86,8 +86,8 @@
         "MinScanTimeMarket": "2026-04-01",
         "SortColumns": [
             {
-                "Column": "ExtremumSubgroup",
-                "OrderedValues": [ "MinFirst_MicroDip_Parabolic", "MinFirst_Shallow_Parabolic", "MinFirst_Deep_Parabolic", "MinFirst_NoDip_Parabolic", "MinFirst_Deep_Explosive", "MinFirst_Medium_Parabolic" ]
+                "Column": "Outcome",
+                "OrderedValues": [ "Win", "Loss", "Open", "NoEntry" ]
             },
             {
                 "Column": "ScanTimeMarket",
@@ -185,7 +185,8 @@
             "MinDollarVolume": 1000000.0,
             "MaxBbMidSignedDistancePct": 0.5,
             "MaxDistanceTo20dHigh": -20.0,
-            "MaxAtrRatio": 0.20
+            "MaxAtrRatio": 0.20,
+            "MinPlannedProfitPct": 3.0
         },
 
         "Finder": {

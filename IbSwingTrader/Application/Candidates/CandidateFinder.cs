@@ -298,7 +298,8 @@ namespace IbSwingTrader.Application.Candidates
                 Candidates =
                 [
                     .. candidateResults.Values
-                        .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                        .OrderByDescending(x => x.TradePlan.ProfitPercent)
+                        .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                         .ThenByDescending(x => x.Score.Score)
                 ],
                 WishList = finalWishList
@@ -381,6 +382,16 @@ namespace IbSwingTrader.Application.Candidates
             string rejectionLogPrefix)
         {
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+            var candidateFilterSettings = _getCandidatesSettingsProvider.Get().CandidateFilter;
+
+            if (trade.ProfitPercent < candidateFilterSettings.MinPlannedProfitPct)
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
+                    $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
+                return;
+            }
 
             if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
             {

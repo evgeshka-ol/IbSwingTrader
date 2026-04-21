@@ -149,7 +149,8 @@ namespace IbSwingTrader.Infrastructure.Logging
         private List<CandidateSummaryItem> BuildSummary(IEnumerable<CandidateDetails> candidates)
         {
             return candidates
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .OrderByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x =>

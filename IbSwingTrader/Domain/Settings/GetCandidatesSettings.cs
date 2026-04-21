@@ -229,6 +229,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MaxBbMidSignedDistancePct { get; set; } = 0.5m;
         public decimal MaxDistanceTo20dHigh { get; set; } = -20m;
         public decimal MaxAtrRatio { get; set; } = 0.20m;
+        public decimal MinPlannedProfitPct { get; set; } = 3.0m;
     }
 
     public class FinderSettings
