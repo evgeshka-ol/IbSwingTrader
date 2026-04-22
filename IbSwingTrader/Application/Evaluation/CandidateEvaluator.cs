@@ -250,6 +250,11 @@ namespace IbSwingTrader.Application.Evaluation
                 }
             }
 
+            ApplyUnambiguousOutcomeCorrection(result, entryPrice, exitPrice, stopPrice);
+
+            if (result.Outcome is "Win" or "Loss")
+                return result;
+
             result.Outcome = "Open";
             return result;
         }
@@ -315,6 +320,42 @@ namespace IbSwingTrader.Application.Evaluation
         private static decimal RoundPct(decimal value)
         {
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static void ApplyUnambiguousOutcomeCorrection(
+            CandidateEvaluationResult result,
+            decimal entryPrice,
+            decimal exitPrice,
+            decimal stopPrice)
+        {
+            if (!result.EntryTouched)
+                return;
+
+            var exitWasReachable = result.MaxPrice.HasValue && exitPrice > 0m && result.MaxPrice.Value >= exitPrice;
+            var stopWasReachable = result.MinPrice.HasValue && stopPrice > 0m && result.MinPrice.Value <= stopPrice;
+
+            if (exitWasReachable && !stopWasReachable)
+            {
+                result.ExitTouched = true;
+                result.StopTouched = false;
+                result.ExitBeforeStop = true;
+                result.StopBeforeExit = false;
+                result.ExitTime ??= result.MaxTime;
+                result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
+                result.Outcome = "Win";
+                return;
+            }
+
+            if (stopWasReachable && !exitWasReachable)
+            {
+                result.ExitTouched = false;
+                result.StopTouched = true;
+                result.ExitBeforeStop = false;
+                result.StopBeforeExit = true;
+                result.StopTime ??= result.MinTime;
+                result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
+                result.Outcome = "Loss";
+            }
         }
 
         private static void FillExcursionStats(

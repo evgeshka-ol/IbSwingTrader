@@ -127,6 +127,7 @@ namespace IbSwingTrader.App.Commands
             record.MinutesFromEntryToMin = DiffMinutes(record.EntryTime, record.MinTime);
             record.PostMaxDrawdownPct = RoundNullable(CalculatePostMaxDrawdownPct(maxUp, afterEntry));
             FillExitMissStats(record, maxUp.High);
+            ApplyUnambiguousOutcomeCorrection(record);
         }
 
         private static void FillBeforeEntryStats(
@@ -249,6 +250,42 @@ namespace IbSwingTrader.App.Commands
                 return 0m;
 
             return (entryPrice - minLowAfterScan) / entryPrice * 100m;
+        }
+
+        private static void ApplyUnambiguousOutcomeCorrection(CandidateEvaluationResult record)
+        {
+            if (!record.EntryTouched)
+                return;
+
+            var exitWasReachable = record.MaxPrice.HasValue &&
+                                   record.ExitPrice > 0m &&
+                                   record.MaxPrice.Value >= record.ExitPrice;
+            var stopWasReachable = record.MinPrice.HasValue &&
+                                   record.StopLoss > 0m &&
+                                   record.MinPrice.Value <= record.StopLoss;
+
+            if (exitWasReachable && !stopWasReachable)
+            {
+                record.ExitTouched = true;
+                record.StopTouched = false;
+                record.ExitBeforeStop = true;
+                record.StopBeforeExit = false;
+                record.ExitTime ??= record.MaxTime;
+                record.RealizedPct = RoundNullable(CalcPct(record.EntryPrice, record.ExitPrice));
+                record.Outcome = "Win";
+                return;
+            }
+
+            if (stopWasReachable && !exitWasReachable)
+            {
+                record.ExitTouched = false;
+                record.StopTouched = true;
+                record.ExitBeforeStop = false;
+                record.StopBeforeExit = true;
+                record.StopTime ??= record.MinTime;
+                record.RealizedPct = RoundNullable(CalcPct(record.EntryPrice, record.StopLoss));
+                record.Outcome = "Loss";
+            }
         }
 
         private static decimal Round(decimal value)
