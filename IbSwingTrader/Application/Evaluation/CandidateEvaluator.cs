@@ -338,8 +338,10 @@ namespace IbSwingTrader.Application.Evaluation
                 .First();
 
             result.MaxPct = RoundPct(CalcPct(scanPrice, maxUpCandle.High));
+            result.MaxPrice = RoundPct(maxUpCandle.High);
             result.MaxTime = maxUpCandle.Time;
             result.MinPct = RoundPct(CalcPct(scanPrice, maxDownCandle.Low));
+            result.MinPrice = RoundPct(maxDownCandle.Low);
             result.MinTime = maxDownCandle.Time;
             result.ExtremumOrder = GetExtremumOrder(result.MinTime, result.MaxTime);
             result.MinutesFromMinToMax = DiffMinutes(result.MinTime, result.MaxTime);
@@ -377,8 +379,10 @@ namespace IbSwingTrader.Application.Evaluation
                 .First();
 
             result.MaxPctBeforeEntry = RoundPct(CalcPct(scanPrice, maxBeforeEntry.High));
+            result.MaxPriceBeforeEntry = RoundPct(maxBeforeEntry.High);
             result.MaxTimeBeforeEntry = maxBeforeEntry.Time;
             result.MinPctBeforeEntry = RoundPct(CalcPct(scanPrice, minBeforeEntry.Low));
+            result.MinPriceBeforeEntry = RoundPct(minBeforeEntry.Low);
             result.MinTimeBeforeEntry = minBeforeEntry.Time;
 
             var entryUndercutAbs = Math.Max(result.EntryPrice - minBeforeEntry.Low, 0m);

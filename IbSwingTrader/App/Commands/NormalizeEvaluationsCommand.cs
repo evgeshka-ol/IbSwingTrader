@@ -116,8 +116,10 @@ namespace IbSwingTrader.App.Commands
                 .First();
 
             record.MaxPct = RoundNullable(CalcPct(record.ScanPrice, maxUp.High));
+            record.MaxPrice = RoundNullable(maxUp.High);
             record.MaxTime = maxUp.Time;
             record.MinPct = RoundNullable(CalcPct(record.ScanPrice, maxDown.Low));
+            record.MinPrice = RoundNullable(maxDown.Low);
             record.MinTime = maxDown.Time;
             record.ExtremumOrder = GetExtremumOrder(record.MinTime, record.MaxTime);
             record.MinutesFromMinToMax = DiffMinutes(record.MinTime, record.MaxTime);
@@ -151,8 +153,10 @@ namespace IbSwingTrader.App.Commands
                 .First();
 
             record.MaxPctBeforeEntry = RoundNullable(CalcPct(record.ScanPrice, maxBeforeEntry.High));
+            record.MaxPriceBeforeEntry = RoundNullable(maxBeforeEntry.High);
             record.MaxTimeBeforeEntry = maxBeforeEntry.Time;
             record.MinPctBeforeEntry = RoundNullable(CalcPct(record.ScanPrice, minBeforeEntry.Low));
+            record.MinPriceBeforeEntry = RoundNullable(minBeforeEntry.Low);
             record.MinTimeBeforeEntry = minBeforeEntry.Time;
 
             var entryUndercutAbs = Math.Max(record.EntryPrice - minBeforeEntry.Low, 0m);

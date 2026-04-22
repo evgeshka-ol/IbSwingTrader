@@ -4,29 +4,7 @@ namespace IbSwingTrader.Domain.Dataset
     {
         public DateTime ScanTimeMarket { get; set; }
 
-        public required string PresetScanCode { get; set; }
-
-        public bool IsFromWishlist { get; set; }
-
         public string Outcome { get; set; } = string.Empty;
-
-        public int StrategyVersion { get; set; }
-
-        public DateTime EvaluatedAtMarketTime { get; set; }
-
-        public DateTime? EntryTime { get; set; }
-
-        public int? DaysAfterEntry { get; set; }
-
-        public required string GroupLabel { get; set; }
-
-        public string ExtremumOrder { get; set; } = string.Empty;
-
-        public string MinDepthGroup { get; set; } = string.Empty;
-
-        public string MaxStrengthGroup { get; set; } = string.Empty;
-
-        public string ExtremumSubgroup { get; set; } = string.Empty;
 
         public decimal AmplitudePct { get; set; }
 
@@ -46,21 +24,51 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal? CurrentPct { get; set; }
 
-        public decimal EntryDistanceToMinAfterScanPct { get; set; }
-
         public decimal? MaxPct { get; set; }
+
+        public decimal? MaxPrice { get; set; }
 
         public DateTime? MaxTime { get; set; }
 
         public decimal? MinPct { get; set; }
 
+        public decimal? MinPrice { get; set; }
+
         public DateTime? MinTime { get; set; }
 
+        public required string PresetScanCode { get; set; }
+
+        public bool IsFromWishlist { get; set; }
+
+        public int StrategyVersion { get; set; }
+
+        public DateTime EvaluatedAtMarketTime { get; set; }
+
+        public DateTime? EntryTime { get; set; }
+
+        public int? DaysAfterEntry { get; set; }
+
+        public required string GroupLabel { get; set; }
+
+        public string ExtremumOrder { get; set; } = string.Empty;
+
+        public string MinDepthGroup { get; set; } = string.Empty;
+
+        public string MaxStrengthGroup { get; set; } = string.Empty;
+
+        public string ExtremumSubgroup { get; set; } = string.Empty;
+
+        public decimal EntryDistanceToMinAfterScanPct { get; set; }
+
         public decimal? MaxPctBeforeEntry { get; set; }
+
+        public decimal? MaxPriceBeforeEntry { get; set; }
 
         public DateTime? MaxTimeBeforeEntry { get; set; }
 
         public decimal? MinPctBeforeEntry { get; set; }
+
+        public decimal? MinPriceBeforeEntry { get; set; }
 
         public DateTime? MinTimeBeforeEntry { get; set; }
 

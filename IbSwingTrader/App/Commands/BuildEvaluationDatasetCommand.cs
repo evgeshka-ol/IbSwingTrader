@@ -1,5 +1,3 @@
-using IbSwingTrader.Domain.Dataset;
-
 namespace IbSwingTrader.App.Commands
 {
     public class BuildEvaluationDatasetCommand(
@@ -50,6 +48,8 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
             if (settings.MinScanTimeMarket.HasValue)
                 _logger.Info($"MinScanTimeMarket filter: {settings.MinScanTimeMarket.Value:yyyy-MM-dd HH:mm:ss}");
+            if (settings.MinAmplitudePct.HasValue)
+                _logger.Info($"MinAmplitudePct filter: {settings.MinAmplitudePct.Value:0.##}");
 
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
@@ -77,14 +77,18 @@ namespace IbSwingTrader.App.Commands
                 }
             }
 
-            rows = rows
+            rows = [.. rows
                 .GroupBy(x => BuildDatasetKey(x), StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
                     .OrderByDescending(r => r.AmplitudePct)
                     .ThenByDescending(r => r.PositivePotentialPct)
                     .ThenByDescending(r => r.EvaluatedAtMarketTime)
-                    .First())
-                .ToList();
+                    .First())];
+
+            if (settings.MinAmplitudePct.HasValue)
+            {
+                rows = [.. rows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
+            }
 
             rows.Sort((left, right) => CompareRows(left, right, settings));
 
@@ -116,7 +120,7 @@ namespace IbSwingTrader.App.Commands
 
         private EvaluationDatasetRow BuildRow(
             CandidateEvaluationResult evaluation,
-            IReadOnlyDictionary<string, CandidateDetails> candidateIndex)
+            Dictionary<string, CandidateDetails> candidateIndex)
         {
             var key = BuildEvaluationKey(evaluation);
             candidateIndex.TryGetValue(key, out var candidate);
@@ -124,12 +128,16 @@ namespace IbSwingTrader.App.Commands
             var cacheMetrics = TryBuildCacheMetrics(evaluation);
 
             var maxPct = cacheMetrics?.MaxPct ?? evaluation.MaxPct;
+            var maxPrice = cacheMetrics?.MaxPrice ?? evaluation.MaxPrice;
             var maxTime = cacheMetrics?.MaxTime ?? evaluation.MaxTime;
             var minPct = cacheMetrics?.MinPct ?? evaluation.MinPct;
+            var minPrice = cacheMetrics?.MinPrice ?? evaluation.MinPrice;
             var minTime = cacheMetrics?.MinTime ?? evaluation.MinTime;
             var maxPctBeforeEntry = cacheMetrics?.MaxPctBeforeEntry ?? evaluation.MaxPctBeforeEntry;
+            var maxPriceBeforeEntry = cacheMetrics?.MaxPriceBeforeEntry ?? evaluation.MaxPriceBeforeEntry;
             var maxTimeBeforeEntry = cacheMetrics?.MaxTimeBeforeEntry ?? evaluation.MaxTimeBeforeEntry;
             var minPctBeforeEntry = cacheMetrics?.MinPctBeforeEntry ?? evaluation.MinPctBeforeEntry;
+            var minPriceBeforeEntry = cacheMetrics?.MinPriceBeforeEntry ?? evaluation.MinPriceBeforeEntry;
             var minTimeBeforeEntry = cacheMetrics?.MinTimeBeforeEntry ?? evaluation.MinTimeBeforeEntry;
             var entryUndercutBeforeEntryAbs = cacheMetrics?.EntryUndercutBeforeEntryAbs ?? evaluation.EntryUndercutBeforeEntryAbs;
             var entryUndercutBeforeEntryPct = cacheMetrics?.EntryUndercutBeforeEntryPct ?? evaluation.EntryUndercutBeforeEntryPct;
@@ -149,7 +157,6 @@ namespace IbSwingTrader.App.Commands
             var negativePotentialPct = Round(Math.Abs(Math.Min(minPct ?? 0m, 0m)));
             var amplitudePct = Round(CalculateAmplitudePct(
                 evaluation.ScanPrice,
-                evaluation.EntryPrice,
                 maxPct,
                 maxTime,
                 minPct,
@@ -181,12 +188,16 @@ namespace IbSwingTrader.App.Commands
                 CurrentPct = evaluation.CurrentPct,
                 EntryDistanceToMinAfterScanPct = evaluation.EntryDistanceToMinAfterScanPct,
                 MaxPct = maxPct,
+                MaxPrice = maxPrice,
                 MaxTime = maxTime,
                 MinPct = minPct,
+                MinPrice = minPrice,
                 MinTime = minTime,
                 MaxPctBeforeEntry = maxPctBeforeEntry,
+                MaxPriceBeforeEntry = maxPriceBeforeEntry,
                 MaxTimeBeforeEntry = maxTimeBeforeEntry,
                 MinPctBeforeEntry = minPctBeforeEntry,
+                MinPriceBeforeEntry = minPriceBeforeEntry,
                 MinTimeBeforeEntry = minTimeBeforeEntry,
                 EntryUndercutBeforeEntryAbs = entryUndercutBeforeEntryAbs,
                 EntryUndercutBeforeEntryPct = entryUndercutBeforeEntryPct,
@@ -274,8 +285,10 @@ namespace IbSwingTrader.App.Commands
                 .First();
 
             decimal? maxPctBeforeEntry = null;
+            decimal? maxPriceBeforeEntry = null;
             DateTime? maxTimeBeforeEntry = null;
             decimal? minPctBeforeEntry = null;
+            decimal? minPriceBeforeEntry = null;
             DateTime? minTimeBeforeEntry = null;
             decimal? entryUndercutBeforeEntryAbs = null;
             decimal? entryUndercutBeforeEntryPct = null;
@@ -293,8 +306,10 @@ namespace IbSwingTrader.App.Commands
                     .First();
 
                 maxPctBeforeEntry = Round(CalcPct(evaluation.ScanPrice, maxBeforeEntry.High));
+                maxPriceBeforeEntry = Round(maxBeforeEntry.High);
                 maxTimeBeforeEntry = maxBeforeEntry.Time;
                 minPctBeforeEntry = Round(CalcPct(evaluation.ScanPrice, minBeforeEntry.Low));
+                minPriceBeforeEntry = Round(minBeforeEntry.Low);
                 minTimeBeforeEntry = minBeforeEntry.Time;
 
                 var undercutAbs = Math.Max(evaluation.EntryPrice - minBeforeEntry.Low, 0m);
@@ -307,10 +322,12 @@ namespace IbSwingTrader.App.Commands
             var maxPct = evaluation.ScanPrice > 0m
                 ? Round(CalcPct(evaluation.ScanPrice, maxAfterEntry.High))
                 : (decimal?)null;
+            var maxPrice = Round(maxAfterEntry.High);
 
             var minPct = evaluation.ScanPrice > 0m
                 ? Round(CalcPct(evaluation.ScanPrice, minAfterEntry.Low))
                 : (decimal?)null;
+            var minPrice = Round(minAfterEntry.Low);
 
             var postMaxDrawdownPct = CalculatePostMaxDrawdownPct(maxAfterEntry, afterEntry);
             var (exitMissAbs, exitMissPct, nearTakeProfitMiss) = CalculateExitMiss(evaluation, maxAfterEntry.High);
@@ -318,12 +335,16 @@ namespace IbSwingTrader.App.Commands
             return new CacheMetrics
             {
                 MaxPct = maxPct,
+                MaxPrice = maxPrice,
                 MaxTime = maxAfterEntry.Time,
                 MinPct = minPct,
+                MinPrice = minPrice,
                 MinTime = minAfterEntry.Time,
                 MaxPctBeforeEntry = maxPctBeforeEntry,
+                MaxPriceBeforeEntry = maxPriceBeforeEntry,
                 MaxTimeBeforeEntry = maxTimeBeforeEntry,
                 MinPctBeforeEntry = minPctBeforeEntry,
+                MinPriceBeforeEntry = minPriceBeforeEntry,
                 MinTimeBeforeEntry = minTimeBeforeEntry,
                 EntryUndercutBeforeEntryAbs = entryUndercutBeforeEntryAbs,
                 EntryUndercutBeforeEntryPct = entryUndercutBeforeEntryPct,
@@ -393,16 +414,6 @@ namespace IbSwingTrader.App.Commands
                 : "Wishlist";
         }
 
-        private static int GetGroupPriority(EvaluationDatasetRow row)
-        {
-            return row.GroupLabel switch
-            {
-                "TradeCandidate" => 0,
-                "Wishlist" => 1,
-                _ => 2
-            };
-        }
-
         private static int CompareRows(
             EvaluationDatasetRow left,
             EvaluationDatasetRow right,
@@ -428,34 +439,17 @@ namespace IbSwingTrader.App.Commands
 
             var orderedValues = sortColumn.OrderedValues ?? [];
             var descending = sortColumn.Descending;
-
-            int comparison;
-
-            switch (sortColumn.Column)
+            var comparison = sortColumn.Column switch
             {
-                case nameof(EvaluationDatasetRow.GroupLabel):
-                    comparison = CompareString(left.GroupLabel, right.GroupLabel, orderedValues);
-                    break;
-                case nameof(EvaluationDatasetRow.ScanTimeMarket):
-                    comparison = left.ScanTimeMarket.CompareTo(right.ScanTimeMarket);
-                    break;
-                case nameof(EvaluationDatasetRow.Outcome):
-                    comparison = CompareString(left.Outcome, right.Outcome, orderedValues);
-                    break;
-                case nameof(EvaluationDatasetRow.ExtremumOrder):
-                    comparison = CompareString(left.ExtremumOrder, right.ExtremumOrder, orderedValues);
-                    break;
-                case nameof(EvaluationDatasetRow.ExtremumSubgroup):
-                    comparison = CompareString(left.ExtremumSubgroup, right.ExtremumSubgroup, orderedValues);
-                    break;
-                case nameof(EvaluationDatasetRow.Ticker):
-                    comparison = CompareString(left.Ticker, right.Ticker, orderedValues);
-                    break;
-                default:
-                    comparison = 0;
-                    break;
-            }
-
+                nameof(EvaluationDatasetRow.GroupLabel) => CompareString(left.GroupLabel, right.GroupLabel, orderedValues),
+                nameof(EvaluationDatasetRow.ScanTimeMarket) => left.ScanTimeMarket.Date.CompareTo(right.ScanTimeMarket.Date),
+                nameof(EvaluationDatasetRow.AmplitudePct) => left.AmplitudePct.CompareTo(right.AmplitudePct),
+                nameof(EvaluationDatasetRow.Outcome) => CompareString(left.Outcome, right.Outcome, orderedValues),
+                nameof(EvaluationDatasetRow.ExtremumOrder) => CompareString(left.ExtremumOrder, right.ExtremumOrder, orderedValues),
+                nameof(EvaluationDatasetRow.ExtremumSubgroup) => CompareString(left.ExtremumSubgroup, right.ExtremumSubgroup, orderedValues),
+                nameof(EvaluationDatasetRow.Ticker) => CompareString(left.Ticker, right.Ticker, orderedValues),
+                _ => 0,
+            };
             if (comparison == 0)
                 return 0;
 
@@ -493,30 +487,6 @@ namespace IbSwingTrader.App.Commands
             return int.MaxValue;
         }
 
-        private static int GetOutcomePriority(EvaluationDatasetRow row)
-        {
-            return row.Outcome switch
-            {
-                "Win" => 0,
-                "NoEntry" => 1,
-                "Loss" => 2,
-                "Open" => 3,
-                "InsufficientFutureData" => 4,
-                _ => 5
-            };
-        }
-
-        private static int GetExtremumOrderPriority(EvaluationDatasetRow row)
-        {
-            return row.ExtremumOrder switch
-            {
-                "MinFirst" => 0,
-                "MaxFirst" => 1,
-                "SameBar" => 2,
-                _ => 3
-            };
-        }
-
         private static decimal CalcPctOrZero(decimal from, decimal to)
         {
             if (from <= 0m)
@@ -535,14 +505,13 @@ namespace IbSwingTrader.App.Commands
 
         private static decimal CalculateAmplitudePct(
             decimal scanPrice,
-            decimal entryPrice,
             decimal? maxUpPct,
             DateTime? maxUpTime,
             decimal? maxDownPct,
             DateTime? maxDownTime)
         {
             var positivePotentialPct = Math.Max(maxUpPct ?? 0m, 0m);
-            var negativePotentialPct = Math.Abs(Math.Min(maxDownPct ?? 0m, 0m));
+            var negativePotentialPct = Math.Abs(Math.Min(maxDownPct ?? scanPrice, scanPrice));
 
             if (positivePotentialPct <= 0m)
                 return 0m;
@@ -682,12 +651,16 @@ namespace IbSwingTrader.App.Commands
         private sealed class CacheMetrics
         {
             public decimal? MaxPct { get; init; }
+            public decimal? MaxPrice { get; init; }
             public DateTime? MaxTime { get; init; }
             public decimal? MinPct { get; init; }
+            public decimal? MinPrice { get; init; }
             public DateTime? MinTime { get; init; }
             public decimal? MaxPctBeforeEntry { get; init; }
+            public decimal? MaxPriceBeforeEntry { get; init; }
             public DateTime? MaxTimeBeforeEntry { get; init; }
             public decimal? MinPctBeforeEntry { get; init; }
+            public decimal? MinPriceBeforeEntry { get; init; }
             public DateTime? MinTimeBeforeEntry { get; init; }
             public decimal? EntryUndercutBeforeEntryAbs { get; init; }
             public decimal? EntryUndercutBeforeEntryPct { get; init; }

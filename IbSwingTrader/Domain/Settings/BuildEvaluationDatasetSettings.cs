@@ -4,6 +4,8 @@ namespace IbSwingTrader.Domain.Settings
     {
         public DateTime? MinScanTimeMarket { get; set; }
 
+        public decimal? MinAmplitudePct { get; set; }
+
         public List<BuildEvaluationDatasetSortColumnSettings> SortColumns { get; set; } =
         [
             new() { Column = "GroupLabel", OrderedValues = ["TradeCandidate", "Wishlist", "FilterReference"] },

@@ -246,8 +246,12 @@ namespace IbSwingTrader.Application.Evaluation
             record.CurrentPct = RoundNullable(record.CurrentPct);
             record.MaxPct = RoundNullable(record.MaxPct);
             record.MinPct = RoundNullable(record.MinPct);
+            record.MaxPrice = RoundNullable(record.MaxPrice);
+            record.MinPrice = RoundNullable(record.MinPrice);
             record.MaxPctBeforeEntry = RoundNullable(record.MaxPctBeforeEntry);
             record.MinPctBeforeEntry = RoundNullable(record.MinPctBeforeEntry);
+            record.MaxPriceBeforeEntry = RoundNullable(record.MaxPriceBeforeEntry);
+            record.MinPriceBeforeEntry = RoundNullable(record.MinPriceBeforeEntry);
             record.EntryDistanceToMinAfterScanPct = Round(record.EntryDistanceToMinAfterScanPct);
             record.EntryUndercutBeforeEntryAbs = RoundNullable(record.EntryUndercutBeforeEntryAbs);
             record.EntryUndercutBeforeEntryPct = RoundNullable(record.EntryUndercutBeforeEntryPct);

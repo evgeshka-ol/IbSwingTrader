@@ -20,8 +20,12 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? CurrentPct { get; set; }
         public decimal? MaxPct { get; set; }
         public decimal? MinPct { get; set; }
+        public decimal? MaxPrice { get; set; }
+        public decimal? MinPrice { get; set; }
         public decimal? MaxPctBeforeEntry { get; set; }
         public decimal? MinPctBeforeEntry { get; set; }
+        public decimal? MaxPriceBeforeEntry { get; set; }
+        public decimal? MinPriceBeforeEntry { get; set; }
         public bool EntryTouched { get; set; }
         public bool ExitTouched { get; set; }
         public bool StopTouched { get; set; }

@@ -84,6 +84,7 @@
 
     "BuildEvaluationDataset": {
         "MinScanTimeMarket": "2026-04-01",
+        "MinAmplitudePct": 3.0,
         "SortColumns": [
             {
                 "Column": "ScanTimeMarket",
@@ -265,7 +266,7 @@
                 "MinAtrRatio": 3.0,
                 "MinDailyRsi14": 65.0,
                 "MaxDistanceTo20dHigh": -15.0,
-                "MinVolumeRatio20": 0.3,
+                "MinVolumeRatio20": 0.28,
                 "DefaultProfitPct": 0.10,
                 "MinProfitPct": 0.08,
                 "MaxProfitPct": 0.18,
@@ -277,7 +278,7 @@
                 "MinTrendPosition": 8.0,
                 "MinAtrRatio": 4.0,
                 "MinDailyRsi14": 60.0,
-                "MinVolumeRatio20": 0.3,
+                "MinVolumeRatio20": 0.28,
                 "DefaultProfitPct": 0.08,
                 "MinProfitPct": 0.06,
                 "MaxProfitPct": 0.14,
