@@ -219,6 +219,16 @@ namespace IbSwingTrader.App.Commands
             {
                 markers.Add("deep-parabolic");
             }
+            else if (IsExplosiveMinFirstProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("explosive");
+            }
+            else if (IsConstructiveDeepMinFirstProxy(candidate))
+            {
+                markers.Add("minfirst");
+                markers.Add("constructive-deep");
+            }
             else if (IsStrongMinFirstProxy(candidate))
             {
                 markers.Add("minfirst");
@@ -255,15 +265,68 @@ namespace IbSwingTrader.App.Commands
         private bool IsWeakDeepPullbackProxy(CandidateDetails candidate)
         {
             var diagnostics = candidate.Diagnostics;
-            if (diagnostics == null)
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
                 return false;
 
             var settings = _getCandidatesSettingsProvider.Get().TradePlan.WeakDeepPullbackExit;
             if (!settings.Enabled || !candidate.NeedsDeeperEntry)
                 return false;
 
+            var constructiveSettings = _getCandidatesSettingsProvider.Get().TradePlan.ConstructiveDeepMinFirst;
+            var isConstructive =
+                constructiveSettings.Enabled &&
+                diagnostics.DailyTrendPosition >= constructiveSettings.MinDailyTrendPosition &&
+                diagnostics.TrendPosition >= constructiveSettings.MinTrendPosition &&
+                diagnostics.ATRRatio >= constructiveSettings.MinAtrRatio &&
+                context.DailyRSI14 >= constructiveSettings.MinDailyRsi14;
+
+            if (isConstructive)
+                return false;
+
             return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
                    diagnostics.ATRRatio >= settings.MinAtrRatio;
+        }
+
+        private bool IsExplosiveMinFirstProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ExplosiveMinFirstExit;
+            if (!settings.Enabled || candidate.NeedsDeeperEntry || !candidate.NeedsMomentumExit)
+                return false;
+
+            if (IsParabolicExpansionProxy(candidate))
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   context.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   context.DistanceTo20dHigh <= settings.MaxDistanceTo20dHigh;
+        }
+
+        private bool IsConstructiveDeepMinFirstProxy(CandidateDetails candidate)
+        {
+            var diagnostics = candidate.Diagnostics;
+            var context = candidate.Context;
+            if (diagnostics == null || context == null)
+                return false;
+
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ConstructiveDeepMinFirst;
+            if (!settings.Enabled || !candidate.NeedsDeeperEntry)
+                return false;
+
+            if (IsDeepParabolicExpansionProxy(candidate))
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   context.DailyRSI14 >= settings.MinDailyRsi14;
         }
 
         private bool IsParabolicExpansionProxy(CandidateDetails candidate)
