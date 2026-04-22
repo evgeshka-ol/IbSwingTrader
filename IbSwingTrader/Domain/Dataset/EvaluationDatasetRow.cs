@@ -37,6 +37,18 @@ namespace IbSwingTrader.Domain.Dataset
         public DateTime? MinTime { get; set; }
 
         public required string PresetScanCode { get; set; }
+        public string ExtremumOrder { get; set; } = string.Empty;
+
+        public string MinDepthGroup { get; set; } = string.Empty;
+
+        public string MaxStrengthGroup { get; set; } = string.Empty;
+
+        public string ExtremumSubgroup { get; set; } = string.Empty;
+
+        public required string GroupLabel { get; set; }
+
+        public int? DaysAfterEntry { get; set; }
+
 
         public bool IsFromWishlist { get; set; }
 
@@ -45,18 +57,6 @@ namespace IbSwingTrader.Domain.Dataset
         public DateTime EvaluatedAtMarketTime { get; set; }
 
         public DateTime? EntryTime { get; set; }
-
-        public int? DaysAfterEntry { get; set; }
-
-        public required string GroupLabel { get; set; }
-
-        public string ExtremumOrder { get; set; } = string.Empty;
-
-        public string MinDepthGroup { get; set; } = string.Empty;
-
-        public string MaxStrengthGroup { get; set; } = string.Empty;
-
-        public string ExtremumSubgroup { get; set; } = string.Empty;
 
         public decimal EntryDistanceToMinAfterScanPct { get; set; }
 
