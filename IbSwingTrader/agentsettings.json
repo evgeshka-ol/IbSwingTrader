@@ -251,6 +251,30 @@
                 "MinProfitPct": 0.05,
                 "MaxProfitPct": 0.12
             },
+            "ExplosiveMinFirstExit": {
+                "Enabled": true,
+                "MinDailyTrendPosition": 4.0,
+                "MinTrendPosition": 8.0,
+                "MinAtrRatio": 3.0,
+                "MinDailyRsi14": 55.0,
+                "MaxDistanceTo20dHigh": -3.0,
+                "DefaultProfitPct": 0.085,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.14
+            },
+            "ConstructiveDeepMinFirst": {
+                "Enabled": true,
+                "MinDailyTrendPosition": -4.0,
+                "MinTrendPosition": 6.0,
+                "MinAtrRatio": 2.8,
+                "MinDailyRsi14": 40.0,
+                "EntryDiscountPct": 0.05,
+                "HighAtrEntryDiscountPct": 0.06,
+                "HighAtrRatioThreshold": 4.0,
+                "DefaultProfitPct": 0.06,
+                "MinProfitPct": 0.04,
+                "MaxProfitPct": 0.10
+            },
             "WeakDeepPullbackExit": {
                 "Enabled": true,
                 "MaxDailyTrendPosition": 1.0,
@@ -313,6 +337,8 @@
             "DeeperEntryBonus": 0.10,
             "MomentumExitPenalty": 0.05,
             "StrongMinFirstBonus": 0.08,
+            "ExplosiveMinFirstBonus": 0.07,
+            "ConstructiveDeepMinFirstBonus": 0.05,
             "WeakDeepPullbackPenalty": 0.12,
             "ParabolicExpansionBonus": 0.10,
             "DeepParabolicExpansionBonus": 0.06,

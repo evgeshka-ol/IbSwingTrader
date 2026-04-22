@@ -550,14 +550,16 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info($"M15 entry history load failed for {ctx.Stock.Ticker}. {ex.Message}");
             }
 
-            var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles);
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
+            var isConstructiveDeepMinFirst = IsConstructiveDeepMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
+            var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles, diagnostics, isConstructiveDeepMinFirst);
             var momentumExit = needsMomentumExit ? tradeSettings.MomentumExit : null;
             var isParabolicExpansion = IsParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
             var isDeepParabolicExpansion = IsDeepParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
+            var isExplosiveMinFirst = IsExplosiveMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -606,6 +608,33 @@ namespace IbSwingTrader.Application.Candidates
                     $"DefaultProfitPct={_fmt.Percent(weakSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(weakSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(weakSettings.MaxProfitPct)}");
+            }
+            else if (isConstructiveDeepMinFirst)
+            {
+                var constructiveSettings = tradeSettings.ConstructiveDeepMinFirst;
+                defaultProfitPctOverride = constructiveSettings.DefaultProfitPct;
+                minProfitPctOverride = constructiveSettings.MinProfitPct;
+                maxProfitPctOverride = constructiveSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan constructive deep MinFirst profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(constructiveSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(constructiveSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(constructiveSettings.MaxProfitPct)}");
+            }
+            else if (isExplosiveMinFirst)
+            {
+                var explosiveSettings = tradeSettings.ExplosiveMinFirstExit;
+                defaultProfitPctOverride = explosiveSettings.DefaultProfitPct;
+                minProfitPctOverride = explosiveSettings.MinProfitPct;
+                maxProfitPctOverride = explosiveSettings.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan explosive MinFirst profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(explosiveSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(explosiveSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(explosiveSettings.MaxProfitPct)}");
             }
             else if (IsStrongMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
             {
@@ -814,6 +843,12 @@ namespace IbSwingTrader.Application.Candidates
             if (IsStrongMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
                 score += s.StrongMinFirstBonus;
 
+            if (IsExplosiveMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
+                score += s.ExplosiveMinFirstBonus;
+
+            if (IsConstructiveDeepMinFirstProxy(snapshot, diagnostics, needsDeeperEntry))
+                score += s.ConstructiveDeepMinFirstBonus;
+
             if (IsParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
                 score += s.ParabolicExpansionBonus;
 
@@ -910,11 +945,21 @@ namespace IbSwingTrader.Application.Candidates
 
         private decimal? ResolveDeepPullbackEntryDiscountPct(
             CandidateSignalSnapshot snapshot,
-            List<Candle> candles)
+            List<Candle> candles,
+            CandidateDiagnostics? diagnostics = null,
+            bool isConstructiveDeepMinFirst = false)
         {
-            var diagnostics = BuildDiagnostics(snapshot, candles);
+            diagnostics ??= BuildDiagnostics(snapshot, candles);
             if (!ResolveNeedsDeeperEntry(snapshot, diagnostics))
                 return null;
+
+            if (isConstructiveDeepMinFirst)
+            {
+                var constructiveSettings = _getCandidatesSettingsProvider.Get().TradePlan.ConstructiveDeepMinFirst;
+                return diagnostics.ATRRatio >= constructiveSettings.HighAtrRatioThreshold
+                    ? constructiveSettings.HighAtrEntryDiscountPct
+                    : constructiveSettings.EntryDiscountPct;
+            }
 
             var settings = _getCandidatesSettingsProvider.Get().TradePlan.DeepPullbackEntry;
 
@@ -948,8 +993,57 @@ namespace IbSwingTrader.Application.Candidates
             if (!settings.Enabled || !needsDeeperEntry)
                 return false;
 
+            var constructiveSettings = _getCandidatesSettingsProvider.Get().TradePlan.ConstructiveDeepMinFirst;
+            var isConstructive =
+                constructiveSettings.Enabled &&
+                diagnostics.DailyTrendPosition >= constructiveSettings.MinDailyTrendPosition &&
+                diagnostics.TrendPosition >= constructiveSettings.MinTrendPosition &&
+                diagnostics.ATRRatio >= constructiveSettings.MinAtrRatio &&
+                snapshot.Current.DailyRSI14 >= constructiveSettings.MinDailyRsi14;
+
+            if (isConstructive)
+                return false;
+
             return diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
                    diagnostics.ATRRatio >= settings.MinAtrRatio;
+        }
+
+        private bool IsExplosiveMinFirstProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry,
+            bool needsMomentumExit)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ExplosiveMinFirstExit;
+            if (!settings.Enabled || needsDeeperEntry || !needsMomentumExit)
+                return false;
+
+            if (IsParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   snapshot.Current.DistanceTo20dHigh <= settings.MaxDistanceTo20dHigh;
+        }
+
+        private bool IsConstructiveDeepMinFirstProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            bool needsDeeperEntry)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ConstructiveDeepMinFirst;
+            if (!settings.Enabled || !needsDeeperEntry)
+                return false;
+
+            if (IsDeepParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry))
+                return false;
+
+            return diagnostics.DailyTrendPosition >= settings.MinDailyTrendPosition &&
+                   diagnostics.TrendPosition >= settings.MinTrendPosition &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14;
         }
 
         private bool IsParabolicExpansionProxy(

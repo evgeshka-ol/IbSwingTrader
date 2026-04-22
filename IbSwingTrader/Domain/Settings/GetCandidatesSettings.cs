@@ -96,6 +96,8 @@ namespace IbSwingTrader.Domain.Settings
         public DeepPullbackEntrySettings DeepPullbackEntry { get; set; } = new();
         public MomentumExitSettings MomentumExit { get; set; } = new();
         public StrongMinFirstExitSettings StrongMinFirstExit { get; set; } = new();
+        public ExplosiveMinFirstExitSettings ExplosiveMinFirstExit { get; set; } = new();
+        public ConstructiveDeepMinFirstSettings ConstructiveDeepMinFirst { get; set; } = new();
         public WeakDeepPullbackExitSettings WeakDeepPullbackExit { get; set; } = new();
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
@@ -138,6 +140,34 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.07m;
         public decimal MinProfitPct { get; set; } = 0.05m;
         public decimal MaxProfitPct { get; set; } = 0.12m;
+    }
+
+    public class ExplosiveMinFirstExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinDailyTrendPosition { get; set; } = 4m;
+        public decimal MinTrendPosition { get; set; } = 8m;
+        public decimal MinAtrRatio { get; set; } = 3m;
+        public decimal MinDailyRsi14 { get; set; } = 55m;
+        public decimal MaxDistanceTo20dHigh { get; set; } = -3m;
+        public decimal DefaultProfitPct { get; set; } = 0.085m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
+    }
+
+    public class ConstructiveDeepMinFirstSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinDailyTrendPosition { get; set; } = -4m;
+        public decimal MinTrendPosition { get; set; } = 6m;
+        public decimal MinAtrRatio { get; set; } = 2.8m;
+        public decimal MinDailyRsi14 { get; set; } = 40m;
+        public decimal EntryDiscountPct { get; set; } = 0.05m;
+        public decimal HighAtrEntryDiscountPct { get; set; } = 0.06m;
+        public decimal HighAtrRatioThreshold { get; set; } = 4m;
+        public decimal DefaultProfitPct { get; set; } = 0.06m;
+        public decimal MinProfitPct { get; set; } = 0.04m;
+        public decimal MaxProfitPct { get; set; } = 0.10m;
     }
 
     public class WeakDeepPullbackExitSettings
@@ -207,6 +237,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DeeperEntryBonus { get; set; } = 0.10m;
         public decimal MomentumExitPenalty { get; set; } = 0.05m;
         public decimal StrongMinFirstBonus { get; set; } = 0.08m;
+        public decimal ExplosiveMinFirstBonus { get; set; } = 0.07m;
+        public decimal ConstructiveDeepMinFirstBonus { get; set; } = 0.05m;
         public decimal WeakDeepPullbackPenalty { get; set; } = 0.12m;
         public decimal ParabolicExpansionBonus { get; set; } = 0.10m;
         public decimal DeepParabolicExpansionBonus { get; set; } = 0.06m;
