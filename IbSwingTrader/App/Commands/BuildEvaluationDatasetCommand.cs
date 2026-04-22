@@ -371,7 +371,7 @@ namespace IbSwingTrader.App.Commands
 
         private static string BuildDatasetKey(EvaluationDatasetRow row)
         {
-            return $"{row.Ticker}|{row.GroupLabel}";
+            return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
         }
 
         private static int? DiffDays(DateTime from, DateTime? to)
