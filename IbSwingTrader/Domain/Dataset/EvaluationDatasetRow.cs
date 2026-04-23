@@ -8,21 +8,17 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal AmplitudePct { get; set; }
 
+        public decimal ScanPrice { get; set; }
+
         public decimal EntryPrice { get; set; }
 
         public decimal ExitPrice { get; set; }
 
         public decimal StopLoss { get; set; }
 
-        public decimal ScanPrice { get; set; }
-
         public decimal PlannedProfitPct { get; set; }
 
         public decimal PlannedLossPct { get; set; }
-
-        public decimal? ScanMovePct { get; set; }
-
-        public decimal? CurrentPct { get; set; }
 
         public decimal? MaxPct { get; set; }
 
@@ -35,6 +31,10 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal? MinPrice { get; set; }
 
         public DateTime? MinTime { get; set; }
+
+        public decimal? ScanMovePct { get; set; }
+
+        public decimal? CurrentPct { get; set; }
 
         public required string PresetScanCode { get; set; }
         public string ExtremumOrder { get; set; } = string.Empty;
