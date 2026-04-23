@@ -50,6 +50,15 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0)
                 return;
 
+            var latestScanDate = candidates.Max(x => x.Scan.ScanTimeMarket.Date);
+            var latestScanCandidates = candidates
+                .Where(x => x.Scan.ScanTimeMarket.Date == latestScanDate)
+                .ToList();
+
+            _logger.Info(
+                $"Evaluating latest scan date only: {latestScanDate:yyyy-MM-dd}. " +
+                $"Latest scan candidates={latestScanCandidates.Count}, skipped older candidates={candidates.Count - latestScanCandidates.Count}");
+
             if (!File.Exists(evaluationsPath))
                 await _candidateCsvService.WriteAsync(evaluationsPath, []);
 
@@ -64,18 +73,24 @@ namespace IbSwingTrader.App.Commands
                     StringComparer.OrdinalIgnoreCase);
 
             var pending = new List<CandidateDetails>();
+            var alreadyEvaluated = 0;
 
-            foreach (var candidate in candidates)
+            foreach (var candidate in latestScanCandidates)
             {
                 var scanKey = BuildScanKey(candidate);
 
                 if (canonicalByScanKey.TryGetValue(scanKey, out var canonical))
+                {
                     ApplyCanonicalSnapshot(candidate, canonical);
+                    alreadyEvaluated++;
+                    continue;
+                }
 
                 pending.Add(candidate);
             }
 
-            _logger.Info($"Pending candidates for evaluation: {pending.Count}");
+            _logger.Info(
+                $"Latest scan evaluation selection: pending={pending.Count}, alreadyEvaluated={alreadyEvaluated}");
 
             if (pending.Count == 0)
                 return;
