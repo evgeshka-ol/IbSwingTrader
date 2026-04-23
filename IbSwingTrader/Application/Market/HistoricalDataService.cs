@@ -131,17 +131,33 @@ namespace IbSwingTrader.Application.Market
                 _logger.Debug(
                     $"Historical chunk load: {symbol}, tf={timeframe}, start={currentChunkStart:yyyy-MM-dd HH:mm:ss}, end={currentChunkEnd:yyyy-MM-dd HH:mm:ss}");
 
-                var chunkCandles = await _retryPolicy.ExecuteAsync(async () =>
+                List<Candle>? chunkCandles;
+
+                if (timeframe == Timeframe.H4)
                 {
                     using (await _throttler.AcquireAsync())
                     {
-                        return await _provider.GetHistoricalRange(
+                        chunkCandles = await _provider.GetHistoricalRange(
                             contract,
                             timeframe,
                             currentChunkStart,
                             currentChunkEnd);
                     }
-                });
+                }
+                else
+                {
+                    chunkCandles = await _retryPolicy.ExecuteAsync(async () =>
+                    {
+                        using (await _throttler.AcquireAsync())
+                        {
+                            return await _provider.GetHistoricalRange(
+                                contract,
+                                timeframe,
+                                currentChunkStart,
+                                currentChunkEnd);
+                        }
+                    });
+                }
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
                 {
