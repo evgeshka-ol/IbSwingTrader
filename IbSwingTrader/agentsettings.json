@@ -289,6 +289,16 @@
                 "MaxProfitPct": 0.05,
                 "MaxLossPct": 0.05
             },
+            "ExplosiveMaxFirstExit": {
+                "Enabled": true,
+                "MinDailyRsi14": 60.0,
+                "MinAtrRatio": 3.5,
+                "MaxVolumeRatio20": 0.35,
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.12,
+                "MaxLossPct": 0.05
+            },
             "ParabolicExpansionExit": {
                 "Enabled": true,
                 "MinDailyTrendPosition": 10.0,

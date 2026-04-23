@@ -584,6 +584,7 @@ namespace IbSwingTrader.Application.Candidates
             var isParabolicExpansion = IsParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
             var isDeepParabolicExpansion = IsDeepParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
             var isExplosiveMinFirst = IsExplosiveMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
+            var isExplosiveMaxFirst = IsExplosiveMaxFirstProxy(ctx.Snapshot, diagnostics);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -671,6 +672,21 @@ namespace IbSwingTrader.Application.Candidates
                     $"DefaultProfitPct={_fmt.Percent(explosiveSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(explosiveSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(explosiveSettings.MaxProfitPct)}");
+            }
+            else if (isExplosiveMaxFirst)
+            {
+                var explosiveMaxFirstSettings = tradeSettings.ExplosiveMaxFirstExit;
+                defaultProfitPctOverride = explosiveMaxFirstSettings.DefaultProfitPct;
+                minProfitPctOverride = explosiveMaxFirstSettings.MinProfitPct;
+                maxProfitPctOverride = explosiveMaxFirstSettings.MaxProfitPct;
+                maxLossPctOverride = explosiveMaxFirstSettings.MaxLossPct;
+
+                _logger.Info(
+                    $"Trade plan explosive MaxFirst profile applied for {ctx.Stock.Ticker}. " +
+                    $"DefaultProfitPct={_fmt.Percent(explosiveMaxFirstSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(explosiveMaxFirstSettings.MaxLossPct)}");
             }
             else if (IsStrongMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
             {
@@ -1108,6 +1124,19 @@ namespace IbSwingTrader.Application.Candidates
                    snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
                    snapshot.Current.DistanceTo20dHigh >= settings.MaxDistanceTo20dHigh &&
                    diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
+        }
+
+        private bool IsExplosiveMaxFirstProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().TradePlan.ExplosiveMaxFirstExit;
+            if (!settings.Enabled)
+                return false;
+
+            return snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   diagnostics.VolumeRatio20 <= settings.MaxVolumeRatio20;
         }
 
         private bool IsDeepParabolicExpansionProxy(
