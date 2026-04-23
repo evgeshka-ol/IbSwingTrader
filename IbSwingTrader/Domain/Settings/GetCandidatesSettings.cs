@@ -177,9 +177,13 @@ namespace IbSwingTrader.Domain.Settings
         public bool Enabled { get; set; } = true;
         public decimal MaxDailyTrendPosition { get; set; } = 1m;
         public decimal MinAtrRatio { get; set; } = 3m;
+        public decimal EntryDiscountPct { get; set; } = 0.06m;
+        public decimal HighAtrEntryDiscountPct { get; set; } = 0.07m;
+        public decimal HighAtrRatioThreshold { get; set; } = 4m;
         public decimal DefaultProfitPct { get; set; } = 0.04m;
         public decimal MinProfitPct { get; set; } = 0.03m;
-        public decimal MaxProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.05m;
+        public decimal MaxLossPct { get; set; } = 0.05m;
     }
 
     public class ParabolicExpansionExitSettings

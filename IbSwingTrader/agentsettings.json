@@ -281,9 +281,13 @@
                 "Enabled": true,
                 "MaxDailyTrendPosition": 1.0,
                 "MinAtrRatio": 3.0,
+                "EntryDiscountPct": 0.06,
+                "HighAtrEntryDiscountPct": 0.07,
+                "HighAtrRatioThreshold": 4.0,
                 "DefaultProfitPct": 0.04,
                 "MinProfitPct": 0.03,
-                "MaxProfitPct": 0.06
+                "MaxProfitPct": 0.05,
+                "MaxLossPct": 0.05
             },
             "ParabolicExpansionExit": {
                 "Enabled": true,

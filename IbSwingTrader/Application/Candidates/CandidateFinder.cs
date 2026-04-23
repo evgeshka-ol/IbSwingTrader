@@ -630,12 +630,18 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride = weakSettings.DefaultProfitPct;
                 minProfitPctOverride = weakSettings.MinProfitPct;
                 maxProfitPctOverride = weakSettings.MaxProfitPct;
+                maxLossPctOverride = weakSettings.MaxLossPct;
+                entryDiscountOverridePct = diagnostics.ATRRatio >= weakSettings.HighAtrRatioThreshold
+                    ? weakSettings.HighAtrEntryDiscountPct
+                    : weakSettings.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan weak deep-pullback profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
                     $"DefaultProfitPct={_fmt.Percent(weakSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(weakSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(weakSettings.MaxProfitPct)}");
+                    $"MaxProfitPct={_fmt.Percent(weakSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(weakSettings.MaxLossPct)}");
             }
             else if (isConstructiveDeepMinFirst)
             {

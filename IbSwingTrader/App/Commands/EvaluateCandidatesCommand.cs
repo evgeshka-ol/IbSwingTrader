@@ -1,3 +1,5 @@
+using IbSwingTrader.Common.Time;
+
 namespace IbSwingTrader.App.Commands
 {
     public class EvaluateCandidatesCommand(
@@ -50,14 +52,33 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0)
                 return;
 
-            var latestScanDate = candidates.Max(x => x.Scan.ScanTimeMarket.Date);
+            var marketToday = MarketTime.Now().Date;
+            var evaluationScanDate = marketToday.AddDays(-1);
+            var latestScanDate = candidates
+                .Select(x => x.Scan.ScanTimeMarket.Date)
+                .Where(x => x == evaluationScanDate)
+                .Distinct()
+                .FirstOrDefault();
+
+            if (latestScanDate == default)
+            {
+                _logger.Info(
+                    $"No previous-day scan candidates to evaluate. " +
+                    $"Current market date={marketToday:yyyy-MM-dd}, " +
+                    $"expected scan date={evaluationScanDate:yyyy-MM-dd}, candidates={candidates.Count}");
+                return;
+            }
+
             var latestScanCandidates = candidates
                 .Where(x => x.Scan.ScanTimeMarket.Date == latestScanDate)
                 .ToList();
+            var currentDayCandidates = candidates.Count(x => x.Scan.ScanTimeMarket.Date >= marketToday);
 
             _logger.Info(
-                $"Evaluating latest scan date only: {latestScanDate:yyyy-MM-dd}. " +
-                $"Latest scan candidates={latestScanCandidates.Count}, skipped older candidates={candidates.Count - latestScanCandidates.Count}");
+                $"Evaluating previous scan date only: {latestScanDate:yyyy-MM-dd}. " +
+                $"Previous-day candidates={latestScanCandidates.Count}, " +
+                $"skipped older candidates={candidates.Count - latestScanCandidates.Count - currentDayCandidates}, " +
+                $"skipped current-day candidates={currentDayCandidates}");
 
             if (!File.Exists(evaluationsPath))
                 await _candidateCsvService.WriteAsync(evaluationsPath, []);
@@ -68,34 +89,18 @@ namespace IbSwingTrader.App.Commands
                 .ToDictionary(
                     x => x.Key,
                     x => x
-                        .OrderBy(y => y.EvaluatedAtMarketTime)
+                        .OrderByDescending(y => y.EvaluatedAtMarketTime)
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var pending = new List<CandidateDetails>();
-            var alreadyEvaluated = 0;
-
-            foreach (var candidate in latestScanCandidates)
-            {
-                var scanKey = BuildScanKey(candidate);
-
-                if (canonicalByScanKey.TryGetValue(scanKey, out var canonical))
-                {
-                    ApplyCanonicalSnapshot(candidate, canonical);
-                    alreadyEvaluated++;
-                    continue;
-                }
-
-                pending.Add(candidate);
-            }
-
             _logger.Info(
-                $"Latest scan evaluation selection: pending={pending.Count}, alreadyEvaluated={alreadyEvaluated}");
+                $"Previous-day scan evaluation selection: pending={latestScanCandidates.Count}, " +
+                "already evaluated rows will be overwritten");
 
-            if (pending.Count == 0)
+            if (latestScanCandidates.Count == 0)
                 return;
 
-            var results = await _candidateEvaluator.EvaluateAsync(pending);
+            var results = await _candidateEvaluator.EvaluateAsync(latestScanCandidates);
 
             foreach (var result in results)
             {
@@ -165,18 +170,6 @@ namespace IbSwingTrader.App.Commands
             return document?.Candidates ?? [];
         }
 
-        private static void ApplyCanonicalSnapshot(
-            CandidateDetails candidate,
-            CandidateEvaluationResult canonical)
-        {
-            candidate.TradePlan.EntryPrice = canonical.EntryPrice;
-            candidate.TradePlan.ExitPrice = canonical.ExitPrice;
-            candidate.TradePlan.StopLoss = canonical.StopLoss;
-            candidate.TradePlan.ProfitPercent = CalcPct(canonical.EntryPrice, canonical.ExitPrice);
-            candidate.TradePlan.LossPercent = CalcPct(canonical.EntryPrice, canonical.StopLoss);
-            candidate.Score.Score = canonical.CandidateScore;
-        }
-
         private static string BuildScanKey(CandidateDetails candidate)
         {
             return string.Create(
@@ -189,14 +182,6 @@ namespace IbSwingTrader.App.Commands
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
-        }
-
-        private static decimal CalcPct(decimal from, decimal to)
-        {
-            if (from == 0m)
-                return 0m;
-
-            return (to - from) / from * 100m;
         }
 
     }

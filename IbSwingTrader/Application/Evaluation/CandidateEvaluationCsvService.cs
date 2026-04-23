@@ -32,7 +32,10 @@ namespace IbSwingTrader.Application.Evaluation
             var merged = existingRecords
                 .Concat(newRecords)
                 .GroupBy(BuildKey, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.Last())
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
                 .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ThenByDescending(x => x.ScanTimeMarket)
                 .ThenByDescending(x => x.EvaluatedAtMarketTime)
@@ -340,7 +343,7 @@ namespace IbSwingTrader.Application.Evaluation
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeMarket:O}|{record.EvaluatedAtMarketTime:O}");
+                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeMarket:O}");
         }
 
         private static int InferStrategyVersion(CandidateEvaluationResult record)
