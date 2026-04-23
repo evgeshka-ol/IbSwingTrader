@@ -6,6 +6,7 @@ namespace IbSwingTrader.App.Commands
         IContractResolver contractResolver,
         IHistoricalDataService historicalDataService,
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
+        BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
         IAgentPathService pathService,
         ITextLogger logger) : ICommand
     {
@@ -14,6 +15,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
+        private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITextLogger _logger = logger;
 
@@ -21,6 +23,23 @@ namespace IbSwingTrader.App.Commands
         {
             var evaluationsPath = _pathService.GetEvaluationsFile();
             var records = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
+            var originalCount = records.Count;
+
+            records = records
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
+                .ToList();
+
+            var duplicatesRemoved = originalCount - records.Count;
+            if (duplicatesRemoved > 0)
+            {
+                _logger.Info(
+                    $"Duplicate evaluations removed before normalization: {duplicatesRemoved}. " +
+                    $"Kept={records.Count}");
+            }
 
             EnsureConnected(_twsSettingsProvider.Get().ConnectTimeoutSeconds);
 
@@ -30,6 +49,9 @@ namespace IbSwingTrader.App.Commands
             await _candidateEvaluationCsvService.WriteAsync(evaluationsPath, records);
 
             _logger.Info($"Evaluations normalized: {evaluationsPath}. Records={records.Count}");
+
+            _logger.Info("Rebuilding evaluation dataset after normalization...");
+            await _buildEvaluationDatasetCommand.RunAsync();
         }
 
         private void EnsureConnected(int timeoutSeconds)
@@ -250,6 +272,13 @@ namespace IbSwingTrader.App.Commands
                 return 0m;
 
             return (entryPrice - minLowAfterScan) / entryPrice * 100m;
+        }
+
+        private static string BuildScanKey(CandidateEvaluationResult result)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
         }
 
         private static void ApplyUnambiguousOutcomeCorrection(CandidateEvaluationResult record)
