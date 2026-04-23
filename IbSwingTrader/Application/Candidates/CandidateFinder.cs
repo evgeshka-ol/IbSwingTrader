@@ -65,6 +65,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
+            var processedScannedTickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var preset in _scannerPresets.GetAll())
             {
@@ -74,6 +75,12 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     if (!_preFilter.Pass(stock))
                         continue;
+
+                    if (!processedScannedTickers.Add(stock.Ticker))
+                    {
+                        _logger.Info($"Skipping duplicate scanned ticker: {stock.Ticker} ({preset.ScanCode})");
+                        continue;
+                    }
 
                     Contract contract;
 
@@ -220,13 +227,29 @@ namespace IbSwingTrader.Application.Candidates
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach (var mergedWishItem in mergedWishList)
+            var agedWishListItems = mergedWishList
+                .Where(x =>
+                {
+                    var firstSeenDate = x.FirstSeenMarketTime?.Date;
+                    return firstSeenDate != null && firstSeenDate.Value < todayMarketDate;
+                })
+                .OrderByDescending(x => x.Score.Score)
+                .ThenByDescending(x => x.LastEvaluatedMarketTime ?? DateTime.MinValue)
+                .ToList();
+
+            if (getCandidatesSettings.MaxWishListItems > 0 &&
+                agedWishListItems.Count > getCandidatesSettings.MaxWishListItems)
             {
-                var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+                _logger.Info(
+                    $"Aged wish list evaluation limited: taking top {getCandidatesSettings.MaxWishListItems} of {agedWishListItems.Count} items.");
 
-                if (firstSeenDate == null || firstSeenDate.Value >= todayMarketDate)
-                    continue;
+                agedWishListItems = agedWishListItems
+                    .Take(getCandidatesSettings.MaxWishListItems)
+                    .ToList();
+            }
 
+            foreach (var mergedWishItem in agedWishListItems)
+            {
                 WishListContext? ctx = null;
 
                 if (scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var scannedCtx))
@@ -381,8 +404,18 @@ namespace IbSwingTrader.Application.Candidates
             string bucketName,
             string rejectionLogPrefix)
         {
-            var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+            var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+            var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
+            var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var candidateFilterSettings = _getCandidatesSettingsProvider.Get().CandidateFilter;
+
+            if (!_candidateFilter.Pass(ctx.Snapshot, 0m, ctx.AvgDollarVolumeDaily))
+            {
+                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
+                return;
+            }
+
+            var trade = ctx.Trade ??= await BuildTradePlan(ctx);
 
             if (trade.ProfitPercent < candidateFilterSettings.MinPlannedProfitPct)
             {
@@ -393,15 +426,6 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (!_candidateFilter.Pass(ctx.Snapshot, trade.EntryPrice, ctx.AvgDollarVolumeDaily))
-            {
-                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
-                return;
-            }
-
-            var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
-            var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
-            var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
             var finalScore = dailyScore + weeklyScore + entryScore;
