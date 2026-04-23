@@ -127,6 +127,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.06m;
         public decimal MinProfitPct { get; set; } = 0.04m;
         public decimal MaxProfitPct { get; set; } = 0.09m;
+        public decimal EntryDiscountPct { get; set; } = 0m;
         public decimal ExitPriceBufferPct { get; set; } = 0.001m;
     }
 
@@ -153,6 +154,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.085m;
         public decimal MinProfitPct { get; set; } = 0.06m;
         public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal EntryDiscountPct { get; set; } = 0m;
     }
 
     public class ConstructiveDeepMinFirstSettings
@@ -192,6 +194,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.10m;
         public decimal MinProfitPct { get; set; } = 0.08m;
         public decimal MaxProfitPct { get; set; } = 0.18m;
+        public decimal EntryDiscountPct { get; set; } = 0m;
         public decimal MaxLossPct { get; set; } = 0.05m;
     }
 
@@ -206,6 +209,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.08m;
         public decimal MinProfitPct { get; set; } = 0.06m;
         public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal EntryDiscountPct { get; set; } = 0.02m;
         public decimal MaxLossPct { get; set; } = 0.06m;
     }
 

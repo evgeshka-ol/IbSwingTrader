@@ -597,9 +597,11 @@ namespace IbSwingTrader.Application.Candidates
                 minProfitPctOverride = parabolicSettings.MinProfitPct;
                 maxProfitPctOverride = parabolicSettings.MaxProfitPct;
                 maxLossPctOverride = parabolicSettings.MaxLossPct;
+                entryDiscountOverridePct = parabolicSettings.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan parabolic expansion profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(parabolicSettings.EntryDiscountPct)}, " +
                     $"DefaultProfitPct={_fmt.Percent(parabolicSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(parabolicSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(parabolicSettings.MaxProfitPct)}, " +
@@ -612,9 +614,11 @@ namespace IbSwingTrader.Application.Candidates
                 minProfitPctOverride = deepParabolicSettings.MinProfitPct;
                 maxProfitPctOverride = deepParabolicSettings.MaxProfitPct;
                 maxLossPctOverride = deepParabolicSettings.MaxLossPct;
+                entryDiscountOverridePct = deepParabolicSettings.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan deep parabolic profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(deepParabolicSettings.EntryDiscountPct)}, " +
                     $"DefaultProfitPct={_fmt.Percent(deepParabolicSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(deepParabolicSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(deepParabolicSettings.MaxProfitPct)}, " +
@@ -653,9 +657,11 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride = explosiveSettings.DefaultProfitPct;
                 minProfitPctOverride = explosiveSettings.MinProfitPct;
                 maxProfitPctOverride = explosiveSettings.MaxProfitPct;
+                entryDiscountOverridePct = explosiveSettings.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan explosive MinFirst profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(explosiveSettings.EntryDiscountPct)}, " +
                     $"DefaultProfitPct={_fmt.Percent(explosiveSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(explosiveSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(explosiveSettings.MaxProfitPct)}");
@@ -666,12 +672,22 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride = strongSettings.DefaultProfitPct;
                 minProfitPctOverride = strongSettings.MinProfitPct;
                 maxProfitPctOverride = strongSettings.MaxProfitPct;
+                if (needsMomentumExit)
+                    entryDiscountOverridePct = tradeSettings.MomentumExit.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan strong MinFirst profile applied for {ctx.Stock.Ticker}. " +
                     $"DefaultProfitPct={_fmt.Percent(strongSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(strongSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(strongSettings.MaxProfitPct)}");
+            }
+            else if (needsMomentumExit)
+            {
+                entryDiscountOverridePct = tradeSettings.MomentumExit.EntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan momentum entry profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(tradeSettings.MomentumExit.EntryDiscountPct)}");
             }
 
             var trade = _tradeBuilder.Build(

@@ -122,11 +122,11 @@ namespace IbSwingTrader.Application.Candidates
         {
             if (entryCandles == null || entryCandles.Count < settings.MinimumEntryCandles)
             {
-                if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value > 0m)
+                if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
                 {
                     var discountedFallback = fallbackEntry * (1m - entryDiscountOverridePct.Value);
                     _logger.Info(
-                        $"Trade entry deep-pullback fallback to discounted H4 close. " +
+                        $"Trade entry fallback to H4 close with profile discount. " +
                         $"Fallback={_fmt.Price(fallbackEntry)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedFallback)}");
                     return discountedFallback > 0m ? discountedFallback : fallbackEntry;
                 }
@@ -143,11 +143,11 @@ namespace IbSwingTrader.Application.Candidates
 
             var current = ordered[^1].Close;
 
-            if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value > 0m)
+            if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
             {
                 var discountedEntry = current * (1m - entryDiscountOverridePct.Value);
                 _logger.Info(
-                    $"Trade entry set to discounted current price for deep-pullback candidate. " +
+                    $"Trade entry set to current M15 close with profile discount. " +
                     $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedEntry)}");
                 return discountedEntry > 0m ? discountedEntry : fallbackEntry;
             }

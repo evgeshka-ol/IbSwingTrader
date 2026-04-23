@@ -84,7 +84,7 @@
 
     "BuildEvaluationDataset": {
         "MinScanTimeMarket": "2026-04-01",
-        "MinAmplitudePct": 3.0,
+        "MinAmplitudePct": 0.0,
         "SortColumns": [
             {
                 "Column": "ScanTimeMarket",
@@ -239,6 +239,7 @@
                 "DefaultProfitPct": 0.06,
                 "MinProfitPct": 0.04,
                 "MaxProfitPct": 0.09,
+                "EntryDiscountPct": 0.0,
                 "ExitPriceBufferPct": 0.001
             },
             "StrongMinFirstExit": {
@@ -260,7 +261,8 @@
                 "MaxDistanceTo20dHigh": -3.0,
                 "DefaultProfitPct": 0.085,
                 "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.14
+                "MaxProfitPct": 0.14,
+                "EntryDiscountPct": 0.0
             },
             "ConstructiveDeepMinFirst": {
                 "Enabled": true,
@@ -294,6 +296,7 @@
                 "DefaultProfitPct": 0.10,
                 "MinProfitPct": 0.08,
                 "MaxProfitPct": 0.18,
+                "EntryDiscountPct": 0.0,
                 "MaxLossPct": 0.05
             },
             "DeepParabolicExpansionExit": {
@@ -306,6 +309,7 @@
                 "DefaultProfitPct": 0.08,
                 "MinProfitPct": 0.06,
                 "MaxProfitPct": 0.14,
+                "EntryDiscountPct": 0.02,
                 "MaxLossPct": 0.06
             }
         },
