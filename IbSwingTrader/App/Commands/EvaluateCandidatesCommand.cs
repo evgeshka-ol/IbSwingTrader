@@ -8,6 +8,7 @@ namespace IbSwingTrader.App.Commands
         BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
         IJsonFileService jsonFileService,
         ICandidateEvaluationCsvService candidateCsvService,
+        ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         ITextLogger logger,
         IAgentPathService pathService,
         ITwsSettingsProvider twsSettingsProvider) : ICommand
@@ -17,6 +18,7 @@ namespace IbSwingTrader.App.Commands
         private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICandidateEvaluationCsvService _candidateCsvService = candidateCsvService;
+        private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
@@ -48,36 +50,20 @@ namespace IbSwingTrader.App.Commands
         {
             var candidates = await LoadCandidatesAsync(candidatesPath);
             _logger.Info($"Candidates found: {candidates.Count}");
-
-            if (candidates.Count == 0)
-                return;
+            var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
 
             var marketToday = MarketTime.Now().Date;
             var evaluationScanDate = marketToday.AddDays(-1);
-            var latestScanDate = candidates
-                .Select(x => x.Scan.ScanTimeMarket.Date)
-                .Where(x => x == evaluationScanDate)
-                .Distinct()
-                .FirstOrDefault();
-
-            if (latestScanDate == default)
-            {
-                _logger.Info(
-                    $"No previous-day scan candidates to evaluate. " +
-                    $"Current market date={marketToday:yyyy-MM-dd}, " +
-                    $"expected scan date={evaluationScanDate:yyyy-MM-dd}, candidates={candidates.Count}");
-                return;
-            }
-
             var latestScanCandidates = candidates
-                .Where(x => x.Scan.ScanTimeMarket.Date == latestScanDate)
+                .Where(x => x.Scan.ScanTimeMarket.Date == evaluationScanDate)
                 .ToList();
             var currentDayCandidates = candidates.Count(x => x.Scan.ScanTimeMarket.Date >= marketToday);
+            var olderCandidates = candidates.Count - latestScanCandidates.Count - currentDayCandidates;
 
             _logger.Info(
-                $"Evaluating previous scan date only: {latestScanDate:yyyy-MM-dd}. " +
+                $"Evaluating previous scan date only: {evaluationScanDate:yyyy-MM-dd}. " +
                 $"Previous-day candidates={latestScanCandidates.Count}, " +
-                $"skipped older candidates={candidates.Count - latestScanCandidates.Count - currentDayCandidates}, " +
+                $"skipped older candidates={olderCandidates}, " +
                 $"skipped current-day candidates={currentDayCandidates}");
 
             if (!File.Exists(evaluationsPath))
@@ -93,14 +79,43 @@ namespace IbSwingTrader.App.Commands
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
+            var candidatesToEvaluate = latestScanCandidates
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+            if (evaluationSettings.ReevaluateOpenCandidates)
+            {
+                var openCandidates = existingEvaluations
+                    .Where(x =>
+                        string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
+                        !x.IsStaleOpen &&
+                        x.ScanTimeMarket.Date < evaluationScanDate)
+                    .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x
+                        .OrderByDescending(y => y.EvaluatedAtMarketTime)
+                        .First())
+                    .Select(RebuildCandidateFromEvaluation)
+                    .ToList();
+
+                foreach (var openCandidate in openCandidates)
+                    candidatesToEvaluate[BuildScanKey(openCandidate)] = openCandidate;
+
+                _logger.Info($"Open reevaluation enabled: additionalOpenCandidates={openCandidates.Count}");
+            }
+
             _logger.Info(
-                $"Previous-day scan evaluation selection: pending={latestScanCandidates.Count}, " +
+                $"Previous-day scan evaluation selection: pending={candidatesToEvaluate.Count}, " +
                 "already evaluated rows will be overwritten");
 
-            if (latestScanCandidates.Count == 0)
+            if (candidatesToEvaluate.Count == 0)
+            {
+                _logger.Info(
+                    $"Nothing to evaluate. Current market date={marketToday:yyyy-MM-dd}, " +
+                    $"expected scan date={evaluationScanDate:yyyy-MM-dd}, candidates={candidates.Count}");
                 return;
+            }
 
-            var results = await _candidateEvaluator.EvaluateAsync(latestScanCandidates);
+            var results = await _candidateEvaluator.EvaluateAsync(candidatesToEvaluate.Values.ToList());
 
             foreach (var result in results)
             {
@@ -184,5 +199,39 @@ namespace IbSwingTrader.App.Commands
                 $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
         }
 
+        private static CandidateDetails RebuildCandidateFromEvaluation(CandidateEvaluationResult evaluation)
+        {
+            return new CandidateDetails
+            {
+                Ticker = evaluation.Ticker,
+                IsFromWishlist = evaluation.IsFromWishlist,
+                Scan = new ScanInfo
+                {
+                    PresetScanCode = evaluation.PresetScanCode,
+                    ScanTimeMarket = evaluation.ScanTimeMarket
+                },
+                Score = new ScoreInfo
+                {
+                    Score = evaluation.CandidateScore
+                },
+                Context = new MarketContextInfo(),
+                TradePlan = new TradePlanInfo
+                {
+                    EntryPrice = evaluation.EntryPrice,
+                    ExitPrice = evaluation.ExitPrice,
+                    StopLoss = evaluation.StopLoss,
+                    ProfitPercent = CalcPct(evaluation.EntryPrice, evaluation.ExitPrice),
+                    LossPercent = CalcPct(evaluation.EntryPrice, evaluation.StopLoss)
+                }
+            };
+        }
+
+        private static decimal CalcPct(decimal from, decimal to)
+        {
+            if (from == 0m)
+                return 0m;
+
+            return (to - from) / from * 100m;
+        }
     }
 }

@@ -7,5 +7,6 @@ namespace IbSwingTrader.Domain.Settings
         public int FreshDataSafetyLagMinutes { get; set; } = 10;
         public decimal DefaultTargetPct { get; set; } = 10m;
         public bool UseAmbiguousBarResolver { get; set; } = true;
+        public bool ReevaluateOpenCandidates { get; set; } = false;
     }
 }

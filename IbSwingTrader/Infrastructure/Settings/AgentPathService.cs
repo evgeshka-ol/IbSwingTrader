@@ -1,4 +1,3 @@
-
 namespace IbSwingTrader.Infrastructure.Settings
 {
     public class AgentPathService : IAgentPathService
@@ -20,6 +19,7 @@ namespace IbSwingTrader.Infrastructure.Settings
         public string GetCacheFolder() => Combine(_paths.CacheFolder);
         public string GetCandidatesFile() => Combine(_paths.CandidatesFile);
         public string GetEvaluationsFile() => Combine(_paths.EvaluationsFile);
+        public string GetEvaluationsArchiveFile() => Combine(_paths.EvaluationsArchiveFile);
         public string GetWishListFile() => Combine(_paths.WishListFile);
         public string GetWishListEvaluationsFile() => Combine(_paths.WishListEvaluationsFile);
 

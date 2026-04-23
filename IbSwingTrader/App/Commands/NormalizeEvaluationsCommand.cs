@@ -3,6 +3,7 @@ namespace IbSwingTrader.App.Commands
     public class NormalizeEvaluationsCommand(
         ITwsConnection twsConnection,
         ITwsSettingsProvider twsSettingsProvider,
+        ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         IContractResolver contractResolver,
         IHistoricalDataService historicalDataService,
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
@@ -12,6 +13,7 @@ namespace IbSwingTrader.App.Commands
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
+        private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
@@ -22,6 +24,7 @@ namespace IbSwingTrader.App.Commands
         public async Task RunAsync()
         {
             var evaluationsPath = _pathService.GetEvaluationsFile();
+            var evaluationsArchivePath = _pathService.GetEvaluationsArchiveFile();
             var records = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
             var originalCount = records.Count;
 
@@ -42,13 +45,37 @@ namespace IbSwingTrader.App.Commands
             }
 
             EnsureConnected(_twsSettingsProvider.Get().ConnectTimeoutSeconds);
+            var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
 
             foreach (var record in records)
+            {
                 await BackfillRecordAsync(record);
+                MarkStaleOpen(record, evaluationSettings);
+            }
 
-            await _candidateEvaluationCsvService.WriteAsync(evaluationsPath, records);
+            var activeRecords = records
+                .Where(x => !(string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) && x.IsStaleOpen))
+                .ToList();
+            var staleOpenRecords = records
+                .Where(x => string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) && x.IsStaleOpen)
+                .ToList();
 
-            _logger.Info($"Evaluations normalized: {evaluationsPath}. Records={records.Count}");
+            var archivedRecords = await _candidateEvaluationCsvService.ReadAsync(evaluationsArchivePath);
+            archivedRecords.AddRange(staleOpenRecords);
+            archivedRecords = archivedRecords
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
+                .ToList();
+
+            await RewriteCsvAsync(evaluationsPath, activeRecords);
+            await RewriteCsvAsync(evaluationsArchivePath, archivedRecords);
+
+            _logger.Info(
+                $"Evaluations normalized: active={activeRecords.Count}, archivedStaleOpen={staleOpenRecords.Count}, " +
+                $"archiveTotal={archivedRecords.Count}");
 
             _logger.Info("Rebuilding evaluation dataset after normalization...");
             await _buildEvaluationDatasetCommand.RunAsync();
@@ -70,6 +97,14 @@ namespace IbSwingTrader.App.Commands
                 throw new InvalidOperationException("Failed to connect to TWS.");
 
             _logger.Info("TWS connected.");
+        }
+
+        private async Task RewriteCsvAsync(string path, List<CandidateEvaluationResult> records)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+
+            await _candidateEvaluationCsvService.WriteAsync(path, records);
         }
 
         private async Task BackfillRecordAsync(CandidateEvaluationResult record)
@@ -209,6 +244,25 @@ namespace IbSwingTrader.App.Commands
             record.ExitMissAbs = RoundNullable(missAbs);
             record.ExitMissPct = RoundNullable(missPct);
             record.NearTakeProfitMiss = missAbs > 0m && (missAbs <= 0.01m || missPct <= 0.1m);
+        }
+
+        private static void MarkStaleOpen(
+            CandidateEvaluationResult record,
+            CandidateEvaluationSettings settings)
+        {
+            record.OpenAgeDays = null;
+            record.IsStaleOpen = false;
+
+            if (!string.Equals(record.Outcome, "Open", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var evaluationEnd = record.EvaluationEndTime ?? record.EvaluatedAtMarketTime;
+            if (evaluationEnd <= record.ScanTimeMarket)
+                return;
+
+            var openAgeDays = (evaluationEnd.Date - record.ScanTimeMarket.Date).Days;
+            record.OpenAgeDays = openAgeDays;
+            record.IsStaleOpen = openAgeDays >= settings.ForwardEvaluationDays;
         }
 
         private static decimal? CalculatePostMaxDrawdownPct(Candle maxUp, List<Candle> afterEntry)

@@ -8,6 +8,7 @@
         "CacheFolder": "cache",
         "CandidatesFile": "Tickers/candidates.json",
         "EvaluationsFile": "Tickers/evaluations.csv",
+        "EvaluationsArchiveFile": "Tickers/evaluations_archive.csv",
         "WishListFile": "Tickers/wishlist.json",
         "ProcessedCandidateFilesManifest": "manifests/processed-candidate-files.json",
         "LogsFolder": "logs"
@@ -379,6 +380,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 7,
+        "ReevaluateOpenCandidates": false,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
         "UseAmbiguousBarResolver": true

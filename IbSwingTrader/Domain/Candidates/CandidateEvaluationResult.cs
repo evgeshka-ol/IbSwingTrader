@@ -61,6 +61,8 @@ namespace IbSwingTrader.Domain.Candidates
 
         public DateTime? EvaluationStartTime { get; set; }
         public DateTime? EvaluationEndTime { get; set; }
+        public bool IsStaleOpen { get; set; }
+        public int? OpenAgeDays { get; set; }
 
         public decimal TakeProfitOverflowPct { get; set; }
         public decimal DaysAfterExitToMaxHigh { get; set; }

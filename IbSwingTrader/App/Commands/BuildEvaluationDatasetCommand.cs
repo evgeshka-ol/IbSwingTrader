@@ -25,13 +25,24 @@ namespace IbSwingTrader.App.Commands
         {
             var settings = _buildEvaluationDatasetSettingsProvider.Get();
             var evaluationsPath = _pathService.GetEvaluationsFile();
+            var evaluationsArchivePath = _pathService.GetEvaluationsArchiveFile();
             var outputPath = Path.GetFullPath(
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
 
             _logger.Info("Building evaluation dataset...");
             _logger.Info($"Evaluations source: {evaluationsPath}");
+            _logger.Info($"Evaluations archive source: {evaluationsArchivePath}");
 
             var evaluations = await _evaluationCsvService.ReadAsync(evaluationsPath);
+            var archivedEvaluations = await _evaluationCsvService.ReadAsync(evaluationsArchivePath);
+            evaluations.AddRange(archivedEvaluations);
+            evaluations = evaluations
+                .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
+                .ToList();
             if (settings.MinScanTimeMarket.HasValue)
             {
                 evaluations = evaluations
@@ -176,6 +187,8 @@ namespace IbSwingTrader.App.Commands
                 Outcome = evaluation.Outcome ?? string.Empty,
                 StrategyVersion = evaluation.StrategyVersion,
                 EvaluatedAtMarketTime = evaluation.EvaluatedAtMarketTime,
+                IsStaleOpen = evaluation.IsStaleOpen,
+                OpenAgeDays = evaluation.OpenAgeDays,
                 EntryTime = evaluation.EntryTime,
                 DaysAfterEntry = evaluation.DaysAfterEntry,
                 EntryPrice = evaluation.EntryPrice,
