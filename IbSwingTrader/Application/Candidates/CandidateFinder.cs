@@ -180,10 +180,24 @@ namespace IbSwingTrader.Application.Candidates
                         $"rank ({stock.Rank}), " +
                         $"avgDollarVolume={_fmt.Generic(avgDollarVolume)}");
 
+                    var diagnostics = BuildDiagnostics(snapshot, candles);
+                    var entryScore = _candidateScore.Calculate(snapshot);
+
                     if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
                     {
-                        _logger.Info($"Wish list rejected: {stock.Ticker}");
-                        continue;
+                        if (!ShouldBypassWishListFilterForLiveScan(snapshot, diagnostics, entryScore))
+                        {
+                            _logger.Info($"Wish list rejected: {stock.Ticker}");
+                            continue;
+                        }
+
+                        _logger.Info(
+                            $"Wish list live-scan bypass applied: {stock.Ticker}. " +
+                            $"EntryScore={_fmt.Generic(entryScore)}, " +
+                            $"DailyRsi14={_fmt.Generic(snapshot.Current.DailyRSI14)}, " +
+                            $"DailyDistance={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}%, " +
+                            $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
+                            $"VolumeRatio20={_fmt.Generic(diagnostics.VolumeRatio20)}");
                     }
 
                     var wishScore = _wishListScore.Calculate(snapshot);
@@ -927,6 +941,20 @@ namespace IbSwingTrader.Application.Candidates
                 score -= s.BbMidNegativePenalty;
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private bool ShouldBypassWishListFilterForLiveScan(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore)
+        {
+            var needsDeeperEntry = ResolveNeedsDeeperEntry(snapshot, diagnostics);
+            var needsMomentumExit = ResolveNeedsMomentumExit(snapshot, diagnostics, entryScore);
+
+            return IsParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit) ||
+                   IsDeepParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry) ||
+                   IsExplosiveMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit) ||
+                   IsExplosiveMaxFirstProxy(snapshot, diagnostics);
         }
 
         private static decimal ResolvePresetBonus(string presetScanCode, NextDayRankingSettings settings)
