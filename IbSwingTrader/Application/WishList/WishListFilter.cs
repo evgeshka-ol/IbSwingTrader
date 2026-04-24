@@ -28,21 +28,21 @@ namespace IbSwingTrader.Application.WishList
             if (f.DailyMaSignedDistancePct > s.MaxDailyMaSignedDistancePct)
             {
                 _logger.Info(
-                    $"WishList rejected: price is too far above daily Bollinger mid. " +
+                    $"WishList rejected: price is too far above daily MA baseline. " +
                     $"Ticker price={_fmt.Generic(price)}, daily distance={_fmt.Generic(f.DailyMaSignedDistancePct)}%");
                 return false;
             }
 
             if (!f.WeeklyMaSignedDistancePct.HasValue)
             {
-                _logger.Info("WishList rejected: weekly Bollinger mid is unavailable.");
+                _logger.Info("WishList rejected: weekly MA baseline is unavailable.");
                 return false;
             }
 
             if (f.WeeklyMaSignedDistancePct.Value > s.MaxWeeklyMaSignedDistancePct)
             {
                 _logger.Info(
-                    $"WishList rejected: price is too far above weekly Bollinger mid. " +
+                    $"WishList rejected: price is too far above weekly MA baseline. " +
                     $"Ticker price={_fmt.Generic(price)}, weekly distance={_fmt.Generic(f.WeeklyMaSignedDistancePct.Value)}%");
                 return false;
             }

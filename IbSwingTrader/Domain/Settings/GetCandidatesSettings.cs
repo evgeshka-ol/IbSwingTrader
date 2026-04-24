@@ -15,6 +15,7 @@ namespace IbSwingTrader.Domain.Settings
         public PreFilterSettings PreFilter { get; set; } = new();
         public TradePlanSettings TradePlan { get; set; } = new();
         public NextDayRankingSettings NextDayRanking { get; set; } = new();
+        public PremarketSummarySettings PremarketSummary { get; set; } = new();
     }
 
     public class ScanCodeSettings
@@ -284,6 +285,14 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MaxBbMidSignedDistancePct { get; set; } = 0.5m;
         public decimal MaxDistanceTo20dHigh { get; set; } = -20m;
         public decimal MaxAtrRatio { get; set; } = 0.20m;
+        public decimal MinPlannedProfitPct { get; set; } = 3.0m;
+    }
+
+    public class PremarketSummarySettings
+    {
+        public bool Enabled { get; set; } = true;
+        public int MaxItems { get; set; } = 5;
+        public decimal MinEntryScore { get; set; } = 30m;
         public decimal MinPlannedProfitPct { get; set; } = 3.0m;
     }
 

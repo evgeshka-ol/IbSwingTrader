@@ -322,6 +322,13 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var promotedTickers = candidateResults.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var summaryOnlyCandidates = await BuildPremarketSummaryCandidates(
+                mergedWishList,
+                mergedMap,
+                scannedWishListContexts,
+                promotedTickers,
+                marketNow,
+                marketTimezone);
 
             var finalWishList = mergedWishList
                 .Where(x => !promotedTickers.Contains(x.Ticker))
@@ -339,8 +346,93 @@ namespace IbSwingTrader.Application.Candidates
                         .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                         .ThenByDescending(x => x.Score.Score)
                 ],
+                SummaryOnlyCandidates = summaryOnlyCandidates,
                 WishList = finalWishList
             };
+        }
+
+        private async Task<List<CandidateDetails>> BuildPremarketSummaryCandidates(
+            List<WishListItem> mergedWishList,
+            Dictionary<string, WishListItem> mergedMap,
+            Dictionary<string, WishListContext> scannedWishListContexts,
+            HashSet<string> promotedTickers,
+            DateTime marketNow,
+            string marketTimezone)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().PremarketSummary;
+            if (!settings.Enabled || settings.MaxItems <= 0)
+                return [];
+
+            var todayMarketDate = marketNow.Date;
+            var results = new List<CandidateDetails>();
+
+            foreach (var ctx in scannedWishListContexts.Values)
+            {
+                if (promotedTickers.Contains(ctx.Stock.Ticker))
+                    continue;
+
+                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
+                    continue;
+
+                var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+                if (firstSeenDate.HasValue && firstSeenDate.Value < todayMarketDate)
+                    continue;
+
+                var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+                var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+
+                if (entryScore < settings.MinEntryScore)
+                    continue;
+
+                if (!ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore))
+                    continue;
+
+                var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+                if (trade.ProfitPercent < settings.MinPlannedProfitPct)
+                    continue;
+
+                var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
+                var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
+                var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
+                var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
+                var finalScore = dailyScore + weeklyScore + entryScore;
+
+                var candidateItem = BuildCandidateItem(
+                    ctx.Stock,
+                    isFromWishlist: false,
+                    needsDeeperEntry,
+                    needsMomentumExit,
+                    ctx.Preset,
+                    ctx.Snapshot,
+                    ctx.Candles,
+                    trade,
+                    diagnostics,
+                    ctx.ScanTimeMarket,
+                    marketTimezone,
+                    dailyScore,
+                    weeklyScore,
+                    entryScore,
+                    finalScore);
+
+                results.Add(candidateItem);
+            }
+
+            var deduped = results
+                .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(y => y.Score.Score)
+                    .First())
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.Score)
+                .Take(settings.MaxItems)
+                .ToList();
+
+            if (deduped.Count > 0)
+                _logger.Info($"Premarket momentum summary prepared. Count={deduped.Count}");
+
+            return deduped;
         }
 
         private void AddOrReplaceWishListContext(

@@ -24,10 +24,13 @@ namespace IbSwingTrader.Infrastructure.Logging
         private readonly ICompositePropertyJsonBuilder _jsonBuilder = jsonBuilder;
         private readonly INumberTextFormatter _fmt = fmt;
 
-        public async Task WriteAsync(string filePath, List<CandidateDetails> candidates)
+        public async Task WriteAsync(string filePath, CandidateSearchResult result)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-            ArgumentNullException.ThrowIfNull(candidates);
+            ArgumentNullException.ThrowIfNull(result);
+
+            var candidates = result.Candidates;
+            var summaryOnlyCandidates = result.SummaryOnlyCandidates;
 
             var folder = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(folder))
@@ -46,7 +49,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             var existingDocument = await LoadDocumentAsync(filePath);
             var merged = MergeCandidates(existingDocument.Candidates, candidates);
-            var summary = BuildSummary(candidates);
+            var summary = BuildSummary(candidates, summaryOnlyCandidates);
             var json = BuildJson(summary, merged);
             await File.WriteAllTextAsync(filePath, json);
 
@@ -146,38 +149,65 @@ namespace IbSwingTrader.Infrastructure.Logging
             });
         }
 
-        private List<CandidateSummaryItem> BuildSummary(IEnumerable<CandidateDetails> candidates)
+        private List<CandidateSummaryItem> BuildSummary(
+            IEnumerable<CandidateDetails> candidates,
+            IEnumerable<CandidateDetails> summaryOnlyCandidates)
         {
-            return candidates
+            var summary = candidates
                 .OrderByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x =>
-                {
-                    var markers = BuildSummaryMarkers(x);
-                    var ticker =
-                        $"{x.Ticker} " +
-                        $"{_fmt.Price(x.TradePlan.EntryPrice)} " +
-                        $"{_fmt.Price(x.TradePlan.ExitPrice)} " +
-                        $"{_fmt.Price(x.TradePlan.StopLoss)} " +
-                        $"{_fmt.Percent(x.TradePlan.ProfitPercent)}%/" +
-                        $"{_fmt.Percent(x.TradePlan.LossPercent)}%" +
-                        $" rank={_fmt.Generic(x.Score.NextDayRank ?? 0m)}" +
-                        $"{markers}";
-
-                    return new CandidateSummaryItem
-                    {
-                        Ticker = ticker,
-                        Comment = string.Empty
-                    };
-                })
+                .Select(x => BuildSummaryItem(x, includePremarketMarker: false))
                 .ToList();
+
+            var premarketItems = summaryOnlyCandidates
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.Score)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => BuildSummaryItem(x, includePremarketMarker: true))
+                .ToList();
+
+            if (premarketItems.Count == 0)
+                return summary;
+
+            summary.Add(new CandidateSummaryItem
+            {
+                Ticker = "PREMARKET_MOMENTUM",
+                Comment = "summary-only"
+            });
+
+            summary.AddRange(premarketItems);
+            return summary;
         }
 
-        private string BuildSummaryMarkers(CandidateDetails candidate)
+        private CandidateSummaryItem BuildSummaryItem(CandidateDetails candidate, bool includePremarketMarker)
+        {
+            var markers = BuildSummaryMarkers(candidate, includePremarketMarker);
+            var ticker =
+                $"{candidate.Ticker} " +
+                $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
+                $"{_fmt.Price(candidate.TradePlan.ExitPrice)} " +
+                $"{_fmt.Price(candidate.TradePlan.StopLoss)} " +
+                $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
+                $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
+                $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
+                $"{markers}";
+
+            return new CandidateSummaryItem
+            {
+                Ticker = ticker,
+                Comment = includePremarketMarker ? "summary-only" : string.Empty
+            };
+        }
+
+        private string BuildSummaryMarkers(CandidateDetails candidate, bool includePremarketMarker)
         {
             var markers = new List<string>();
+
+            if (includePremarketMarker)
+                markers.Add("premarket-momentum");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");

@@ -31,13 +31,14 @@ namespace IbSwingTrader.App.Commands
                 Directory.CreateDirectory(wishListFolder);
 
             await _wishListWriter.WriteAsync(wishListPath, result.WishList);
-            await _candidateWriter.WriteAsync(candidatesPath, result.Candidates);
+            await _candidateWriter.WriteAsync(candidatesPath, result);
 
             _logger.Info($"Candidates saved: {candidatesPath}");
             _logger.Info(
                 $"GetCandidates completed. " +
                 $"Wish list count: {result.WishList.Count}, " +
-                $"Candidates count: {result.Candidates.Count}");
+                $"Candidates count: {result.Candidates.Count}, " +
+                $"Summary-only count: {result.SummaryOnlyCandidates.Count}");
         }
     }
 }

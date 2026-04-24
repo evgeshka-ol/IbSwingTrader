@@ -153,8 +153,8 @@
             "MinDollarVolume": 15000000,
             "MaxDistanceTo20dHigh": -5.0,
             "MaxDistanceTo52wHigh": -10.0,
-            "MaxDailyMaSignedDistancePct": 15.0,
-            "MaxWeeklyMaSignedDistancePct": 10.0,
+            "MaxDailyMaSignedDistancePct": 22.0,
+            "MaxWeeklyMaSignedDistancePct": 15.0,
             "MinWeeklyMaSignedDistancePct": -12.0,
             "MinDailyRsi14": 28.0,
             "MaxDailyRsi14": 55.0,
@@ -164,11 +164,11 @@
 
         "EntryFilter": {
             "MinDollarVolume": 15000000,
-            "MaxDistanceTo20dHigh": -1.0,
-            "MinCurrentDailyMaSignedDistancePct": -3.0,
+            "MaxDistanceTo20dHigh": 0.0,
+            "MinCurrentDailyMaSignedDistancePct": -5.0,
             "MinDailyMaDelta3": 0.10,
             "MinDailyRsiDelta3": 0.50,
-            "MinDailyRsiDelta3Strong": 1.0,
+            "MinDailyRsiDelta3Strong": 0.50,
             "MinDailyMacdDelta3": 0.01,
             "MinDailyTurnSignals": 1,
             "MinH4MaDelta3": 0.05,
@@ -374,6 +374,13 @@
             "TopOpenPercGainPresetBonus": 0.2,
             "TopOpenPercLosePresetBonus": 0.1,
             "DefaultPresetBonus": 0.0
+        },
+
+        "PremarketSummary": {
+            "Enabled": true,
+            "MaxItems": 5,
+            "MinEntryScore": 30.0,
+            "MinPlannedProfitPct": 3.0
         }
     },
 
