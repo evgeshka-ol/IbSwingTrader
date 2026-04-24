@@ -38,9 +38,21 @@ namespace IbSwingTrader.Application.WishList
                 return [];
             }
 
+            json = NormalizeLegacyJson(json);
+
             var items = JsonSerializer.Deserialize<List<WishListItem>>(json, _jsonSerializerOptions);
 
             return items ?? [];
+        }
+
+        private static string NormalizeLegacyJson(string json)
+        {
+            return json
+                .Replace("\"ScanTimeMarket\"", "\"ScanTime\"", StringComparison.Ordinal)
+                .Replace("\"FirstSeenMarketTime\"", "\"FirstSeen\"", StringComparison.Ordinal)
+                .Replace("\"LastEvaluatedMarketTime\"", "\"LastEvaluatedAt\"", StringComparison.Ordinal)
+                .Replace("\"ExpectedTargetMarketTime\"", "\"ExpectedTargetTime\"", StringComparison.Ordinal)
+                .Replace("\"LastStatusMarketTime\"", "\"LastStatusTime\"", StringComparison.Ordinal);
         }
     }
 }

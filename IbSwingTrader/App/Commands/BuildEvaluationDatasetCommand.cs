@@ -39,14 +39,14 @@ namespace IbSwingTrader.App.Commands
             evaluations = evaluations
                 .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .OrderByDescending(r => r.EvaluatedAt)
                     .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
                     .First())
                 .ToList();
-            if (settings.MinScanTimeMarket.HasValue)
+            if (settings.MinScanTime.HasValue)
             {
                 evaluations = evaluations
-                    .Where(x => x.ScanTimeMarket >= settings.MinScanTimeMarket.Value)
+                    .Where(x => x.ScanTime >= settings.MinScanTime.Value)
                     .ToList();
             }
 
@@ -57,8 +57,8 @@ namespace IbSwingTrader.App.Commands
             }
 
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
-            if (settings.MinScanTimeMarket.HasValue)
-                _logger.Info($"MinScanTimeMarket filter: {settings.MinScanTimeMarket.Value:yyyy-MM-dd HH:mm:ss}");
+            if (settings.MinScanTime.HasValue)
+                _logger.Info($"MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
             if (settings.MinAmplitudePct.HasValue)
                 _logger.Info($"MinAmplitudePct filter: {settings.MinAmplitudePct.Value:0.##}");
 
@@ -93,7 +93,7 @@ namespace IbSwingTrader.App.Commands
                 .Select(x => x
                     .OrderByDescending(r => r.AmplitudePct)
                     .ThenByDescending(r => r.PositivePotentialPct)
-                    .ThenByDescending(r => r.EvaluatedAtMarketTime)
+                    .ThenByDescending(r => r.EvaluatedAt)
                     .First())];
 
             if (settings.MinAmplitudePct.HasValue)
@@ -173,23 +173,24 @@ namespace IbSwingTrader.App.Commands
                 minPct,
                 minTime));
 
-            var daysToMaxUpFromScan = DiffDays(evaluation.ScanTimeMarket, maxTime);
+            var daysToMaxUpFromScan = DiffDays(evaluation.ScanTime, maxTime);
             var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, maxTime);
-            var daysToMaxDownFromScan = DiffDays(evaluation.ScanTimeMarket, minTime);
+            var daysToMaxDownFromScan = DiffDays(evaluation.ScanTime, minTime);
             var daysToMaxDownFromEntry = DiffDays(evaluation.EntryTime, minTime);
 
             return new EvaluationDatasetRow
             {
                 Ticker = evaluation.Ticker,
-                ScanTimeMarket = evaluation.ScanTimeMarket,
+                ScanTime = evaluation.ScanTime,
+                EntryTime = evaluation.EntryTime,
+                ExitTime = evaluation.ExitTime,
                 PresetScanCode = evaluation.PresetScanCode,
                 IsFromWishlist = isFromWishlist,
                 Outcome = evaluation.Outcome ?? string.Empty,
                 StrategyVersion = evaluation.StrategyVersion,
-                EvaluatedAtMarketTime = evaluation.EvaluatedAtMarketTime,
+                EvaluatedAt = evaluation.EvaluatedAt,
                 IsStaleOpen = evaluation.IsStaleOpen,
                 OpenAgeDays = evaluation.OpenAgeDays,
-                EntryTime = evaluation.EntryTime,
                 DaysAfterEntry = evaluation.DaysAfterEntry,
                 EntryPrice = evaluation.EntryPrice,
                 ExitPrice = evaluation.ExitPrice,
@@ -262,12 +263,12 @@ namespace IbSwingTrader.App.Commands
                 return null;
             }
 
-            var evaluationEnd = evaluation.EvaluationEndTime ?? evaluation.EvaluatedAtMarketTime;
-            if (evaluationEnd <= evaluation.ScanTimeMarket)
+            var evaluationEnd = evaluation.EvaluationEndTime ?? evaluation.EvaluatedAt;
+            if (evaluationEnd <= evaluation.ScanTime)
                 return null;
 
             var ordered = cached
-                .Where(x => x.Time >= evaluation.ScanTimeMarket && x.Time <= evaluationEnd)
+                .Where(x => x.Time >= evaluation.ScanTime && x.Time <= evaluationEnd)
                 .OrderBy(x => x.Time)
                 .ToList();
 
@@ -374,17 +375,17 @@ namespace IbSwingTrader.App.Commands
 
         private static string BuildEvaluationKey(CandidateEvaluationResult row)
         {
-            return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
+            return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}";
         }
 
         private static string BuildCandidateKey(CandidateDetails row)
         {
-            return $"{row.Ticker}|{row.Scan.PresetScanCode}|{row.Scan.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
+            return $"{row.Ticker}|{row.Scan.PresetScanCode}|{row.Scan.ScanTime:yyyy-MM-dd HH:mm:ss}";
         }
 
         private static string BuildDatasetKey(EvaluationDatasetRow row)
         {
-            return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}";
+            return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}";
         }
 
         private static int? DiffDays(DateTime from, DateTime? to)
@@ -455,7 +456,7 @@ namespace IbSwingTrader.App.Commands
             var comparison = sortColumn.Column switch
             {
                 nameof(EvaluationDatasetRow.GroupLabel) => CompareString(left.GroupLabel, right.GroupLabel, orderedValues),
-                nameof(EvaluationDatasetRow.ScanTimeMarket) => left.ScanTimeMarket.Date.CompareTo(right.ScanTimeMarket.Date),
+                nameof(EvaluationDatasetRow.ScanTime) => left.ScanTime.Date.CompareTo(right.ScanTime.Date),
                 nameof(EvaluationDatasetRow.AmplitudePct) => left.AmplitudePct.CompareTo(right.AmplitudePct),
                 nameof(EvaluationDatasetRow.Outcome) => CompareString(left.Outcome, right.Outcome, orderedValues),
                 nameof(EvaluationDatasetRow.ExtremumOrder) => CompareString(left.ExtremumOrder, right.ExtremumOrder, orderedValues),

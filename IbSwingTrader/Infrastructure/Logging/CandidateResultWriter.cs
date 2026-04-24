@@ -37,11 +37,11 @@ namespace IbSwingTrader.Infrastructure.Logging
                 Directory.CreateDirectory(folder);
 
             var marketSettings = _marketSettingsProvider.Get();
-            var scanTimeMarket = GetMarketNow(marketSettings.Timezone);
+            var scanTime = GetMarketNow(marketSettings.Timezone);
 
             foreach (var candidate in candidates)
             {
-                candidate.Scan.ScanTimeMarket = scanTimeMarket;
+                candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
 
                 WriteCandidateToConsole(candidate);
@@ -49,7 +49,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             foreach (var candidate in sameDayCandidates)
             {
-                candidate.Scan.ScanTimeMarket = scanTimeMarket;
+                candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
             }
 
@@ -76,7 +76,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 UpsertCandidate(map, item, preferIncomingOnSameScan: false);
 
             return map.Values
-                .OrderByDescending(x => x.Scan.ScanTimeMarket)
+                .OrderByDescending(x => x.Scan.ScanTime)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
@@ -95,8 +95,8 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             var keepIncoming =
-                candidate.Scan.ScanTimeMarket < existing.Scan.ScanTimeMarket ||
-                (candidate.Scan.ScanTimeMarket == existing.Scan.ScanTimeMarket &&
+                candidate.Scan.ScanTime < existing.Scan.ScanTime ||
+                (candidate.Scan.ScanTime == existing.Scan.ScanTime &&
                  preferIncomingOnSameScan &&
                  candidate.Score.Score >= existing.Score.Score);
 
@@ -120,17 +120,31 @@ namespace IbSwingTrader.Infrastructure.Logging
             if (string.IsNullOrWhiteSpace(json))
                 return new CandidateFileDocument();
 
+            json = NormalizeLegacyJson(json);
+
             var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
 
             if (firstNonWhitespace == '[')
             {
                 return new CandidateFileDocument
                 {
-                    Candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(filePath) ?? []
+                    Candidates = JsonSerializer.Deserialize<List<CandidateDetails>>(json) ?? []
                 };
             }
 
-            return await _jsonFileService.ReadAsync<CandidateFileDocument>(filePath) ?? new CandidateFileDocument();
+            return JsonSerializer.Deserialize<CandidateFileDocument>(json) ?? new CandidateFileDocument();
+        }
+
+        private static string NormalizeLegacyJson(string json)
+        {
+            return json
+                .Replace("\"ScanTimeMarket\"", "\"ScanTime\"", StringComparison.Ordinal)
+                .Replace("\"FirstSeenMarketTime\"", "\"FirstSeen\"", StringComparison.Ordinal)
+                .Replace("\"LastEvaluatedMarketTime\"", "\"LastEvaluatedAt\"", StringComparison.Ordinal)
+                .Replace("\"ExpectedTargetMarketTime\"", "\"ExpectedTargetTime\"", StringComparison.Ordinal)
+                .Replace("\"LastStatusMarketTime\"", "\"LastStatusTime\"", StringComparison.Ordinal)
+                .Replace("\"EvaluatedAtMarketTime\"", "\"EvaluatedAt\"", StringComparison.Ordinal)
+                .Replace("\"ScanTimeNy\"", "\"ScanTime\"", StringComparison.Ordinal);
         }
 
         private string BuildJson(

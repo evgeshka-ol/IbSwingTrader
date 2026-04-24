@@ -8,11 +8,11 @@ namespace IbSwingTrader.Domain.WishList
 
         public required MarketContextInfo Context { get; set; }
 
-        public DateTime? FirstSeenMarketTime { get; set; }
+        public DateTime? FirstSeen { get; set; }
 
-        public DateTime? LastEvaluatedMarketTime { get; set; }
+        public DateTime? LastEvaluatedAt { get; set; }
 
-        public DateTime? ExpectedTargetMarketTime { get; set; }
+        public DateTime? ExpectedTargetTime { get; set; }
 
         public int? ExpectedBarsToTarget { get; set; }
 
@@ -20,6 +20,6 @@ namespace IbSwingTrader.Domain.WishList
 
         public string? LastStatusReason { get; set; }
 
-        public DateTime? LastStatusMarketTime { get; set; }
+        public DateTime? LastStatusTime { get; set; }
     }
 }

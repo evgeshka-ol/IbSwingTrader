@@ -3,8 +3,8 @@ namespace IbSwingTrader.Domain.Candidates
     public class CandidateEvaluationResult
     {
         public required string Ticker { get; set; }
-        public DateTime ScanTimeMarket { get; set; }
-        public DateTime EvaluatedAtMarketTime { get; set; }
+        public DateTime ScanTime { get; set; }
+        public DateTime EvaluatedAt { get; set; }
 
         public required string PresetScanCode { get; set; }
         public bool IsFromWishlist { get; set; }

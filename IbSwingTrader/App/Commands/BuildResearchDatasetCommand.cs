@@ -81,8 +81,8 @@ namespace IbSwingTrader.App.Commands
                 .GroupBy(BuildResearchRowKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.Last())
                 .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.ReferenceTimeMarket)
-                .ThenByDescending(x => x.PeakTimeMarket)
+                .ThenByDescending(x => x.ReferenceTime)
+                .ThenByDescending(x => x.PeakTime)
                 .ToList();
 
             _csvWriter.Write(outputPath, allRows);
@@ -158,7 +158,7 @@ namespace IbSwingTrader.App.Commands
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{row.Ticker}|{row.Mode}|{row.Source}|{row.ReferenceType}|{row.ReferenceTimeMarket:yyyy-MM-dd HH:mm:ss}|{row.PeakTimeMarket:yyyy-MM-dd HH:mm:ss}");
+                $"{row.Ticker}|{row.Mode}|{row.Source}|{row.ReferenceType}|{row.ReferenceTime:yyyy-MM-dd HH:mm:ss}|{row.PeakTime:yyyy-MM-dd HH:mm:ss}");
         }
 
         private static async Task<List<ResearchDatasetRow>> ReadExistingRowsAsync(string path)
@@ -564,9 +564,9 @@ namespace IbSwingTrader.App.Commands
                 Mode = settings.Mode,
                 Source = settings.Source,
                 ReferenceType = "OracleBottom",
-                ReferenceTimeMarket = candles[episode.ReferenceIndex].Time,
+                ReferenceTime = candles[episode.ReferenceIndex].Time,
                 ReferencePrice = referencePrice,
-                PeakTimeMarket = candles[episode.PeakIndex].Time,
+                PeakTime = candles[episode.PeakIndex].Time,
                 PeakPrice = episode.PeakHigh,
                 RunupPct = episode.RunupPct,
                 BarsToPeak = episode.PeakIndex - episode.ReferenceIndex,

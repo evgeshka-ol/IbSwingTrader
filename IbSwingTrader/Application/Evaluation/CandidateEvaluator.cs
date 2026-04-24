@@ -44,12 +44,12 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateDetails candidate)
         {
             var result = CreateBaseResult(candidate);
-            result.EvaluatedAtMarketTime = MarketTime.Now();
+            result.EvaluatedAt = MarketTime.Now();
 
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
 
-            var start = candidate.Scan.ScanTimeMarket;
-            var requestedEnd = candidate.Scan.ScanTimeMarket.Add(MaxEvaluationWindow);
+            var start = candidate.Scan.ScanTime;
+            var requestedEnd = candidate.Scan.ScanTime.Add(MaxEvaluationWindow);
             var availableNow = MarketTime.Now() - FreshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
@@ -76,7 +76,7 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             var ordered = candles
-                .Where(x => x.Time >= candidate.Scan.ScanTimeMarket && x.Time <= end)
+                .Where(x => x.Time >= candidate.Scan.ScanTime && x.Time <= end)
                 .OrderBy(x => x.Time)
                 .ToList();
 
@@ -264,8 +264,8 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeMarket = candidate.Scan.ScanTimeMarket,
-                EvaluatedAtMarketTime = MarketTime.Now(),
+                ScanTime = candidate.Scan.ScanTime,
+                EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 IsFromWishlist = candidate.IsFromWishlist,
                 StrategyVersion = 6,
@@ -283,8 +283,8 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
-                ScanTimeMarket = candidate.Scan.ScanTimeMarket,
-                EvaluatedAtMarketTime = MarketTime.Now(),
+                ScanTime = candidate.Scan.ScanTime,
+                EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 IsFromWishlist = candidate.IsFromWishlist,
                 StrategyVersion = 6,
@@ -551,7 +551,7 @@ namespace IbSwingTrader.Application.Evaluation
 
             _logger.Info(
                 $"NoEntry diagnostics for {candidate.Ticker}: " +
-                $"Entry={entryPrice}, ScanTime={candidate.Scan.ScanTimeMarket:yyyy-MM-dd HH:mm:ss}, " +
+                $"Entry={entryPrice}, ScanTime={candidate.Scan.ScanTime:yyyy-MM-dd HH:mm:ss}, " +
                 $"Candles={ordered.Count}, MinLowAfterScan={minLow}, MaxHighAfterScan={maxHigh}");
 
             for (var i = from; i <= to; i++)

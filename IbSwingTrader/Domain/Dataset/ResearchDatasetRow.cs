@@ -8,11 +8,11 @@ namespace IbSwingTrader.Domain.Dataset
 
         public required string ReferenceType { get; set; }
 
-        public DateTime ReferenceTimeMarket { get; set; }
+        public DateTime ReferenceTime { get; set; }
 
         public decimal ReferencePrice { get; set; }
 
-        public DateTime PeakTimeMarket { get; set; }
+        public DateTime PeakTime { get; set; }
 
         public decimal PeakPrice { get; set; }
 

@@ -33,12 +33,12 @@ namespace IbSwingTrader.Application.Evaluation
                 .Concat(newRecords)
                 .GroupBy(BuildKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .OrderByDescending(r => r.EvaluatedAt)
                     .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
                     .First())
                 .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.ScanTimeMarket)
-                .ThenByDescending(x => x.EvaluatedAtMarketTime)
+                .ThenByDescending(x => x.ScanTime)
+                .ThenByDescending(x => x.EvaluatedAt)
                 .ToList();
 
             var properties = typeof(CandidateEvaluationResult)
@@ -114,8 +114,8 @@ namespace IbSwingTrader.Application.Evaluation
                 if (string.IsNullOrWhiteSpace(record.Ticker) || string.IsNullOrWhiteSpace(record.PresetScanCode))
                     continue;
 
-                if (record.EvaluatedAtMarketTime == default)
-                    record.EvaluatedAtMarketTime = record.EvaluationEndTime ?? record.ScanTimeMarket;
+                if (record.EvaluatedAt == default)
+                    record.EvaluatedAt = record.EvaluationEndTime ?? record.ScanTime;
 
                 if (record.StrategyVersion <= 0)
                     record.StrategyVersion = InferStrategyVersion(record);
@@ -129,10 +129,22 @@ namespace IbSwingTrader.Application.Evaluation
 
         private static void MapLegacyHeaders(Dictionary<string, int> headerIndex)
         {
-            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.ScanTimeMarket)) &&
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.ScanTime)) &&
                 headerIndex.TryGetValue("ScanTimeNy", out var scanTimeNyIndex))
             {
-                headerIndex[nameof(CandidateEvaluationResult.ScanTimeMarket)] = scanTimeNyIndex;
+                headerIndex[nameof(CandidateEvaluationResult.ScanTime)] = scanTimeNyIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.ScanTime)) &&
+                headerIndex.TryGetValue("ScanTimeMarket", out var scanTimeMarketIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.ScanTime)] = scanTimeMarketIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.EvaluatedAt)) &&
+                headerIndex.TryGetValue("EvaluatedAtMarketTime", out var evaluatedAtMarketIndex))
+            {
+                headerIndex[nameof(CandidateEvaluationResult.EvaluatedAt)] = evaluatedAtMarketIndex;
             }
 
             if (!headerIndex.ContainsKey(nameof(CandidateEvaluationResult.MaxPct)) &&
@@ -343,13 +355,13 @@ namespace IbSwingTrader.Application.Evaluation
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTimeMarket:O}");
+                $"{record.Ticker}|{record.PresetScanCode}|{record.ScanTime:O}");
         }
 
         private static int InferStrategyVersion(CandidateEvaluationResult record)
         {
             if (string.Equals(record.Ticker, "SGML", StringComparison.OrdinalIgnoreCase) &&
-                record.ScanTimeMarket.Date == new DateTime(2026, 3, 28))
+                record.ScanTime.Date == new DateTime(2026, 3, 28))
             {
                 return 2;
             }

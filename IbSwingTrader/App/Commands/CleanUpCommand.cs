@@ -65,7 +65,7 @@ namespace IbSwingTrader.App.Commands
                 return 0;
 
             var filtered = candidates
-                .Where(x => !evaluatedKeys.Contains(BuildCandidateKey(x.Ticker, x.Scan.PresetScanCode, x.Scan.ScanTimeMarket)))
+                .Where(x => !evaluatedKeys.Contains(BuildCandidateKey(x.Ticker, x.Scan.PresetScanCode, x.Scan.ScanTime)))
                 .ToList();
 
             var removed = candidates.Count - filtered.Count;
@@ -173,10 +173,10 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0)
                 return [];
 
-            var latestScanTime = candidates.Max(x => x.Scan.ScanTimeMarket);
+            var latestScanTime = candidates.Max(x => x.Scan.ScanTime);
 
             return candidates
-                .Where(x => x.Scan.ScanTimeMarket == latestScanTime)
+                .Where(x => x.Scan.ScanTime == latestScanTime)
                 .OrderByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.Score.Score)
@@ -489,19 +489,19 @@ namespace IbSwingTrader.App.Commands
                     ? "Marked for removal by wish list evaluation"
                     : $"Marked for removal: {item.LastStatusReason}";
 
-            var firstSeen = item.FirstSeenMarketTime ?? item.Scan.ScanTimeMarket;
+            var firstSeen = item.FirstSeen ?? item.Scan.ScanTime;
             var ageDays = (marketNow.Date - firstSeen.Date).TotalDays;
 
-            if (!item.ExpectedTargetMarketTime.HasValue &&
+            if (!item.ExpectedTargetTime.HasValue &&
                 settings.RemoveWishListWithoutTargetOlderThanDays > 0 &&
                 ageDays >= settings.RemoveWishListWithoutTargetOlderThanDays)
             {
                 return $"No target for {settings.RemoveWishListWithoutTargetOlderThanDays}+ days";
             }
 
-            if (item.ExpectedTargetMarketTime.HasValue &&
+            if (item.ExpectedTargetTime.HasValue &&
                 settings.RemoveWishListPastExpectedTargetGraceDays > 0 &&
-                marketNow.Date > item.ExpectedTargetMarketTime.Value.Date.AddDays(settings.RemoveWishListPastExpectedTargetGraceDays))
+                marketNow.Date > item.ExpectedTargetTime.Value.Date.AddDays(settings.RemoveWishListPastExpectedTargetGraceDays))
             {
                 return $"Past expected target by {settings.RemoveWishListPastExpectedTargetGraceDays}+ days";
             }
@@ -520,7 +520,9 @@ namespace IbSwingTrader.App.Commands
             var delimiter = DetectDelimiter(lines[0]);
             var headers = SplitCsvLine(lines[0], delimiter);
             var tickerIndex = FindHeaderIndex(headers, "Ticker");
-            var scanTimeIndex = FindHeaderIndex(headers, "ScanTimeMarket");
+            var scanTimeIndex = FindHeaderIndex(headers, "ScanTime");
+            if (scanTimeIndex < 0)
+                scanTimeIndex = FindHeaderIndex(headers, "ScanTimeMarket");
             if (scanTimeIndex < 0)
                 scanTimeIndex = FindHeaderIndex(headers, "ScanTimeNy");
             var presetIndex = FindHeaderIndex(headers, "PresetScanCode");
@@ -529,10 +531,12 @@ namespace IbSwingTrader.App.Commands
             if (tickerIndex < 0 || scanTimeIndex < 0 || presetIndex < 0 || outcomeIndex < 0)
                 return [];
 
-            var latestByCandidate = new Dictionary<string, (string Outcome, DateTime EvaluatedAtMarketTime)>(
+            var latestByCandidate = new Dictionary<string, (string Outcome, DateTime EvaluatedAt)>(
                 StringComparer.OrdinalIgnoreCase);
 
-            var evaluatedAtIndex = FindHeaderIndex(headers, "EvaluatedAtMarketTime");
+            var evaluatedAtIndex = FindHeaderIndex(headers, "EvaluatedAt");
+            if (evaluatedAtIndex < 0)
+                evaluatedAtIndex = FindHeaderIndex(headers, "EvaluatedAtMarketTime");
             if (evaluatedAtIndex < 0)
                 evaluatedAtIndex = FindHeaderIndex(headers, "EvaluationEndTime");
 
@@ -560,7 +564,7 @@ namespace IbSwingTrader.App.Commands
                 var outcome = parts[outcomeIndex].Trim();
 
                 if (!latestByCandidate.TryGetValue(candidateKey, out var existing) ||
-                    evaluatedAt > existing.EvaluatedAtMarketTime)
+                    evaluatedAt > existing.EvaluatedAt)
                 {
                     latestByCandidate[candidateKey] = (outcome, evaluatedAt);
                 }

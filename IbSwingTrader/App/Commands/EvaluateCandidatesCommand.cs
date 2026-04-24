@@ -55,9 +55,9 @@ namespace IbSwingTrader.App.Commands
             var marketToday = MarketTime.Now().Date;
             var evaluationScanDate = marketToday.AddDays(-1);
             var latestScanCandidates = candidates
-                .Where(x => x.Scan.ScanTimeMarket.Date == evaluationScanDate)
+                .Where(x => x.Scan.ScanTime.Date == evaluationScanDate)
                 .ToList();
-            var currentDayCandidates = candidates.Count(x => x.Scan.ScanTimeMarket.Date >= marketToday);
+            var currentDayCandidates = candidates.Count(x => x.Scan.ScanTime.Date >= marketToday);
             var olderCandidates = candidates.Count - latestScanCandidates.Count - currentDayCandidates;
 
             _logger.Info(
@@ -75,7 +75,7 @@ namespace IbSwingTrader.App.Commands
                 .ToDictionary(
                     x => x.Key,
                     x => x
-                        .OrderByDescending(y => y.EvaluatedAtMarketTime)
+                        .OrderByDescending(y => y.EvaluatedAt)
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
@@ -89,10 +89,10 @@ namespace IbSwingTrader.App.Commands
                     .Where(x =>
                         string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
                         !x.IsStaleOpen &&
-                        x.ScanTimeMarket.Date < evaluationScanDate)
+                        x.ScanTime.Date < evaluationScanDate)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x
-                        .OrderByDescending(y => y.EvaluatedAtMarketTime)
+                        .OrderByDescending(y => y.EvaluatedAt)
                         .First())
                     .Select(RebuildCandidateFromEvaluation)
                     .ToList();
@@ -189,14 +189,14 @@ namespace IbSwingTrader.App.Commands
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTimeMarket:O}");
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}");
         }
 
         private static string BuildScanKey(CandidateEvaluationResult result)
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
+                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTime:O}");
         }
 
         private static CandidateDetails RebuildCandidateFromEvaluation(CandidateEvaluationResult evaluation)
@@ -208,7 +208,7 @@ namespace IbSwingTrader.App.Commands
                 Scan = new ScanInfo
                 {
                     PresetScanCode = evaluation.PresetScanCode,
-                    ScanTimeMarket = evaluation.ScanTimeMarket
+                    ScanTime = evaluation.ScanTime
                 },
                 Score = new ScoreInfo
                 {

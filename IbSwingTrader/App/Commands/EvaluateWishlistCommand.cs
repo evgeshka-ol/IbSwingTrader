@@ -60,7 +60,7 @@ namespace IbSwingTrader.App.Commands
 
             foreach (var item in items)
             {
-                if (item.Scan.ScanTimeMarket.Date >= todayMarketDate)
+                if (item.Scan.ScanTime.Date >= todayMarketDate)
                     todayItems.Add(item);
                 else
                     oldItems.Add(item);
@@ -79,7 +79,7 @@ namespace IbSwingTrader.App.Commands
             var evaluationTime = marketNow;
 
             var evaluationMap = evaluations.ToDictionary(
-                x => BuildWishListKey(x.Ticker, x.ScanTimeMarket),
+                x => BuildWishListKey(x.Ticker, x.ScanTime),
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
@@ -95,7 +95,7 @@ namespace IbSwingTrader.App.Commands
 
             var updatedItems = todayItems
                 .Concat(updatedOldItems)
-                .OrderByDescending(x => x.Scan.ScanTimeMarket)
+                .OrderByDescending(x => x.Scan.ScanTime)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -159,13 +159,13 @@ namespace IbSwingTrader.App.Commands
             Dictionary<string, WishListEvaluationResult> evaluationMap,
             DateTime evaluationTime)
         {
-            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTimeMarket), out var evaluation))
+            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTime), out var evaluation))
                 return item;
 
-            item.LastEvaluatedMarketTime = evaluationTime;
+            item.LastEvaluatedAt = evaluationTime;
             item.LastStatus = evaluation.Decision;
             item.LastStatusReason = evaluation.Reason;
-            item.LastStatusMarketTime = evaluationTime;
+            item.LastStatusTime = evaluationTime;
 
             return item;
         }
@@ -175,18 +175,18 @@ namespace IbSwingTrader.App.Commands
             Dictionary<string, WishListEvaluationResult> evaluationMap,
             DateTime evaluationTime)
         {
-            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTimeMarket), out var evaluation))
+            if (!evaluationMap.TryGetValue(BuildWishListKey(item.Ticker, item.Scan.ScanTime), out var evaluation))
                 return null;
 
             return new WishListEvaluationRecord
             {
                 Ticker = item.Ticker,
-                ScanTimeMarket = item.Scan.ScanTimeMarket,
-                FirstSeenMarketTime = item.FirstSeenMarketTime,
-                PreviousLastEvaluatedMarketTime = item.LastEvaluatedMarketTime,
+                ScanTime = item.Scan.ScanTime,
+                FirstSeen = item.FirstSeen,
+                PreviousLastEvaluatedAt = item.LastEvaluatedAt,
                 PreviousDecision = item.LastStatus,
                 PreviousReason = item.LastStatusReason,
-                EvaluatedAtMarketTime = evaluationTime,
+                EvaluatedAt = evaluationTime,
                 Decision = evaluation.Decision,
                 Reason = evaluation.Reason,
                 RemoveSuggested = evaluation.RemoveFromWishList

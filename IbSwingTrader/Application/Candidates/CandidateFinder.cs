@@ -244,11 +244,11 @@ namespace IbSwingTrader.Application.Candidates
             var agedWishListItems = mergedWishList
                 .Where(x =>
                 {
-                    var firstSeenDate = x.FirstSeenMarketTime?.Date;
+                    var firstSeenDate = x.FirstSeen?.Date;
                     return firstSeenDate != null && firstSeenDate.Value < todayMarketDate;
                 })
                 .OrderByDescending(x => x.Score.Score)
-                .ThenByDescending(x => x.LastEvaluatedMarketTime ?? DateTime.MinValue)
+                .ThenByDescending(x => x.LastEvaluatedAt ?? DateTime.MinValue)
                 .ToList();
 
             if (getCandidatesSettings.MaxWishListItems > 0 &&
@@ -303,7 +303,7 @@ namespace IbSwingTrader.Application.Candidates
                     if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
                         continue;
 
-                    var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+                    var firstSeenDate = mergedWishItem.FirstSeen?.Date;
 
                     if (firstSeenDate != null && firstSeenDate.Value < todayMarketDate)
                         continue;
@@ -374,7 +374,7 @@ namespace IbSwingTrader.Application.Candidates
                 if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
                     continue;
 
-                var firstSeenDate = mergedWishItem.FirstSeenMarketTime?.Date;
+                var firstSeenDate = mergedWishItem.FirstSeen?.Date;
                 if (firstSeenDate.HasValue && firstSeenDate.Value < todayMarketDate)
                     continue;
 
@@ -865,7 +865,7 @@ namespace IbSwingTrader.Application.Candidates
             _logger.Info(
                 $"WishList item build completed: {stock.Ticker}. " +
                 $"ExpectedBarsToTarget={targetForecast.ExpectedBarsToTarget?.ToString() ?? "null"}, " +
-                $"ExpectedTargetMarketTime={targetForecast.ExpectedTargetMarketTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
+                $"ExpectedTargetTime={targetForecast.ExpectedTargetMarketTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
 
             return new WishListItem
             {
@@ -874,7 +874,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
-                    ScanTimeMarket = scanTimeMarket,
+                    ScanTime = scanTimeMarket,
                     ScanTimeZone = scanTimeZone
                 },
                 Score = new ScoreInfo
@@ -891,9 +891,9 @@ namespace IbSwingTrader.Application.Candidates
                     DailyRSI14 = snapshot.Current.DailyRSI14,
                     Notes = BuildWishListNotes(snapshot)
                 },
-                FirstSeenMarketTime = scanTimeMarket,
-                LastEvaluatedMarketTime = scanTimeMarket,
-                ExpectedTargetMarketTime = targetForecast.ExpectedTargetMarketTime,
+                FirstSeen = scanTimeMarket,
+                LastEvaluatedAt = scanTimeMarket,
+                ExpectedTargetTime = targetForecast.ExpectedTargetMarketTime,
                 ExpectedBarsToTarget = targetForecast.ExpectedBarsToTarget
             };
         }

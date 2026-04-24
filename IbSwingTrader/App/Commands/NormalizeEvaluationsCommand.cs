@@ -31,7 +31,7 @@ namespace IbSwingTrader.App.Commands
             records = records
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .OrderByDescending(r => r.EvaluatedAt)
                     .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
                     .First())
                 .ToList();
@@ -65,7 +65,7 @@ namespace IbSwingTrader.App.Commands
             archivedRecords = archivedRecords
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.EvaluatedAtMarketTime)
+                    .OrderByDescending(r => r.EvaluatedAt)
                     .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
                     .First())
                 .ToList();
@@ -113,11 +113,11 @@ namespace IbSwingTrader.App.Commands
 
             var evaluationEnd = record.EvaluationEndTime != null
                 ? record.EvaluationEndTime.Value
-                : (record.EvaluatedAtMarketTime != default
-                    ? record.EvaluatedAtMarketTime
-                    : record.ScanTimeMarket);
+                : (record.EvaluatedAt != default
+                    ? record.EvaluatedAt
+                    : record.ScanTime);
 
-            if (evaluationEnd <= record.ScanTimeMarket)
+            if (evaluationEnd <= record.ScanTime)
                 return;
 
             var contract = await _contractResolver.ResolveStockAsync(record.Ticker);
@@ -125,14 +125,14 @@ namespace IbSwingTrader.App.Commands
                 record.Ticker,
                 contract,
                 Timeframe.M5,
-                record.ScanTimeMarket,
+                record.ScanTime,
                 evaluationEnd);
 
             if (candles == null || candles.Count == 0)
                 return;
 
             var ordered = candles
-                .Where(x => x.Time >= record.ScanTimeMarket && x.Time <= evaluationEnd)
+                .Where(x => x.Time >= record.ScanTime && x.Time <= evaluationEnd)
                 .OrderBy(x => x.Time)
                 .ToList();
 
@@ -256,11 +256,11 @@ namespace IbSwingTrader.App.Commands
             if (!string.Equals(record.Outcome, "Open", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            var evaluationEnd = record.EvaluationEndTime ?? record.EvaluatedAtMarketTime;
-            if (evaluationEnd <= record.ScanTimeMarket)
+            var evaluationEnd = record.EvaluationEndTime ?? record.EvaluatedAt;
+            if (evaluationEnd <= record.ScanTime)
                 return;
 
-            var openAgeDays = (evaluationEnd.Date - record.ScanTimeMarket.Date).Days;
+            var openAgeDays = (evaluationEnd.Date - record.ScanTime.Date).Days;
             record.OpenAgeDays = openAgeDays;
             record.IsStaleOpen = openAgeDays >= settings.ForwardEvaluationDays;
         }
@@ -332,7 +332,7 @@ namespace IbSwingTrader.App.Commands
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTimeMarket:O}");
+                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTime:O}");
         }
 
         private static void ApplyUnambiguousOutcomeCorrection(CandidateEvaluationResult record)

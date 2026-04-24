@@ -84,11 +84,11 @@
     },
 
     "BuildEvaluationDataset": {
-        "MinScanTimeMarket": "2026-04-01",
+        "MinScanTime": "2026-04-01",
         "MinAmplitudePct": 0.0,
         "SortColumns": [
             {
-                "Column": "ScanTimeMarket",
+                "Column": "ScanTime",
                 "Descending": true
             },
             {

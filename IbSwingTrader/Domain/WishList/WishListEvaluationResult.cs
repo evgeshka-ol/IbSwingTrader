@@ -4,7 +4,7 @@ namespace IbSwingTrader.Domain.WishList
     {
         public required string Ticker { get; set; }
 
-        public DateTime ScanTimeMarket { get; set; }
+        public DateTime ScanTime { get; set; }
 
         public bool RemoveFromWishList { get; set; }
 

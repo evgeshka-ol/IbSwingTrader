@@ -4,17 +4,17 @@ namespace IbSwingTrader.Domain.WishList
     {
         public required string Ticker { get; set; }
 
-        public DateTime ScanTimeMarket { get; set; }
+        public DateTime ScanTime { get; set; }
 
-        public DateTime? FirstSeenMarketTime { get; set; }
+        public DateTime? FirstSeen { get; set; }
 
-        public DateTime? PreviousLastEvaluatedMarketTime { get; set; }
+        public DateTime? PreviousLastEvaluatedAt { get; set; }
 
         public string? PreviousDecision { get; set; }
 
         public string? PreviousReason { get; set; }
 
-        public DateTime EvaluatedAtMarketTime { get; set; }
+        public DateTime EvaluatedAt { get; set; }
 
         public string Decision { get; set; } = string.Empty;
 

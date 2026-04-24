@@ -2,7 +2,11 @@ namespace IbSwingTrader.Domain.Dataset
 {
     public class EvaluationDatasetRow : TickerEntity
     {
-        public DateTime ScanTimeMarket { get; set; }
+        public DateTime ScanTime { get; set; }
+
+        public DateTime? EntryTime { get; set; }
+
+        public DateTime? ExitTime { get; set; }
 
         public string Outcome { get; set; } = string.Empty;
 
@@ -54,11 +58,9 @@ namespace IbSwingTrader.Domain.Dataset
 
         public int StrategyVersion { get; set; }
 
-        public DateTime EvaluatedAtMarketTime { get; set; }
+        public DateTime EvaluatedAt { get; set; }
         public bool IsStaleOpen { get; set; }
         public int? OpenAgeDays { get; set; }
-
-        public DateTime? EntryTime { get; set; }
 
         public decimal EntryDistanceToMinAfterScanPct { get; set; }
 

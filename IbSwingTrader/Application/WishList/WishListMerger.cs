@@ -20,39 +20,39 @@ namespace IbSwingTrader.Application.WishList
                 if (result.TryGetValue(newItem.Ticker, out var existing))
                 {
                     var restoredFirstSeen =
-                        existing.FirstSeenMarketTime
-                        ?? existing.Scan?.ScanTimeMarket
-                        ?? newItem.Scan?.ScanTimeMarket;
+                        existing.FirstSeen
+                        ?? existing.Scan?.ScanTime
+                        ?? newItem.Scan?.ScanTime;
 
                     var currentRunMarketTime =
-                        newItem.LastEvaluatedMarketTime
-                        ?? newItem.Scan?.ScanTimeMarket;
+                        newItem.LastEvaluatedAt
+                        ?? newItem.Scan?.ScanTime;
 
                     existing.Scan = newItem.Scan!;
                     existing.Score = newItem.Score!;
                     existing.Context = newItem.Context!;
 
-                    existing.FirstSeenMarketTime = restoredFirstSeen;
-                    existing.LastEvaluatedMarketTime =
+                    existing.FirstSeen = restoredFirstSeen;
+                    existing.LastEvaluatedAt =
                         currentRunMarketTime
-                        ?? existing.LastEvaluatedMarketTime
-                        ?? existing.Scan?.ScanTimeMarket;
+                        ?? existing.LastEvaluatedAt
+                        ?? existing.Scan?.ScanTime;
 
                     existing.ExpectedBarsToTarget =
                         newItem.ExpectedBarsToTarget
                         ?? existing.ExpectedBarsToTarget;
 
-                    existing.ExpectedTargetMarketTime =
-                        newItem.ExpectedTargetMarketTime
-                        ?? existing.ExpectedTargetMarketTime;
+                    existing.ExpectedTargetTime =
+                        newItem.ExpectedTargetTime
+                        ?? existing.ExpectedTargetTime;
                 }
                 else
                 {
-                    newItem.FirstSeenMarketTime ??=
-                        newItem.Scan?.ScanTimeMarket;
+                    newItem.FirstSeen ??=
+                        newItem.Scan?.ScanTime;
 
-                    newItem.LastEvaluatedMarketTime ??=
-                        newItem.Scan?.ScanTimeMarket;
+                    newItem.LastEvaluatedAt ??=
+                        newItem.Scan?.ScanTime;
 
                     result[newItem.Ticker] = newItem;
                 }
@@ -68,11 +68,11 @@ namespace IbSwingTrader.Application.WishList
 
         private static WishListItem NormalizeExistingItem(WishListItem item)
         {
-            item.FirstSeenMarketTime ??=
-                item.Scan?.ScanTimeMarket;
+            item.FirstSeen ??=
+                item.Scan?.ScanTime;
 
-            item.LastEvaluatedMarketTime ??=
-                item.Scan?.ScanTimeMarket;
+            item.LastEvaluatedAt ??=
+                item.Scan?.ScanTime;
 
             return item;
         }

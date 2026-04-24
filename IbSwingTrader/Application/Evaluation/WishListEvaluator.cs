@@ -42,7 +42,7 @@ namespace IbSwingTrader.Application.Evaluation
                     results.Add(new WishListEvaluationResult
                     {
                         Ticker = item.Ticker,
-                        ScanTimeMarket = item.Scan.ScanTimeMarket,
+                        ScanTime = item.Scan.ScanTime,
                         RemoveFromWishList = false,
                         Decision = "Keep",
                         Reason = $"CandidateEvaluation error: {ex.Message}"
@@ -89,7 +89,7 @@ namespace IbSwingTrader.Application.Evaluation
                 _ => 0m
             };
 
-            var ageDays = (MarketTime.Now().Date - item.Scan.ScanTimeMarket.Date).TotalDays;
+            var ageDays = (MarketTime.Now().Date - item.Scan.ScanTime.Date).TotalDays;
 
             var dropFromReferencePct = 0m;
             if (TryEstimateReferencePrice(item, out var referencePrice) && referencePrice > 0m)
@@ -144,7 +144,7 @@ namespace IbSwingTrader.Application.Evaluation
         {
             price = 0m;
 
-            if (item.ExpectedTargetMarketTime.HasValue)
+            if (item.ExpectedTargetTime.HasValue)
                 return false;
 
             return false;
@@ -163,7 +163,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeMarket = item.Scan.ScanTimeMarket,
+                ScanTime = item.Scan.ScanTime,
                 RemoveFromWishList = false,
                 Decision = "Keep",
                 Reason = reason
@@ -175,7 +175,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeMarket = item.Scan.ScanTimeMarket,
+                ScanTime = item.Scan.ScanTime,
                 RemoveFromWishList = false,
                 Decision = "Deferred",
                 Reason = reason
@@ -187,7 +187,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new WishListEvaluationResult
             {
                 Ticker = item.Ticker,
-                ScanTimeMarket = item.Scan.ScanTimeMarket,
+                ScanTime = item.Scan.ScanTime,
                 RemoveFromWishList = true,
                 Decision = "Remove",
                 Reason = reason

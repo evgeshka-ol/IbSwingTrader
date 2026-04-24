@@ -21,7 +21,7 @@ namespace IbSwingTrader.Application.Evaluation
             var merged = existingRecords
                 .Concat(newRecords)
                 .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.EvaluatedAtMarketTime)
+                .ThenByDescending(x => x.EvaluatedAt)
                 .ToList();
 
             var properties = typeof(WishListEvaluationRecord)
@@ -59,6 +59,8 @@ namespace IbSwingTrader.Application.Evaluation
             var headerIndex = headers
                 .Select((name, index) => new { name, index })
                 .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+            MapLegacyHeaders(headerIndex);
 
             var properties = typeof(WishListEvaluationRecord)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
@@ -98,6 +100,33 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             return records;
+        }
+
+        private static void MapLegacyHeaders(Dictionary<string, int> headerIndex)
+        {
+            if (!headerIndex.ContainsKey(nameof(WishListEvaluationRecord.ScanTime)) &&
+                headerIndex.TryGetValue("ScanTimeMarket", out var scanTimeMarketIndex))
+            {
+                headerIndex[nameof(WishListEvaluationRecord.ScanTime)] = scanTimeMarketIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(WishListEvaluationRecord.FirstSeen)) &&
+                headerIndex.TryGetValue("FirstSeenMarketTime", out var firstSeenMarketIndex))
+            {
+                headerIndex[nameof(WishListEvaluationRecord.FirstSeen)] = firstSeenMarketIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(WishListEvaluationRecord.PreviousLastEvaluatedAt)) &&
+                headerIndex.TryGetValue("PreviousLastEvaluatedMarketTime", out var previousLastEvaluatedMarketIndex))
+            {
+                headerIndex[nameof(WishListEvaluationRecord.PreviousLastEvaluatedAt)] = previousLastEvaluatedMarketIndex;
+            }
+
+            if (!headerIndex.ContainsKey(nameof(WishListEvaluationRecord.EvaluatedAt)) &&
+                headerIndex.TryGetValue("EvaluatedAtMarketTime", out var evaluatedAtMarketIndex))
+            {
+                headerIndex[nameof(WishListEvaluationRecord.EvaluatedAt)] = evaluatedAtMarketIndex;
+            }
         }
 
         private static object? ParseValue(Type type, string raw)
