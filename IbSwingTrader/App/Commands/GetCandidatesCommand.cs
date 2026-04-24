@@ -38,7 +38,7 @@ namespace IbSwingTrader.App.Commands
                 $"GetCandidates completed. " +
                 $"Wish list count: {result.WishList.Count}, " +
                 $"Candidates count: {result.Candidates.Count}, " +
-                $"Summary-only count: {result.SummaryOnlyCandidates.Count}");
+                $"Same-day count: {result.SameDayCandidates.Count}");
         }
     }
 }

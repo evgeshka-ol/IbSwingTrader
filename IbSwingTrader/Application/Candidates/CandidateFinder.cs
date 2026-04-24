@@ -322,7 +322,7 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var promotedTickers = candidateResults.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var summaryOnlyCandidates = await BuildPremarketSummaryCandidates(
+            var sameDayCandidates = await BuildPremarketSummaryCandidates(
                 mergedWishList,
                 mergedMap,
                 scannedWishListContexts,
@@ -346,7 +346,7 @@ namespace IbSwingTrader.Application.Candidates
                         .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                         .ThenByDescending(x => x.Score.Score)
                 ],
-                SummaryOnlyCandidates = summaryOnlyCandidates,
+                SameDayCandidates = sameDayCandidates,
                 WishList = finalWishList
             };
         }

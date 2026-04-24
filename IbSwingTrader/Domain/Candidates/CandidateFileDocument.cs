@@ -5,6 +5,8 @@ namespace IbSwingTrader.Domain.Candidates
         public List<CandidateSummaryItem> Summary { get; set; } = [];
 
         public List<CandidateDetails> Candidates { get; set; } = [];
+
+        public List<CandidateDetails> SameDayCandidates { get; set; } = [];
     }
 
     public class CandidateSummaryItem

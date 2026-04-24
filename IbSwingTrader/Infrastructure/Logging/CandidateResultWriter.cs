@@ -30,7 +30,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             ArgumentNullException.ThrowIfNull(result);
 
             var candidates = result.Candidates;
-            var summaryOnlyCandidates = result.SummaryOnlyCandidates;
+            var sameDayCandidates = result.SameDayCandidates;
 
             var folder = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(folder))
@@ -47,10 +47,17 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
+            foreach (var candidate in sameDayCandidates)
+            {
+                candidate.Scan.ScanTimeMarket = scanTimeMarket;
+                candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+            }
+
             var existingDocument = await LoadDocumentAsync(filePath);
             var merged = MergeCandidates(existingDocument.Candidates, candidates);
-            var summary = BuildSummary(candidates, summaryOnlyCandidates);
-            var json = BuildJson(summary, merged);
+            var mergedSameDay = MergeCandidates(existingDocument.SameDayCandidates, sameDayCandidates);
+            var summary = BuildSummary(candidates, sameDayCandidates);
+            var json = BuildJson(summary, merged, mergedSameDay);
             await File.WriteAllTextAsync(filePath, json);
 
             _logger.Info($"Candidate results saved: {filePath}");
@@ -128,11 +135,13 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private string BuildJson(
             IEnumerable<CandidateSummaryItem> summary,
-            IEnumerable<CandidateDetails> candidates)
+            IEnumerable<CandidateDetails> candidates,
+            IEnumerable<CandidateDetails> sameDayCandidates)
         {
             var root = new JsonObject();
             var summaryArray = new JsonArray();
             var candidatesArray = new JsonArray();
+            var sameDayCandidatesArray = new JsonArray();
 
             foreach (var item in summary)
                 summaryArray.Add(_jsonBuilder.BuildObject(item));
@@ -140,8 +149,12 @@ namespace IbSwingTrader.Infrastructure.Logging
             foreach (var candidate in candidates)
                 candidatesArray.Add(_jsonBuilder.BuildObject(candidate));
 
+            foreach (var candidate in sameDayCandidates)
+                sameDayCandidatesArray.Add(_jsonBuilder.BuildObject(candidate));
+
             root["Summary"] = summaryArray;
             root["Candidates"] = candidatesArray;
+            root["SameDayCandidates"] = sameDayCandidatesArray;
 
             return root.ToJsonString(new JsonSerializerOptions
             {
@@ -151,40 +164,40 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private List<CandidateSummaryItem> BuildSummary(
             IEnumerable<CandidateDetails> candidates,
-            IEnumerable<CandidateDetails> summaryOnlyCandidates)
+            IEnumerable<CandidateDetails> sameDayCandidates)
         {
             var summary = candidates
                 .OrderByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x => BuildSummaryItem(x, includePremarketMarker: false))
+                .Select(x => BuildSummaryItem(x, includeSameDayMarker: false))
                 .ToList();
 
-            var premarketItems = summaryOnlyCandidates
+            var sameDayItems = sameDayCandidates
                 .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x => BuildSummaryItem(x, includePremarketMarker: true))
+                .Select(x => BuildSummaryItem(x, includeSameDayMarker: true))
                 .ToList();
 
-            if (premarketItems.Count == 0)
+            if (sameDayItems.Count == 0)
                 return summary;
 
             summary.Add(new CandidateSummaryItem
             {
-                Ticker = "PREMARKET_MOMENTUM",
-                Comment = "summary-only"
+                Ticker = "SAME_DAY_CONTINUATION",
+                Comment = "separate-mode"
             });
 
-            summary.AddRange(premarketItems);
+            summary.AddRange(sameDayItems);
             return summary;
         }
 
-        private CandidateSummaryItem BuildSummaryItem(CandidateDetails candidate, bool includePremarketMarker)
+        private CandidateSummaryItem BuildSummaryItem(CandidateDetails candidate, bool includeSameDayMarker)
         {
-            var markers = BuildSummaryMarkers(candidate, includePremarketMarker);
+            var markers = BuildSummaryMarkers(candidate, includeSameDayMarker);
             var ticker =
                 $"{candidate.Ticker} " +
                 $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
@@ -198,16 +211,16 @@ namespace IbSwingTrader.Infrastructure.Logging
             return new CandidateSummaryItem
             {
                 Ticker = ticker,
-                Comment = includePremarketMarker ? "summary-only" : string.Empty
+                Comment = includeSameDayMarker ? "separate-mode" : string.Empty
             };
         }
 
-        private string BuildSummaryMarkers(CandidateDetails candidate, bool includePremarketMarker)
+        private string BuildSummaryMarkers(CandidateDetails candidate, bool includeSameDayMarker)
         {
             var markers = new List<string>();
 
-            if (includePremarketMarker)
-                markers.Add("premarket-momentum");
+            if (includeSameDayMarker)
+                markers.Add("same-day-continuation");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");
