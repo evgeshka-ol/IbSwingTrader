@@ -8,6 +8,8 @@ namespace IbSwingTrader.Domain.Candidates
 
         public decimal StopLoss { get; set; }
 
+        public decimal StopLimitPrice { get; set; }
+
         public decimal ProfitPercent { get; set; }
 
         public decimal LossPercent { get; set; }

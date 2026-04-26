@@ -12,7 +12,8 @@ namespace IbSwingTrader.Infrastructure.Logging
         [
             "EntryPrice",
             "ExitPrice",
-            "StopLoss"
+            "StopLoss",
+            "StopLimitPrice"
         ];
 
         private static readonly HashSet<string> PercentFields =

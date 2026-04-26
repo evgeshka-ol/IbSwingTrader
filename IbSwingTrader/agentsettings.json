@@ -176,7 +176,29 @@
             "MinH4MacdDelta3": 0.01,
             "MinH4TurnSignals": 1,
             "MinCurrentDailyRsi14": 35.0,
-            "MaxCurrentWeeklyMacdLineMinusSignal": 0.5
+            "MaxCurrentWeeklyMacdLineMinusSignal": 0.5,
+            "EarlyReversal": {
+                "Enabled": true,
+                "MaxDistanceTo20dHigh": -8.0,
+                "MinCurrentDailyMaSignedDistancePct": -15.0,
+                "MaxCurrentDailyMaSignedDistancePct": 8.0,
+                "MinCurrentDailyRsi14": 22.0,
+                "MaxCurrentDailyRsi14": 48.0,
+                "MinDailyTurnSignals": 2,
+                "MinH4TurnSignals": 2,
+                "MaxCurrentWeeklyMacdLineMinusSignal": 0.5
+            },
+            "HotContinuation": {
+                "Enabled": true,
+                "MaxDistanceTo20dHigh": 0.0,
+                "MinCurrentDailyMaSignedDistancePct": -5.0,
+                "MaxCurrentDailyMaSignedDistancePct": 25.0,
+                "MinCurrentDailyRsi14": 55.0,
+                "MaxCurrentDailyRsi14": 75.0,
+                "MinDailyTurnSignals": 1,
+                "MinH4TurnSignals": 1,
+                "MaxCurrentWeeklyMacdLineMinusSignal": 0.5
+            }
         },
 
         "CandidateFilter": {
@@ -208,6 +230,7 @@
             "StopLookbackBars": 5,
             "StopBufferMultiplier": 0.99,
             "FallbackStopMultiplier": 0.97,
+            "StopLimitOffsetPct": 0.0025,
             "MaxLossPct": 0.10,
             "CapLossToTargetProfitForFastTrades": true,
             "FastTradeProfitPctThreshold": 0.05,
@@ -387,7 +410,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 7,
-        "ReevaluateOpenCandidates": false,
+        "ReevaluateOpenCandidates": true,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
         "UseAmbiguousBarResolver": true

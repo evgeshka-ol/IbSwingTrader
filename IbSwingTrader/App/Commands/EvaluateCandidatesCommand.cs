@@ -220,6 +220,7 @@ namespace IbSwingTrader.App.Commands
                     EntryPrice = evaluation.EntryPrice,
                     ExitPrice = evaluation.ExitPrice,
                     StopLoss = evaluation.StopLoss,
+                    StopLimitPrice = evaluation.StopLoss,
                     ProfitPercent = CalcPct(evaluation.EntryPrice, evaluation.ExitPrice),
                     LossPercent = CalcPct(evaluation.EntryPrice, evaluation.StopLoss)
                 }

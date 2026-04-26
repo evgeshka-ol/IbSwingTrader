@@ -81,6 +81,10 @@ namespace IbSwingTrader.Application.Candidates
                 stop = minAllowedStop;
             }
 
+            var stopLimit = stop * (1m - Math.Max(settings.StopLimitOffsetPct, 0m));
+            if (stopLimit <= 0m || stopLimit >= stop)
+                stopLimit = stop * 0.999m;
+
             var risk = entry - stop;
             var rawExit = entry + risk * settings.RiskRewardRatio;
             var cappedExit = entry * (1m + targetProfitPct);
@@ -102,13 +106,14 @@ namespace IbSwingTrader.Application.Candidates
 
             _logger.Info(
                 $"Trade plan built. " +
-                $"Entry={_fmt.Price(entry)}, Stop={_fmt.Price(stop)}, Exit={_fmt.Price(exit)}, Risk={_fmt.Price(risk)}, RawExit={_fmt.Price(rawExit)}, " +
+                $"Entry={_fmt.Price(entry)}, Stop={_fmt.Price(stop)}, StopLimit={_fmt.Price(stopLimit)}, Exit={_fmt.Price(exit)}, Risk={_fmt.Price(risk)}, RawExit={_fmt.Price(rawExit)}, " +
                 $"TargetProfitPct={_fmt.Percent(targetProfitPct)}, MaxProfitPct={_fmt.Percent(maxProfitPctOverride ?? settings.MaxProfitPct)}");
 
             return new TradePlan
             {
                 Entry = entry,
                 Stop = stop,
+                StopLimit = stopLimit,
                 Exit = exit,
                 ExitProfile = defaultProfitPctOverride.HasValue ? "momentum" : "standard"
             };
@@ -308,11 +313,19 @@ namespace IbSwingTrader.Application.Candidates
                 return defaultPct;
 
             var resistancePct = (nearestResistance.Value - entry) / entry;
-
-            return Clamp(
+            var clampedResistancePct = Clamp(
                 resistancePct,
                 minProfitPct,
                 maxProfitPct);
+
+            if (clampedResistancePct < defaultPct)
+            {
+                _logger.Info(
+                    $"Trade target kept at profile default instead of near H4 resistance. " +
+                    $"ResistancePct={_fmt.Percent(clampedResistancePct)}, DefaultProfitPct={_fmt.Percent(defaultPct)}");
+            }
+
+            return Math.Max(defaultPct, clampedResistancePct);
         }
 
         private static decimal CalculateAtr(List<Candle> candles, int length)

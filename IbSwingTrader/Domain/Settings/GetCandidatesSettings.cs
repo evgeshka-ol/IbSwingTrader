@@ -64,6 +64,21 @@ namespace IbSwingTrader.Domain.Settings
 
         public decimal MinCurrentDailyRsi14 { get; set; }
         public decimal MaxCurrentWeeklyMacdLineMinusSignal { get; set; } = decimal.MaxValue;
+        public EntryProfileSettings EarlyReversal { get; set; } = new();
+        public EntryProfileSettings HotContinuation { get; set; } = new();
+    }
+
+    public class EntryProfileSettings
+    {
+        public bool Enabled { get; set; } = false;
+        public decimal MaxDistanceTo20dHigh { get; set; } = decimal.MaxValue;
+        public decimal MinCurrentDailyMaSignedDistancePct { get; set; } = decimal.MinValue;
+        public decimal MaxCurrentDailyMaSignedDistancePct { get; set; } = decimal.MaxValue;
+        public decimal MinCurrentDailyRsi14 { get; set; } = decimal.MinValue;
+        public decimal MaxCurrentDailyRsi14 { get; set; } = decimal.MaxValue;
+        public int MinDailyTurnSignals { get; set; } = 1;
+        public int MinH4TurnSignals { get; set; } = 1;
+        public decimal MaxCurrentWeeklyMacdLineMinusSignal { get; set; } = decimal.MaxValue;
     }
 
     public class TradePlanSettings
@@ -74,6 +89,7 @@ namespace IbSwingTrader.Domain.Settings
         public int StopLookbackBars { get; set; } = 5;
         public decimal StopBufferMultiplier { get; set; } = 0.99m;
         public decimal FallbackStopMultiplier { get; set; } = 0.97m;
+        public decimal StopLimitOffsetPct { get; set; } = 0.0025m;
         public decimal MaxLossPct { get; set; } = 0.10m;
         public bool CapLossToTargetProfitForFastTrades { get; set; } = true;
         public decimal FastTradeProfitPctThreshold { get; set; } = 0.05m;

@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
+using IbSwingTrader.Infrastructure.Serialization;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
@@ -15,6 +16,11 @@ namespace IbSwingTrader.Infrastructure.Logging
         ICompositePropertyJsonBuilder jsonBuilder,
         INumberTextFormatter fmt) : ICandidateResultWriter
     {
+        private static readonly JsonSerializerOptions ReadOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
         private readonly IAgentPathService _pathService = pathService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
@@ -23,6 +29,12 @@ namespace IbSwingTrader.Infrastructure.Logging
         private readonly IConsoleColorWriter _console = console;
         private readonly ICompositePropertyJsonBuilder _jsonBuilder = jsonBuilder;
         private readonly INumberTextFormatter _fmt = fmt;
+
+        static CandidateResultWriter()
+        {
+            ReadOptions.Converters.Add(new FlexibleDateTimeConverter());
+            ReadOptions.Converters.Add(new FlexibleNullableDateTimeConverter());
+        }
 
         public async Task WriteAsync(string filePath, CandidateSearchResult result)
         {
@@ -128,11 +140,11 @@ namespace IbSwingTrader.Infrastructure.Logging
             {
                 return new CandidateFileDocument
                 {
-                    Candidates = JsonSerializer.Deserialize<List<CandidateDetails>>(json) ?? []
+                    Candidates = JsonSerializer.Deserialize<List<CandidateDetails>>(json, ReadOptions) ?? []
                 };
             }
 
-            return JsonSerializer.Deserialize<CandidateFileDocument>(json) ?? new CandidateFileDocument();
+            return JsonSerializer.Deserialize<CandidateFileDocument>(json, ReadOptions) ?? new CandidateFileDocument();
         }
 
         private static string NormalizeLegacyJson(string json)
@@ -212,11 +224,12 @@ namespace IbSwingTrader.Infrastructure.Logging
         private CandidateSummaryItem BuildSummaryItem(CandidateDetails candidate, bool includeSameDayMarker)
         {
             var markers = BuildSummaryMarkers(candidate, includeSameDayMarker);
+            var stopLimitPrice = ResolveStopLimitPrice(candidate);
             var ticker =
                 $"{candidate.Ticker} " +
                 $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
                 $"{_fmt.Price(candidate.TradePlan.ExitPrice)} " +
-                $"{_fmt.Price(candidate.TradePlan.StopLoss)} " +
+                $"{_fmt.Price(candidate.TradePlan.StopLoss)}/{_fmt.Price(stopLimitPrice)} " +
                 $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
                 $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
                 $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
@@ -399,14 +412,22 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private void WriteCandidateToConsole(CandidateDetails candidate)
         {
+            var stopLimitPrice = ResolveStopLimitPrice(candidate);
             _console.Write($"{candidate.Ticker} ", ConsoleColor.Gray);
             _console.Write($"{_fmt.Price(candidate.TradePlan.EntryPrice)} ", ConsoleColor.DarkYellow);
             _console.Write($"{_fmt.Price(candidate.TradePlan.ExitPrice)} ", ConsoleColor.DarkGreen);
-            _console.Write($"{_fmt.Price(candidate.TradePlan.StopLoss)} ", ConsoleColor.DarkRed);
+            _console.Write($"{_fmt.Price(candidate.TradePlan.StopLoss)}/{_fmt.Price(stopLimitPrice)} ", ConsoleColor.DarkRed);
             _console.Write($"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%", ConsoleColor.Green);
             _console.Write("/", ConsoleColor.DarkGray);
             _console.Write($"{_fmt.Percent(candidate.TradePlan.LossPercent)}%", ConsoleColor.Red);
             _console.WriteLine(string.Empty, ConsoleColor.Gray);
+        }
+
+        private static decimal ResolveStopLimitPrice(CandidateDetails candidate)
+        {
+            return candidate.TradePlan.StopLimitPrice > 0m
+                ? candidate.TradePlan.StopLimitPrice
+                : candidate.TradePlan.StopLoss;
         }
 
         private static DateTime GetMarketNow(string timezoneId)

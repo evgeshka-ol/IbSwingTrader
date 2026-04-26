@@ -832,6 +832,7 @@ namespace IbSwingTrader.Application.Candidates
                 EntryPrice = trade.Entry,
                 ExitPrice = trade.Exit,
                 StopLoss = trade.Stop,
+                StopLimitPrice = trade.StopLimit,
                 ProfitPercent = CalculatePercent(trade.Entry, trade.Exit),
                 LossPercent = CalculatePercent(trade.Entry, trade.Stop),
                 ExitProfile = trade.ExitProfile
@@ -936,7 +937,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
-                    ScanTimeMarket = scanTimeMarket,
+                    ScanTime = scanTimeMarket,
                     ScanTimeZone = scanTimeZone
                 },
                 Score = new ScoreInfo
