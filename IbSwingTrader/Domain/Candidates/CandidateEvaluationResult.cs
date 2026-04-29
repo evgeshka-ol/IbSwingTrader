@@ -7,6 +7,7 @@ namespace IbSwingTrader.Domain.Candidates
         public DateTime EvaluatedAt { get; set; }
 
         public required string PresetScanCode { get; set; }
+        public string CandidateSource { get; set; } = string.Empty;
         public bool IsFromWishlist { get; set; }
         public int StrategyVersion { get; set; }
         public decimal CandidateScore { get; set; }

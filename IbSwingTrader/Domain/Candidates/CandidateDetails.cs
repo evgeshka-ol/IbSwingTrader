@@ -2,6 +2,8 @@ namespace IbSwingTrader.Domain.Candidates
 {
     public class CandidateDetails : TickerEntity
     {
+        public string CandidateSource { get; set; } = "Primary";
+
         public bool IsFromWishlist { get; set; }
 
         public bool NeedsDeeperEntry { get; set; }

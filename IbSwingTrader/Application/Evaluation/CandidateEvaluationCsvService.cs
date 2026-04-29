@@ -120,6 +120,9 @@ namespace IbSwingTrader.Application.Evaluation
                 if (record.StrategyVersion <= 0)
                     record.StrategyVersion = InferStrategyVersion(record);
 
+                if (string.IsNullOrWhiteSpace(record.CandidateSource))
+                    record.CandidateSource = "Primary";
+
                 CanonicalizeRecord(record);
                 records.Add(record);
             }

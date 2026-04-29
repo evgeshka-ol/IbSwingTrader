@@ -414,6 +414,7 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore,
                     finalScore);
 
+                candidateItem.CandidateSource = "SameDayContinuation";
                 results.Add(candidateItem);
             }
 

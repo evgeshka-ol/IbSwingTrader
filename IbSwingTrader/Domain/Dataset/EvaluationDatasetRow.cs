@@ -51,6 +51,8 @@ namespace IbSwingTrader.Domain.Dataset
 
         public required string GroupLabel { get; set; }
 
+        public string CandidateSource { get; set; } = string.Empty;
+
         public int? DaysAfterEntry { get; set; }
 
 
