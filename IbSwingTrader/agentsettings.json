@@ -108,7 +108,20 @@
         "LocalExtremaLookbackBars": 3,
         "EpisodeMergeCooldownBars": 8,
         "MaxBarsToPeak": 30,
-        "MinRunupPct": 20.0
+        "MinRunupPct": 20.0,
+        "SortColumns": [
+            {
+                "Column": "ScanTime",
+                "Descending": true
+            },
+            {
+                "Column": "AmplitudePct",
+                "Descending": true
+            },
+            {
+                "Column": "Ticker"
+            }
+        ]
     },
 
     "FeatureCalculation": {

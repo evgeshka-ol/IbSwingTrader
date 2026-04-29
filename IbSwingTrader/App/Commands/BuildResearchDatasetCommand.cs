@@ -74,15 +74,16 @@ namespace IbSwingTrader.App.Commands
             }).ToList();
 
             var results = await Task.WhenAll(tasks);
-            var freshRows = results.SelectMany(x => x).ToList();
+            var freshRows = results
+                .SelectMany(x => x)
+                .Select(MapToCsvRow)
+                .ToList();
             var existingRows = await ReadExistingRowsAsync(outputPath);
             var allRows = existingRows
                 .Concat(freshRows)
                 .GroupBy(BuildResearchRowKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.Last())
-                .OrderBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ThenByDescending(x => x.ReferenceTime)
-                .ThenByDescending(x => x.PeakTime)
+                .OrderBy(x => x, Comparer<ResearchTopGainerDatasetRow>.Create((left, right) => CompareRows(left, right, settings)))
                 .ToList();
 
             _csvWriter.Write(outputPath, allRows);
@@ -154,14 +155,14 @@ namespace IbSwingTrader.App.Commands
             return [.. result.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)];
         }
 
-        private static string BuildResearchRowKey(ResearchDatasetRow row)
+        private static string BuildResearchRowKey(ResearchTopGainerDatasetRow row)
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{row.Ticker}|{row.Mode}|{row.Source}|{row.ReferenceType}|{row.ReferenceTime:yyyy-MM-dd HH:mm:ss}|{row.PeakTime:yyyy-MM-dd HH:mm:ss}");
+                $"{row.Ticker}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}|{row.MaxTime:yyyy-MM-dd HH:mm:ss}");
         }
 
-        private static async Task<List<ResearchDatasetRow>> ReadExistingRowsAsync(string path)
+        private static async Task<List<ResearchTopGainerDatasetRow>> ReadExistingRowsAsync(string path)
         {
             if (!File.Exists(path))
                 return [];
@@ -175,12 +176,12 @@ namespace IbSwingTrader.App.Commands
                 .Select((name, index) => new { name, index })
                 .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
 
-            var properties = typeof(ResearchDatasetRow)
+            var properties = typeof(ResearchTopGainerDatasetRow)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
                 .Where(x => x.CanWrite)
                 .ToArray();
 
-            var rows = new List<ResearchDatasetRow>();
+            var rows = new List<ResearchTopGainerDatasetRow>();
 
             foreach (var line in lines.Skip(1))
             {
@@ -188,17 +189,14 @@ namespace IbSwingTrader.App.Commands
                     continue;
 
                 var values = SplitCsvLine(line);
-                var row = new ResearchDatasetRow
+                var row = new ResearchTopGainerDatasetRow
                 {
-                    Ticker = string.Empty,
-                    Mode = string.Empty,
-                    Source = string.Empty,
-                    ReferenceType = string.Empty
+                    Ticker = string.Empty
                 };
 
                 foreach (var property in properties)
                 {
-                    if (!headerIndex.TryGetValue(property.Name, out var index))
+                    if (!TryGetResearchColumnIndex(headerIndex, property.Name, out var index))
                         continue;
 
                     if (index >= values.Count)
@@ -208,13 +206,11 @@ namespace IbSwingTrader.App.Commands
                     property.SetValue(row, parsed);
                 }
 
-                if (string.IsNullOrWhiteSpace(row.Ticker) ||
-                    string.IsNullOrWhiteSpace(row.Mode) ||
-                    string.IsNullOrWhiteSpace(row.Source) ||
-                    string.IsNullOrWhiteSpace(row.ReferenceType))
-                {
+                if (string.IsNullOrWhiteSpace(row.Ticker))
                     continue;
-                }
+
+                row.NegativePotentialPct = Math.Abs(row.NegativePotentialPct);
+                row.PositivePotentialPct = row.PositivePotentialPct == 0m ? row.AmplitudePct : row.PositivePotentialPct;
 
                 rows.Add(row);
             }
@@ -291,6 +287,49 @@ namespace IbSwingTrader.App.Commands
             return [.. trimmed
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec) ? dec : 0m)];
+        }
+
+        private static bool TryGetResearchColumnIndex(
+            Dictionary<string, int> headerIndex,
+            string propertyName,
+            out int index)
+        {
+            if (headerIndex.TryGetValue(propertyName, out index))
+                return true;
+
+            foreach (var alias in GetResearchColumnAliases(propertyName))
+            {
+                if (headerIndex.TryGetValue(alias, out index))
+                    return true;
+            }
+
+            index = -1;
+            return false;
+        }
+
+        private static List<string> GetResearchColumnAliases(string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(ResearchTopGainerDatasetRow.ScanTime) => ["ReferenceTime"],
+                nameof(ResearchTopGainerDatasetRow.ScanPrice) => ["ReferencePrice"],
+                nameof(ResearchTopGainerDatasetRow.MaxTime) => ["PeakTime"],
+                nameof(ResearchTopGainerDatasetRow.MaxPrice) => ["PeakPrice"],
+                nameof(ResearchTopGainerDatasetRow.AmplitudePct) => ["RunupPct"],
+                nameof(ResearchTopGainerDatasetRow.PositivePotentialPct) => ["RunupPct"],
+                nameof(ResearchTopGainerDatasetRow.NegativePotentialPct) => ["MaxDrawdownBeforePeakPct"],
+                nameof(ResearchTopGainerDatasetRow.BarsToMax) => ["BarsToPeak"],
+                nameof(ResearchTopGainerDatasetRow.DailyMaSeries) => ["DailyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
+                _ => []
+            };
         }
 
         private static List<string> SplitCsvLine(string line)
@@ -433,6 +472,127 @@ namespace IbSwingTrader.App.Commands
             }
         }
 
+        private static ResearchTopGainerDatasetRow MapToCsvRow(ResearchDatasetRow row)
+        {
+            return new ResearchTopGainerDatasetRow
+            {
+                Ticker = row.Ticker,
+                ScanTime = row.ReferenceTime,
+                ScanPrice = row.ReferencePrice,
+                MaxTime = row.PeakTime,
+                MaxPrice = row.PeakPrice,
+                AmplitudePct = row.RunupPct,
+                PositivePotentialPct = row.RunupPct,
+                NegativePotentialPct = Math.Abs(row.MaxDrawdownBeforePeakPct),
+                BarsToMax = row.BarsToPeak,
+                DistanceTo20dHigh = row.DistanceTo20dHigh,
+                DistanceTo52wHigh = row.DistanceTo52wHigh,
+                H4MaSignedDistancePct = row.H4MaSignedDistancePct,
+                H4Rsi14 = row.H4Rsi14,
+                H4MacdLineMinusSignal = row.H4MacdLineMinusSignal,
+                DailyMaSignedDistancePct = row.DailyMaSignedDistancePct,
+                DailyRsi14 = row.DailyRsi14,
+                DailyMacdLineMinusSignal = row.DailyMacdLineMinusSignal,
+                WeeklyMaSignedDistancePct = row.WeeklyMaSignedDistancePct,
+                WeeklyRsi14 = row.WeeklyRsi14,
+                WeeklyMacdLineMinusSignal = row.WeeklyMacdLineMinusSignal,
+                DailyBollingerUpperDistancePct = row.DailyBollingerUpperDistancePct,
+                DailyBollingerBandWidthPct = row.DailyBollingerBandWidthPct,
+                WeeklyBollingerUpperDistancePct = row.WeeklyBollingerUpperDistancePct,
+                WeeklyBollingerBandWidthPct = row.WeeklyBollingerBandWidthPct,
+                Pullback10d = row.Pullback10d,
+                DailyPullback10d = row.DailyPullback10d,
+                VolumeRatio20 = row.VolumeRatio20,
+                AtrRatio = row.AtrRatio,
+                TrendPosition = row.TrendPosition,
+                DailyTrendPosition = row.DailyTrendPosition,
+                BbMidSignedDistancePct = row.BbMidSignedDistancePct,
+                WeeklyMacdHistDelta = row.WeeklyMacdHistDelta,
+                DailyMaSeries = [.. row.DailyMaDistances],
+                DailyRsiSeries = [.. row.DailyRsiValues],
+                DailyMacdSeries = [.. row.DailyMacdValues],
+                WeeklyMaSeries = [.. row.WeeklyMaDistances],
+                WeeklyRsiSeries = [.. row.WeeklyRsiValues],
+                WeeklyMacdSeries = [.. row.WeeklyMacdValues],
+                H4MaSeries = row.H4MaDistances == null ? null : [.. row.H4MaDistances],
+                H4RsiSeries = row.H4RsiValues == null ? null : [.. row.H4RsiValues],
+                H4MacdSeries = row.H4MacdValues == null ? null : [.. row.H4MacdValues]
+            };
+        }
+
+        private static int CompareRows(
+            ResearchTopGainerDatasetRow left,
+            ResearchTopGainerDatasetRow right,
+            ResearchSettings settings)
+        {
+            foreach (var sortColumn in settings.SortColumns ?? [])
+            {
+                var comparison = CompareByColumn(left, right, sortColumn);
+                if (comparison != 0)
+                    return comparison;
+            }
+
+            return string.Compare(left.Ticker, right.Ticker, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int CompareByColumn(
+            ResearchTopGainerDatasetRow left,
+            ResearchTopGainerDatasetRow right,
+            ResearchSortColumnSettings sortColumn)
+        {
+            if (string.IsNullOrWhiteSpace(sortColumn.Column))
+                return 0;
+
+            var orderedValues = sortColumn.OrderedValues ?? [];
+            var comparison = sortColumn.Column switch
+            {
+                nameof(ResearchTopGainerDatasetRow.ScanTime) => left.ScanTime.CompareTo(right.ScanTime),
+                nameof(ResearchTopGainerDatasetRow.MaxTime) => left.MaxTime.CompareTo(right.MaxTime),
+                nameof(ResearchTopGainerDatasetRow.AmplitudePct) => left.AmplitudePct.CompareTo(right.AmplitudePct),
+                nameof(ResearchTopGainerDatasetRow.PositivePotentialPct) => left.PositivePotentialPct.CompareTo(right.PositivePotentialPct),
+                nameof(ResearchTopGainerDatasetRow.NegativePotentialPct) => left.NegativePotentialPct.CompareTo(right.NegativePotentialPct),
+                nameof(ResearchTopGainerDatasetRow.BarsToMax) => left.BarsToMax.CompareTo(right.BarsToMax),
+                nameof(ResearchTopGainerDatasetRow.Ticker) => CompareString(left.Ticker, right.Ticker, orderedValues),
+                _ => 0
+            };
+
+            if (comparison == 0)
+                return 0;
+
+            return sortColumn.Descending ? -comparison : comparison;
+        }
+
+        private static int CompareString(
+            string? left,
+            string? right,
+            List<string> orderedValues)
+        {
+            var leftValue = left ?? string.Empty;
+            var rightValue = right ?? string.Empty;
+
+            if (orderedValues.Count > 0)
+            {
+                var leftIndex = GetOrderedValueIndex(leftValue, orderedValues);
+                var rightIndex = GetOrderedValueIndex(rightValue, orderedValues);
+                var orderedComparison = leftIndex.CompareTo(rightIndex);
+                if (orderedComparison != 0)
+                    return orderedComparison;
+            }
+
+            return string.Compare(leftValue, rightValue, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int GetOrderedValueIndex(string value, List<string> orderedValues)
+        {
+            for (var i = 0; i < orderedValues.Count; i++)
+            {
+                if (string.Equals(orderedValues[i], value, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return int.MaxValue;
+        }
+
         private List<ResearchDatasetRow> BuildTopGainerRows(
             string ticker,
             ResearchSettings settings,
@@ -557,6 +717,7 @@ namespace IbSwingTrader.App.Commands
         {
             var referenceFeatures = _featureEngine.Calculate(candles, episode.ReferenceIndex + 1);
             var referencePrice = candles[episode.ReferenceIndex].Close;
+            var referenceCandles = candles.Take(episode.ReferenceIndex + 1).ToList();
 
             var row = new ResearchDatasetRow
             {
@@ -573,10 +734,27 @@ namespace IbSwingTrader.App.Commands
                 MaxDrawdownBeforePeakPct = episode.MaxDrawdownPct,
                 DistanceTo20dHigh = referenceFeatures.DistanceTo20dHigh,
                 DistanceTo52wHigh = referenceFeatures.DistanceTo52wHigh,
+                H4MaSignedDistancePct = referenceFeatures.H4MaSignedDistancePct,
+                H4Rsi14 = referenceFeatures.RSI14,
+                H4MacdLineMinusSignal = referenceFeatures.MACDLineMinusSignal,
+                DailyMaSignedDistancePct = referenceFeatures.DailyMaSignedDistancePct,
+                DailyRsi14 = referenceFeatures.DailyRSI14,
+                DailyMacdLineMinusSignal = referenceFeatures.DailyMACDLineMinusSignal,
+                WeeklyMaSignedDistancePct = referenceFeatures.WeeklyMaSignedDistancePct,
+                WeeklyRsi14 = referenceFeatures.WeeklyRSI14,
+                WeeklyMacdLineMinusSignal = referenceFeatures.WeeklyMACDLineMinusSignal,
                 DailyBollingerUpperDistancePct = referenceFeatures.DailyBollingerUpperDistancePct,
                 DailyBollingerBandWidthPct = referenceFeatures.DailyBollingerBandWidthPct,
                 WeeklyBollingerUpperDistancePct = referenceFeatures.WeeklyBollingerUpperDistancePct,
-                WeeklyBollingerBandWidthPct = referenceFeatures.WeeklyBollingerBandWidthPct
+                WeeklyBollingerBandWidthPct = referenceFeatures.WeeklyBollingerBandWidthPct,
+                Pullback10d = CalculatePullbackByCalendarDays(referenceCandles, 10),
+                DailyPullback10d = CalculateDailyPullback10d(referenceCandles),
+                VolumeRatio20 = CalculateVolumeRatio20(referenceCandles),
+                AtrRatio = CalculateAtrRatio(referenceCandles, 14),
+                TrendPosition = referenceFeatures.H4MaSignedDistancePct,
+                DailyTrendPosition = referenceFeatures.DailyMaSignedDistancePct,
+                BbMidSignedDistancePct = CalculateSmaSignedDistancePct(referenceCandles, 20),
+                WeeklyMacdHistDelta = CalculateWeeklyMacdHistDelta(referenceCandles)
             };
 
             FillSeries(row, candles, episode.ReferenceIndex, episode.PeakIndex);
@@ -683,6 +861,209 @@ namespace IbSwingTrader.App.Commands
             }
         }
 
+        private static decimal CalculatePullbackByCalendarDays(List<Candle> candles, int days)
+        {
+            if (candles.Count == 0)
+                return 0m;
+
+            var lastTime = candles[^1].Time;
+            var start = lastTime.AddDays(-days);
+
+            var range = candles
+                .Where(x => x.Time >= start)
+                .ToList();
+
+            if (range.Count == 0)
+                return 0m;
+
+            var highest = range.Max(x => x.High);
+            var close = candles[^1].Close;
+
+            if (highest <= 0m)
+                return 0m;
+
+            return (close - highest) / highest * 100m;
+        }
+
+        private static decimal CalculateVolumeRatio20(List<Candle> candles)
+        {
+            if (candles.Count < 21)
+                return 0m;
+
+            var currentVolume = candles[^1].Volume;
+            var avgVolume20 = candles
+                .Skip(candles.Count - 21)
+                .Take(20)
+                .Average(x => x.Volume);
+
+            if (avgVolume20 <= 0m)
+                return 0m;
+
+            return currentVolume / avgVolume20;
+        }
+
+        private static decimal CalculateAtrRatio(List<Candle> candles, int length)
+        {
+            if (candles.Count < length + 1)
+                return 0m;
+
+            var trueRanges = new List<decimal>();
+
+            for (var i = candles.Count - length; i < candles.Count; i++)
+            {
+                var current = candles[i];
+                var prevClose = candles[i - 1].Close;
+
+                var tr = Math.Max(
+                    current.High - current.Low,
+                    Math.Max(
+                        Math.Abs(current.High - prevClose),
+                        Math.Abs(current.Low - prevClose)));
+
+                trueRanges.Add(tr);
+            }
+
+            if (trueRanges.Count == 0)
+                return 0m;
+
+            var atr = trueRanges.Average();
+            var close = candles[^1].Close;
+
+            if (close == 0m)
+                return 0m;
+
+            return atr / close * 100m;
+        }
+
+        private static decimal CalculateDailyPullback10d(List<Candle> candles)
+        {
+            var dailyBars = BuildDailyBars(candles);
+
+            if (dailyBars.Count == 0)
+                return 0m;
+
+            var range = dailyBars.TakeLast(10).ToList();
+            var highest = range.Max(x => x.High);
+            var close = dailyBars[^1].Close;
+
+            if (highest <= 0m)
+                return 0m;
+
+            return (close - highest) / highest * 100m;
+        }
+
+        private static decimal CalculateSmaSignedDistancePct(List<Candle> candles, int length)
+        {
+            if (candles.Count < length)
+                return 0m;
+
+            var sma = candles.TakeLast(length).Average(x => x.Close);
+
+            if (sma == 0m)
+                return 0m;
+
+            var close = candles[^1].Close;
+            return (close - sma) / sma * 100m;
+        }
+
+        private static decimal? CalculateWeeklyMacdHistDelta(List<Candle> candles)
+        {
+            var weeklyCloses = BuildWeeklyBars(candles)
+                .Select(x => x.Close)
+                .ToList();
+
+            var macdSeries = BuildMacdSeries(weeklyCloses);
+
+            if (macdSeries.Count < 2)
+                return null;
+
+            var currentHist = macdSeries[^1].Macd - macdSeries[^1].Signal;
+            var prevHist = macdSeries[^2].Macd - macdSeries[^2].Signal;
+
+            return currentHist - prevHist;
+        }
+
+        private static List<Candle> BuildDailyBars(List<Candle> candles)
+        {
+            var result = new List<Candle>();
+
+            foreach (var group in candles.GroupBy(x => x.Time.Date).OrderBy(x => x.Key))
+            {
+                var ordered = group.OrderBy(x => x.Time).ToList();
+
+                result.Add(new Candle
+                {
+                    Timeframe = Timeframe.D1,
+                    Time = group.Key,
+                    Open = ordered[0].Open,
+                    High = ordered.Max(x => x.High),
+                    Low = ordered.Min(x => x.Low),
+                    Close = ordered[^1].Close,
+                    Volume = ordered.Sum(x => x.Volume)
+                });
+            }
+
+            return result;
+        }
+
+        private static List<Candle> BuildWeeklyBars(List<Candle> candles)
+        {
+            var result = new List<Candle>();
+
+            foreach (var group in candles
+                .GroupBy(x => GetWeekStart(x.Time.Date))
+                .OrderBy(x => x.Key))
+            {
+                var ordered = group.OrderBy(x => x.Time).ToList();
+
+                result.Add(new Candle
+                {
+                    Timeframe = Timeframe.W1,
+                    Time = group.Key,
+                    Open = ordered[0].Open,
+                    High = ordered.Max(x => x.High),
+                    Low = ordered.Min(x => x.Low),
+                    Close = ordered[^1].Close,
+                    Volume = ordered.Sum(x => x.Volume)
+                });
+            }
+
+            return result;
+        }
+
+        private static List<MacdPoint> BuildMacdSeries(List<decimal> closes)
+        {
+            var result = new List<MacdPoint>();
+
+            if (closes.Count == 0)
+                return result;
+
+            decimal? ema12 = null;
+            decimal? ema26 = null;
+            decimal? signal = null;
+
+            const decimal k12 = 2m / 13m;
+            const decimal k26 = 2m / 27m;
+            const decimal k9 = 2m / 10m;
+
+            foreach (var close in closes)
+            {
+                ema12 = ema12 == null ? close : ema12.Value + (close - ema12.Value) * k12;
+                ema26 = ema26 == null ? close : ema26.Value + (close - ema26.Value) * k26;
+
+                var macd = ema12.Value - ema26.Value;
+                signal = signal == null ? macd : signal.Value + (macd - signal.Value) * k9;
+
+                result.Add(new MacdPoint
+                {
+                    Macd = macd,
+                    Signal = signal.Value
+                });
+            }
+
+            return result;
+        }
+
         private static bool IsLocalMinimum(List<Candle> candles, int index, int radius)
         {
             var low = candles[index].Low;
@@ -739,6 +1120,12 @@ namespace IbSwingTrader.App.Commands
             public decimal MinLowAfterReference { get; set; }
             public decimal RunupPct { get; set; }
             public decimal MaxDrawdownPct { get; set; }
+        }
+
+        private sealed class MacdPoint
+        {
+            public decimal Macd { get; set; }
+            public decimal Signal { get; set; }
         }
     }
 }

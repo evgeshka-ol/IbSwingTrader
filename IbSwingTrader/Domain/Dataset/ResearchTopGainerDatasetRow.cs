@@ -1,26 +1,22 @@
 namespace IbSwingTrader.Domain.Dataset
 {
-    public class ResearchDatasetRow : TickerEntity
+    public class ResearchTopGainerDatasetRow : TickerEntity
     {
-        public required string Mode { get; set; }
+        public DateTime ScanTime { get; set; }
 
-        public required string Source { get; set; }
+        public decimal ScanPrice { get; set; }
 
-        public required string ReferenceType { get; set; }
+        public DateTime MaxTime { get; set; }
 
-        public DateTime ReferenceTime { get; set; }
+        public decimal MaxPrice { get; set; }
 
-        public decimal ReferencePrice { get; set; }
+        public decimal AmplitudePct { get; set; }
 
-        public DateTime PeakTime { get; set; }
+        public decimal PositivePotentialPct { get; set; }
 
-        public decimal PeakPrice { get; set; }
+        public decimal NegativePotentialPct { get; set; }
 
-        public decimal RunupPct { get; set; }
-
-        public int BarsToPeak { get; set; }
-
-        public decimal MaxDrawdownBeforePeakPct { get; set; }
+        public int BarsToMax { get; set; }
 
         public decimal DistanceTo20dHigh { get; set; }
 
@@ -68,16 +64,16 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal? WeeklyMacdHistDelta { get; set; }
 
-        public List<decimal> DailyMaDistances { get; set; } = [];
-        public List<decimal> DailyRsiValues { get; set; } = [];
-        public List<decimal> DailyMacdValues { get; set; } = [];
+        public List<decimal> DailyMaSeries { get; set; } = [];
+        public List<decimal> DailyRsiSeries { get; set; } = [];
+        public List<decimal> DailyMacdSeries { get; set; } = [];
 
-        public List<decimal> WeeklyMaDistances { get; set; } = [];
-        public List<decimal> WeeklyRsiValues { get; set; } = [];
-        public List<decimal> WeeklyMacdValues { get; set; } = [];
+        public List<decimal> WeeklyMaSeries { get; set; } = [];
+        public List<decimal> WeeklyRsiSeries { get; set; } = [];
+        public List<decimal> WeeklyMacdSeries { get; set; } = [];
 
-        public List<decimal>? H4MaDistances { get; set; }
-        public List<decimal>? H4RsiValues { get; set; }
-        public List<decimal>? H4MacdValues { get; set; }
+        public List<decimal>? H4MaSeries { get; set; }
+        public List<decimal>? H4RsiSeries { get; set; }
+        public List<decimal>? H4MacdSeries { get; set; }
     }
 }
