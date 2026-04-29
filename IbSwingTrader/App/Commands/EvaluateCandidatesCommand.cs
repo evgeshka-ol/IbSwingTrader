@@ -185,8 +185,22 @@ namespace IbSwingTrader.App.Commands
             if (document == null)
                 return [];
 
-            return document.Candidates
-                .Concat(document.SameDayCandidates)
+            var primaryCandidates = document.Candidates
+                .Select(x =>
+                {
+                    x.CandidateSource = string.IsNullOrWhiteSpace(x.CandidateSource) ? "Primary" : x.CandidateSource;
+                    return x;
+                });
+
+            var sameDayCandidates = document.SameDayCandidates
+                .Select(x =>
+                {
+                    x.CandidateSource = "SameDayContinuation";
+                    return x;
+                });
+
+            return primaryCandidates
+                .Concat(sameDayCandidates)
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.First())
                 .ToList();
@@ -211,6 +225,7 @@ namespace IbSwingTrader.App.Commands
             return new CandidateDetails
             {
                 Ticker = evaluation.Ticker,
+                CandidateSource = string.IsNullOrWhiteSpace(evaluation.CandidateSource) ? "Primary" : evaluation.CandidateSource,
                 IsFromWishlist = evaluation.IsFromWishlist,
                 Scan = new ScanInfo
                 {

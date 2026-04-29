@@ -129,8 +129,22 @@ namespace IbSwingTrader.App.Commands
             if (document == null)
                 return [];
 
-            return document.Candidates
-                .Concat(document.SameDayCandidates)
+            var primaryCandidates = document.Candidates
+                .Select(x =>
+                {
+                    x.CandidateSource = string.IsNullOrWhiteSpace(x.CandidateSource) ? "Primary" : x.CandidateSource;
+                    return x;
+                });
+
+            var sameDayCandidates = document.SameDayCandidates
+                .Select(x =>
+                {
+                    x.CandidateSource = "SameDayContinuation";
+                    return x;
+                });
+
+            return primaryCandidates
+                .Concat(sameDayCandidates)
                 .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.First())
                 .ToList();
@@ -143,6 +157,9 @@ namespace IbSwingTrader.App.Commands
             var key = BuildEvaluationKey(evaluation);
             candidateIndex.TryGetValue(key, out var candidate);
             var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
+            var candidateSource = candidate?.CandidateSource ?? evaluation.CandidateSource;
+            if (string.IsNullOrWhiteSpace(candidateSource))
+                candidateSource = "Primary";
             var cacheMetrics = TryBuildCacheMetrics(evaluation);
 
             var maxPct = cacheMetrics?.MaxPct ?? evaluation.MaxPct;
@@ -242,6 +259,7 @@ namespace IbSwingTrader.App.Commands
                 MinutesFromEntryToMin = minutesFromEntryToMin,
                 MaxDownBeforeMaxUp = CompareTimes(minTime, maxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
+                CandidateSource = candidateSource,
                 HasActiveCandidateSnapshot = candidate != null,
                 CandidateScore = candidate?.Score.Score,
                 WeeklyScore = candidate?.Score.WeeklyScore,
