@@ -182,7 +182,14 @@ namespace IbSwingTrader.App.Commands
                 return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
 
             var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
-            return document?.Candidates ?? [];
+            if (document == null)
+                return [];
+
+            return document.Candidates
+                .Concat(document.SameDayCandidates)
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .ToList();
         }
 
         private static string BuildScanKey(CandidateDetails candidate)

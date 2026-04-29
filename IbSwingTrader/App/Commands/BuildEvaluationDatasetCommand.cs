@@ -126,7 +126,14 @@ namespace IbSwingTrader.App.Commands
                 return await _jsonFileService.ReadAsync<List<CandidateDetails>>(path) ?? [];
 
             var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(path);
-            return document?.Candidates ?? [];
+            if (document == null)
+                return [];
+
+            return document.Candidates
+                .Concat(document.SameDayCandidates)
+                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .ToList();
         }
 
         private EvaluationDatasetRow BuildRow(
