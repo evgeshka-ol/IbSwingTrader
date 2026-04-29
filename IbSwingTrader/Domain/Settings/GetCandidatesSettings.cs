@@ -42,6 +42,22 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinWeeklyRsi14 { get; set; }
 
         public decimal MaxDailyMacdLineMinusSignal { get; set; }
+        public WishListProfileSettings DeepLaunchProfile { get; set; } = new();
+        public WishListProfileSettings ExplosiveBreakoutProfile { get; set; } = new();
+    }
+
+    public class WishListProfileSettings
+    {
+        public bool Enabled { get; set; } = false;
+        public decimal MaxDistanceTo20dHigh { get; set; } = decimal.MaxValue;
+        public decimal MinDailyBollingerBandWidthPct { get; set; } = decimal.MinValue;
+        public decimal MinWeeklyBollingerBandWidthPct { get; set; } = decimal.MinValue;
+        public decimal MinCurrentDailyRsi14 { get; set; } = decimal.MinValue;
+        public decimal MaxCurrentDailyRsi14 { get; set; } = decimal.MaxValue;
+        public decimal MinDailyMaDelta3 { get; set; } = decimal.MinValue;
+        public decimal MinDailyRsiDelta3 { get; set; } = decimal.MinValue;
+        public decimal MinDailyMacdLineMinusSignal { get; set; } = decimal.MinValue;
+        public decimal MaxCurrentWeeklyMacdLineMinusSignal { get; set; } = decimal.MaxValue;
     }
 
     public class EntryFilterSettings
@@ -280,11 +296,24 @@ namespace IbSwingTrader.Domain.Settings
         public decimal WeakDeepPullbackPenalty { get; set; } = 0.12m;
         public decimal ParabolicExpansionBonus { get; set; } = 0.10m;
         public decimal DeepParabolicExpansionBonus { get; set; } = 0.06m;
+        public decimal DeepLaunchBonus { get; set; } = 0.08m;
+        public decimal ExplosiveBreakoutBonus { get; set; } = 0.10m;
+        public decimal EarlyReversalBonus { get; set; } = 0.10m;
+        public decimal EarlyReversalMaxTrendPosition { get; set; } = 2m;
+        public decimal EarlyReversalMaxDailyTrendPosition { get; set; } = 2m;
+        public decimal EarlyReversalMaxDistanceTo20dHigh { get; set; } = -8m;
+        public decimal EarlyReversalMinDailyRsi14 { get; set; } = 38m;
+        public decimal EarlyReversalMaxDailyRsi14 { get; set; } = 52m;
+        public decimal EarlyReversalMinAtrRatio { get; set; } = 2.4m;
+        public decimal EarlyReversalMaxVolumeRatio20 { get; set; } = 0.40m;
 
         public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
         public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;
         public decimal BbMidNegativePenaltyThreshold { get; set; } = 0m;
         public decimal BbMidNegativePenalty { get; set; } = 0.05m;
+        public decimal LateExtensionDistanceTo20dHighThreshold { get; set; } = -3m;
+        public decimal LateExtensionDailyRsi14Threshold { get; set; } = 70m;
+        public decimal LateExtensionPenalty { get; set; } = 0.10m;
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;

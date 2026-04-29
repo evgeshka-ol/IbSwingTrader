@@ -58,11 +58,40 @@ namespace IbSwingTrader.Application.Candidates
                     score += 4m;
             }
 
+            if (f.DistanceTo20dHigh <= -12m &&
+                f.DailyBollingerBandWidthPct >= 45m &&
+                snapshot.DailyMaDelta3 > 0m &&
+                snapshot.DailyRsiDelta3 > 0m)
+            {
+                score += 10m;
+
+                if ((f.WeeklyBollingerBandWidthPct ?? 0m) >= 70m)
+                    score += 6m;
+            }
+
+            if (f.DailyBollingerBandWidthPct >= 70m &&
+                f.DailyRSI14 >= 60m &&
+                f.DailyMACDLineMinusSignal > 0m &&
+                snapshot.DailyMaDelta3 > 0m)
+            {
+                score += 12m;
+            }
+
             if (f.WeeklyMACDLineMinusSignal.HasValue &&
                 f.WeeklyMACDLineMinusSignal.Value > 0.5m)
             {
                 score -= 12m;
             }
+
+            if (f.DailyRSI14 > 72m)
+                score -= 14m;
+            else if (f.DailyRSI14 > 65m)
+                score -= 8m;
+
+            if (f.DistanceTo20dHigh > -2m)
+                score -= 14m;
+            else if (f.DistanceTo20dHigh > -5m)
+                score -= 6m;
 
             if (f.DistanceTo20dHigh > -3m)
                 score -= 10m;

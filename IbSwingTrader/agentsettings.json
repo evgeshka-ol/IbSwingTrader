@@ -117,10 +117,10 @@
     },
 
     "GetCandidates": {
-        "RowsPerScan": 50,
+        "RowsPerScan": 100,
         "FinalTopCandidates": 10,
         "UseWishListFirst": true,
-        "MaxWishListItems": 100,
+        "MaxWishListItems": 150,
 
         "ScanCodes": [
             {
@@ -159,7 +159,31 @@
             "MinDailyRsi14": 28.0,
             "MaxDailyRsi14": 55.0,
             "MinWeeklyRsi14": 35.0,
-            "MaxDailyMacdLineMinusSignal": 0.0
+            "MaxDailyMacdLineMinusSignal": 0.0,
+            "DeepLaunchProfile": {
+                "Enabled": true,
+                "MaxDistanceTo20dHigh": -12.0,
+                "MinDailyBollingerBandWidthPct": 45.0,
+                "MinWeeklyBollingerBandWidthPct": 70.0,
+                "MinCurrentDailyRsi14": 32.0,
+                "MaxCurrentDailyRsi14": 62.0,
+                "MinDailyMaDelta3": 0.0,
+                "MinDailyRsiDelta3": 0.0,
+                "MinDailyMacdLineMinusSignal": -0.2,
+                "MaxCurrentWeeklyMacdLineMinusSignal": 0.8
+            },
+            "ExplosiveBreakoutProfile": {
+                "Enabled": true,
+                "MaxDistanceTo20dHigh": -6.0,
+                "MinDailyBollingerBandWidthPct": 70.0,
+                "MinWeeklyBollingerBandWidthPct": 0.0,
+                "MinCurrentDailyRsi14": 60.0,
+                "MaxCurrentDailyRsi14": 98.0,
+                "MinDailyMaDelta3": 0.0,
+                "MinDailyRsiDelta3": 0.0,
+                "MinDailyMacdLineMinusSignal": 0.0,
+                "MaxCurrentWeeklyMacdLineMinusSignal": 5.0
+            }
         },
 
         "EntryFilter": {
@@ -260,9 +284,9 @@
                 "TrendPositionThreshold": 6.0,
                 "DailyTrendPositionThreshold": 3.0,
                 "AtrRatioThreshold": 2.8,
-                "DefaultProfitPct": 0.06,
-                "MinProfitPct": 0.04,
-                "MaxProfitPct": 0.09,
+                "DefaultProfitPct": 0.07,
+                "MinProfitPct": 0.05,
+                "MaxProfitPct": 0.10,
                 "EntryDiscountPct": 0.0,
                 "ExitPriceBufferPct": 0.001
             },
@@ -272,9 +296,9 @@
                 "TrendPositionThreshold": 4.0,
                 "MaxAtrRatio": 3.0,
                 "MaxDistanceTo20dHigh": -5.0,
-                "DefaultProfitPct": 0.07,
-                "MinProfitPct": 0.05,
-                "MaxProfitPct": 0.12
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.13
             },
             "ExplosiveMinFirstExit": {
                 "Enabled": true,
@@ -283,9 +307,9 @@
                 "MinAtrRatio": 3.0,
                 "MinDailyRsi14": 55.0,
                 "MaxDistanceTo20dHigh": -3.0,
-                "DefaultProfitPct": 0.085,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.14,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.16,
                 "EntryDiscountPct": 0.0
             },
             "ConstructiveDeepMinFirst": {
@@ -384,11 +408,24 @@
             "WeakDeepPullbackPenalty": 0.12,
             "ParabolicExpansionBonus": 0.10,
             "DeepParabolicExpansionBonus": 0.06,
+            "DeepLaunchBonus": 0.10,
+            "ExplosiveBreakoutBonus": 0.12,
+            "EarlyReversalBonus": 0.14,
+            "EarlyReversalMaxTrendPosition": 2.5,
+            "EarlyReversalMaxDailyTrendPosition": 2.5,
+            "EarlyReversalMaxDistanceTo20dHigh": -8.0,
+            "EarlyReversalMinDailyRsi14": 38.0,
+            "EarlyReversalMaxDailyRsi14": 52.0,
+            "EarlyReversalMinAtrRatio": 2.4,
+            "EarlyReversalMaxVolumeRatio20": 0.40,
 
             "DailyTrendNegativePenaltyThreshold": 0.0,
             "DailyTrendNegativePenalty": 0.08,
             "BbMidNegativePenaltyThreshold": 0.0,
             "BbMidNegativePenalty": 0.05,
+            "LateExtensionDistanceTo20dHighThreshold": -3.0,
+            "LateExtensionDailyRsi14Threshold": 70.0,
+            "LateExtensionPenalty": 0.12,
 
             "HotByVolumePresetBonus": 1.0,
             "MostActivePresetBonus": 0.9,

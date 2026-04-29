@@ -1024,14 +1024,36 @@ namespace IbSwingTrader.Application.Candidates
             if (IsDeepParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry))
                 score += s.DeepParabolicExpansionBonus;
 
+            if (IsDeepLaunchProxy(snapshot))
+                score += s.DeepLaunchBonus;
+
+            if (IsExplosiveBreakoutProxy(snapshot))
+                score += s.ExplosiveBreakoutBonus;
+
+            var isEarlyReversal = IsEarlyReversalProxy(snapshot, diagnostics, s);
+            if (isEarlyReversal)
+                score += s.EarlyReversalBonus;
+
             if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
                 score -= s.WeakDeepPullbackPenalty;
 
-            if (diagnostics.DailyTrendPosition < s.DailyTrendNegativePenaltyThreshold)
+            if (!isEarlyReversal &&
+                diagnostics.DailyTrendPosition < s.DailyTrendNegativePenaltyThreshold)
+            {
                 score -= s.DailyTrendNegativePenalty;
+            }
 
-            if (diagnostics.BBMidSignedDistancePct < s.BbMidNegativePenaltyThreshold)
+            if (!isEarlyReversal &&
+                diagnostics.BBMidSignedDistancePct < s.BbMidNegativePenaltyThreshold)
+            {
                 score -= s.BbMidNegativePenalty;
+            }
+
+            if (snapshot.Current.DistanceTo20dHigh >= s.LateExtensionDistanceTo20dHighThreshold &&
+                snapshot.Current.DailyRSI14 >= s.LateExtensionDailyRsi14Threshold)
+            {
+                score -= s.LateExtensionPenalty;
+            }
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
@@ -1047,7 +1069,8 @@ namespace IbSwingTrader.Application.Candidates
             return IsParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit) ||
                    IsDeepParabolicExpansionProxy(snapshot, diagnostics, needsDeeperEntry) ||
                    IsExplosiveMinFirstProxy(snapshot, diagnostics, needsDeeperEntry, needsMomentumExit) ||
-                   IsExplosiveMaxFirstProxy(snapshot, diagnostics);
+                   IsExplosiveMaxFirstProxy(snapshot, diagnostics) ||
+                   IsExplosiveBreakoutProxy(snapshot);
         }
 
         private static decimal ResolvePresetBonus(string presetScanCode, NextDayRankingSettings settings)
@@ -1258,6 +1281,47 @@ namespace IbSwingTrader.Application.Candidates
             return snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
                    diagnostics.ATRRatio >= settings.MinAtrRatio &&
                    diagnostics.VolumeRatio20 <= settings.MaxVolumeRatio20;
+        }
+
+        private static bool IsDeepLaunchProxy(CandidateSignalSnapshot snapshot)
+        {
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= -12m &&
+                   f.DailyBollingerBandWidthPct >= 45m &&
+                   (f.WeeklyBollingerBandWidthPct ?? 0m) >= 70m &&
+                   snapshot.DailyMaDelta3 > 0m &&
+                   snapshot.DailyRsiDelta3 > 0m;
+        }
+
+        private static bool IsExplosiveBreakoutProxy(CandidateSignalSnapshot snapshot)
+        {
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= -6m &&
+                   f.DailyBollingerBandWidthPct >= 70m &&
+                   f.DailyRSI14 >= 60m &&
+                   f.DailyMACDLineMinusSignal > 0m &&
+                   snapshot.DailyMaDelta3 > 0m &&
+                   (!f.WeeklyMACDLineMinusSignal.HasValue || f.WeeklyMACDLineMinusSignal.Value <= 5m);
+        }
+
+        private static bool IsEarlyReversalProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= settings.EarlyReversalMaxDistanceTo20dHigh &&
+                   f.DailyRSI14 >= settings.EarlyReversalMinDailyRsi14 &&
+                   f.DailyRSI14 <= settings.EarlyReversalMaxDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.EarlyReversalMinAtrRatio &&
+                   diagnostics.VolumeRatio20 <= settings.EarlyReversalMaxVolumeRatio20 &&
+                   diagnostics.TrendPosition <= settings.EarlyReversalMaxTrendPosition &&
+                   diagnostics.DailyTrendPosition <= settings.EarlyReversalMaxDailyTrendPosition &&
+                   snapshot.DailyMaDelta3 > 0m &&
+                   snapshot.DailyRsiDelta3 > 0m;
         }
 
         private bool IsDeepParabolicExpansionProxy(
