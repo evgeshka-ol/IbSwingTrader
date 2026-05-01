@@ -55,6 +55,7 @@ namespace IbSwingTrader.Application.Candidates
             var finderSettings = getCandidatesSettings.Finder;
             var contractResolveTimeout = TimeSpan.FromSeconds(
                 Math.Max(15, finderSettings.ContractResolveTimeoutSeconds));
+            var contractResolveMaxAttempts = Math.Max(1, finderSettings.ContractResolveMaxAttempts);
 
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
@@ -66,7 +67,8 @@ namespace IbSwingTrader.Application.Candidates
                 $"MinimumCandles={finderSettings.MinimumCandles}, " +
                 $"AvgVolumePeriod={finderSettings.AvgVolumePeriod}, " +
                 $"CandleCount={finderSettings.CandleCount}, " +
-                $"ContractResolveTimeoutSeconds={finderSettings.ContractResolveTimeoutSeconds}");
+                $"ContractResolveTimeoutSeconds={finderSettings.ContractResolveTimeoutSeconds}, " +
+                $"ContractResolveMaxAttempts={finderSettings.ContractResolveMaxAttempts}");
 
             var wishListPath = _pathService.GetWishListFile();
             var currentWishList = await _wishListReader.ReadAsync(wishListPath);
@@ -94,7 +96,10 @@ namespace IbSwingTrader.Application.Candidates
 
                     try
                     {
-                        contract = await _contractResolver.ResolveStockAsync(stock.Ticker, contractResolveTimeout);
+                        contract = await _contractResolver.ResolveStockAsync(
+                            stock.Ticker,
+                            contractResolveTimeout,
+                            contractResolveMaxAttempts);
                     }
                     catch (Exception ex)
                     {
@@ -285,7 +290,8 @@ namespace IbSwingTrader.Application.Candidates
                         marketNow,
                         marketTimezone,
                         finderSettings,
-                        contractResolveTimeout);
+                        contractResolveTimeout,
+                        contractResolveMaxAttempts);
                 }
 
                 if (ctx == null)
@@ -573,13 +579,17 @@ namespace IbSwingTrader.Application.Candidates
             DateTime marketNow,
             string marketTimezone,
             FinderSettings finderSettings,
-            TimeSpan contractResolveTimeout)
+            TimeSpan contractResolveTimeout,
+            int contractResolveMaxAttempts)
         {
             Contract contract;
 
             try
             {
-                contract = await _contractResolver.ResolveStockAsync(item.Ticker, contractResolveTimeout);
+                contract = await _contractResolver.ResolveStockAsync(
+                    item.Ticker,
+                    contractResolveTimeout,
+                    contractResolveMaxAttempts);
             }
             catch (Exception ex)
             {

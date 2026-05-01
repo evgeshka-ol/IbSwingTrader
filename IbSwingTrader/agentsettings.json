@@ -252,7 +252,8 @@
             "MinimumCandles": 60,
             "AvgVolumePeriod": 20,
             "LookbackCalendarDays": 240,
-            "ContractResolveTimeoutSeconds": 45
+            "ContractResolveTimeoutSeconds": 15,
+            "ContractResolveMaxAttempts": 2
         },
 
         "PreFilter": {
