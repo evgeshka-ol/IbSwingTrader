@@ -8,6 +8,15 @@ namespace IbSwingTrader.Domain.Candidates
 
         public required string PresetScanCode { get; set; }
         public string CandidateSource { get; set; } = string.Empty;
+        public List<decimal> RecentDailyMaSeries { get; set; } = [];
+        public List<decimal> RecentDailyRsiSeries { get; set; } = [];
+        public List<decimal> RecentDailyMacdSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyMaSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyRsiSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyMacdSeries { get; set; } = [];
+        public List<decimal> RecentH4MaSeries { get; set; } = [];
+        public List<decimal> RecentH4RsiSeries { get; set; } = [];
+        public List<decimal> RecentH4MacdSeries { get; set; } = [];
         public bool IsFromWishlist { get; set; }
         public int StrategyVersion { get; set; }
         public decimal CandidateScore { get; set; }

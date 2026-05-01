@@ -141,5 +141,23 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal? BbMidSignedDistancePct { get; set; }
 
         public decimal? WeeklyMacdHistDelta { get; set; }
+
+        public List<decimal> RecentDailyMaSeries { get; set; } = [];
+
+        public List<decimal> RecentDailyRsiSeries { get; set; } = [];
+
+        public List<decimal> RecentDailyMacdSeries { get; set; } = [];
+
+        public List<decimal> RecentWeeklyMaSeries { get; set; } = [];
+
+        public List<decimal> RecentWeeklyRsiSeries { get; set; } = [];
+
+        public List<decimal> RecentWeeklyMacdSeries { get; set; } = [];
+
+        public List<decimal> RecentH4MaSeries { get; set; } = [];
+
+        public List<decimal> RecentH4RsiSeries { get; set; } = [];
+
+        public List<decimal> RecentH4MacdSeries { get; set; } = [];
     }
 }

@@ -4,6 +4,7 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluationCsvService evaluationCsvService,
         IJsonFileService jsonFileService,
         IHistoricalCache historicalCache,
+        IFeatureEngine featureEngine,
         ICsvWriter csvWriter,
         IAgentPathService pathService,
         IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
@@ -12,10 +13,14 @@ namespace IbSwingTrader.App.Commands
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
         private const int ProgressLogInterval = 250;
+        private const int RecentDailySeriesLength = 6;
+        private const int RecentWeeklySeriesLength = 3;
+        private const int RecentH4SeriesLength = 12;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly IHistoricalCache _historicalCache = historicalCache;
+        private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICsvWriter _csvWriter = csvWriter;
         private readonly IAgentPathService _pathService = pathService;
         private readonly IBuildEvaluationDatasetSettingsProvider _buildEvaluationDatasetSettingsProvider = buildEvaluationDatasetSettingsProvider;
@@ -161,6 +166,7 @@ namespace IbSwingTrader.App.Commands
             if (string.IsNullOrWhiteSpace(candidateSource))
                 candidateSource = "Primary";
             var cacheMetrics = TryBuildCacheMetrics(evaluation);
+            var recentSeries = TryBuildRecentSeries(evaluation);
 
             var maxPct = cacheMetrics?.MaxPct ?? evaluation.MaxPct;
             var maxPrice = cacheMetrics?.MaxPrice ?? evaluation.MaxPrice;
@@ -275,7 +281,16 @@ namespace IbSwingTrader.App.Commands
                 TrendPosition = candidate?.Diagnostics?.TrendPosition,
                 DailyTrendPosition = candidate?.Diagnostics?.DailyTrendPosition,
                 BbMidSignedDistancePct = candidate?.Diagnostics?.BBMidSignedDistancePct,
-                WeeklyMacdHistDelta = candidate?.Diagnostics?.WeeklyMACDHistDelta
+                WeeklyMacdHistDelta = candidate?.Diagnostics?.WeeklyMACDHistDelta,
+                RecentDailyMaSeries = ResolveSeries(candidate?.RecentDailyMaSeries, evaluation.RecentDailyMaSeries, recentSeries?.DailyMaSeries),
+                RecentDailyRsiSeries = ResolveSeries(candidate?.RecentDailyRsiSeries, evaluation.RecentDailyRsiSeries, recentSeries?.DailyRsiSeries),
+                RecentDailyMacdSeries = ResolveSeries(candidate?.RecentDailyMacdSeries, evaluation.RecentDailyMacdSeries, recentSeries?.DailyMacdSeries),
+                RecentWeeklyMaSeries = ResolveSeries(candidate?.RecentWeeklyMaSeries, evaluation.RecentWeeklyMaSeries, recentSeries?.WeeklyMaSeries),
+                RecentWeeklyRsiSeries = ResolveSeries(candidate?.RecentWeeklyRsiSeries, evaluation.RecentWeeklyRsiSeries, recentSeries?.WeeklyRsiSeries),
+                RecentWeeklyMacdSeries = ResolveSeries(candidate?.RecentWeeklyMacdSeries, evaluation.RecentWeeklyMacdSeries, recentSeries?.WeeklyMacdSeries),
+                RecentH4MaSeries = ResolveSeries(candidate?.RecentH4MaSeries, evaluation.RecentH4MaSeries, recentSeries?.H4MaSeries),
+                RecentH4RsiSeries = ResolveSeries(candidate?.RecentH4RsiSeries, evaluation.RecentH4RsiSeries, recentSeries?.H4RsiSeries),
+                RecentH4MacdSeries = ResolveSeries(candidate?.RecentH4MacdSeries, evaluation.RecentH4MacdSeries, recentSeries?.H4MacdSeries)
             };
         }
 
@@ -398,9 +413,132 @@ namespace IbSwingTrader.App.Commands
             };
         }
 
+        private RecentFeatureSeries? TryBuildRecentSeries(CandidateEvaluationResult evaluation)
+        {
+            if (!_historicalCache.TryLoad(evaluation.Ticker, Timeframe.M5, out var cached) ||
+                cached == null ||
+                cached.Count == 0)
+            {
+                return null;
+            }
+
+            var ordered = cached
+                .Where(x => x.Time <= evaluation.ScanTime)
+                .OrderBy(x => x.Time)
+                .ToList();
+
+            if (ordered.Count == 0)
+                return null;
+
+            var scanIndex = ordered.Count - 1;
+
+            return new RecentFeatureSeries
+            {
+                DailyMaSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyMaSignedDistancePct),
+                DailyRsiSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyRSI14),
+                DailyMacdSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyMACDLineMinusSignal),
+                WeeklyMaSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMaSignedDistancePct),
+                WeeklyRsiSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyRSI14),
+                WeeklyMacdSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDLineMinusSignal),
+                H4MaSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4MaSignedDistancePct),
+                H4RsiSeries = BuildRecentH4Series(ordered, scanIndex, x => x.RSI14),
+                H4MacdSeries = BuildRecentH4Series(ordered, scanIndex, x => x.MACDLineMinusSignal)
+            };
+        }
+
+        private List<decimal> BuildRecentDailySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => Round(selector(_featureEngine.Calculate(candles, i + 1))))];
+        }
+
+        private List<decimal> BuildRecentWeeklySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal?> selector)
+        {
+            var indexes = new List<int>();
+            var usedWeeks = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var week = StartOfWeek(candles[i].Time);
+                if (!usedWeeks.Add(week))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentWeeklySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+
+            return [.. indexes
+                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Where(x => x.HasValue)
+                .Select(x => Round(x!.Value))];
+        }
+
+        private List<decimal> BuildRecentH4Series(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedBuckets = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var bucket = StartOfH4Bucket(candles[i].Time);
+                if (!usedBuckets.Add(bucket))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => Round(selector(_featureEngine.Calculate(candles, i + 1))))];
+        }
+
         private static string BuildEvaluationKey(CandidateEvaluationResult row)
         {
             return $"{row.Ticker}|{row.PresetScanCode}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}";
+        }
+
+        private static List<decimal> ResolveSeries(
+            List<decimal>? candidateSeries,
+            List<decimal>? evaluationSeries,
+            List<decimal>? fallbackSeries)
+        {
+            if (candidateSeries != null && candidateSeries.Count > 0)
+                return [.. candidateSeries];
+
+            if (evaluationSeries != null && evaluationSeries.Count > 0)
+                return [.. evaluationSeries];
+
+            if (fallbackSeries != null && fallbackSeries.Any(x => x != 0m))
+                return [.. fallbackSeries];
+
+            return [];
         }
 
         private static string BuildCandidateKey(CandidateDetails row)
@@ -652,6 +790,25 @@ namespace IbSwingTrader.App.Commands
             return $"{extremumOrder}_{minDepthGroup}_{maxStrengthGroup}";
         }
 
+        private static DateTime StartOfWeek(DateTime time)
+        {
+            var date = time.Date;
+            var diff = ((int)date.DayOfWeek + 6) % 7;
+            return date.AddDays(-diff);
+        }
+
+        private static DateTime StartOfH4Bucket(DateTime time)
+        {
+            return new DateTime(
+                time.Year,
+                time.Month,
+                time.Day,
+                (time.Hour / 4) * 4,
+                0,
+                0,
+                time.Kind);
+        }
+
         private static decimal? CalculatePostMaxDrawdownPct(Candle maxCandle, List<Candle> afterEntry)
         {
             if (maxCandle.High <= 0m)
@@ -685,6 +842,19 @@ namespace IbSwingTrader.App.Commands
                 Round(missAbs),
                 Round(missPct),
                 missAbs > 0m && (missAbs <= 0.01m || missPct <= 0.1m));
+        }
+
+        private sealed class RecentFeatureSeries
+        {
+            public List<decimal> DailyMaSeries { get; init; } = [];
+            public List<decimal> DailyRsiSeries { get; init; } = [];
+            public List<decimal> DailyMacdSeries { get; init; } = [];
+            public List<decimal> WeeklyMaSeries { get; init; } = [];
+            public List<decimal> WeeklyRsiSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdSeries { get; init; } = [];
+            public List<decimal> H4MaSeries { get; init; } = [];
+            public List<decimal> H4RsiSeries { get; init; } = [];
+            public List<decimal> H4MacdSeries { get; init; } = [];
         }
 
         private sealed class CacheMetrics

@@ -8,6 +8,7 @@ namespace IbSwingTrader.Domain.Settings
         public int LookbackCalendarDays { get; set; } = 240;
         public int MinimumCandles { get; set; } = 120;
         public int MaxParallelTickers { get; set; } = 2;
+        public int ContractResolveTimeoutSeconds { get; set; } = 60;
         public int LocalExtremaLookbackBars { get; set; } = 3;
         public int EpisodeMergeCooldownBars { get; set; } = 8;
         public int MaxBarsToPeak { get; set; } = 30;

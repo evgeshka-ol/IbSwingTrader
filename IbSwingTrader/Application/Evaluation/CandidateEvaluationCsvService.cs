@@ -252,6 +252,9 @@ namespace IbSwingTrader.Application.Evaluation
                 return Nullable.GetUnderlyingType(type) != null ? null : false;
             }
 
+            if (targetType == typeof(List<decimal>))
+                return ParseDecimalList(raw);
+
             if (targetType.IsEnum)
                 return Enum.Parse(targetType, raw, ignoreCase: true);
 
@@ -287,6 +290,25 @@ namespace IbSwingTrader.Application.Evaluation
         private static decimal? RoundNullable(decimal? value)
         {
             return value.HasValue ? Round(value.Value) : null;
+        }
+
+        private static List<decimal> ParseDecimalList(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return [];
+
+            var trimmed = raw.Trim();
+            if (trimmed.Length >= 2 && trimmed[0] == '[' && trimmed[^1] == ']')
+                trimmed = trimmed[1..^1];
+
+            if (string.IsNullOrWhiteSpace(trimmed))
+                return [];
+
+            return [.. trimmed
+                .Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : (decimal?)null)
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)];
         }
 
         private static char DetectDelimiter(string line)

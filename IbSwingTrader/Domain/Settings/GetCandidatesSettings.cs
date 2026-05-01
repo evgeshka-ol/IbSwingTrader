@@ -347,6 +347,7 @@ namespace IbSwingTrader.Domain.Settings
         public int MinimumCandles { get; set; } = 60;
         public int AvgVolumePeriod { get; set; } = 20;
         public int LookbackCalendarDays { get; set; } = 240;
+        public int ContractResolveTimeoutSeconds { get; set; } = 45;
     }
 
     public class PreFilterSettings

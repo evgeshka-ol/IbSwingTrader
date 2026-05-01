@@ -9,7 +9,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
         private readonly ITextLogger _logger = logger;
         private readonly ConcurrentDictionary<string, Contract> _cache = new();
 
-        public async Task<Contract> ResolveStockAsync(string ticker)
+        public async Task<Contract> ResolveStockAsync(string ticker, TimeSpan? timeout = null)
         {
             ticker = ticker.Trim().ToUpperInvariant();
 
@@ -44,15 +44,23 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
                 }
             };
 
-            foreach (var request in attempts)
+            for (var i = 0; i < attempts.Length; i++)
             {
-                var details = await _tws.GetContractDetails(request);
+                var request = attempts[i];
+                _logger.Info(
+                    $"ResolveStock attempt {i + 1}/{attempts.Length}: ticker={ticker}, " +
+                    $"exchange={request.Exchange}, primary={request.PrimaryExch}");
+
+                var details = await _tws.GetContractDetails(request, timeout);
 
                 var contract = details.FirstOrDefault()?.Contract;
-                _logger.Debug($"Contract resolved for {ticker} via {request.Exchange}/{request.PrimaryExch}");
+                _logger.Info(
+                    $"ResolveStock result {i + 1}/{attempts.Length}: ticker={ticker}, " +
+                    $"matches={details.Count}, exchange={request.Exchange}, primary={request.PrimaryExch}");
 
                 if (contract != null)
                 {
+                    _logger.Info($"Contract resolved for {ticker} via {request.Exchange}/{request.PrimaryExch}");
                     _cache[ticker] = contract;
                     return contract;
                 }

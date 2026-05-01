@@ -443,7 +443,10 @@ namespace IbSwingTrader.App.Commands
         {
             try
             {
-                var contract = await _contractResolver.ResolveStockAsync(ticker);
+                var resolveTimeout = TimeSpan.FromSeconds(
+                    Math.Max(15, settings.ContractResolveTimeoutSeconds));
+
+                var contract = await _contractResolver.ResolveStockAsync(ticker, resolveTimeout);
 
                 var end = MarketTime.Now();
                 var start = end.AddDays(-settings.LookbackCalendarDays);

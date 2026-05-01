@@ -21,12 +21,21 @@ namespace IbSwingTrader.Application.Evaluation
         {
             var results = new List<CandidateEvaluationResult>();
 
-            foreach (var candidate in candidates)
+            for (var i = 0; i < candidates.Count; i++)
             {
+                var candidate = candidates[i];
+                _logger.Info(
+                    $"Evaluation start: {i + 1}/{candidates.Count} {candidate.Ticker} [{candidate.Scan.PresetScanCode}] " +
+                    $"scan={candidate.Scan.ScanTime:yyyy-MM-dd HH:mm:ss} source={candidate.CandidateSource}");
+
                 try
                 {
                     var result = await EvaluateOneAsync(candidate);
                     results.Add(result);
+                    _logger.Info(
+                        $"Evaluation completed: {i + 1}/{candidates.Count} {candidate.Ticker} [{candidate.Scan.PresetScanCode}] " +
+                        $"outcome={result.Outcome ?? "Unknown"} entryTouched={result.EntryTouched} " +
+                        $"entryTime={FormatTime(result.EntryTime)} exitTime={FormatTime(result.ExitTime)} stopTime={FormatTime(result.StopTime)}");
                 }
                 catch (Exception ex)
                 {
@@ -46,7 +55,10 @@ namespace IbSwingTrader.Application.Evaluation
             var result = CreateBaseResult(candidate);
             result.EvaluatedAt = MarketTime.Now();
 
+            _logger.Info($"Evaluation step: resolving contract for {candidate.Ticker}");
+
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
+            _logger.Info($"Evaluation step: contract resolved for {candidate.Ticker}");
 
             var start = candidate.Scan.ScanTime;
             var requestedEnd = candidate.Scan.ScanTime.Add(MaxEvaluationWindow);
@@ -59,8 +71,13 @@ namespace IbSwingTrader.Application.Evaluation
             if (end <= start)
             {
                 result.Outcome = "InsufficientFutureData";
+                _logger.Info($"Evaluation step: insufficient future data for {candidate.Ticker}");
                 return result;
             }
+
+            _logger.Info(
+                $"Evaluation step: loading M5 candles for {candidate.Ticker} " +
+                $"from {start:yyyy-MM-dd HH:mm:ss} to {end:yyyy-MM-dd HH:mm:ss}");
 
             var candles = await _historicalDataService.GetCandlesRange(
                 candidate.Ticker,
@@ -69,9 +86,12 @@ namespace IbSwingTrader.Application.Evaluation
                 start,
                 end);
 
+            _logger.Info($"Evaluation step: candles loaded for {candidate.Ticker}. Count={candles?.Count ?? 0}");
+
             if (candles == null || candles.Count == 0)
             {
                 result.Outcome = "NoData";
+                _logger.Info($"Evaluation step: no data for {candidate.Ticker}");
                 return result;
             }
 
@@ -83,6 +103,7 @@ namespace IbSwingTrader.Application.Evaluation
             if (ordered.Count == 0)
             {
                 result.Outcome = "NoDataAfterScan";
+                _logger.Info($"Evaluation step: no post-scan candles for {candidate.Ticker}");
                 return result;
             }
 
@@ -106,6 +127,7 @@ namespace IbSwingTrader.Application.Evaluation
                 result.EntryTouched = false;
                 LogNoEntryDiagnostics(candidate, ordered, entryPrice);
                 result.Outcome = "NoEntry";
+                _logger.Info($"Evaluation step: entry not touched for {candidate.Ticker}");
                 return result;
             }
 
@@ -253,9 +275,13 @@ namespace IbSwingTrader.Application.Evaluation
             ApplyUnambiguousOutcomeCorrection(result, entryPrice, exitPrice, stopPrice);
 
             if (result.Outcome is "Win" or "Loss")
+            {
+                _logger.Info($"Evaluation step: resolved outcome for {candidate.Ticker} via correction loop as {result.Outcome}");
                 return result;
+            }
 
             result.Outcome = "Open";
+            _logger.Info($"Evaluation step: position still open for {candidate.Ticker}");
             return result;
         }
 
@@ -268,6 +294,15 @@ namespace IbSwingTrader.Application.Evaluation
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 CandidateSource = candidate.CandidateSource,
+                RecentDailyMaSeries = [.. candidate.RecentDailyMaSeries],
+                RecentDailyRsiSeries = [.. candidate.RecentDailyRsiSeries],
+                RecentDailyMacdSeries = [.. candidate.RecentDailyMacdSeries],
+                RecentWeeklyMaSeries = [.. candidate.RecentWeeklyMaSeries],
+                RecentWeeklyRsiSeries = [.. candidate.RecentWeeklyRsiSeries],
+                RecentWeeklyMacdSeries = [.. candidate.RecentWeeklyMacdSeries],
+                RecentH4MaSeries = [.. candidate.RecentH4MaSeries],
+                RecentH4RsiSeries = [.. candidate.RecentH4RsiSeries],
+                RecentH4MacdSeries = [.. candidate.RecentH4MacdSeries],
                 IsFromWishlist = candidate.IsFromWishlist,
                 StrategyVersion = 6,
                 CandidateScore = candidate.Score.Score,
@@ -288,6 +323,15 @@ namespace IbSwingTrader.Application.Evaluation
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 CandidateSource = candidate.CandidateSource,
+                RecentDailyMaSeries = [.. candidate.RecentDailyMaSeries],
+                RecentDailyRsiSeries = [.. candidate.RecentDailyRsiSeries],
+                RecentDailyMacdSeries = [.. candidate.RecentDailyMacdSeries],
+                RecentWeeklyMaSeries = [.. candidate.RecentWeeklyMaSeries],
+                RecentWeeklyRsiSeries = [.. candidate.RecentWeeklyRsiSeries],
+                RecentWeeklyMacdSeries = [.. candidate.RecentWeeklyMacdSeries],
+                RecentH4MaSeries = [.. candidate.RecentH4MaSeries],
+                RecentH4RsiSeries = [.. candidate.RecentH4RsiSeries],
+                RecentH4MacdSeries = [.. candidate.RecentH4MacdSeries],
                 IsFromWishlist = candidate.IsFromWishlist,
                 StrategyVersion = 6,
                 CandidateScore = candidate.Score.Score,
@@ -322,6 +366,11 @@ namespace IbSwingTrader.Application.Evaluation
         private static decimal RoundPct(decimal value)
         {
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static string FormatTime(DateTime? value)
+        {
+            return value?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-";
         }
 
         private static void ApplyUnambiguousOutcomeCorrection(

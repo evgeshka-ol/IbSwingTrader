@@ -9,7 +9,7 @@ namespace IbSwingTrader.Abstractions.Market
         TaskCompletionSource<bool> Ready { get; }
 
         void Connect(string host = "127.0.0.1", int port = 7496, int clientId = 1);
-        Task<List<ContractDetails>> GetContractDetails(Contract contract);
+        Task<List<ContractDetails>> GetContractDetails(Contract contract, TimeSpan? timeout = null);
         Task<List<Candle>> RequestHistoricalData(Contract contract, Timeframe timeframe, DateTime endTimeUtc, int bars);
         Task<List<StockInfo>> GetStocksAsync(ScannerSubscription subscription, List<TagValue> filters);
         Task<string> RequestScannerParametersAsync();

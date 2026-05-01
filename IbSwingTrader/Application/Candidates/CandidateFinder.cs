@@ -9,6 +9,7 @@ namespace IbSwingTrader.Application.Candidates
         IStockPreFilter preFilter,
         IContractResolver contractResolver,
         IHistoricalDataService historicalData,
+        IFeatureEngine featureEngine,
         ICandidateSignalAnalyzer signalAnalyzer,
         IWishListFilter wishListFilter,
         IWishListScore wishListScore,
@@ -28,6 +29,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IStockPreFilter _preFilter = preFilter;
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalData = historicalData;
+        private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICandidateSignalAnalyzer _signalAnalyzer = signalAnalyzer;
         private readonly IWishListFilter _wishListFilter = wishListFilter;
         private readonly IWishListScore _wishListScore = wishListScore;
@@ -43,11 +45,16 @@ namespace IbSwingTrader.Application.Candidates
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
+        private const int RecentDailySeriesLength = 6;
+        private const int RecentWeeklySeriesLength = 3;
+        private const int RecentH4SeriesLength = 12;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
             var getCandidatesSettings = _getCandidatesSettingsProvider.Get();
             var finderSettings = getCandidatesSettings.Finder;
+            var contractResolveTimeout = TimeSpan.FromSeconds(
+                Math.Max(15, finderSettings.ContractResolveTimeoutSeconds));
 
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
@@ -58,7 +65,8 @@ namespace IbSwingTrader.Application.Candidates
                 $"LookbackCalendarDays={finderSettings.LookbackCalendarDays}, " +
                 $"MinimumCandles={finderSettings.MinimumCandles}, " +
                 $"AvgVolumePeriod={finderSettings.AvgVolumePeriod}, " +
-                $"CandleCount={finderSettings.CandleCount}");
+                $"CandleCount={finderSettings.CandleCount}, " +
+                $"ContractResolveTimeoutSeconds={finderSettings.ContractResolveTimeoutSeconds}");
 
             var wishListPath = _pathService.GetWishListFile();
             var currentWishList = await _wishListReader.ReadAsync(wishListPath);
@@ -86,7 +94,7 @@ namespace IbSwingTrader.Application.Candidates
 
                     try
                     {
-                        contract = await _contractResolver.ResolveStockAsync(stock.Ticker);
+                        contract = await _contractResolver.ResolveStockAsync(stock.Ticker, contractResolveTimeout);
                     }
                     catch (Exception ex)
                     {
@@ -569,7 +577,7 @@ namespace IbSwingTrader.Application.Candidates
 
             try
             {
-                contract = await _contractResolver.ResolveStockAsync(item.Ticker);
+                contract = await _contractResolver.ResolveStockAsync(item.Ticker, contractResolveTimeout);
             }
             catch (Exception ex)
             {
@@ -928,10 +936,21 @@ namespace IbSwingTrader.Application.Candidates
                 snapshot,
                 candles);
 
+            var recentSeries = BuildRecentFeatureSeries(candles);
+
             return new CandidateDetails
             {
                 Ticker = stock.Ticker,
                 IsFromWishlist = isFromWishlist,
+                RecentDailyMaSeries = recentSeries.DailyMaSeries,
+                RecentDailyRsiSeries = recentSeries.DailyRsiSeries,
+                RecentDailyMacdSeries = recentSeries.DailyMacdSeries,
+                RecentWeeklyMaSeries = recentSeries.WeeklyMaSeries,
+                RecentWeeklyRsiSeries = recentSeries.WeeklyRsiSeries,
+                RecentWeeklyMacdSeries = recentSeries.WeeklyMacdSeries,
+                RecentH4MaSeries = recentSeries.H4MaSeries,
+                RecentH4RsiSeries = recentSeries.H4RsiSeries,
+                RecentH4MacdSeries = recentSeries.H4MacdSeries,
                 NeedsDeeperEntry = needsDeeperEntry,
                 NeedsMomentumExit = needsMomentumExit,
                 Scan = new ScanInfo
@@ -1057,6 +1076,97 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private RecentFeatureSeries BuildRecentFeatureSeries(List<Candle> candles)
+        {
+            var scanIndex = candles.Count - 1;
+
+            return new RecentFeatureSeries
+            {
+                DailyMaSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct),
+                DailyRsiSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14),
+                DailyMacdSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal),
+                WeeklyMaSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct),
+                WeeklyRsiSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14),
+                WeeklyMacdSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal),
+                H4MaSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct),
+                H4RsiSeries = BuildRecentH4Series(candles, scanIndex, x => x.RSI14),
+                H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal)
+            };
+        }
+
+        private List<decimal> BuildRecentDailySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentWeeklySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal?> selector)
+        {
+            var indexes = new List<int>();
+            var usedWeeks = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var week = StartOfWeek(candles[i].Time);
+                if (!usedWeeks.Add(week))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentWeeklySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+
+            return [.. indexes
+                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Where(x => x.HasValue)
+                .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentH4Series(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedBuckets = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var bucket = StartOfH4Bucket(candles[i].Time);
+                if (!usedBuckets.Add(bucket))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
 
         private bool ShouldBypassWishListFilterForLiveScan(
@@ -1636,6 +1746,18 @@ namespace IbSwingTrader.Application.Candidates
             return value.AddDays(-diff).Date;
         }
 
+        private static DateTime StartOfH4Bucket(DateTime value)
+        {
+            return new DateTime(
+                value.Year,
+                value.Month,
+                value.Day,
+                (value.Hour / 4) * 4,
+                0,
+                0,
+                value.Kind);
+        }
+
         private static List<MacdPoint> BuildMacdSeries(List<decimal> closes)
         {
             var result = new List<MacdPoint>();
@@ -1756,6 +1878,19 @@ namespace IbSwingTrader.Application.Candidates
         {
             public decimal Macd { get; init; }
             public decimal Signal { get; init; }
+        }
+
+        private sealed class RecentFeatureSeries
+        {
+            public List<decimal> DailyMaSeries { get; init; } = [];
+            public List<decimal> DailyRsiSeries { get; init; } = [];
+            public List<decimal> DailyMacdSeries { get; init; } = [];
+            public List<decimal> WeeklyMaSeries { get; init; } = [];
+            public List<decimal> WeeklyRsiSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdSeries { get; init; } = [];
+            public List<decimal> H4MaSeries { get; init; } = [];
+            public List<decimal> H4RsiSeries { get; init; } = [];
+            public List<decimal> H4MacdSeries { get; init; } = [];
         }
 
         private sealed class WishListContext

@@ -105,6 +105,7 @@
         "LookbackCalendarDays": 240,
         "MinimumCandles": 120,
         "MaxParallelTickers": 2,
+        "ContractResolveTimeoutSeconds": 60,
         "LocalExtremaLookbackBars": 3,
         "EpisodeMergeCooldownBars": 8,
         "MaxBarsToPeak": 30,
@@ -250,7 +251,8 @@
             "CandleCount": 600,
             "MinimumCandles": 60,
             "AvgVolumePeriod": 20,
-            "LookbackCalendarDays": 240
+            "LookbackCalendarDays": 240,
+            "ContractResolveTimeoutSeconds": 45
         },
 
         "PreFilter": {
@@ -460,7 +462,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 7,
-        "ReevaluateOpenCandidates": true,
+        "ReevaluateOpenCandidates": false,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
         "UseAmbiguousBarResolver": true

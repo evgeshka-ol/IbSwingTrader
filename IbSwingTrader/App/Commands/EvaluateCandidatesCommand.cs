@@ -116,6 +116,7 @@ namespace IbSwingTrader.App.Commands
             }
 
             var results = await _candidateEvaluator.EvaluateAsync(candidatesToEvaluate.Values.ToList());
+            _logger.Info($"Evaluation step: candidate evaluator returned {results.Count} results");
 
             foreach (var result in results)
             {
@@ -126,7 +127,9 @@ namespace IbSwingTrader.App.Commands
                 }
             }
 
+            _logger.Info($"Evaluation step: writing {results.Count} evaluation rows to CSV");
             await _candidateCsvService.WriteAsync(evaluationsPath, results);
+            _logger.Info("Evaluation step: evaluation CSV write completed");
             LogCandidateSummary(Path.GetFileName(candidatesPath), results);
         }
 
@@ -226,6 +229,15 @@ namespace IbSwingTrader.App.Commands
             {
                 Ticker = evaluation.Ticker,
                 CandidateSource = string.IsNullOrWhiteSpace(evaluation.CandidateSource) ? "Primary" : evaluation.CandidateSource,
+                RecentDailyMaSeries = [.. evaluation.RecentDailyMaSeries],
+                RecentDailyRsiSeries = [.. evaluation.RecentDailyRsiSeries],
+                RecentDailyMacdSeries = [.. evaluation.RecentDailyMacdSeries],
+                RecentWeeklyMaSeries = [.. evaluation.RecentWeeklyMaSeries],
+                RecentWeeklyRsiSeries = [.. evaluation.RecentWeeklyRsiSeries],
+                RecentWeeklyMacdSeries = [.. evaluation.RecentWeeklyMacdSeries],
+                RecentH4MaSeries = [.. evaluation.RecentH4MaSeries],
+                RecentH4RsiSeries = [.. evaluation.RecentH4RsiSeries],
+                RecentH4MacdSeries = [.. evaluation.RecentH4MacdSeries],
                 IsFromWishlist = evaluation.IsFromWishlist,
                 Scan = new ScanInfo
                 {

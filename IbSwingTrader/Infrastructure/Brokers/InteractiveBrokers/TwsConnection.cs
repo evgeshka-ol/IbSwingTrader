@@ -6,6 +6,8 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 {
     public class TwsConnection : EWrapper, ITwsConnection
     {
+        private static readonly TimeSpan DefaultContractDetailsTimeout = TimeSpan.FromSeconds(15);
+
         private readonly EReaderMonitorSignal _signal;
 
         private readonly ITextLogger _logger;
@@ -104,20 +106,52 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
             }
         }
 
-        public async Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract)
+        public async Task<List<ContractDetails>> GetContractDetails(IBApi.Contract contract, TimeSpan? timeout = null)
         {
             await WaitForConnectionAsync();
 
             var requestId = Interlocked.Increment(ref _nextRequestId);
+            var effectiveTimeout = timeout ?? DefaultContractDetailsTimeout;
 
             var tcs = new TaskCompletionSource<List<ContractDetails>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
             _contractRequests[requestId] = tcs;
+            _contractResults[requestId] = [];
 
-            Client.reqContractDetails(requestId, contract);
+            _logger.Info(
+                $"Sending reqContractDetails: symbol={contract.Symbol}, reqId={requestId}, " +
+                $"exchange={contract.Exchange}, primary={contract.PrimaryExch}, timeout={effectiveTimeout.TotalSeconds}s");
 
-            return await tcs.Task;
+            try
+            {
+                Client.reqContractDetails(requestId, contract);
+
+                var completed = await Task.WhenAny(
+                    tcs.Task,
+                    Task.Delay(effectiveTimeout));
+
+                if (completed != tcs.Task)
+                {
+                    _logger.Error(
+                        $"REQ CONTRACT {requestId} TIMEOUT: symbol={contract.Symbol}, " +
+                        $"exchange={contract.Exchange}, primary={contract.PrimaryExch}");
+
+                    _contractRequests.TryRemove(requestId, out _);
+                    _contractResults.TryRemove(requestId, out _);
+                    return [];
+                }
+
+                var result = await tcs.Task;
+                _logger.Info(
+                    $"REQ CONTRACT {requestId} completed: symbol={contract.Symbol}, matches={result.Count}");
+                return result;
+            }
+            finally
+            {
+                _contractRequests.TryRemove(requestId, out _);
+                _contractResults.TryRemove(requestId, out _);
+            }
         }
 
         public async Task<List<StockInfo>> GetStocksAsync(
@@ -700,6 +734,9 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
                 _contractResults[reqId] = [];
 
             _contractResults[reqId].Add(contractDetails);
+            _logger.Debug(
+                $"contractDetails: reqId={reqId}, symbol={contractDetails.Contract?.Symbol}, " +
+                $"exchange={contractDetails.Contract?.Exchange}, primary={contractDetails.Contract?.PrimaryExch}");
         }
 
         public void contractDetailsEnd(int reqId)
@@ -710,10 +747,8 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
                     ? list
                     : [];
 
+                _logger.Info($"contractDetailsEnd: reqId={reqId}, matches={result.Count}");
                 tcs.SetResult(result);
-
-                _contractRequests.TryRemove(reqId, out var contractTcs);
-                _contractResults.TryRemove(reqId, out var contractDetails);
             }
         }
 
