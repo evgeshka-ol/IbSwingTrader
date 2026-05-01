@@ -284,7 +284,8 @@ namespace IbSwingTrader.Application.Candidates
                         mergedWishItem,
                         marketNow,
                         marketTimezone,
-                        finderSettings);
+                        finderSettings,
+                        contractResolveTimeout);
                 }
 
                 if (ctx == null)
@@ -571,7 +572,8 @@ namespace IbSwingTrader.Application.Candidates
             WishListItem item,
             DateTime marketNow,
             string marketTimezone,
-            FinderSettings finderSettings)
+            FinderSettings finderSettings,
+            TimeSpan contractResolveTimeout)
         {
             Contract contract;
 
