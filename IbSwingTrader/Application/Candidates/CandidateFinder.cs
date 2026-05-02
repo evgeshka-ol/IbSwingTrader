@@ -1071,6 +1071,17 @@ namespace IbSwingTrader.Application.Candidates
 
             score += CalculatePatternSeriesAdjustment(recentSeries, s);
 
+            if (IsResearchLikeLaunch(snapshot, diagnostics, recentSeries, s))
+            {
+                score += s.ResearchLikeBonus;
+
+                if (HasPositiveSlope(recentSeries.DailyMacdSeries, 0.08m) &&
+                    HasPositiveSlope(recentSeries.H4RsiSeries, s.PatternH4RsiSlopeThreshold))
+                {
+                    score += s.ResearchLikeStrongPatternBonus;
+                }
+            }
+
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
 
@@ -1273,6 +1284,21 @@ namespace IbSwingTrader.Application.Candidates
             => series.Count >= 3 &&
                series[^1] >= threshold &&
                series[^1] <= series[^2];
+
+        private static bool IsResearchLikeLaunch(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            NextDayRankingSettings settings)
+        {
+            return snapshot.Current.DistanceTo20dHigh <= settings.ResearchLikeDistanceTo20dHighThreshold &&
+                   snapshot.Current.DailyRSI14 <= settings.ResearchLikeMaxDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.ResearchLikeMinAtrRatio &&
+                   diagnostics.TrendPosition <= settings.ResearchLikeMaxTrendPosition &&
+                   diagnostics.BBMidSignedDistancePct <= settings.ResearchLikeMaxBbMid &&
+                   HasPositiveSlope(recentSeries.DailyRsiSeries, settings.PatternDailyRsiSlopeThreshold) &&
+                   HasPositiveSlope(recentSeries.H4MaSeries, settings.PatternH4MaSlopeThreshold);
+        }
 
         private bool ShouldBypassWishListFilterForLiveScan(
             CandidateSignalSnapshot snapshot,

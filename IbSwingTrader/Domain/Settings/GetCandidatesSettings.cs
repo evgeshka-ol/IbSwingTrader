@@ -327,6 +327,13 @@ namespace IbSwingTrader.Domain.Settings
         public decimal LateContinuationTrendPositionThreshold { get; set; } = 4.0m;
         public decimal LateContinuationBbMidThreshold { get; set; } = 3.0m;
         public decimal LateContinuationPenalty { get; set; } = 0.14m;
+        public decimal ResearchLikeDistanceTo20dHighThreshold { get; set; } = -10.0m;
+        public decimal ResearchLikeMaxDailyRsi14 { get; set; } = 58.0m;
+        public decimal ResearchLikeMinAtrRatio { get; set; } = 2.2m;
+        public decimal ResearchLikeMaxTrendPosition { get; set; } = 1.5m;
+        public decimal ResearchLikeMaxBbMid { get; set; } = 1.0m;
+        public decimal ResearchLikeBonus { get; set; } = 0.12m;
+        public decimal ResearchLikeStrongPatternBonus { get; set; } = 0.08m;
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;

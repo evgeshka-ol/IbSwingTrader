@@ -455,6 +455,13 @@
             "LateContinuationTrendPositionThreshold": 4.0,
             "LateContinuationBbMidThreshold": 3.0,
             "LateContinuationPenalty": 0.14,
+            "ResearchLikeDistanceTo20dHighThreshold": -10.0,
+            "ResearchLikeMaxDailyRsi14": 58.0,
+            "ResearchLikeMinAtrRatio": 2.2,
+            "ResearchLikeMaxTrendPosition": 1.5,
+            "ResearchLikeMaxBbMid": 1.0,
+            "ResearchLikeBonus": 0.12,
+            "ResearchLikeStrongPatternBonus": 0.08,
 
             "HotByVolumePresetBonus": 1.0,
             "MostActivePresetBonus": 0.9,
