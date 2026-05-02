@@ -1069,16 +1069,29 @@ namespace IbSwingTrader.Application.Candidates
                 score -= s.LateContinuationPenalty;
             }
 
+            if (diagnostics.TrendPosition >= s.OverextendedTrendPositionThreshold &&
+                snapshot.Current.DailyRSI14 >= s.OverextendedDailyRsi14Threshold &&
+                diagnostics.BBMidSignedDistancePct >= s.OverextendedBbMidThreshold)
+            {
+                score -= s.OverextendedPenalty;
+            }
+
             score += CalculatePatternSeriesAdjustment(recentSeries, s);
 
             if (IsResearchLikeLaunch(snapshot, diagnostics, recentSeries, s))
             {
                 score += s.ResearchLikeBonus;
 
-                if (HasPositiveSlope(recentSeries.DailyMacdSeries, 0.08m) &&
+                if (HasPositiveSlope(recentSeries.DailyMacdSeries, s.ResearchLikeDailyMacdSlopeThreshold) &&
                     HasPositiveSlope(recentSeries.H4RsiSeries, s.PatternH4RsiSlopeThreshold))
                 {
                     score += s.ResearchLikeStrongPatternBonus;
+                }
+
+                if (HasPositiveSlope(recentSeries.H4MacdSeries, 0.05m) &&
+                    CountUpMoves(recentSeries.H4RsiSeries) >= 7)
+                {
+                    score += s.ResearchLikeExtraBonus;
                 }
             }
 

@@ -326,14 +326,20 @@ namespace IbSwingTrader.Domain.Settings
         public decimal LateContinuationDistanceTo20dHighThreshold { get; set; } = -6.0m;
         public decimal LateContinuationTrendPositionThreshold { get; set; } = 4.0m;
         public decimal LateContinuationBbMidThreshold { get; set; } = 3.0m;
-        public decimal LateContinuationPenalty { get; set; } = 0.14m;
+        public decimal LateContinuationPenalty { get; set; } = 0.20m;
         public decimal ResearchLikeDistanceTo20dHighThreshold { get; set; } = -10.0m;
         public decimal ResearchLikeMaxDailyRsi14 { get; set; } = 58.0m;
         public decimal ResearchLikeMinAtrRatio { get; set; } = 2.2m;
         public decimal ResearchLikeMaxTrendPosition { get; set; } = 1.5m;
         public decimal ResearchLikeMaxBbMid { get; set; } = 1.0m;
-        public decimal ResearchLikeBonus { get; set; } = 0.12m;
-        public decimal ResearchLikeStrongPatternBonus { get; set; } = 0.08m;
+        public decimal ResearchLikeBonus { get; set; } = 0.16m;
+        public decimal ResearchLikeStrongPatternBonus { get; set; } = 0.12m;
+        public decimal ResearchLikeDailyMacdSlopeThreshold { get; set; } = 0.08m;
+        public decimal ResearchLikeExtraBonus { get; set; } = 0.08m;
+        public decimal OverextendedTrendPositionThreshold { get; set; } = 8.0m;
+        public decimal OverextendedDailyRsi14Threshold { get; set; } = 66.0m;
+        public decimal OverextendedBbMidThreshold { get; set; } = 5.0m;
+        public decimal OverextendedPenalty { get; set; } = 0.16m;
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;
