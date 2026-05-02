@@ -8,6 +8,7 @@ namespace IbSwingTrader.Application.Candidates
         IStockUniverseProvider stockUniverseProvider,
         IStockPreFilter preFilter,
         IContractResolver contractResolver,
+        IHistoricalCache historicalCache,
         IHistoricalDataService historicalData,
         IFeatureEngine featureEngine,
         ICandidateSignalAnalyzer signalAnalyzer,
@@ -28,6 +29,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
         private readonly IStockPreFilter _preFilter = preFilter;
         private readonly IContractResolver _contractResolver = contractResolver;
+        private readonly IHistoricalCache _historicalCache = historicalCache;
         private readonly IHistoricalDataService _historicalData = historicalData;
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICandidateSignalAnalyzer _signalAnalyzer = signalAnalyzer;
@@ -92,66 +94,35 @@ namespace IbSwingTrader.Application.Candidates
                         continue;
                     }
 
-                    Contract contract;
-
-                    try
-                    {
-                        contract = await _contractResolver.ResolveStockAsync(
-                            stock.Ticker,
-                            contractResolveTimeout,
-                            contractResolveMaxAttempts);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Info($"Skipping {stock.Ticker}: failed to resolve contract. {ex.Message}");
-                        continue;
-                    }
-
+                    Contract? contract = null;
                     List<Candle>? candles;
 
-                    try
+                    if (!TryLoadPreparedH4CandlesFromCache(stock.Ticker, finderSettings, out candles))
                     {
-                        var end = MarketTime.Now();
-                        var start = end.AddDays(-finderSettings.LookbackCalendarDays);
-
-                        candles = await _historicalData.GetCandlesRange(
-                            stock.Ticker,
-                            contract,
-                            Timeframe.H4,
-                            start,
-                            end);
-
-                        if (candles != null &&
-                            finderSettings.CandleCount > 0 &&
-                            candles.Count > finderSettings.CandleCount)
+                        try
                         {
-                            var trimmedCandles = candles
-                                .TakeLast(finderSettings.CandleCount)
-                                .ToList();
+                            contract = await _contractResolver.ResolveStockAsync(
+                                stock.Ticker,
+                                contractResolveTimeout,
+                                contractResolveMaxAttempts);
 
-                            var trimmedWeeklyBars = BuildWeeklyBars(trimmedCandles);
+                            var end = MarketTime.Now();
+                            var start = end.AddDays(-finderSettings.LookbackCalendarDays);
 
-                            if (trimmedWeeklyBars.Count >= 20)
-                            {
-                                candles = trimmedCandles;
+                            candles = await _historicalData.GetCandlesRange(
+                                stock.Ticker,
+                                contract,
+                                Timeframe.H4,
+                                start,
+                                end);
 
-                                _logger.Info(
-                                    $"Ticker history trimmed: {stock.Ticker}. " +
-                                    $"H4={candles.Count}, W1={trimmedWeeklyBars.Count}");
-                            }
-                            else
-                            {
-                                _logger.Info(
-                                    $"Ticker history trim skipped: {stock.Ticker}. " +
-                                    $"RequestedH4={finderSettings.CandleCount}, " +
-                                    $"TrimmedW1={trimmedWeeklyBars.Count} is too short for weekly analysis.");
-                            }
+                            candles = PrepareFinderCandles(stock.Ticker, candles, finderSettings);
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Info($"Skipping {stock.Ticker}: failed to load candles. {ex.Message}");
-                        continue;
+                        catch (Exception ex)
+                        {
+                            _logger.Info($"Skipping {stock.Ticker}: failed to load candles. {ex.Message}");
+                            continue;
+                        }
                     }
 
                     if (candles == null || candles.Count < finderSettings.MinimumCandles)
@@ -582,53 +553,35 @@ namespace IbSwingTrader.Application.Candidates
             TimeSpan contractResolveTimeout,
             int contractResolveMaxAttempts)
         {
-            Contract contract;
-
-            try
-            {
-                contract = await _contractResolver.ResolveStockAsync(
-                    item.Ticker,
-                    contractResolveTimeout,
-                    contractResolveMaxAttempts);
-            }
-            catch (Exception ex)
-            {
-                _logger.Info($"Skipping {item.Ticker}: failed to resolve contract from wish list. {ex.Message}");
-                return null;
-            }
-
+            Contract? contract = null;
             List<Candle>? candles;
 
-            try
+            if (!TryLoadPreparedH4CandlesFromCache(item.Ticker, finderSettings, out candles))
             {
-                var end = MarketTime.Now();
-                var start = end.AddDays(-finderSettings.LookbackCalendarDays);
-
-                candles = await _historicalData.GetCandlesRange(
-                    item.Ticker,
-                    contract,
-                    Timeframe.H4,
-                    start,
-                    end);
-
-                if (candles != null &&
-                    finderSettings.CandleCount > 0 &&
-                    candles.Count > finderSettings.CandleCount)
+                try
                 {
-                    var trimmedCandles = candles
-                        .TakeLast(finderSettings.CandleCount)
-                        .ToList();
+                    contract = await _contractResolver.ResolveStockAsync(
+                        item.Ticker,
+                        contractResolveTimeout,
+                        contractResolveMaxAttempts);
 
-                    var trimmedWeeklyBars = BuildWeeklyBars(trimmedCandles);
+                    var end = MarketTime.Now();
+                    var start = end.AddDays(-finderSettings.LookbackCalendarDays);
 
-                    if (trimmedWeeklyBars.Count >= 20)
-                        candles = trimmedCandles;
+                    candles = await _historicalData.GetCandlesRange(
+                        item.Ticker,
+                        contract,
+                        Timeframe.H4,
+                        start,
+                        end);
+
+                    candles = PrepareFinderCandles(item.Ticker, candles, finderSettings);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.Info($"Skipping {item.Ticker}: failed to load wish list candles. {ex.Message}");
-                return null;
+                catch (Exception ex)
+                {
+                    _logger.Info($"Skipping {item.Ticker}: failed to load wish list candles. {ex.Message}");
+                    return null;
+                }
             }
 
             if (candles == null || candles.Count < finderSettings.MinimumCandles)
@@ -662,10 +615,10 @@ namespace IbSwingTrader.Application.Candidates
                 Stock = new StockInfo
                 {
                     Ticker = item.Ticker,
-                    Exchange = contract.Exchange ?? string.Empty,
-                    Currency = contract.Currency ?? string.Empty,
-                    TradingClass = contract.TradingClass ?? string.Empty,
-                    ConId = contract.ConId
+                    Exchange = contract?.Exchange ?? string.Empty,
+                    Currency = contract?.Currency ?? string.Empty,
+                    TradingClass = contract?.TradingClass ?? string.Empty,
+                    ConId = contract?.ConId ?? 0
                 },
                 Contract = contract,
                 Preset = new PresetScanCode(
@@ -682,23 +635,42 @@ namespace IbSwingTrader.Application.Candidates
         private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx)
         {
             var tradeSettings = _getCandidatesSettingsProvider.Get().TradePlan;
+            var finderSettings = _getCandidatesSettingsProvider.Get().Finder;
             List<Candle>? entryCandles = null;
 
-            try
+            if (ctx.Contract == null)
             {
-                var end = MarketTime.Now();
-                var start = end.AddHours(-tradeSettings.EntryLookbackHours);
-
-                entryCandles = await _historicalData.GetCandlesRange(
-                    ctx.Stock.Ticker,
-                    ctx.Contract,
-                    Timeframe.M15,
-                    start,
-                    end);
+                try
+                {
+                    ctx.Contract = await _contractResolver.ResolveStockAsync(
+                        ctx.Stock.Ticker,
+                        TimeSpan.FromSeconds(Math.Max(15, finderSettings.ContractResolveTimeoutSeconds)),
+                        Math.Max(1, finderSettings.ContractResolveMaxAttempts));
+                }
+                catch (Exception ex)
+                {
+                    _logger.Info($"Contract resolve skipped for trade plan {ctx.Stock.Ticker}. {ex.Message}");
+                }
             }
-            catch (Exception ex)
+
+            if (ctx.Contract != null)
             {
-                _logger.Info($"M15 entry history load failed for {ctx.Stock.Ticker}. {ex.Message}");
+                try
+                {
+                    var end = MarketTime.Now();
+                    var start = end.AddHours(-tradeSettings.EntryLookbackHours);
+
+                    entryCandles = await _historicalData.GetCandlesRange(
+                        ctx.Stock.Ticker,
+                        ctx.Contract,
+                        Timeframe.M15,
+                        start,
+                        end);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Info($"M15 entry history load failed for {ctx.Stock.Ticker}. {ex.Message}");
+                }
             }
 
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -937,6 +909,8 @@ namespace IbSwingTrader.Application.Candidates
             decimal entryScore,
             decimal finalScore)
         {
+            var recentSeries = BuildRecentFeatureSeries(candles);
+
             var nextDayRank = CalculateNextDayRank(
                 preset.ScanCode,
                 finalScore,
@@ -946,9 +920,8 @@ namespace IbSwingTrader.Application.Candidates
                 needsDeeperEntry,
                 needsMomentumExit,
                 snapshot,
-                candles);
-
-            var recentSeries = BuildRecentFeatureSeries(candles);
+                candles,
+                recentSeries);
 
             return new CandidateDetails
             {
@@ -1001,7 +974,8 @@ namespace IbSwingTrader.Application.Candidates
             bool needsDeeperEntry,
             bool needsMomentumExit,
             CandidateSignalSnapshot snapshot,
-            List<Candle> candles)
+            List<Candle> candles,
+            RecentFeatureSeries recentSeries)
         {
             var s = _nextDayRankingSettings;
             var diagnostics = BuildDiagnostics(snapshot, candles);
@@ -1087,7 +1061,48 @@ namespace IbSwingTrader.Application.Candidates
                 score -= s.LateExtensionPenalty;
             }
 
+            if (snapshot.Current.DailyRSI14 >= s.LateContinuationDailyRsi14Threshold &&
+                snapshot.Current.DistanceTo20dHigh >= s.LateContinuationDistanceTo20dHighThreshold &&
+                diagnostics.TrendPosition >= s.LateContinuationTrendPositionThreshold &&
+                diagnostics.BBMidSignedDistancePct >= s.LateContinuationBbMidThreshold)
+            {
+                score -= s.LateContinuationPenalty;
+            }
+
+            score += CalculatePatternSeriesAdjustment(recentSeries, s);
+
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private decimal CalculatePatternSeriesAdjustment(
+            RecentFeatureSeries recentSeries,
+            NextDayRankingSettings settings)
+        {
+            decimal score = 0m;
+
+            var constructiveDaily =
+                HasPositiveSlope(recentSeries.DailyMaSeries, settings.PatternDailyMaSlopeThreshold) &&
+                HasPositiveSlope(recentSeries.DailyRsiSeries, settings.PatternDailyRsiSlopeThreshold) &&
+                CountUpMoves(recentSeries.DailyRsiSeries) >= 3;
+
+            if (constructiveDaily)
+                score += settings.PatternConstructiveLaunchBonus;
+
+            var constructiveH4 =
+                HasPositiveSlope(recentSeries.H4MaSeries, settings.PatternH4MaSlopeThreshold) &&
+                HasPositiveSlope(recentSeries.H4RsiSeries, settings.PatternH4RsiSlopeThreshold) &&
+                CountUpMoves(recentSeries.H4RsiSeries) >= 6;
+
+            if (constructiveH4)
+                score += settings.PatternH4TrendBonus;
+
+            if (IsExhausted(recentSeries.H4RsiSeries, settings.PatternExhaustionH4RsiThreshold) ||
+                IsRollingOver(recentSeries.H4MaSeries))
+            {
+                score -= settings.PatternExhaustionPenalty;
+            }
+
+            return score;
         }
 
         private RecentFeatureSeries BuildRecentFeatureSeries(List<Candle> candles)
@@ -1180,6 +1195,84 @@ namespace IbSwingTrader.Application.Candidates
             indexes.Reverse();
             return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
+
+        private bool TryLoadPreparedH4CandlesFromCache(
+            string ticker,
+            FinderSettings finderSettings,
+            out List<Candle>? candles)
+        {
+            candles = null;
+
+            if (!_historicalCache.TryLoad(ticker, Timeframe.H4, out var cached) ||
+                cached == null ||
+                cached.Count < finderSettings.MinimumCandles)
+            {
+                return false;
+            }
+
+            candles = PrepareFinderCandles(ticker, cached, finderSettings);
+            if (candles == null || candles.Count < finderSettings.MinimumCandles)
+                return false;
+
+            _logger.Info(
+                $"Historical cache used for scanner: {ticker}. " +
+                $"H4={candles.Count}, LookbackDays={finderSettings.LookbackCalendarDays}");
+
+            return true;
+        }
+
+        private List<Candle>? PrepareFinderCandles(
+            string ticker,
+            List<Candle>? candles,
+            FinderSettings finderSettings)
+        {
+            if (candles == null || candles.Count == 0)
+                return candles;
+
+            var prepared = candles;
+
+            if (finderSettings.CandleCount > 0 &&
+                prepared.Count > finderSettings.CandleCount)
+            {
+                var trimmedCandles = prepared
+                    .TakeLast(finderSettings.CandleCount)
+                    .ToList();
+
+                var trimmedWeeklyBars = BuildWeeklyBars(trimmedCandles);
+
+                if (trimmedWeeklyBars.Count >= 20)
+                {
+                    prepared = trimmedCandles;
+
+                    _logger.Info(
+                        $"Ticker history trimmed: {ticker}. " +
+                        $"H4={prepared.Count}, W1={trimmedWeeklyBars.Count}");
+                }
+                else
+                {
+                    _logger.Info(
+                        $"Ticker history trim skipped: {ticker}. " +
+                        $"RequestedH4={finderSettings.CandleCount}, " +
+                        $"TrimmedW1={trimmedWeeklyBars.Count} is too short for weekly analysis.");
+                }
+            }
+
+            return prepared;
+        }
+
+        private static bool HasPositiveSlope(List<decimal> series, decimal minSlope)
+            => series.Count >= 2 && series[^1] - series[0] >= minSlope;
+
+        private static int CountUpMoves(List<decimal> series)
+            => series.Count < 2 ? 0 : series.Zip(series.Skip(1), (a, b) => b > a ? 1 : 0).Sum();
+
+        private static bool IsRollingOver(List<decimal> series)
+            => series.Count >= 3 && series[^1] < series[^2] && series[^2] <= series[^3];
+
+        private static bool IsExhausted(List<decimal> series, decimal threshold)
+            => series.Count >= 3 &&
+               series[^1] >= threshold &&
+               series[^1] <= series[^2];
 
         private bool ShouldBypassWishListFilterForLiveScan(
             CandidateSignalSnapshot snapshot,
@@ -1908,7 +2001,7 @@ namespace IbSwingTrader.Application.Candidates
         private sealed class WishListContext
         {
             public required StockInfo Stock { get; init; }
-            public required Contract Contract { get; init; }
+            public Contract? Contract { get; set; }
             public required PresetScanCode Preset { get; init; }
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }

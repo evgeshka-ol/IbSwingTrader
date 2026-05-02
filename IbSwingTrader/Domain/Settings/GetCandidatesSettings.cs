@@ -314,6 +314,19 @@ namespace IbSwingTrader.Domain.Settings
         public decimal LateExtensionDistanceTo20dHighThreshold { get; set; } = -3m;
         public decimal LateExtensionDailyRsi14Threshold { get; set; } = 70m;
         public decimal LateExtensionPenalty { get; set; } = 0.10m;
+        public decimal PatternConstructiveLaunchBonus { get; set; } = 0.08m;
+        public decimal PatternH4TrendBonus { get; set; } = 0.05m;
+        public decimal PatternExhaustionPenalty { get; set; } = 0.10m;
+        public decimal PatternDailyMaSlopeThreshold { get; set; } = 2.0m;
+        public decimal PatternDailyRsiSlopeThreshold { get; set; } = 8.0m;
+        public decimal PatternH4MaSlopeThreshold { get; set; } = 1.0m;
+        public decimal PatternH4RsiSlopeThreshold { get; set; } = 10.0m;
+        public decimal PatternExhaustionH4RsiThreshold { get; set; } = 78.0m;
+        public decimal LateContinuationDailyRsi14Threshold { get; set; } = 60.0m;
+        public decimal LateContinuationDistanceTo20dHighThreshold { get; set; } = -6.0m;
+        public decimal LateContinuationTrendPositionThreshold { get; set; } = 4.0m;
+        public decimal LateContinuationBbMidThreshold { get; set; } = 3.0m;
+        public decimal LateContinuationPenalty { get; set; } = 0.14m;
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;

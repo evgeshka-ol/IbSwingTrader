@@ -8,6 +8,10 @@ namespace IbSwingTrader.Infrastructure.Historical
     {
         private readonly string _folder;
         private readonly ITextLogger _logger;
+        private readonly IFeatureEngine _featureEngine;
+        private const int RecentDailySeriesLength = 6;
+        private const int RecentWeeklySeriesLength = 3;
+        private const int RecentH4SeriesLength = 12;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -16,9 +20,11 @@ namespace IbSwingTrader.Infrastructure.Historical
 
         public HistoricalCache(
             IAgentPathService pathService,
+            IFeatureEngine featureEngine,
             ITextLogger logger)
         {
             _folder = pathService.GetCacheFolder();
+            _featureEngine = featureEngine;
             _logger = logger;
 
             Directory.CreateDirectory(_folder);
@@ -100,6 +106,15 @@ namespace IbSwingTrader.Infrastructure.Historical
                     .OrderBy(x => x.Time)
                     .ToList();
 
+                file.Coverage[timeframeKey] = BuildCoverage(file.Timeframes[timeframeKey]);
+
+                if (file.Timeframes.TryGetValue(nameof(Timeframe.H4), out var h4Candles) &&
+                    h4Candles != null &&
+                    h4Candles.Count > 0)
+                {
+                    file.PatternSnapshot = BuildPatternSnapshot(h4Candles);
+                }
+
                 var json = JsonSerializer.Serialize(file, JsonOptions);
                 File.WriteAllText(path, json);
             }
@@ -141,5 +156,153 @@ namespace IbSwingTrader.Infrastructure.Historical
             candle.Time = MarketTime.Normalize(candle.Time);
             return candle;
         }
+
+        private HistoricalTimeframeCoverage BuildCoverage(List<Candle> candles)
+        {
+            if (candles.Count == 0)
+            {
+                return new HistoricalTimeframeCoverage();
+            }
+
+            return new HistoricalTimeframeCoverage
+            {
+                Count = candles.Count,
+                FirstTime = candles[0].Time,
+                LastTime = candles[^1].Time,
+                SpanDays = Math.Max(0, (candles[^1].Time.Date - candles[0].Time.Date).Days)
+            };
+        }
+
+        private CachedPatternSnapshot BuildPatternSnapshot(List<Candle> candles)
+        {
+            var scanIndex = candles.Count - 1;
+
+            var dailyMa = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct);
+            var dailyRsi = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
+            var dailyMacd = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
+            var weeklyMa = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
+            var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
+            var weeklyMacd = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
+            var h4Ma = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
+            var h4Rsi = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
+            var h4Macd = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal);
+
+            return new CachedPatternSnapshot
+            {
+                RecentDailyMaSeries = dailyMa,
+                RecentDailyRsiSeries = dailyRsi,
+                RecentDailyMacdSeries = dailyMacd,
+                RecentWeeklyMaSeries = weeklyMa,
+                RecentWeeklyRsiSeries = weeklyRsi,
+                RecentWeeklyMacdSeries = weeklyMacd,
+                RecentH4MaSeries = h4Ma,
+                RecentH4RsiSeries = h4Rsi,
+                RecentH4MacdSeries = h4Macd,
+                DailyMaSlope = CalculateSlope(dailyMa),
+                DailyRsiSlope = CalculateSlope(dailyRsi),
+                H4MaSlope = CalculateSlope(h4Ma),
+                H4RsiSlope = CalculateSlope(h4Rsi),
+                DailyRsiUpMoves = CountUpMoves(dailyRsi),
+                H4RsiUpMoves = CountUpMoves(h4Rsi),
+                H4MaRollingOver = IsRollingOver(h4Ma),
+                H4RsiExhausted = IsExhausted(h4Rsi, 78m)
+            };
+        }
+
+        private List<decimal> BuildRecentDailySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentWeeklySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal?> selector)
+        {
+            var indexes = new List<int>();
+            var usedWeeks = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var week = StartOfWeek(candles[i].Time);
+                if (!usedWeeks.Add(week))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentWeeklySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes
+                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Where(x => x.HasValue)
+                .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentH4Series(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedBuckets = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var bucket = StartOfH4Bucket(candles[i].Time);
+                if (!usedBuckets.Add(bucket))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private static DateTime StartOfWeek(DateTime time)
+        {
+            var day = (int)time.DayOfWeek;
+            var delta = day == 0 ? 6 : day - 1;
+            return time.Date.AddDays(-delta);
+        }
+
+        private static DateTime StartOfH4Bucket(DateTime time)
+            => new(time.Year, time.Month, time.Day, (time.Hour / 4) * 4, 0, 0, time.Kind);
+
+        private static decimal CalculateSlope(List<decimal> series)
+            => series.Count >= 2 ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero) : 0m;
+
+        private static int CountUpMoves(List<decimal> series)
+            => series.Count < 2 ? 0 : series.Zip(series.Skip(1), (a, b) => b > a ? 1 : 0).Sum();
+
+        private static bool IsRollingOver(List<decimal> series)
+            => series.Count >= 3 && series[^1] < series[^2] && series[^2] <= series[^3];
+
+        private static bool IsExhausted(List<decimal> series, decimal threshold)
+            => series.Count >= 3 &&
+               series[^1] >= threshold &&
+               series[^1] <= series[^2];
     }
 }

@@ -8,5 +8,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultTargetPct { get; set; } = 10m;
         public bool UseAmbiguousBarResolver { get; set; } = true;
         public bool ReevaluateOpenCandidates { get; set; } = false;
+        public bool ReevaluateAllCandidatesWithSeries { get; set; } = false;
     }
 }

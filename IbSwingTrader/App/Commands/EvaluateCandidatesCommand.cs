@@ -83,6 +83,22 @@ namespace IbSwingTrader.App.Commands
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
 
+            if (evaluationSettings.ReevaluateAllCandidatesWithSeries)
+            {
+                var candidatesWithSeries = candidates
+                    .Where(HasRecentSeries)
+                    .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x.First())
+                    .ToList();
+
+                candidatesToEvaluate = candidatesWithSeries
+                    .ToDictionary(BuildScanKey, x => x, StringComparer.OrdinalIgnoreCase);
+
+                _logger.Info(
+                    $"Full reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
+                    $"ignoredWithoutSeries={candidates.Count - candidatesToEvaluate.Count}");
+            }
+
             if (evaluationSettings.ReevaluateOpenCandidates)
             {
                 var openCandidates = existingEvaluations
@@ -104,7 +120,7 @@ namespace IbSwingTrader.App.Commands
             }
 
             _logger.Info(
-                $"Previous-day scan evaluation selection: pending={candidatesToEvaluate.Count}, " +
+                $"Candidate evaluation selection: pending={candidatesToEvaluate.Count}, " +
                 "already evaluated rows will be overwritten");
 
             if (candidatesToEvaluate.Count == 0)
@@ -214,6 +230,19 @@ namespace IbSwingTrader.App.Commands
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}");
+        }
+
+        private static bool HasRecentSeries(CandidateDetails candidate)
+        {
+            return (candidate.RecentDailyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyMacdSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyRsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyMacdSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4MaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4RsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4MacdSeries?.Count ?? 0) > 0;
         }
 
         private static string BuildScanKey(CandidateEvaluationResult result)
