@@ -323,15 +323,14 @@ namespace IbSwingTrader.Application.Candidates
             var finalForecastedCount = finalWishList.Count(x => x.ExpectedBarsToTarget != null);
             _logger.Info($"WishList final. Total={finalWishList.Count}, WithForecast={finalForecastedCount}");
 
+            var finalCandidates = ReRankCandidates(
+                candidateResults.Values.ToList(),
+                getCandidatesSettings.FinalTopCandidates,
+                _nextDayRankingSettings);
+
             return new CandidateSearchResult
             {
-                Candidates =
-                [
-                    .. candidateResults.Values
-                        .OrderByDescending(x => x.TradePlan.ProfitPercent)
-                        .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                        .ThenByDescending(x => x.Score.Score)
-                ],
+                Candidates = [.. finalCandidates],
                 SameDayCandidates = sameDayCandidates,
                 WishList = finalWishList
             };
@@ -1098,6 +1097,103 @@ namespace IbSwingTrader.Application.Candidates
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
 
+        private List<CandidateDetails> ReRankCandidates(
+            List<CandidateDetails> candidates,
+            int finalTopCandidates,
+            NextDayRankingSettings settings)
+        {
+            if (candidates.Count <= 1)
+                return candidates;
+
+            var ordered = candidates
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.Score)
+                .ToList();
+
+            var window = Math.Min(
+                ordered.Count,
+                Math.Max(settings.SecondPassMinimumWindow, finalTopCandidates * settings.SecondPassWindowMultiplier));
+
+            if (window <= 1)
+                return ordered;
+
+            var topWindow = ordered
+                .Take(window)
+                .Select(x => new
+                {
+                    Candidate = x,
+                    AdjustedRank = (x.Score.NextDayRank ?? decimal.MinValue) + CalculateSecondPassAdjustment(x, settings)
+                })
+                .OrderByDescending(x => x.AdjustedRank)
+                .ThenByDescending(x => x.Candidate.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Candidate.Score.Score)
+                .ToList();
+
+            for (var i = 0; i < topWindow.Count; i++)
+            {
+                topWindow[i].Candidate.Score.NextDayRank = decimal.Round(
+                    topWindow[i].AdjustedRank,
+                    4,
+                    MidpointRounding.AwayFromZero);
+            }
+
+            return
+            [
+                .. topWindow.Select(x => x.Candidate),
+                .. ordered.Skip(window)
+            ];
+        }
+
+        private decimal CalculateSecondPassAdjustment(
+            CandidateDetails candidate,
+            NextDayRankingSettings settings)
+        {
+            var diagnostics = candidate.Diagnostics;
+            if (diagnostics == null)
+                return 0m;
+
+            var distanceTo20dHigh = candidate.Context.DistanceTo20dHigh;
+            var dailyRsi14 = candidate.Context.DailyRSI14;
+
+            var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
+            var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
+            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
+            var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+            var h4UpMoves = CountUpMoves(candidate.RecentH4RsiSeries);
+
+            var researchLikeScore =
+                Positive((-distanceTo20dHigh - 10m) / 20m) +
+                Positive((58m - dailyRsi14) / 20m) +
+                Positive((diagnostics.ATRRatio - 2.2m) / 2m) +
+                Positive((-diagnostics.TrendPosition) / 8m) +
+                Positive((-diagnostics.BBMidSignedDistancePct) / 6m);
+
+            var patternScore =
+                Positive((dailyRsiSlope - settings.PatternDailyRsiSlopeThreshold) / 20m) +
+                Positive((dailyMacdSlope - settings.ResearchLikeDailyMacdSlopeThreshold) / 0.2m) +
+                Positive((h4RsiSlope - settings.PatternH4RsiSlopeThreshold) / 30m) +
+                Positive((h4MacdSlope - 0.05m) / 0.2m) +
+                Positive((h4UpMoves - 6m) / 6m);
+
+            var latePenaltyScore =
+                Positive((dailyRsi14 - settings.LateContinuationDailyRsi14Threshold) / 20m) +
+                Positive((distanceTo20dHigh - settings.LateContinuationDistanceTo20dHighThreshold) / 6m) +
+                Positive((diagnostics.TrendPosition - settings.LateContinuationTrendPositionThreshold) / 8m) +
+                Positive((diagnostics.BBMidSignedDistancePct - settings.LateContinuationBbMidThreshold) / 6m);
+
+            var overextendedPenaltyScore =
+                Positive((dailyRsi14 - settings.OverextendedDailyRsi14Threshold) / 20m) +
+                Positive((diagnostics.TrendPosition - settings.OverextendedTrendPositionThreshold) / 8m) +
+                Positive((diagnostics.BBMidSignedDistancePct - settings.OverextendedBbMidThreshold) / 8m);
+
+            return
+                researchLikeScore * settings.SecondPassResearchLikeWeight +
+                patternScore * settings.SecondPassPatternWeight -
+                latePenaltyScore * settings.SecondPassLatePenaltyWeight -
+                overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight;
+        }
+
         private decimal CalculatePatternSeriesAdjustment(
             RecentFeatureSeries recentSeries,
             NextDayRankingSettings settings)
@@ -1297,6 +1393,14 @@ namespace IbSwingTrader.Application.Candidates
             => series.Count >= 3 &&
                series[^1] >= threshold &&
                series[^1] <= series[^2];
+
+        private static decimal CalculateSlope(List<decimal> series)
+            => series.Count >= 2
+                ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero)
+                : 0m;
+
+        private static decimal Positive(decimal value)
+            => value > 0m ? value : 0m;
 
         private static bool IsResearchLikeLaunch(
             CandidateSignalSnapshot snapshot,
