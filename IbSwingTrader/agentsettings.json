@@ -389,6 +389,19 @@
                 "MaxProfitPct": 0.14,
                 "EntryDiscountPct": 0.02,
                 "MaxLossPct": 0.06
+            },
+            "ResearchLikeExit": {
+                "Enabled": true,
+                "EntryDiscountPct": 0.01,
+                "EarlyEntryDiscountPct": 0.025,
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.12,
+                "MinDailyRsiSlope": 18.0,
+                "MinDailyMacdSlope": 0.18,
+                "MinH4RsiSlope": 30.0,
+                "MinH4MacdSlope": 0.15,
+                "MinH4RsiUpMoves": 8
             }
         },
 
@@ -476,6 +489,22 @@
             "SecondPassSeriesPenaltyWeight": 0.38,
             "SecondPassLatePenaltyWeight": 0.35,
             "SecondPassOverextendedPenaltyWeight": 0.25,
+            "ResearchSeriesDailyMaSlopeTarget": 22.95,
+            "ResearchSeriesDailyMaSlopeTolerance": 18.0,
+            "ResearchSeriesDailyRsiSlopeTarget": 19.56,
+            "ResearchSeriesDailyRsiSlopeTolerance": 15.0,
+            "ResearchSeriesDailyMacdSlopeTarget": 0.42,
+            "ResearchSeriesDailyMacdSlopeTolerance": 0.35,
+            "ResearchSeriesH4MaSlopeTarget": 24.49,
+            "ResearchSeriesH4MaSlopeTolerance": 18.0,
+            "ResearchSeriesH4RsiSlopeTarget": 38.34,
+            "ResearchSeriesH4RsiSlopeTolerance": 22.0,
+            "ResearchSeriesH4MacdSlopeTarget": 0.26,
+            "ResearchSeriesH4MacdSlopeTolerance": 0.20,
+            "ResearchSeriesDailyRsiUpMovesTarget": 3.0,
+            "ResearchSeriesDailyRsiUpMovesTolerance": 2.0,
+            "ResearchSeriesH4RsiUpMovesTarget": 13.0,
+            "ResearchSeriesH4RsiUpMovesTolerance": 4.0,
 
             "HotByVolumePresetBonus": 1.0,
             "MostActivePresetBonus": 0.9,

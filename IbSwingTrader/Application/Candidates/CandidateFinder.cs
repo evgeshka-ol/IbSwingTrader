@@ -683,6 +683,13 @@ namespace IbSwingTrader.Application.Candidates
             var isDeepParabolicExpansion = IsDeepParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
             var isExplosiveMinFirst = IsExplosiveMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
             var isExplosiveMaxFirst = IsExplosiveMaxFirstProxy(ctx.Snapshot, diagnostics);
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var isResearchLikeLaunch = IsResearchLikeLaunch(
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                _nextDayRankingSettings);
+            var isResearchLikeReadyNow = IsResearchLikeReadyNow(recentSeries, tradeSettings.ResearchLikeExit);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -800,6 +807,32 @@ namespace IbSwingTrader.Application.Candidates
                     $"DefaultProfitPct={_fmt.Percent(strongSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(strongSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(strongSettings.MaxProfitPct)}");
+            }
+            else if (isResearchLikeLaunch && tradeSettings.ResearchLikeExit.Enabled)
+            {
+                var researchLikeSettings = tradeSettings.ResearchLikeExit;
+                if (isResearchLikeReadyNow)
+                {
+                    defaultProfitPctOverride = researchLikeSettings.DefaultProfitPct;
+                    minProfitPctOverride = researchLikeSettings.MinProfitPct;
+                    maxProfitPctOverride = researchLikeSettings.MaxProfitPct;
+                    entryDiscountOverridePct ??= researchLikeSettings.EntryDiscountPct;
+
+                    _logger.Info(
+                        $"Trade plan research-like ready-now profile applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
+                        $"DefaultProfitPct={_fmt.Percent(researchLikeSettings.DefaultProfitPct)}, " +
+                        $"MinProfitPct={_fmt.Percent(researchLikeSettings.MinProfitPct)}, " +
+                        $"MaxProfitPct={_fmt.Percent(researchLikeSettings.MaxProfitPct)}");
+                }
+                else
+                {
+                    entryDiscountOverridePct ??= researchLikeSettings.EarlyEntryDiscountPct;
+
+                    _logger.Info(
+                        $"Trade plan research-like early-entry profile applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
+                }
             }
             else if (needsMomentumExit)
             {
@@ -1166,16 +1199,16 @@ namespace IbSwingTrader.Application.Candidates
             var h4UpMoves = CountUpMoves(candidate.RecentH4RsiSeries);
 
             var dailySeriesScore =
-                Positive((dailyMaSlope - settings.PatternDailyMaSlopeThreshold) / 8m) +
-                Positive((dailyRsiSlope - settings.PatternDailyRsiSlopeThreshold) / 18m) +
-                Positive((dailyMacdSlope - settings.ResearchLikeDailyMacdSlopeThreshold) / 0.18m) +
-                Positive((dailyUpMoves - 2m) / 3m);
+                Closeness(dailyMaSlope, settings.ResearchSeriesDailyMaSlopeTarget, settings.ResearchSeriesDailyMaSlopeTolerance) +
+                Closeness(dailyRsiSlope, settings.ResearchSeriesDailyRsiSlopeTarget, settings.ResearchSeriesDailyRsiSlopeTolerance) +
+                Closeness(dailyMacdSlope, settings.ResearchSeriesDailyMacdSlopeTarget, settings.ResearchSeriesDailyMacdSlopeTolerance) +
+                Closeness(dailyUpMoves, settings.ResearchSeriesDailyRsiUpMovesTarget, settings.ResearchSeriesDailyRsiUpMovesTolerance);
 
             var h4SeriesScore =
-                Positive((h4MaSlope - settings.PatternH4MaSlopeThreshold) / 6m) +
-                Positive((h4RsiSlope - settings.PatternH4RsiSlopeThreshold) / 25m) +
-                Positive((h4MacdSlope - 0.05m) / 0.18m) +
-                Positive((h4UpMoves - 6m) / 5m);
+                Closeness(h4MaSlope, settings.ResearchSeriesH4MaSlopeTarget, settings.ResearchSeriesH4MaSlopeTolerance) +
+                Closeness(h4RsiSlope, settings.ResearchSeriesH4RsiSlopeTarget, settings.ResearchSeriesH4RsiSlopeTolerance) +
+                Closeness(h4MacdSlope, settings.ResearchSeriesH4MacdSlopeTarget, settings.ResearchSeriesH4MacdSlopeTolerance) +
+                Closeness(h4UpMoves, settings.ResearchSeriesH4RsiUpMovesTarget, settings.ResearchSeriesH4RsiUpMovesTolerance);
 
             var contextScore =
                 Positive((-distanceTo20dHigh - 10m) / 20m) +
@@ -1424,6 +1457,14 @@ namespace IbSwingTrader.Application.Candidates
         private static decimal Negative(decimal value)
             => value < 0m ? -value : 0m;
 
+        private static decimal Closeness(decimal actual, decimal target, decimal tolerance)
+        {
+            if (tolerance <= 0m)
+                return 0m;
+
+            return Positive(1m - Math.Abs(actual - target) / tolerance);
+        }
+
         private static bool IsResearchLikeLaunch(
             CandidateSignalSnapshot snapshot,
             CandidateDiagnostics diagnostics,
@@ -1437,6 +1478,18 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.BBMidSignedDistancePct <= settings.ResearchLikeMaxBbMid &&
                    HasPositiveSlope(recentSeries.DailyRsiSeries, settings.PatternDailyRsiSlopeThreshold) &&
                    HasPositiveSlope(recentSeries.H4MaSeries, settings.PatternH4MaSlopeThreshold);
+        }
+
+        private static bool IsResearchLikeReadyNow(
+            RecentFeatureSeries recentSeries,
+            ResearchLikeExitSettings settings)
+        {
+            return settings.Enabled &&
+                   CalculateSlope(recentSeries.DailyRsiSeries) >= settings.MinDailyRsiSlope &&
+                   CalculateSlope(recentSeries.DailyMacdSeries) >= settings.MinDailyMacdSlope &&
+                   CalculateSlope(recentSeries.H4RsiSeries) >= settings.MinH4RsiSlope &&
+                   CalculateSlope(recentSeries.H4MacdSeries) >= settings.MinH4MacdSlope &&
+                   CountUpMoves(recentSeries.H4RsiSeries) >= settings.MinH4RsiUpMoves;
         }
 
         private bool ShouldBypassWishListFilterForLiveScan(

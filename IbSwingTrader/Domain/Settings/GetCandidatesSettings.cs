@@ -135,6 +135,7 @@ namespace IbSwingTrader.Domain.Settings
         public ExplosiveMaxFirstExitSettings ExplosiveMaxFirstExit { get; set; } = new();
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
+        public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
     }
 
     public class DeepPullbackEntrySettings
@@ -263,6 +264,21 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MaxLossPct { get; set; } = 0.06m;
     }
 
+    public class ResearchLikeExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal EntryDiscountPct { get; set; } = 0.01m;
+        public decimal EarlyEntryDiscountPct { get; set; } = 0.025m;
+        public decimal DefaultProfitPct { get; set; } = 0.08m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal MinDailyRsiSlope { get; set; } = 18m;
+        public decimal MinDailyMacdSlope { get; set; } = 0.18m;
+        public decimal MinH4RsiSlope { get; set; } = 30m;
+        public decimal MinH4MacdSlope { get; set; } = 0.15m;
+        public int MinH4RsiUpMoves { get; set; } = 8;
+    }
+
     public class NextDayRankingSettings
     {
         public decimal EntryScoreWeight { get; set; } = 0.35m;
@@ -348,6 +364,22 @@ namespace IbSwingTrader.Domain.Settings
         public decimal SecondPassSeriesPenaltyWeight { get; set; } = 0.30m;
         public decimal SecondPassLatePenaltyWeight { get; set; } = 0.35m;
         public decimal SecondPassOverextendedPenaltyWeight { get; set; } = 0.25m;
+        public decimal ResearchSeriesDailyMaSlopeTarget { get; set; } = 22.95m;
+        public decimal ResearchSeriesDailyMaSlopeTolerance { get; set; } = 18m;
+        public decimal ResearchSeriesDailyRsiSlopeTarget { get; set; } = 19.56m;
+        public decimal ResearchSeriesDailyRsiSlopeTolerance { get; set; } = 15m;
+        public decimal ResearchSeriesDailyMacdSlopeTarget { get; set; } = 0.42m;
+        public decimal ResearchSeriesDailyMacdSlopeTolerance { get; set; } = 0.35m;
+        public decimal ResearchSeriesH4MaSlopeTarget { get; set; } = 24.49m;
+        public decimal ResearchSeriesH4MaSlopeTolerance { get; set; } = 18m;
+        public decimal ResearchSeriesH4RsiSlopeTarget { get; set; } = 38.34m;
+        public decimal ResearchSeriesH4RsiSlopeTolerance { get; set; } = 22m;
+        public decimal ResearchSeriesH4MacdSlopeTarget { get; set; } = 0.26m;
+        public decimal ResearchSeriesH4MacdSlopeTolerance { get; set; } = 0.20m;
+        public decimal ResearchSeriesDailyRsiUpMovesTarget { get; set; } = 3m;
+        public decimal ResearchSeriesDailyRsiUpMovesTolerance { get; set; } = 2m;
+        public decimal ResearchSeriesH4RsiUpMovesTarget { get; set; } = 13m;
+        public decimal ResearchSeriesH4RsiUpMovesTolerance { get; set; } = 4m;
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;
