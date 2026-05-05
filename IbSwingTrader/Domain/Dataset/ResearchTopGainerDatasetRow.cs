@@ -65,14 +65,20 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal? WeeklyMacdHistDelta { get; set; }
 
         public List<decimal> DailyMaSeries { get; set; } = [];
+        public List<decimal> DailyBbUpperDistanceSeries { get; set; } = [];
+        public List<decimal> DailyBbWidthSeries { get; set; } = [];
         public List<decimal> DailyRsiSeries { get; set; } = [];
         public List<decimal> DailyMacdSeries { get; set; } = [];
 
         public List<decimal> WeeklyMaSeries { get; set; } = [];
+        public List<decimal> WeeklyBbUpperDistanceSeries { get; set; } = [];
+        public List<decimal> WeeklyBbWidthSeries { get; set; } = [];
         public List<decimal> WeeklyRsiSeries { get; set; } = [];
         public List<decimal> WeeklyMacdSeries { get; set; } = [];
 
         public List<decimal>? H4MaSeries { get; set; }
+        public List<decimal>? H4BbUpperDistanceSeries { get; set; }
+        public List<decimal>? H4BbWidthSeries { get; set; }
         public List<decimal>? H4RsiSeries { get; set; }
         public List<decimal>? H4MacdSeries { get; set; }
     }

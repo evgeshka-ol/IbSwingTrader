@@ -320,12 +320,18 @@ namespace IbSwingTrader.App.Commands
                 nameof(ResearchTopGainerDatasetRow.NegativePotentialPct) => ["MaxDrawdownBeforePeakPct"],
                 nameof(ResearchTopGainerDatasetRow.BarsToMax) => ["BarsToPeak"],
                 nameof(ResearchTopGainerDatasetRow.DailyMaSeries) => ["DailyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbUpperDistanceSeries) => ["DailyBollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbWidthSeries) => ["DailyBollingerBandWidths"],
                 nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
                 nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbUpperDistanceSeries) => ["WeeklyBollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbWidthSeries) => ["WeeklyBollingerBandWidths"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4BbUpperDistanceSeries) => ["H4BollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4BbWidthSeries) => ["H4BollingerBandWidths"],
                 nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
                 _ => []
@@ -512,12 +518,18 @@ namespace IbSwingTrader.App.Commands
                 BbMidSignedDistancePct = row.BbMidSignedDistancePct,
                 WeeklyMacdHistDelta = row.WeeklyMacdHistDelta,
                 DailyMaSeries = [.. row.DailyMaDistances],
+                DailyBbUpperDistanceSeries = [.. row.DailyBollingerUpperDistances],
+                DailyBbWidthSeries = [.. row.DailyBollingerBandWidths],
                 DailyRsiSeries = [.. row.DailyRsiValues],
                 DailyMacdSeries = [.. row.DailyMacdValues],
                 WeeklyMaSeries = [.. row.WeeklyMaDistances],
+                WeeklyBbUpperDistanceSeries = [.. row.WeeklyBollingerUpperDistances],
+                WeeklyBbWidthSeries = [.. row.WeeklyBollingerBandWidths],
                 WeeklyRsiSeries = [.. row.WeeklyRsiValues],
                 WeeklyMacdSeries = [.. row.WeeklyMacdValues],
                 H4MaSeries = row.H4MaDistances == null ? null : [.. row.H4MaDistances],
+                H4BbUpperDistanceSeries = row.H4BollingerUpperDistances == null ? null : [.. row.H4BollingerUpperDistances],
+                H4BbWidthSeries = row.H4BollingerBandWidths == null ? null : [.. row.H4BollingerBandWidths],
                 H4RsiSeries = row.H4RsiValues == null ? null : [.. row.H4RsiValues],
                 H4MacdSeries = row.H4MacdValues == null ? null : [.. row.H4MacdValues]
             };
@@ -801,6 +813,8 @@ namespace IbSwingTrader.App.Commands
 
                 var features = _featureEngine.Calculate(candles, lastBarIndexOfDay + 1);
                 row.DailyMaDistances.Add(features.DailyMaSignedDistancePct);
+                row.DailyBollingerUpperDistances.Add(features.DailyBollingerUpperDistancePct);
+                row.DailyBollingerBandWidths.Add(features.DailyBollingerBandWidthPct);
                 row.DailyRsiValues.Add(features.DailyRSI14);
                 row.DailyMacdValues.Add(features.DailyMACDLineMinusSignal);
             }
@@ -836,6 +850,10 @@ namespace IbSwingTrader.App.Commands
 
                 if (features.WeeklyMaSignedDistancePct.HasValue)
                     row.WeeklyMaDistances.Add(features.WeeklyMaSignedDistancePct.Value);
+                if (features.WeeklyBollingerUpperDistancePct.HasValue)
+                    row.WeeklyBollingerUpperDistances.Add(features.WeeklyBollingerUpperDistancePct.Value);
+                if (features.WeeklyBollingerBandWidthPct.HasValue)
+                    row.WeeklyBollingerBandWidths.Add(features.WeeklyBollingerBandWidthPct.Value);
 
                 if (features.WeeklyRSI14.HasValue)
                     row.WeeklyRsiValues.Add(features.WeeklyRSI14.Value);
@@ -852,6 +870,8 @@ namespace IbSwingTrader.App.Commands
             int exitIndex)
         {
             row.H4MaDistances = [];
+            row.H4BollingerUpperDistances = [];
+            row.H4BollingerBandWidths = [];
             row.H4RsiValues = [];
             row.H4MacdValues = [];
 
@@ -859,6 +879,8 @@ namespace IbSwingTrader.App.Commands
             {
                 var features = _featureEngine.Calculate(candles, i + 1);
                 row.H4MaDistances.Add(features.H4MaSignedDistancePct);
+                row.H4BollingerUpperDistances.Add(features.H4BollingerUpperDistancePct);
+                row.H4BollingerBandWidths.Add(features.H4BollingerBandWidthPct);
                 row.H4RsiValues.Add(features.RSI14);
                 row.H4MacdValues.Add(features.MACDLineMinusSignal);
             }

@@ -17,6 +17,8 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- 4H ---
                 H4MaSignedDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 50),
+                H4BollingerUpperDistancePct = CalcH4BollingerUpperDistancePct(candles, index, 20, 2m),
+                H4BollingerBandWidthPct = CalcH4BollingerBandWidthPct(candles, index, 20, 2m),
                 RSI14 = CalcRsiFromCandles(candles, index, 14),
                 MACDLineMinusSignal = CalcMacdLineMinusSignalFromCandles(candles, index),
 
@@ -137,6 +139,24 @@ namespace IbSwingTrader.Application.Dataset
 
             var close = dailyCloses[^1];
             return (close - sma) / sma * 100m;
+        }
+
+        private static decimal CalcH4BollingerUpperDistancePct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerUpperDistancePctFromSeries(BuildH4Closes(candles, i), length, stdDevMultiplier) ?? 0m;
+        }
+
+        private static decimal CalcH4BollingerBandWidthPct(
+            List<Candle> candles,
+            int i,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            return CalcBollingerBandWidthPctFromSeries(BuildH4Closes(candles, i), length, stdDevMultiplier) ?? 0m;
         }
 
         private static decimal CalcDailyBollingerUpperDistancePct(
@@ -415,6 +435,14 @@ namespace IbSwingTrader.Application.Dataset
             }
 
             return result;
+        }
+
+        private static List<decimal> BuildH4Closes(List<Candle> candles, int i)
+        {
+            if (i <= 0)
+                return [];
+
+            return [.. candles.Take(i).Select(x => x.Close)];
         }
 
         private static List<DailyBar> BuildDailyBars(List<Candle> candles, int i)

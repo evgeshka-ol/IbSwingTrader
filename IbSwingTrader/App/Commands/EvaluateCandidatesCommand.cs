@@ -235,12 +235,18 @@ namespace IbSwingTrader.App.Commands
         private static bool HasRecentSeries(CandidateDetails candidate)
         {
             return (candidate.RecentDailyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyRsiSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4MaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4BbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4BbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4RsiSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4MacdSeries?.Count ?? 0) > 0;
         }
@@ -259,12 +265,18 @@ namespace IbSwingTrader.App.Commands
                 Ticker = evaluation.Ticker,
                 CandidateSource = string.IsNullOrWhiteSpace(evaluation.CandidateSource) ? "Primary" : evaluation.CandidateSource,
                 RecentDailyMaSeries = [.. evaluation.RecentDailyMaSeries],
+                RecentDailyBbUpperDistanceSeries = [.. evaluation.RecentDailyBbUpperDistanceSeries],
+                RecentDailyBbWidthSeries = [.. evaluation.RecentDailyBbWidthSeries],
                 RecentDailyRsiSeries = [.. evaluation.RecentDailyRsiSeries],
                 RecentDailyMacdSeries = [.. evaluation.RecentDailyMacdSeries],
                 RecentWeeklyMaSeries = [.. evaluation.RecentWeeklyMaSeries],
+                RecentWeeklyBbUpperDistanceSeries = [.. evaluation.RecentWeeklyBbUpperDistanceSeries],
+                RecentWeeklyBbWidthSeries = [.. evaluation.RecentWeeklyBbWidthSeries],
                 RecentWeeklyRsiSeries = [.. evaluation.RecentWeeklyRsiSeries],
                 RecentWeeklyMacdSeries = [.. evaluation.RecentWeeklyMacdSeries],
                 RecentH4MaSeries = [.. evaluation.RecentH4MaSeries],
+                RecentH4BbUpperDistanceSeries = [.. evaluation.RecentH4BbUpperDistanceSeries],
+                RecentH4BbWidthSeries = [.. evaluation.RecentH4BbWidthSeries],
                 RecentH4RsiSeries = [.. evaluation.RecentH4RsiSeries],
                 RecentH4MacdSeries = [.. evaluation.RecentH4MacdSeries],
                 IsFromWishlist = evaluation.IsFromWishlist,

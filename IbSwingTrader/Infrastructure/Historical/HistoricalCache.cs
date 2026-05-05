@@ -178,24 +178,36 @@ namespace IbSwingTrader.Infrastructure.Historical
             var scanIndex = candles.Count - 1;
 
             var dailyMa = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct);
+            var dailyBbUpper = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct);
+            var dailyBbWidth = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct);
             var dailyRsi = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
             var dailyMacd = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
             var weeklyMa = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
+            var weeklyBbUpper = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct);
+            var weeklyBbWidth = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct);
             var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
             var weeklyMacd = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
             var h4Ma = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
+            var h4BbUpper = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct);
+            var h4BbWidth = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct);
             var h4Rsi = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
             var h4Macd = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal);
 
             return new CachedPatternSnapshot
             {
                 RecentDailyMaSeries = dailyMa,
+                RecentDailyBbUpperDistanceSeries = dailyBbUpper,
+                RecentDailyBbWidthSeries = dailyBbWidth,
                 RecentDailyRsiSeries = dailyRsi,
                 RecentDailyMacdSeries = dailyMacd,
                 RecentWeeklyMaSeries = weeklyMa,
+                RecentWeeklyBbUpperDistanceSeries = weeklyBbUpper,
+                RecentWeeklyBbWidthSeries = weeklyBbWidth,
                 RecentWeeklyRsiSeries = weeklyRsi,
                 RecentWeeklyMacdSeries = weeklyMacd,
                 RecentH4MaSeries = h4Ma,
+                RecentH4BbUpperDistanceSeries = h4BbUpper,
+                RecentH4BbWidthSeries = h4BbWidth,
                 RecentH4RsiSeries = h4Rsi,
                 RecentH4MacdSeries = h4Macd,
                 DailyMaSlope = CalculateSlope(dailyMa),

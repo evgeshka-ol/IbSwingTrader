@@ -9,12 +9,18 @@ namespace IbSwingTrader.Domain.Candidates
         public required string PresetScanCode { get; set; }
         public string CandidateSource { get; set; } = string.Empty;
         public List<decimal> RecentDailyMaSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbUpperDistanceSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbWidthSeries { get; set; } = [];
         public List<decimal> RecentDailyRsiSeries { get; set; } = [];
         public List<decimal> RecentDailyMacdSeries { get; set; } = [];
         public List<decimal> RecentWeeklyMaSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbUpperDistanceSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbWidthSeries { get; set; } = [];
         public List<decimal> RecentWeeklyRsiSeries { get; set; } = [];
         public List<decimal> RecentWeeklyMacdSeries { get; set; } = [];
         public List<decimal> RecentH4MaSeries { get; set; } = [];
+        public List<decimal> RecentH4BbUpperDistanceSeries { get; set; } = [];
+        public List<decimal> RecentH4BbWidthSeries { get; set; } = [];
         public List<decimal> RecentH4RsiSeries { get; set; } = [];
         public List<decimal> RecentH4MacdSeries { get; set; } = [];
         public bool IsFromWishlist { get; set; }

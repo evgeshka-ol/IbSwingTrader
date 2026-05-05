@@ -960,12 +960,18 @@ namespace IbSwingTrader.Application.Candidates
                 Ticker = stock.Ticker,
                 IsFromWishlist = isFromWishlist,
                 RecentDailyMaSeries = recentSeries.DailyMaSeries,
+                RecentDailyBbUpperDistanceSeries = recentSeries.DailyBbUpperDistanceSeries,
+                RecentDailyBbWidthSeries = recentSeries.DailyBbWidthSeries,
                 RecentDailyRsiSeries = recentSeries.DailyRsiSeries,
                 RecentDailyMacdSeries = recentSeries.DailyMacdSeries,
                 RecentWeeklyMaSeries = recentSeries.WeeklyMaSeries,
+                RecentWeeklyBbUpperDistanceSeries = recentSeries.WeeklyBbUpperDistanceSeries,
+                RecentWeeklyBbWidthSeries = recentSeries.WeeklyBbWidthSeries,
                 RecentWeeklyRsiSeries = recentSeries.WeeklyRsiSeries,
                 RecentWeeklyMacdSeries = recentSeries.WeeklyMacdSeries,
                 RecentH4MaSeries = recentSeries.H4MaSeries,
+                RecentH4BbUpperDistanceSeries = recentSeries.H4BbUpperDistanceSeries,
+                RecentH4BbWidthSeries = recentSeries.H4BbWidthSeries,
                 RecentH4RsiSeries = recentSeries.H4RsiSeries,
                 RecentH4MacdSeries = recentSeries.H4MacdSeries,
                 NeedsDeeperEntry = needsDeeperEntry,
@@ -1284,12 +1290,18 @@ namespace IbSwingTrader.Application.Candidates
             return new RecentFeatureSeries
             {
                 DailyMaSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct),
+                DailyBbUpperDistanceSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct),
+                DailyBbWidthSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct),
                 DailyRsiSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14),
                 DailyMacdSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal),
                 WeeklyMaSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct),
+                WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct),
+                WeeklyBbWidthSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct),
                 WeeklyRsiSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14),
                 WeeklyMacdSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal),
                 H4MaSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct),
+                H4BbUpperDistanceSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct),
+                H4BbWidthSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct),
                 H4RsiSeries = BuildRecentH4Series(candles, scanIndex, x => x.RSI14),
                 H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal)
             };
@@ -2206,12 +2218,18 @@ namespace IbSwingTrader.Application.Candidates
         private sealed class RecentFeatureSeries
         {
             public List<decimal> DailyMaSeries { get; init; } = [];
+            public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> DailyBbWidthSeries { get; init; } = [];
             public List<decimal> DailyRsiSeries { get; init; } = [];
             public List<decimal> DailyMacdSeries { get; init; } = [];
             public List<decimal> WeeklyMaSeries { get; init; } = [];
+            public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
             public List<decimal> WeeklyRsiSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSeries { get; init; } = [];
             public List<decimal> H4MaSeries { get; init; } = [];
+            public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> H4BbWidthSeries { get; init; } = [];
             public List<decimal> H4RsiSeries { get; init; } = [];
             public List<decimal> H4MacdSeries { get; init; } = [];
         }
