@@ -470,8 +470,10 @@
             "OverextendedPenalty": 0.16,
             "SecondPassWindowMultiplier": 4,
             "SecondPassMinimumWindow": 30,
-            "SecondPassResearchLikeWeight": 0.40,
-            "SecondPassPatternWeight": 0.20,
+            "SecondPassDailySeriesWeight": 0.55,
+            "SecondPassH4SeriesWeight": 0.50,
+            "SecondPassContextWeight": 0.12,
+            "SecondPassSeriesPenaltyWeight": 0.38,
             "SecondPassLatePenaltyWeight": 0.35,
             "SecondPassOverextendedPenaltyWeight": 0.25,
 
@@ -495,7 +497,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 7,
-        "ReevaluateOpenCandidates": false,
+        "ReevaluateOpenCandidates": true,
         "ReevaluateAllCandidatesWithSeries": true,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,

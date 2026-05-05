@@ -1156,25 +1156,42 @@ namespace IbSwingTrader.Application.Candidates
             var distanceTo20dHigh = candidate.Context.DistanceTo20dHigh;
             var dailyRsi14 = candidate.Context.DailyRSI14;
 
+            var dailyMaSlope = CalculateSlope(candidate.RecentDailyMaSeries);
             var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
             var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
+            var h4MaSlope = CalculateSlope(candidate.RecentH4MaSeries);
             var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
             var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+            var dailyUpMoves = CountUpMoves(candidate.RecentDailyRsiSeries);
             var h4UpMoves = CountUpMoves(candidate.RecentH4RsiSeries);
 
-            var researchLikeScore =
+            var dailySeriesScore =
+                Positive((dailyMaSlope - settings.PatternDailyMaSlopeThreshold) / 8m) +
+                Positive((dailyRsiSlope - settings.PatternDailyRsiSlopeThreshold) / 18m) +
+                Positive((dailyMacdSlope - settings.ResearchLikeDailyMacdSlopeThreshold) / 0.18m) +
+                Positive((dailyUpMoves - 2m) / 3m);
+
+            var h4SeriesScore =
+                Positive((h4MaSlope - settings.PatternH4MaSlopeThreshold) / 6m) +
+                Positive((h4RsiSlope - settings.PatternH4RsiSlopeThreshold) / 25m) +
+                Positive((h4MacdSlope - 0.05m) / 0.18m) +
+                Positive((h4UpMoves - 6m) / 5m);
+
+            var contextScore =
                 Positive((-distanceTo20dHigh - 10m) / 20m) +
                 Positive((58m - dailyRsi14) / 20m) +
                 Positive((diagnostics.ATRRatio - 2.2m) / 2m) +
                 Positive((-diagnostics.TrendPosition) / 8m) +
                 Positive((-diagnostics.BBMidSignedDistancePct) / 6m);
 
-            var patternScore =
-                Positive((dailyRsiSlope - settings.PatternDailyRsiSlopeThreshold) / 20m) +
-                Positive((dailyMacdSlope - settings.ResearchLikeDailyMacdSlopeThreshold) / 0.2m) +
-                Positive((h4RsiSlope - settings.PatternH4RsiSlopeThreshold) / 30m) +
-                Positive((h4MacdSlope - 0.05m) / 0.2m) +
-                Positive((h4UpMoves - 6m) / 6m);
+            var seriesPenaltyScore =
+                Negative(dailyMacdSlope) / 0.15m +
+                Negative(h4MacdSlope) / 0.15m +
+                (IsRollingOver(candidate.RecentDailyRsiSeries) ? 0.8m : 0m) +
+                (IsRollingOver(candidate.RecentDailyMaSeries) ? 1.0m : 0m) +
+                (IsRollingOver(candidate.RecentH4MaSeries) ? 1.2m : 0m) +
+                (IsExhausted(candidate.RecentDailyRsiSeries, settings.PatternExhaustionH4RsiThreshold - 8m) ? 0.6m : 0m) +
+                (IsExhausted(candidate.RecentH4RsiSeries, settings.PatternExhaustionH4RsiThreshold) ? 1.0m : 0m);
 
             var latePenaltyScore =
                 Positive((dailyRsi14 - settings.LateContinuationDailyRsi14Threshold) / 20m) +
@@ -1188,8 +1205,10 @@ namespace IbSwingTrader.Application.Candidates
                 Positive((diagnostics.BBMidSignedDistancePct - settings.OverextendedBbMidThreshold) / 8m);
 
             return
-                researchLikeScore * settings.SecondPassResearchLikeWeight +
-                patternScore * settings.SecondPassPatternWeight -
+                dailySeriesScore * settings.SecondPassDailySeriesWeight +
+                h4SeriesScore * settings.SecondPassH4SeriesWeight +
+                contextScore * settings.SecondPassContextWeight -
+                seriesPenaltyScore * settings.SecondPassSeriesPenaltyWeight -
                 latePenaltyScore * settings.SecondPassLatePenaltyWeight -
                 overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight;
         }
@@ -1401,6 +1420,9 @@ namespace IbSwingTrader.Application.Candidates
 
         private static decimal Positive(decimal value)
             => value > 0m ? value : 0m;
+
+        private static decimal Negative(decimal value)
+            => value < 0m ? -value : 0m;
 
         private static bool IsResearchLikeLaunch(
             CandidateSignalSnapshot snapshot,

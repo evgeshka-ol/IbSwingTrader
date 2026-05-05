@@ -342,8 +342,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal OverextendedPenalty { get; set; } = 0.16m;
         public int SecondPassWindowMultiplier { get; set; } = 4;
         public int SecondPassMinimumWindow { get; set; } = 30;
-        public decimal SecondPassResearchLikeWeight { get; set; } = 0.40m;
-        public decimal SecondPassPatternWeight { get; set; } = 0.20m;
+        public decimal SecondPassDailySeriesWeight { get; set; } = 0.40m;
+        public decimal SecondPassH4SeriesWeight { get; set; } = 0.40m;
+        public decimal SecondPassContextWeight { get; set; } = 0.15m;
+        public decimal SecondPassSeriesPenaltyWeight { get; set; } = 0.30m;
         public decimal SecondPassLatePenaltyWeight { get; set; } = 0.35m;
         public decimal SecondPassOverextendedPenaltyWeight { get; set; } = 0.25m;
 
