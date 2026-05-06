@@ -82,7 +82,8 @@ namespace IbSwingTrader.App.Commands
             var allRows = existingRows
                 .Concat(freshRows)
                 .GroupBy(BuildResearchRowKey, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.Last())
+                .Select(x => x.Aggregate(ChooseBetterResearchRow))
+                .Where(HasUsefulSeries)
                 .OrderBy(x => x, Comparer<ResearchTopGainerDatasetRow>.Create((left, right) => CompareRows(left, right, settings)))
                 .ToList();
 
@@ -159,7 +160,7 @@ namespace IbSwingTrader.App.Commands
         {
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{row.Ticker}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}|{row.MaxTime:yyyy-MM-dd HH:mm:ss}");
+                $"{row.Ticker}|{row.ScanTime:yyyy-MM-dd HH:mm:ss}");
         }
 
         private static async Task<List<ResearchTopGainerDatasetRow>> ReadExistingRowsAsync(string path)
@@ -216,6 +217,53 @@ namespace IbSwingTrader.App.Commands
             }
 
             return rows;
+        }
+
+        private static ResearchTopGainerDatasetRow ChooseBetterResearchRow(
+            ResearchTopGainerDatasetRow left,
+            ResearchTopGainerDatasetRow right)
+        {
+            var leftScore = GetResearchRowCompletenessScore(left);
+            var rightScore = GetResearchRowCompletenessScore(right);
+
+            if (leftScore != rightScore)
+                return rightScore > leftScore ? right : left;
+
+            if (left.AmplitudePct != right.AmplitudePct)
+                return right.AmplitudePct > left.AmplitudePct ? right : left;
+
+            if (left.MaxTime != right.MaxTime)
+                return right.MaxTime > left.MaxTime ? right : left;
+
+            return right;
+        }
+
+        private static int GetResearchRowCompletenessScore(ResearchTopGainerDatasetRow row)
+        {
+            var score = 0;
+
+            score += row.DailyBbMidDistanceSeries?.Count ?? 0;
+            score += row.DailyBbUpperDistanceSeries?.Count ?? 0;
+            score += row.DailyBbWidthSeries?.Count ?? 0;
+            score += row.WeeklyBbMidDistanceSeries?.Count ?? 0;
+            score += row.WeeklyBbUpperDistanceSeries?.Count ?? 0;
+            score += row.WeeklyBbWidthSeries?.Count ?? 0;
+            score += row.H4BbMidDistanceSeries?.Count ?? 0;
+            score += row.H4BbUpperDistanceSeries?.Count ?? 0;
+            score += row.H4BbWidthSeries?.Count ?? 0;
+            score += row.DailyRsiSeries?.Count ?? 0;
+            score += row.DailyMacdSeries?.Count ?? 0;
+            score += row.WeeklyRsiSeries?.Count ?? 0;
+            score += row.WeeklyMacdSeries?.Count ?? 0;
+            score += row.H4RsiSeries?.Count ?? 0;
+            score += row.H4MacdSeries?.Count ?? 0;
+
+            return score;
+        }
+
+        private static bool HasUsefulSeries(ResearchTopGainerDatasetRow row)
+        {
+            return GetResearchRowCompletenessScore(row) > 0;
         }
 
         private static object? ParseValue(Type type, string raw)
