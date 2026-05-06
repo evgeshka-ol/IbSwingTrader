@@ -168,22 +168,43 @@ namespace IbSwingTrader.Application.Candidates
 
                     var diagnostics = BuildDiagnostics(snapshot, candles);
                     var entryScore = _candidateScore.Calculate(snapshot);
+                    var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles));
+
+                    if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
+                    {
+                        _logger.Info(
+                            $"Wish list BB veto applied: {stock.Ticker}. " +
+                            $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}");
+                        continue;
+                    }
 
                     if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
                     {
-                        if (!ShouldBypassWishListFilterForLiveScan(snapshot, diagnostics, entryScore))
+                        var weeklyBbBypass = ShouldAllowWeeklyBbWishlistBypass(bbState.Weekly);
+
+                        if (!weeklyBbBypass &&
+                            !ShouldBypassWishListFilterForLiveScan(snapshot, diagnostics, entryScore))
                         {
                             _logger.Info($"Wish list rejected: {stock.Ticker}");
                             continue;
                         }
 
-                        _logger.Info(
-                            $"Wish list live-scan bypass applied: {stock.Ticker}. " +
-                            $"EntryScore={_fmt.Generic(entryScore)}, " +
-                            $"DailyRsi14={_fmt.Generic(snapshot.Current.DailyRSI14)}, " +
-                            $"DailyDistance={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}%, " +
-                            $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
-                            $"VolumeRatio20={_fmt.Generic(diagnostics.VolumeRatio20)}");
+                        if (weeklyBbBypass)
+                        {
+                            _logger.Info(
+                                $"Wish list weekly-BB bypass applied: {stock.Ticker}. " +
+                                $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}");
+                        }
+                        else
+                        {
+                            _logger.Info(
+                                $"Wish list live-scan bypass applied: {stock.Ticker}. " +
+                                $"EntryScore={_fmt.Generic(entryScore)}, " +
+                                $"DailyRsi14={_fmt.Generic(snapshot.Current.DailyRSI14)}, " +
+                                $"DailyDistance={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}%, " +
+                                $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
+                                $"VolumeRatio20={_fmt.Generic(diagnostics.VolumeRatio20)}");
+                        }
                     }
 
                     var wishScore = _wishListScore.Calculate(snapshot);
@@ -615,6 +636,15 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
+            var weeklyBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles)).Weekly;
+
+            if (ShouldRejectByWeeklyBbForWishlist(weeklyBbState))
+            {
+                _logger.Info(
+                    $"Skipping {item.Ticker}: weekly BB veto on aged wish list item. " +
+                    $"Weekly={weeklyBbState.Regime}/{weeklyBbState.Direction}");
+                return null;
+            }
 
             _logger.Info(
                 $"Aged wish list context rebuilt: {item.Ticker}. " +
@@ -695,6 +725,7 @@ namespace IbSwingTrader.Application.Candidates
             var isExplosiveMinFirst = IsExplosiveMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
             var isExplosiveMaxFirst = IsExplosiveMaxFirstProxy(ctx.Snapshot, diagnostics);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var bbState = BuildBollingerStateSet(recentSeries);
             var isResearchLikeLaunch = IsResearchLikeLaunch(
                 ctx.Snapshot,
                 diagnostics,
@@ -854,6 +885,22 @@ namespace IbSwingTrader.Application.Candidates
                     $"EntryDiscountPct={_fmt.Percent(tradeSettings.MomentumExit.EntryDiscountPct)}");
             }
 
+            var bbEntryDiscountOverridePct = ResolveBollingerEntryDiscountOverridePct(
+                bbState,
+                entryDiscountOverridePct);
+
+            if (bbEntryDiscountOverridePct != entryDiscountOverridePct)
+            {
+                _logger.Info(
+                    $"Trade plan H4 BB entry adjustment applied for {ctx.Stock.Ticker}. " +
+                    $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
+                    $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                    $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                    $"EntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}");
+            }
+
+            entryDiscountOverridePct = bbEntryDiscountOverridePct;
+
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
                 entryCandles,
@@ -965,7 +1012,8 @@ namespace IbSwingTrader.Application.Candidates
                 needsMomentumExit,
                 snapshot,
                 candles,
-                recentSeries);
+                recentSeries,
+                bbState);
 
             return new CandidateDetails
             {
@@ -1043,7 +1091,8 @@ namespace IbSwingTrader.Application.Candidates
             bool needsMomentumExit,
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
-            RecentFeatureSeries recentSeries)
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState)
         {
             var s = _nextDayRankingSettings;
             var diagnostics = BuildDiagnostics(snapshot, candles);
@@ -1076,6 +1125,11 @@ namespace IbSwingTrader.Application.Candidates
 
             if (diagnostics.ATRRatio >= s.AtrRatioBonusThreshold)
                 score += s.AtrRatioBonus;
+
+            score += CalculateBbRankAdjustment(
+                bbState.Weekly,
+                bbState.Daily,
+                bbState.H4);
 
             if (needsDeeperEntry)
                 score += s.DeeperEntryBonus;
@@ -1273,13 +1327,23 @@ namespace IbSwingTrader.Application.Candidates
                 Positive((diagnostics.TrendPosition - settings.OverextendedTrendPositionThreshold) / 8m) +
                 Positive((diagnostics.BBMidSignedDistancePct - settings.OverextendedBbMidThreshold) / 8m);
 
+            var bbAdjustment =
+                CalculateBbSecondPassAdjustment(
+                    candidate.WeeklyBbRegime,
+                    candidate.WeeklyBbDirection,
+                    candidate.DailyBbRegime,
+                    candidate.DailyBbDirection,
+                    candidate.H4BbRegime,
+                    candidate.H4BbDirection);
+
             return
                 dailySeriesScore * settings.SecondPassDailySeriesWeight +
                 h4SeriesScore * settings.SecondPassH4SeriesWeight +
                 contextScore * settings.SecondPassContextWeight -
                 seriesPenaltyScore * settings.SecondPassSeriesPenaltyWeight -
                 latePenaltyScore * settings.SecondPassLatePenaltyWeight -
-                overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight;
+                overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight +
+                bbAdjustment;
         }
 
         private decimal CalculatePatternSeriesAdjustment(
@@ -1572,6 +1636,140 @@ namespace IbSwingTrader.Application.Candidates
                    CalculateSlope(recentSeries.H4RsiSeries) >= settings.MinH4RsiSlope &&
                    CalculateSlope(recentSeries.H4MacdSeries) >= settings.MinH4MacdSlope &&
                    CountUpMoves(recentSeries.H4RsiSeries) >= settings.MinH4RsiUpMoves;
+        }
+
+        private static bool ShouldRejectByWeeklyBbForWishlist(BollingerStateOutput weekly)
+        {
+            return weekly.Direction == nameof(BollingerFigureDirection.Down) &&
+                   (weekly.Regime is nameof(BollingerFigureRegime.Collapse) or
+                    nameof(BollingerFigureRegime.Runaway));
+        }
+
+        private static bool ShouldAllowWeeklyBbWishlistBypass(BollingerStateOutput weekly)
+        {
+            return weekly.Direction == nameof(BollingerFigureDirection.Up) &&
+                   (weekly.Regime is nameof(BollingerFigureRegime.Runaway) or
+                    nameof(BollingerFigureRegime.Pullback) or
+                    nameof(BollingerFigureRegime.Reacceleration));
+        }
+
+        private static decimal CalculateBbRankAdjustment(
+            BollingerStateOutput weekly,
+            BollingerStateOutput daily,
+            BollingerStateOutput h4)
+        {
+            decimal score = 0m;
+
+            score += CalculateBbTierAdjustment(weekly.Regime, weekly.Direction, 0.06m, 0.03m, 0.12m, 0.08m);
+            score += CalculateBbTierAdjustment(daily.Regime, daily.Direction, 0.16m, 0.06m, 0.20m, 0.10m);
+            score += CalculateBbTierAdjustment(h4.Regime, h4.Direction, 0.10m, 0.02m, 0.14m, 0.10m);
+
+            if (daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                daily.Regime == nameof(BollingerFigureRegime.Runaway) &&
+                h4.Direction == nameof(BollingerFigureDirection.Up) &&
+                h4.Regime == nameof(BollingerFigureRegime.Runaway))
+            {
+                score += 0.08m;
+            }
+
+            if (weekly.Direction == nameof(BollingerFigureDirection.Up) &&
+                daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                daily.Regime == nameof(BollingerFigureRegime.Pullback) &&
+                h4.Direction == nameof(BollingerFigureDirection.Up) &&
+                h4.Regime == nameof(BollingerFigureRegime.Pullback))
+            {
+                score -= 0.04m;
+            }
+
+            if (daily.Direction == nameof(BollingerFigureDirection.Down) &&
+                daily.Regime == nameof(BollingerFigureRegime.Collapse) &&
+                h4.Direction == nameof(BollingerFigureDirection.Down))
+            {
+                score -= 0.10m;
+            }
+
+            return score;
+        }
+
+        private static decimal CalculateBbSecondPassAdjustment(
+            string weeklyRegime,
+            string weeklyDirection,
+            string dailyRegime,
+            string dailyDirection,
+            string h4Regime,
+            string h4Direction)
+        {
+            return
+                CalculateBbTierAdjustment(weeklyRegime, weeklyDirection, 0.03m, 0.02m, 0.06m, 0.04m) +
+                CalculateBbTierAdjustment(dailyRegime, dailyDirection, 0.10m, 0.03m, 0.12m, 0.06m) +
+                CalculateBbTierAdjustment(h4Regime, h4Direction, 0.05m, 0.01m, 0.08m, 0.06m);
+        }
+
+        private static decimal CalculateBbTierAdjustment(
+            string regime,
+            string direction,
+            decimal runawayBonus,
+            decimal pullbackBonus,
+            decimal downwardPenalty,
+            decimal collapsePenalty)
+        {
+            var isUp = direction == nameof(BollingerFigureDirection.Up);
+            var isDown = direction == nameof(BollingerFigureDirection.Down);
+
+            return regime switch
+            {
+                nameof(BollingerFigureRegime.Runaway) when isUp => runawayBonus,
+                nameof(BollingerFigureRegime.Reacceleration) when isUp => runawayBonus * 0.85m,
+                nameof(BollingerFigureRegime.Pullback) when isUp => pullbackBonus,
+                nameof(BollingerFigureRegime.Runaway) when isDown => -downwardPenalty,
+                nameof(BollingerFigureRegime.Collapse) when isDown => -collapsePenalty,
+                nameof(BollingerFigureRegime.Collapse) when isUp => -collapsePenalty * 0.60m,
+                nameof(BollingerFigureRegime.Pullback) when isDown => -pullbackBonus,
+                _ => 0m
+            };
+        }
+
+        private static decimal? ResolveBollingerEntryDiscountOverridePct(
+            BollingerStateSet bbState,
+            decimal? currentEntryDiscountPct)
+        {
+            var adjusted = currentEntryDiscountPct;
+
+            if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
+            {
+                adjusted = MaxDiscount(adjusted, 0.02m);
+            }
+
+            if (bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
+            {
+                adjusted = MaxDiscount(
+                    adjusted,
+                    bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ? 0.035m : 0.025m);
+            }
+
+            if (bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) &&
+                bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
+            {
+                adjusted = MaxDiscount(adjusted, 0.03m);
+            }
+
+            if (bbState.Daily.Direction == nameof(BollingerFigureDirection.Down) &&
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Collapse))
+            {
+                adjusted = MaxDiscount(adjusted, 0.035m);
+            }
+
+            return adjusted;
+        }
+
+        private static decimal? MaxDiscount(decimal? currentValue, decimal candidateValue)
+        {
+            return currentValue == null || candidateValue > currentValue.Value
+                ? candidateValue
+                : currentValue;
         }
 
         private bool ShouldBypassWishListFilterForLiveScan(
