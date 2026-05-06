@@ -74,6 +74,7 @@ namespace IbSwingTrader.App.Bootstrap
 
             // candidate search
             services.AddSingleton<ICandidateSignalAnalyzer, CandidateSignalAnalyzer>();
+            services.AddSingleton<IBollingerFigureAnalyzer, BollingerFigureAnalyzer>();
             services.AddSingleton<ICandidateScore, CandidateScore>();
             services.AddSingleton<IStockPreFilter, StockPreFilter>();
             services.AddSingleton<ICandidateFilter, CandidateFilter>();

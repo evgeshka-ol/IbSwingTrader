@@ -267,6 +267,24 @@ namespace IbSwingTrader.Infrastructure.Logging
             if (candidate.NeedsMomentumExit)
                 markers.Add("momentum-exit");
 
+            if (!string.IsNullOrWhiteSpace(candidate.WeeklyBbRegime) &&
+                !candidate.WeeklyBbRegime.Equals("Neutral", StringComparison.OrdinalIgnoreCase))
+            {
+                markers.Add($"w-{candidate.WeeklyBbRegime.ToLowerInvariant()}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate.DailyBbRegime) &&
+                !candidate.DailyBbRegime.Equals("Neutral", StringComparison.OrdinalIgnoreCase))
+            {
+                markers.Add($"d-{candidate.DailyBbRegime.ToLowerInvariant()}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate.H4BbRegime) &&
+                !candidate.H4BbRegime.Equals("Neutral", StringComparison.OrdinalIgnoreCase))
+            {
+                markers.Add($"h4-{candidate.H4BbRegime.ToLowerInvariant()}");
+            }
+
             if (IsParabolicExpansionProxy(candidate))
             {
                 markers.Add("parabolic-expansion");

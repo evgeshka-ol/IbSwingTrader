@@ -235,16 +235,19 @@ namespace IbSwingTrader.App.Commands
         private static bool HasRecentSeries(CandidateDetails candidate)
         {
             return (candidate.RecentDailyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyBbMidDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyBbMidDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyRsiSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4MaSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4BbMidDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4BbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4BbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4RsiSeries?.Count ?? 0) > 0 ||
@@ -265,20 +268,38 @@ namespace IbSwingTrader.App.Commands
                 Ticker = evaluation.Ticker,
                 CandidateSource = string.IsNullOrWhiteSpace(evaluation.CandidateSource) ? "Primary" : evaluation.CandidateSource,
                 RecentDailyMaSeries = [.. evaluation.RecentDailyMaSeries],
+                RecentDailyBbMidDistanceSeries = [.. evaluation.RecentDailyBbMidDistanceSeries],
                 RecentDailyBbUpperDistanceSeries = [.. evaluation.RecentDailyBbUpperDistanceSeries],
                 RecentDailyBbWidthSeries = [.. evaluation.RecentDailyBbWidthSeries],
                 RecentDailyRsiSeries = [.. evaluation.RecentDailyRsiSeries],
                 RecentDailyMacdSeries = [.. evaluation.RecentDailyMacdSeries],
                 RecentWeeklyMaSeries = [.. evaluation.RecentWeeklyMaSeries],
+                RecentWeeklyBbMidDistanceSeries = [.. evaluation.RecentWeeklyBbMidDistanceSeries],
                 RecentWeeklyBbUpperDistanceSeries = [.. evaluation.RecentWeeklyBbUpperDistanceSeries],
                 RecentWeeklyBbWidthSeries = [.. evaluation.RecentWeeklyBbWidthSeries],
                 RecentWeeklyRsiSeries = [.. evaluation.RecentWeeklyRsiSeries],
                 RecentWeeklyMacdSeries = [.. evaluation.RecentWeeklyMacdSeries],
                 RecentH4MaSeries = [.. evaluation.RecentH4MaSeries],
+                RecentH4BbMidDistanceSeries = [.. evaluation.RecentH4BbMidDistanceSeries],
                 RecentH4BbUpperDistanceSeries = [.. evaluation.RecentH4BbUpperDistanceSeries],
                 RecentH4BbWidthSeries = [.. evaluation.RecentH4BbWidthSeries],
                 RecentH4RsiSeries = [.. evaluation.RecentH4RsiSeries],
                 RecentH4MacdSeries = [.. evaluation.RecentH4MacdSeries],
+                WeeklyBbDirection = evaluation.WeeklyBbDirection,
+                WeeklyBbRegime = evaluation.WeeklyBbRegime,
+                WeeklyBbMidSlope = evaluation.WeeklyBbMidSlope,
+                WeeklyBbWidthSlope = evaluation.WeeklyBbWidthSlope,
+                WeeklyBbUpperDistanceSlope = evaluation.WeeklyBbUpperDistanceSlope,
+                DailyBbDirection = evaluation.DailyBbDirection,
+                DailyBbRegime = evaluation.DailyBbRegime,
+                DailyBbMidSlope = evaluation.DailyBbMidSlope,
+                DailyBbWidthSlope = evaluation.DailyBbWidthSlope,
+                DailyBbUpperDistanceSlope = evaluation.DailyBbUpperDistanceSlope,
+                H4BbDirection = evaluation.H4BbDirection,
+                H4BbRegime = evaluation.H4BbRegime,
+                H4BbMidSlope = evaluation.H4BbMidSlope,
+                H4BbWidthSlope = evaluation.H4BbWidthSlope,
+                H4BbUpperDistanceSlope = evaluation.H4BbUpperDistanceSlope,
                 IsFromWishlist = evaluation.IsFromWishlist,
                 Scan = new ScanInfo
                 {

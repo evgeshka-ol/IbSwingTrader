@@ -14,7 +14,7 @@ namespace IbSwingTrader.App.Commands
         private const int MaxTradeDaysToMaxUpFromScan = 1;
         private const int ProgressLogInterval = 250;
         private const int RecentDailySeriesLength = 6;
-        private const int RecentWeeklySeriesLength = 3;
+        private const int RecentWeeklySeriesLength = 5;
         private const int RecentH4SeriesLength = 12;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
@@ -283,20 +283,38 @@ namespace IbSwingTrader.App.Commands
                 BbMidSignedDistancePct = candidate?.Diagnostics?.BBMidSignedDistancePct,
                 WeeklyMacdHistDelta = candidate?.Diagnostics?.WeeklyMACDHistDelta,
                 RecentDailyMaSeries = ResolveSeries(candidate?.RecentDailyMaSeries, evaluation.RecentDailyMaSeries, recentSeries?.DailyMaSeries),
+                RecentDailyBbMidDistanceSeries = ResolveSeries(candidate?.RecentDailyBbMidDistanceSeries, evaluation.RecentDailyBbMidDistanceSeries, recentSeries?.DailyBbMidDistanceSeries),
                 RecentDailyBbUpperDistanceSeries = ResolveSeries(candidate?.RecentDailyBbUpperDistanceSeries, evaluation.RecentDailyBbUpperDistanceSeries, recentSeries?.DailyBbUpperDistanceSeries),
                 RecentDailyBbWidthSeries = ResolveSeries(candidate?.RecentDailyBbWidthSeries, evaluation.RecentDailyBbWidthSeries, recentSeries?.DailyBbWidthSeries),
                 RecentDailyRsiSeries = ResolveSeries(candidate?.RecentDailyRsiSeries, evaluation.RecentDailyRsiSeries, recentSeries?.DailyRsiSeries),
                 RecentDailyMacdSeries = ResolveSeries(candidate?.RecentDailyMacdSeries, evaluation.RecentDailyMacdSeries, recentSeries?.DailyMacdSeries),
                 RecentWeeklyMaSeries = ResolveSeries(candidate?.RecentWeeklyMaSeries, evaluation.RecentWeeklyMaSeries, recentSeries?.WeeklyMaSeries),
+                RecentWeeklyBbMidDistanceSeries = ResolveSeries(candidate?.RecentWeeklyBbMidDistanceSeries, evaluation.RecentWeeklyBbMidDistanceSeries, recentSeries?.WeeklyBbMidDistanceSeries),
                 RecentWeeklyBbUpperDistanceSeries = ResolveSeries(candidate?.RecentWeeklyBbUpperDistanceSeries, evaluation.RecentWeeklyBbUpperDistanceSeries, recentSeries?.WeeklyBbUpperDistanceSeries),
                 RecentWeeklyBbWidthSeries = ResolveSeries(candidate?.RecentWeeklyBbWidthSeries, evaluation.RecentWeeklyBbWidthSeries, recentSeries?.WeeklyBbWidthSeries),
                 RecentWeeklyRsiSeries = ResolveSeries(candidate?.RecentWeeklyRsiSeries, evaluation.RecentWeeklyRsiSeries, recentSeries?.WeeklyRsiSeries),
                 RecentWeeklyMacdSeries = ResolveSeries(candidate?.RecentWeeklyMacdSeries, evaluation.RecentWeeklyMacdSeries, recentSeries?.WeeklyMacdSeries),
                 RecentH4MaSeries = ResolveSeries(candidate?.RecentH4MaSeries, evaluation.RecentH4MaSeries, recentSeries?.H4MaSeries),
+                RecentH4BbMidDistanceSeries = ResolveSeries(candidate?.RecentH4BbMidDistanceSeries, evaluation.RecentH4BbMidDistanceSeries, recentSeries?.H4BbMidDistanceSeries),
                 RecentH4BbUpperDistanceSeries = ResolveSeries(candidate?.RecentH4BbUpperDistanceSeries, evaluation.RecentH4BbUpperDistanceSeries, recentSeries?.H4BbUpperDistanceSeries),
                 RecentH4BbWidthSeries = ResolveSeries(candidate?.RecentH4BbWidthSeries, evaluation.RecentH4BbWidthSeries, recentSeries?.H4BbWidthSeries),
                 RecentH4RsiSeries = ResolveSeries(candidate?.RecentH4RsiSeries, evaluation.RecentH4RsiSeries, recentSeries?.H4RsiSeries),
-                RecentH4MacdSeries = ResolveSeries(candidate?.RecentH4MacdSeries, evaluation.RecentH4MacdSeries, recentSeries?.H4MacdSeries)
+                RecentH4MacdSeries = ResolveSeries(candidate?.RecentH4MacdSeries, evaluation.RecentH4MacdSeries, recentSeries?.H4MacdSeries),
+                WeeklyBbDirection = candidate?.WeeklyBbDirection ?? evaluation.WeeklyBbDirection,
+                WeeklyBbRegime = candidate?.WeeklyBbRegime ?? evaluation.WeeklyBbRegime,
+                WeeklyBbMidSlope = candidate?.WeeklyBbMidSlope ?? evaluation.WeeklyBbMidSlope,
+                WeeklyBbWidthSlope = candidate?.WeeklyBbWidthSlope ?? evaluation.WeeklyBbWidthSlope,
+                WeeklyBbUpperDistanceSlope = candidate?.WeeklyBbUpperDistanceSlope ?? evaluation.WeeklyBbUpperDistanceSlope,
+                DailyBbDirection = candidate?.DailyBbDirection ?? evaluation.DailyBbDirection,
+                DailyBbRegime = candidate?.DailyBbRegime ?? evaluation.DailyBbRegime,
+                DailyBbMidSlope = candidate?.DailyBbMidSlope ?? evaluation.DailyBbMidSlope,
+                DailyBbWidthSlope = candidate?.DailyBbWidthSlope ?? evaluation.DailyBbWidthSlope,
+                DailyBbUpperDistanceSlope = candidate?.DailyBbUpperDistanceSlope ?? evaluation.DailyBbUpperDistanceSlope,
+                H4BbDirection = candidate?.H4BbDirection ?? evaluation.H4BbDirection,
+                H4BbRegime = candidate?.H4BbRegime ?? evaluation.H4BbRegime,
+                H4BbMidSlope = candidate?.H4BbMidSlope ?? evaluation.H4BbMidSlope,
+                H4BbWidthSlope = candidate?.H4BbWidthSlope ?? evaluation.H4BbWidthSlope,
+                H4BbUpperDistanceSlope = candidate?.H4BbUpperDistanceSlope ?? evaluation.H4BbUpperDistanceSlope
             };
         }
 
@@ -441,16 +459,19 @@ namespace IbSwingTrader.App.Commands
             return new RecentFeatureSeries
             {
                 DailyMaSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyMaSignedDistancePct),
+                DailyBbMidDistanceSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerMidDistancePct),
                 DailyBbUpperDistanceSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerUpperDistancePct),
                 DailyBbWidthSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerBandWidthPct),
                 DailyRsiSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyRSI14),
                 DailyMacdSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyMACDLineMinusSignal),
                 WeeklyMaSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMaSignedDistancePct),
+                WeeklyBbMidDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerMidDistancePct),
                 WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerUpperDistancePct),
                 WeeklyBbWidthSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerBandWidthPct),
                 WeeklyRsiSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyRSI14),
                 WeeklyMacdSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDLineMinusSignal),
                 H4MaSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4MaSignedDistancePct),
+                H4BbMidDistanceSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerMidDistancePct),
                 H4BbUpperDistanceSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerUpperDistancePct),
                 H4BbWidthSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerBandWidthPct),
                 H4RsiSeries = BuildRecentH4Series(ordered, scanIndex, x => x.RSI14),
@@ -859,16 +880,19 @@ namespace IbSwingTrader.App.Commands
         private sealed class RecentFeatureSeries
         {
             public List<decimal> DailyMaSeries { get; init; } = [];
+            public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
             public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
             public List<decimal> DailyBbWidthSeries { get; init; } = [];
             public List<decimal> DailyRsiSeries { get; init; } = [];
             public List<decimal> DailyMacdSeries { get; init; } = [];
             public List<decimal> WeeklyMaSeries { get; init; } = [];
+            public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
             public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
             public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
             public List<decimal> WeeklyRsiSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSeries { get; init; } = [];
             public List<decimal> H4MaSeries { get; init; } = [];
+            public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
             public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
             public List<decimal> H4BbWidthSeries { get; init; } = [];
             public List<decimal> H4RsiSeries { get; init; } = [];

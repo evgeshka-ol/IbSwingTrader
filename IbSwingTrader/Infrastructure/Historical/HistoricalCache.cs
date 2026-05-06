@@ -10,7 +10,7 @@ namespace IbSwingTrader.Infrastructure.Historical
         private readonly ITextLogger _logger;
         private readonly IFeatureEngine _featureEngine;
         private const int RecentDailySeriesLength = 6;
-        private const int RecentWeeklySeriesLength = 3;
+        private const int RecentWeeklySeriesLength = 5;
         private const int RecentH4SeriesLength = 12;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -178,16 +178,19 @@ namespace IbSwingTrader.Infrastructure.Historical
             var scanIndex = candles.Count - 1;
 
             var dailyMa = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct);
+            var dailyBbMid = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidDistancePct);
             var dailyBbUpper = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct);
             var dailyBbWidth = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct);
             var dailyRsi = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
             var dailyMacd = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
             var weeklyMa = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
+            var weeklyBbMid = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct);
             var weeklyBbUpper = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct);
             var weeklyBbWidth = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct);
             var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
             var weeklyMacd = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
             var h4Ma = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
+            var h4BbMid = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct);
             var h4BbUpper = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct);
             var h4BbWidth = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct);
             var h4Rsi = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
@@ -196,16 +199,19 @@ namespace IbSwingTrader.Infrastructure.Historical
             return new CachedPatternSnapshot
             {
                 RecentDailyMaSeries = dailyMa,
+                RecentDailyBbMidDistanceSeries = dailyBbMid,
                 RecentDailyBbUpperDistanceSeries = dailyBbUpper,
                 RecentDailyBbWidthSeries = dailyBbWidth,
                 RecentDailyRsiSeries = dailyRsi,
                 RecentDailyMacdSeries = dailyMacd,
                 RecentWeeklyMaSeries = weeklyMa,
+                RecentWeeklyBbMidDistanceSeries = weeklyBbMid,
                 RecentWeeklyBbUpperDistanceSeries = weeklyBbUpper,
                 RecentWeeklyBbWidthSeries = weeklyBbWidth,
                 RecentWeeklyRsiSeries = weeklyRsi,
                 RecentWeeklyMacdSeries = weeklyMacd,
                 RecentH4MaSeries = h4Ma,
+                RecentH4BbMidDistanceSeries = h4BbMid,
                 RecentH4BbUpperDistanceSeries = h4BbUpper,
                 RecentH4BbWidthSeries = h4BbWidth,
                 RecentH4RsiSeries = h4Rsi,

@@ -143,6 +143,7 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal? WeeklyMacdHistDelta { get; set; }
 
         public List<decimal> RecentDailyMaSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentDailyBbWidthSeries { get; set; } = [];
 
@@ -151,6 +152,7 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> RecentDailyMacdSeries { get; set; } = [];
 
         public List<decimal> RecentWeeklyMaSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentWeeklyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentWeeklyBbWidthSeries { get; set; } = [];
 
@@ -159,11 +161,30 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> RecentWeeklyMacdSeries { get; set; } = [];
 
         public List<decimal> RecentH4MaSeries { get; set; } = [];
+        public List<decimal> RecentH4BbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentH4BbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentH4BbWidthSeries { get; set; } = [];
 
         public List<decimal> RecentH4RsiSeries { get; set; } = [];
 
         public List<decimal> RecentH4MacdSeries { get; set; } = [];
+
+        public string WeeklyBbDirection { get; set; } = string.Empty;
+        public string WeeklyBbRegime { get; set; } = string.Empty;
+        public decimal WeeklyBbMidSlope { get; set; }
+        public decimal WeeklyBbWidthSlope { get; set; }
+        public decimal WeeklyBbUpperDistanceSlope { get; set; }
+
+        public string DailyBbDirection { get; set; } = string.Empty;
+        public string DailyBbRegime { get; set; } = string.Empty;
+        public decimal DailyBbMidSlope { get; set; }
+        public decimal DailyBbWidthSlope { get; set; }
+        public decimal DailyBbUpperDistanceSlope { get; set; }
+
+        public string H4BbDirection { get; set; } = string.Empty;
+        public string H4BbRegime { get; set; } = string.Empty;
+        public decimal H4BbMidSlope { get; set; }
+        public decimal H4BbWidthSlope { get; set; }
+        public decimal H4BbUpperDistanceSlope { get; set; }
     }
 }

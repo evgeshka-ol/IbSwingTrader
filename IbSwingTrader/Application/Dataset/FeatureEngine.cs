@@ -17,6 +17,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- 4H ---
                 H4MaSignedDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 50),
+                H4BollingerMidDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 20),
                 H4BollingerUpperDistancePct = CalcH4BollingerUpperDistancePct(candles, index, 20, 2m),
                 H4BollingerBandWidthPct = CalcH4BollingerBandWidthPct(candles, index, 20, 2m),
                 RSI14 = CalcRsiFromCandles(candles, index, 14),
@@ -24,6 +25,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- Daily ---
                 DailyMaSignedDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
+                DailyBollingerMidDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
                 DailyBollingerUpperDistancePct = CalcDailyBollingerUpperDistancePct(candles, index, 20, 2m),
                 DailyBollingerBandWidthPct = CalcDailyBollingerBandWidthPct(candles, index, 20, 2m),
                 DailyRSI14 = CalcDailyRsi14(candles, index),
@@ -31,6 +33,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- Weekly ---
                 WeeklyMaSignedDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
+                WeeklyBollingerMidDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
                 WeeklyBollingerUpperDistancePct = CalcWeeklyBollingerUpperDistancePct(candles, index, 20, 2m),
                 WeeklyBollingerBandWidthPct = CalcWeeklyBollingerBandWidthPct(candles, index, 20, 2m),
                 WeeklyRSI14 = CalcWeeklyRsi14(candles, index),
