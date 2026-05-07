@@ -1659,10 +1659,19 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateOutput h4)
         {
             decimal score = 0m;
+            var isBullishMinFirstSetup = IsBullishMinFirstSetup(
+                weekly.Regime,
+                weekly.Direction,
+                daily.Regime,
+                daily.Direction,
+                h4.Regime,
+                h4.Direction);
 
             score += CalculateBbTierAdjustment(weekly.Regime, weekly.Direction, 0.06m, 0.03m, 0.12m, 0.08m);
             score += CalculateBbTierAdjustment(daily.Regime, daily.Direction, 0.16m, 0.06m, 0.20m, 0.10m);
-            score += CalculateBbTierAdjustment(h4.Regime, h4.Direction, 0.10m, 0.02m, 0.14m, 0.10m);
+            score += isBullishMinFirstSetup
+                ? 0.01m
+                : CalculateBbTierAdjustment(h4.Regime, h4.Direction, 0.10m, 0.02m, 0.14m, 0.10m);
 
             if (daily.Direction == nameof(BollingerFigureDirection.Up) &&
                 daily.Regime == nameof(BollingerFigureRegime.Runaway) &&
@@ -1688,6 +1697,9 @@ namespace IbSwingTrader.Application.Candidates
                 score -= 0.10m;
             }
 
+            if (isBullishMinFirstSetup)
+                score += 0.06m;
+
             return score;
         }
 
@@ -1699,10 +1711,21 @@ namespace IbSwingTrader.Application.Candidates
             string h4Regime,
             string h4Direction)
         {
+            var isBullishMinFirstSetup = IsBullishMinFirstSetup(
+                weeklyRegime,
+                weeklyDirection,
+                dailyRegime,
+                dailyDirection,
+                h4Regime,
+                h4Direction);
+
             return
                 CalculateBbTierAdjustment(weeklyRegime, weeklyDirection, 0.03m, 0.02m, 0.06m, 0.04m) +
                 CalculateBbTierAdjustment(dailyRegime, dailyDirection, 0.10m, 0.03m, 0.12m, 0.06m) +
-                CalculateBbTierAdjustment(h4Regime, h4Direction, 0.05m, 0.01m, 0.08m, 0.06m);
+                (isBullishMinFirstSetup
+                    ? 0.02m
+                    : CalculateBbTierAdjustment(h4Regime, h4Direction, 0.05m, 0.01m, 0.08m, 0.06m)) +
+                (isBullishMinFirstSetup ? 0.04m : 0m);
         }
 
         private static decimal CalculateBbTierAdjustment(
@@ -1734,6 +1757,13 @@ namespace IbSwingTrader.Application.Candidates
             decimal? currentEntryDiscountPct)
         {
             var adjusted = currentEntryDiscountPct;
+            var isBullishMinFirstSetup = IsBullishMinFirstSetup(
+                bbState.Weekly.Regime,
+                bbState.Weekly.Direction,
+                bbState.Daily.Regime,
+                bbState.Daily.Direction,
+                bbState.H4.Regime,
+                bbState.H4.Direction);
 
             if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
@@ -1762,7 +1792,41 @@ namespace IbSwingTrader.Application.Candidates
                 adjusted = MaxDiscount(adjusted, 0.035m);
             }
 
+            if (isBullishMinFirstSetup)
+            {
+                adjusted = MaxDiscount(
+                    adjusted,
+                    bbState.Daily.Regime == nameof(BollingerFigureRegime.Collapse) ? 0.035m : 0.03m);
+            }
+
             return adjusted;
+        }
+
+        private static bool IsBullishMinFirstSetup(
+            string weeklyRegime,
+            string weeklyDirection,
+            string dailyRegime,
+            string dailyDirection,
+            string h4Regime,
+            string h4Direction)
+        {
+            var weeklyBullish =
+                weeklyDirection == nameof(BollingerFigureDirection.Up) &&
+                (weeklyRegime is nameof(BollingerFigureRegime.Runaway) or
+                                nameof(BollingerFigureRegime.Pullback) or
+                                nameof(BollingerFigureRegime.Reacceleration));
+
+            var dailyBullishCorrection =
+                dailyDirection == nameof(BollingerFigureDirection.Up) &&
+                (dailyRegime is nameof(BollingerFigureRegime.Runaway) or
+                               nameof(BollingerFigureRegime.Pullback) or
+                               nameof(BollingerFigureRegime.Collapse));
+
+            var h4CorrectivePushDown =
+                h4Direction == nameof(BollingerFigureDirection.Down) &&
+                h4Regime == nameof(BollingerFigureRegime.Runaway);
+
+            return weeklyBullish && dailyBullishCorrection && h4CorrectivePushDown;
         }
 
         private static decimal? MaxDiscount(decimal? currentValue, decimal candidateValue)
