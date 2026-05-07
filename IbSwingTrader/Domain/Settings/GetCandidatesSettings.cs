@@ -136,6 +136,20 @@ namespace IbSwingTrader.Domain.Settings
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
         public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
+        public H4BollingerEntrySettings H4BollingerEntry { get; set; } = new();
+    }
+
+    public class H4BollingerEntrySettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal FlatMidSlopeThresholdPct { get; set; } = 1.0m;
+        public decimal UpwardMidSlopeThresholdPct { get; set; } = 1.0m;
+        public decimal MidpointWeightWhenMidUp { get; set; } = 0.50m;
+        public decimal MidpointWeightWhenMidDown { get; set; } = 0.65m;
+        public decimal MidTouchWeightWhenMidFlat { get; set; } = 1.00m;
+        public decimal BelowMidBufferPct { get; set; } = 0.005m;
+        public decimal MinimumDistanceToMidPct { get; set; } = 0.02m;
+        public decimal MaximumEntryDiscountPct { get; set; } = 0.10m;
     }
 
     public class DeepPullbackEntrySettings

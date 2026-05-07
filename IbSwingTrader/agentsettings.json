@@ -402,6 +402,17 @@
                 "MinH4RsiSlope": 30.0,
                 "MinH4MacdSlope": 0.15,
                 "MinH4RsiUpMoves": 8
+            },
+            "H4BollingerEntry": {
+                "Enabled": true,
+                "FlatMidSlopeThresholdPct": 1.0,
+                "UpwardMidSlopeThresholdPct": 1.0,
+                "MidpointWeightWhenMidUp": 0.50,
+                "MidpointWeightWhenMidDown": 0.65,
+                "MidTouchWeightWhenMidFlat": 1.00,
+                "BelowMidBufferPct": 0.005,
+                "MinimumDistanceToMidPct": 0.02,
+                "MaximumEntryDiscountPct": 0.10
             }
         },
 

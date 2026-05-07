@@ -887,6 +887,8 @@ namespace IbSwingTrader.Application.Candidates
 
             var bbEntryDiscountOverridePct = ResolveBollingerEntryDiscountOverridePct(
                 bbState,
+                recentSeries,
+                tradeSettings.H4BollingerEntry,
                 entryDiscountOverridePct);
 
             if (bbEntryDiscountOverridePct != entryDiscountOverridePct)
@@ -896,7 +898,9 @@ namespace IbSwingTrader.Application.Candidates
                     $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
                     $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
                     $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
-                    $"EntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}");
+                    $"EntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}, " +
+                    $"H4MidDistance={_fmt.Percent(GetLatestSignedPercent(recentSeries.H4BbMidDistanceSeries))}, " +
+                    $"H4MidSlope={_fmt.Percent(bbState.H4.MidSlope)}");
             }
 
             entryDiscountOverridePct = bbEntryDiscountOverridePct;
@@ -1754,6 +1758,8 @@ namespace IbSwingTrader.Application.Candidates
 
         private static decimal? ResolveBollingerEntryDiscountOverridePct(
             BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries,
+            H4BollingerEntrySettings settings,
             decimal? currentEntryDiscountPct)
         {
             var adjusted = currentEntryDiscountPct;
@@ -1764,6 +1770,16 @@ namespace IbSwingTrader.Application.Candidates
                 bbState.Daily.Direction,
                 bbState.H4.Regime,
                 bbState.H4.Direction);
+
+            if (settings.Enabled)
+            {
+                adjusted = ResolveH4BbFigureEntryDiscountPct(
+                    adjusted,
+                    bbState,
+                    recentSeries,
+                    settings,
+                    isBullishMinFirstSetup);
+            }
 
             if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
@@ -1802,6 +1818,57 @@ namespace IbSwingTrader.Application.Candidates
             return adjusted;
         }
 
+        private static decimal? ResolveH4BbFigureEntryDiscountPct(
+            decimal? currentEntryDiscountPct,
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries,
+            H4BollingerEntrySettings settings,
+            bool isBullishMinFirstSetup)
+        {
+            var latestMidDistancePctSigned = GetLatestSignedPercent(recentSeries.H4BbMidDistanceSeries);
+            if (latestMidDistancePctSigned <= 0m)
+                return currentEntryDiscountPct;
+
+            var latestMidDistancePct = latestMidDistancePctSigned;
+            if (latestMidDistancePct < settings.MinimumDistanceToMidPct)
+                return currentEntryDiscountPct;
+
+            var h4DirectionUp = bbState.H4.Direction == nameof(BollingerFigureDirection.Up);
+            var h4DirectionDown = bbState.H4.Direction == nameof(BollingerFigureDirection.Down);
+            var dailyCorrection =
+                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                (bbState.Daily.Regime is nameof(BollingerFigureRegime.Pullback) or nameof(BollingerFigureRegime.Collapse));
+            var h4Correction =
+                (h4DirectionUp && bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback)) ||
+                (h4DirectionDown && bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or nameof(BollingerFigureRegime.Collapse));
+
+            if (!isBullishMinFirstSetup && !(dailyCorrection && h4Correction))
+                return currentEntryDiscountPct;
+
+            var midSlopePct = bbState.H4.MidSlope;
+            decimal targetDiscountPct;
+
+            if (midSlopePct >= settings.UpwardMidSlopeThresholdPct)
+            {
+                targetDiscountPct = latestMidDistancePct * settings.MidpointWeightWhenMidUp;
+            }
+            else if (decimal.Abs(midSlopePct) <= settings.FlatMidSlopeThresholdPct)
+            {
+                targetDiscountPct = latestMidDistancePct * settings.MidTouchWeightWhenMidFlat + settings.BelowMidBufferPct;
+            }
+            else
+            {
+                targetDiscountPct = latestMidDistancePct * settings.MidpointWeightWhenMidDown;
+            }
+
+            targetDiscountPct = decimal.Clamp(
+                targetDiscountPct,
+                settings.MinimumDistanceToMidPct,
+                settings.MaximumEntryDiscountPct);
+
+            return MaxDiscount(currentEntryDiscountPct, targetDiscountPct);
+        }
+
         private static bool IsBullishMinFirstSetup(
             string weeklyRegime,
             string weeklyDirection,
@@ -1834,6 +1901,13 @@ namespace IbSwingTrader.Application.Candidates
             return currentValue == null || candidateValue > currentValue.Value
                 ? candidateValue
                 : currentValue;
+        }
+
+        private static decimal GetLatestSignedPercent(List<decimal> series)
+        {
+            return series.Count == 0
+                ? 0m
+                : series[^1] / 100m;
         }
 
         private bool ShouldBypassWishListFilterForLiveScan(
