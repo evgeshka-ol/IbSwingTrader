@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
 
@@ -164,28 +166,39 @@ namespace IbSwingTrader.App.Commands
                 };
             }
 
-            return await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath)
-                ?? new CandidateFileDocument();
+            var root = JsonNode.Parse(json) as JsonObject;
+            if (root == null)
+                return new CandidateFileDocument();
+
+            return new CandidateFileDocument
+            {
+                Candidates = root["Candidates"]?.Deserialize<List<CandidateDetails>>() ?? [],
+                SameDayCandidates = root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>() ?? []
+            };
         }
 
-        private List<CandidateSummaryItem> BuildSummary(List<CandidateDetails> candidates)
+        private CandidateSummarySections BuildSummary(List<CandidateDetails> candidates)
         {
             if (candidates.Count == 0)
-                return [];
+                return new CandidateSummarySections();
 
             var latestScanTime = candidates.Max(x => x.Scan.ScanTime);
 
-            return candidates
-                .Where(x => x.Scan.ScanTime == latestScanTime)
-                .OrderByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.Score.Score)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x => new CandidateSummaryItem
-                {
-                    Ticker = BuildSummaryTickerText(x)
-                })
-                .ToList();
+            return new CandidateSummarySections
+            {
+                ReversalCandidates = candidates
+                    .Where(x => x.Scan.ScanTime == latestScanTime)
+                    .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                    .ThenByDescending(x => x.Score.Score)
+                    .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => new CandidateSummaryItem
+                    {
+                        Ticker = BuildSummaryTickerText(x)
+                    })
+                    .ToList(),
+                TodayResearchLikeCandidates = []
+            };
         }
 
         private string BuildSummaryTickerText(CandidateDetails candidate)
@@ -367,6 +380,17 @@ namespace IbSwingTrader.App.Commands
         }
 
         private static bool AreSummariesEqual(
+            CandidateSummarySections? left,
+            CandidateSummarySections? right)
+        {
+            left ??= new CandidateSummarySections();
+            right ??= new CandidateSummarySections();
+
+            return AreSummaryListsEqual(left.ReversalCandidates, right.ReversalCandidates) &&
+                   AreSummaryListsEqual(left.TodayResearchLikeCandidates, right.TodayResearchLikeCandidates);
+        }
+
+        private static bool AreSummaryListsEqual(
             List<CandidateSummaryItem>? left,
             List<CandidateSummaryItem>? right)
         {
@@ -378,8 +402,7 @@ namespace IbSwingTrader.App.Commands
 
             for (var i = 0; i < left.Count; i++)
             {
-                if (!string.Equals(left[i].Ticker, right[i].Ticker, StringComparison.Ordinal) ||
-                    !string.Equals(left[i].Comment, right[i].Comment, StringComparison.Ordinal))
+                if (!string.Equals(left[i].Ticker, right[i].Ticker, StringComparison.Ordinal))
                 {
                     return false;
                 }

@@ -51,6 +51,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var marketSettings = _marketSettingsProvider.Get();
             var scanTime = GetMarketNow(marketSettings.Timezone);
 
+            WriteConsoleSectionHeader("ReversalCandidates");
             foreach (var candidate in candidates)
             {
                 candidate.Scan.ScanTime = scanTime;
@@ -59,10 +60,15 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
+            if (sameDayCandidates.Count > 0)
+                WriteConsoleSectionHeader("TodayResearchLikeCandidates");
+
             foreach (var candidate in sameDayCandidates)
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+
+                WriteCandidateToConsole(candidate);
             }
 
             var existingDocument = await LoadDocumentAsync(filePath);
@@ -144,7 +150,15 @@ namespace IbSwingTrader.Infrastructure.Logging
                 };
             }
 
-            return JsonSerializer.Deserialize<CandidateFileDocument>(json, ReadOptions) ?? new CandidateFileDocument();
+            var root = JsonNode.Parse(json) as JsonObject;
+            if (root == null)
+                return new CandidateFileDocument();
+
+            return new CandidateFileDocument
+            {
+                Candidates = root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ?? [],
+                SameDayCandidates = root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ?? []
+            };
         }
 
         private static string NormalizeLegacyJson(string json)
@@ -160,17 +174,22 @@ namespace IbSwingTrader.Infrastructure.Logging
         }
 
         private string BuildJson(
-            IEnumerable<CandidateSummaryItem> summary,
+            CandidateSummarySections summary,
             IEnumerable<CandidateDetails> candidates,
             IEnumerable<CandidateDetails> sameDayCandidates)
         {
             var root = new JsonObject();
-            var summaryArray = new JsonArray();
+            var summaryObject = new JsonObject();
+            var reversalArray = new JsonArray();
+            var todayResearchLikeArray = new JsonArray();
             var candidatesArray = new JsonArray();
             var sameDayCandidatesArray = new JsonArray();
 
-            foreach (var item in summary)
-                summaryArray.Add(_jsonBuilder.BuildObject(item));
+            foreach (var item in summary.ReversalCandidates)
+                reversalArray.Add(BuildSummaryJson(item));
+
+            foreach (var item in summary.TodayResearchLikeCandidates)
+                todayResearchLikeArray.Add(BuildSummaryJson(item));
 
             foreach (var candidate in candidates)
                 candidatesArray.Add(_jsonBuilder.BuildObject(candidate));
@@ -178,7 +197,9 @@ namespace IbSwingTrader.Infrastructure.Logging
             foreach (var candidate in sameDayCandidates)
                 sameDayCandidatesArray.Add(_jsonBuilder.BuildObject(candidate));
 
-            root["Summary"] = summaryArray;
+            summaryObject["ReversalCandidates"] = reversalArray;
+            summaryObject["TodayResearchLikeCandidates"] = todayResearchLikeArray;
+            root["Summary"] = summaryObject;
             root["Candidates"] = candidatesArray;
             root["SameDayCandidates"] = sameDayCandidatesArray;
 
@@ -188,29 +209,21 @@ namespace IbSwingTrader.Infrastructure.Logging
             });
         }
 
-        private List<CandidateSummaryItem> BuildSummary(
+        private CandidateSummarySections BuildSummary(
             IEnumerable<CandidateDetails> candidates,
             IEnumerable<CandidateDetails> sameDayCandidates)
         {
-            var summary = OrderPrimaryForDisplay(candidates)
-                .Select(x => BuildSummaryItem(x, includeSameDayMarker: false))
-                .ToList();
-
-            var sameDayItems = OrderSameDayForDisplay(sameDayCandidates)
-                .Select(x => BuildSummaryItem(x, includeSameDayMarker: true))
-                .ToList();
-
-            if (sameDayItems.Count == 0)
-                return summary;
-
-            summary.Add(new CandidateSummaryItem
+            var orderedCandidates = OrderPrimaryForDisplay(candidates);
+            var orderedSameDayCandidates = OrderSameDayForDisplay(sameDayCandidates);
+            return new CandidateSummarySections
             {
-                Ticker = "SAME_DAY_CONTINUATION",
-                Comment = "separate-mode"
-            });
-
-            summary.AddRange(sameDayItems);
-            return summary;
+                ReversalCandidates = orderedCandidates
+                    .Select(x => BuildSummaryItem(x, includeSameDayMarker: false))
+                    .ToList(),
+                TodayResearchLikeCandidates = orderedSameDayCandidates
+                    .Select(x => BuildSummaryItem(x, includeSameDayMarker: true))
+                    .ToList()
+            };
         }
 
         private static List<CandidateDetails> OrderPrimaryForDisplay(IEnumerable<CandidateDetails> candidates)
@@ -249,8 +262,15 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             return new CandidateSummaryItem
             {
-                Ticker = ticker,
-                Comment = includeSameDayMarker ? "separate-mode" : string.Empty
+                Ticker = ticker
+            };
+        }
+
+        private static JsonObject BuildSummaryJson(CandidateSummaryItem item)
+        {
+            return new JsonObject
+            {
+                ["Ticker"] = item.Ticker
             };
         }
 
@@ -259,7 +279,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var markers = new List<string>();
 
             if (includeSameDayMarker)
-                markers.Add("same-day-continuation");
+                markers.Add("today-research-like");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");
@@ -451,6 +471,12 @@ namespace IbSwingTrader.Infrastructure.Logging
             _console.Write("/", ConsoleColor.DarkGray);
             _console.Write($"{_fmt.Percent(candidate.TradePlan.LossPercent)}%", ConsoleColor.Red);
             _console.WriteLine(string.Empty, ConsoleColor.Gray);
+        }
+
+        private void WriteConsoleSectionHeader(string title)
+        {
+            _console.WriteLine(string.Empty, ConsoleColor.Gray);
+            _console.WriteLine(title, ConsoleColor.Cyan);
         }
 
         private static decimal ResolveStopLimitPrice(CandidateDetails candidate)
