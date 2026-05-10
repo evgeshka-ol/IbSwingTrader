@@ -150,6 +150,18 @@ namespace IbSwingTrader.Domain.Settings
         public decimal BelowMidBufferPct { get; set; } = 0.005m;
         public decimal MinimumDistanceToMidPct { get; set; } = 0.02m;
         public decimal MaximumEntryDiscountPct { get; set; } = 0.10m;
+        public H4TriangleEntrySettings Triangle { get; set; } = new();
+    }
+
+    public class H4TriangleEntrySettings
+    {
+        public bool Enabled { get; set; } = true;
+        public int ImpulseAndDriftBars { get; set; } = 6;
+        public decimal MinImpulseBodyPct { get; set; } = 0.04m;
+        public decimal MaxDriftBodyPct { get; set; } = 0.015m;
+        public decimal MinDriftCandlesNearEdge { get; set; } = 3m;
+        public decimal MinSmallCandleLowPositionPctOfImpulse { get; set; } = 0.55m;
+        public decimal EntryBufferBelowShortLowsPct { get; set; } = 0.0025m;
     }
 
     public class DeepPullbackEntrySettings

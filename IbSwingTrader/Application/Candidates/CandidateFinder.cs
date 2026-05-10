@@ -301,6 +301,30 @@ namespace IbSwingTrader.Application.Candidates
                     rejectionLogPrefix: "Entry rejected after wish list pass");
             }
 
+            var sameDayWishListItems = mergedWishList
+                .Where(x =>
+                {
+                    var firstSeenDate = x.FirstSeen?.Date;
+                    return firstSeenDate != null && firstSeenDate.Value == todayMarketDate;
+                })
+                .OrderByDescending(x => x.Score.Score)
+                .ToList();
+
+            foreach (var mergedWishItem in sameDayWishListItems)
+            {
+                if (!scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var ctx))
+                    continue;
+
+                await TryAddCandidate(
+                    candidateResults,
+                    mergedWishItem,
+                    ctx,
+                    isFromWishlist: false,
+                    marketTimezone,
+                    bucketName: "same-day promoted candidates",
+                    rejectionLogPrefix: "Entry rejected after same-day promotion");
+            }
+
             if (candidateResults.Count == 0)
             {
                 _logger.Info(
@@ -904,6 +928,21 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             entryDiscountOverridePct = bbEntryDiscountOverridePct;
+
+            var triangleEntryDiscountOverridePct = ResolveH4TriangleEntryDiscountOverridePct(
+                ctx.Candles,
+                entryCandles,
+                tradeSettings.H4BollingerEntry.Triangle,
+                entryDiscountOverridePct);
+
+            if (triangleEntryDiscountOverridePct != entryDiscountOverridePct)
+            {
+                _logger.Info(
+                    $"Trade plan H4 triangle entry adjustment applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(triangleEntryDiscountOverridePct ?? 0m)}");
+            }
+
+            entryDiscountOverridePct = triangleEntryDiscountOverridePct;
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
@@ -1869,6 +1908,55 @@ namespace IbSwingTrader.Application.Candidates
             return MaxDiscount(currentEntryDiscountPct, targetDiscountPct);
         }
 
+        private static decimal? ResolveH4TriangleEntryDiscountOverridePct(
+            List<Candle> h4Candles,
+            List<Candle>? entryCandles,
+            H4TriangleEntrySettings settings,
+            decimal? currentEntryDiscountPct)
+        {
+            if (!settings.Enabled || h4Candles.Count < settings.ImpulseAndDriftBars)
+                return currentEntryDiscountPct;
+
+            var window = h4Candles.TakeLast(settings.ImpulseAndDriftBars).ToList();
+            var impulse = window[0];
+            if (impulse.Close <= impulse.Open)
+                return currentEntryDiscountPct;
+
+            var impulseBodyPct = CalculateRelativeMovePct(impulse.Open, impulse.Close);
+            if (impulseBodyPct < settings.MinImpulseBodyPct)
+                return currentEntryDiscountPct;
+
+            var impulseRange = impulse.High - impulse.Low;
+            if (impulseRange <= 0m)
+                return currentEntryDiscountPct;
+
+            var driftCandles = window.Skip(1).ToList();
+            var qualifyingDriftCandles = driftCandles
+                .Where(c => CalculateRelativeMovePct(c.Open, c.Close) <= settings.MaxDriftBodyPct)
+                .Where(c => (c.Low - impulse.Low) / impulseRange >= settings.MinSmallCandleLowPositionPctOfImpulse)
+                .ToList();
+
+            if (qualifyingDriftCandles.Count < (int)settings.MinDriftCandlesNearEdge)
+                return currentEntryDiscountPct;
+
+            var shortLowsMin = qualifyingDriftCandles.Min(x => x.Low);
+            var targetEntryPrice = shortLowsMin * (1m - settings.EntryBufferBelowShortLowsPct);
+            if (targetEntryPrice <= 0m)
+                return currentEntryDiscountPct;
+
+            var currentReferencePrice = (entryCandles != null && entryCandles.Count > 0
+                    ? entryCandles[^1].Close
+                    : h4Candles[^1].Close);
+
+            if (currentReferencePrice <= 0m || targetEntryPrice >= currentReferencePrice)
+                return currentEntryDiscountPct;
+
+            var targetDiscountPct = (currentReferencePrice - targetEntryPrice) / currentReferencePrice;
+            return targetDiscountPct > 0m
+                ? targetDiscountPct
+                : currentEntryDiscountPct;
+        }
+
         private static bool IsBullishMinFirstSetup(
             string weeklyRegime,
             string weeklyDirection,
@@ -1908,6 +1996,13 @@ namespace IbSwingTrader.Application.Candidates
             return series.Count == 0
                 ? 0m
                 : series[^1] / 100m;
+        }
+
+        private static decimal CalculateRelativeMovePct(decimal from, decimal to)
+        {
+            return from <= 0m
+                ? 0m
+                : decimal.Abs(to - from) / from;
         }
 
         private bool ShouldBypassWishListFilterForLiveScan(

@@ -412,7 +412,16 @@
                 "MidTouchWeightWhenMidFlat": 1.00,
                 "BelowMidBufferPct": 0.005,
                 "MinimumDistanceToMidPct": 0.02,
-                "MaximumEntryDiscountPct": 0.10
+                "MaximumEntryDiscountPct": 0.10,
+                "Triangle": {
+                    "Enabled": true,
+                    "ImpulseAndDriftBars": 6,
+                    "MinImpulseBodyPct": 0.04,
+                    "MaxDriftBodyPct": 0.015,
+                    "MinDriftCandlesNearEdge": 3,
+                    "MinSmallCandleLowPositionPctOfImpulse": 0.55,
+                    "EntryBufferBelowShortLowsPct": 0.0025
+                }
             }
         },
 

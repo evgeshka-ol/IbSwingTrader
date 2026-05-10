@@ -32,6 +32,9 @@ namespace IbSwingTrader.App.Commands
         private readonly IFailedHistoryRequestTableFormatter _failedHistoryRequestTableFormatter = failedHistoryRequestTableFormatter;
 
         private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = [];
+        private const int RecentDailySeriesLength = 8;
+        private const int RecentWeeklySeriesLength = 5;
+        private const int RecentH4SeriesLength = 12;
 
         public async Task RunAsync()
         {
@@ -670,10 +673,51 @@ namespace IbSwingTrader.App.Commands
             if (candles.Count < settings.MinimumCandles)
                 return [];
 
-            var candidates = BuildEpisodeCandidates(candles, settings);
-            var merged = MergeEpisodeCandidates(candidates, settings.EpisodeMergeCooldownBars);
+            var latestIndex = candles.Count - 1;
+            var sessionDate = candles[latestIndex].Time.Date;
+            var sessionStartIndex = candles.FindIndex(x => x.Time.Date == sessionDate);
+            if (sessionStartIndex <= 0)
+                return [];
 
-            return [.. merged.Select(x => BuildRow(ticker, settings, candles, x))];
+            var previousClose = candles[sessionStartIndex - 1].Close;
+            var currentClose = candles[latestIndex].Close;
+            if (previousClose <= 0m || currentClose <= 0m)
+                return [];
+
+            var peakIndex = sessionStartIndex;
+            var peakHigh = candles[sessionStartIndex].High;
+            var minLow = candles[sessionStartIndex].Low;
+
+            for (var i = sessionStartIndex + 1; i <= latestIndex; i++)
+            {
+                if (candles[i].High > peakHigh)
+                {
+                    peakHigh = candles[i].High;
+                    peakIndex = i;
+                }
+
+                if (candles[i].Low < minLow)
+                    minLow = candles[i].Low;
+            }
+
+            var peakGainPct = (peakHigh - previousClose) / previousClose * 100m;
+            if (peakGainPct < settings.MinRunupPct)
+                return [];
+
+            var drawdownPct = (minLow - previousClose) / previousClose * 100m;
+
+            return
+            [
+                BuildSessionSnapshotRow(
+                    ticker,
+                    settings,
+                    candles,
+                    latestIndex,
+                    sessionStartIndex,
+                    peakIndex,
+                    peakGainPct,
+                    drawdownPct)
+            ];
         }
 
         private static List<ResearchEpisodeCandidate> BuildEpisodeCandidates(
@@ -778,56 +822,87 @@ namespace IbSwingTrader.App.Commands
             return candidate.ReferenceIndex < currentBest.ReferenceIndex;
         }
 
-        private ResearchDatasetRow BuildRow(
+        private ResearchDatasetRow BuildSessionSnapshotRow(
             string ticker,
             ResearchSettings settings,
             List<Candle> candles,
-            ResearchEpisodeCandidate episode)
+            int latestIndex,
+            int sessionStartIndex,
+            int peakIndex,
+            decimal peakGainPct,
+            decimal drawdownPct)
         {
-            var referenceFeatures = _featureEngine.Calculate(candles, episode.ReferenceIndex + 1);
-            var referencePrice = candles[episode.ReferenceIndex].Close;
-            var referenceCandles = candles.Take(episode.ReferenceIndex + 1).ToList();
+            var snapshotFeatures = _featureEngine.Calculate(candles, latestIndex + 1);
+            var snapshotPrice = candles[latestIndex].Close;
+            var snapshotCandles = candles.Take(latestIndex + 1).ToList();
 
             var row = new ResearchDatasetRow
             {
                 Ticker = ticker,
                 Mode = settings.Mode,
                 Source = settings.Source,
-                ReferenceType = "OracleBottom",
-                ReferenceTime = candles[episode.ReferenceIndex].Time,
-                ReferencePrice = referencePrice,
-                PeakTime = candles[episode.PeakIndex].Time,
-                PeakPrice = episode.PeakHigh,
-                RunupPct = episode.RunupPct,
-                BarsToPeak = episode.PeakIndex - episode.ReferenceIndex,
-                MaxDrawdownBeforePeakPct = episode.MaxDrawdownPct,
-                DistanceTo20dHigh = referenceFeatures.DistanceTo20dHigh,
-                DistanceTo52wHigh = referenceFeatures.DistanceTo52wHigh,
-                H4MaSignedDistancePct = referenceFeatures.H4MaSignedDistancePct,
-                H4Rsi14 = referenceFeatures.RSI14,
-                H4MacdLineMinusSignal = referenceFeatures.MACDLineMinusSignal,
-                DailyMaSignedDistancePct = referenceFeatures.DailyMaSignedDistancePct,
-                DailyRsi14 = referenceFeatures.DailyRSI14,
-                DailyMacdLineMinusSignal = referenceFeatures.DailyMACDLineMinusSignal,
-                WeeklyMaSignedDistancePct = referenceFeatures.WeeklyMaSignedDistancePct,
-                WeeklyRsi14 = referenceFeatures.WeeklyRSI14,
-                WeeklyMacdLineMinusSignal = referenceFeatures.WeeklyMACDLineMinusSignal,
-                DailyBollingerUpperDistancePct = referenceFeatures.DailyBollingerUpperDistancePct,
-                DailyBollingerBandWidthPct = referenceFeatures.DailyBollingerBandWidthPct,
-                WeeklyBollingerUpperDistancePct = referenceFeatures.WeeklyBollingerUpperDistancePct,
-                WeeklyBollingerBandWidthPct = referenceFeatures.WeeklyBollingerBandWidthPct,
-                Pullback10d = CalculatePullbackByCalendarDays(referenceCandles, 10),
-                DailyPullback10d = CalculateDailyPullback10d(referenceCandles),
-                VolumeRatio20 = CalculateVolumeRatio20(referenceCandles),
-                AtrRatio = CalculateAtrRatio(referenceCandles, 14),
-                TrendPosition = referenceFeatures.H4MaSignedDistancePct,
-                DailyTrendPosition = referenceFeatures.DailyMaSignedDistancePct,
-                BbMidSignedDistancePct = CalculateSmaSignedDistancePct(referenceCandles, 20),
-                WeeklyMacdHistDelta = CalculateWeeklyMacdHistDelta(referenceCandles)
+                ReferenceType = "SessionTopGainer",
+                ReferenceTime = candles[latestIndex].Time,
+                ReferencePrice = snapshotPrice,
+                PeakTime = candles[peakIndex].Time,
+                PeakPrice = candles[peakIndex].High,
+                RunupPct = peakGainPct,
+                BarsToPeak = peakIndex - sessionStartIndex,
+                MaxDrawdownBeforePeakPct = drawdownPct,
+                DistanceTo20dHigh = snapshotFeatures.DistanceTo20dHigh,
+                DistanceTo52wHigh = snapshotFeatures.DistanceTo52wHigh,
+                H4MaSignedDistancePct = snapshotFeatures.H4MaSignedDistancePct,
+                H4Rsi14 = snapshotFeatures.RSI14,
+                H4MacdLineMinusSignal = snapshotFeatures.MACDLineMinusSignal,
+                DailyMaSignedDistancePct = snapshotFeatures.DailyMaSignedDistancePct,
+                DailyRsi14 = snapshotFeatures.DailyRSI14,
+                DailyMacdLineMinusSignal = snapshotFeatures.DailyMACDLineMinusSignal,
+                WeeklyMaSignedDistancePct = snapshotFeatures.WeeklyMaSignedDistancePct,
+                WeeklyRsi14 = snapshotFeatures.WeeklyRSI14,
+                WeeklyMacdLineMinusSignal = snapshotFeatures.WeeklyMACDLineMinusSignal,
+                DailyBollingerUpperDistancePct = snapshotFeatures.DailyBollingerUpperDistancePct,
+                DailyBollingerBandWidthPct = snapshotFeatures.DailyBollingerBandWidthPct,
+                WeeklyBollingerUpperDistancePct = snapshotFeatures.WeeklyBollingerUpperDistancePct,
+                WeeklyBollingerBandWidthPct = snapshotFeatures.WeeklyBollingerBandWidthPct,
+                Pullback10d = CalculatePullbackByCalendarDays(snapshotCandles, 10),
+                DailyPullback10d = CalculateDailyPullback10d(snapshotCandles),
+                VolumeRatio20 = CalculateVolumeRatio20(snapshotCandles),
+                AtrRatio = CalculateAtrRatio(snapshotCandles, 14),
+                TrendPosition = snapshotFeatures.H4MaSignedDistancePct,
+                DailyTrendPosition = snapshotFeatures.DailyMaSignedDistancePct,
+                BbMidSignedDistancePct = CalculateSmaSignedDistancePct(snapshotCandles, 20),
+                WeeklyMacdHistDelta = CalculateWeeklyMacdHistDelta(snapshotCandles)
             };
 
-            FillSeries(row, candles, episode.ReferenceIndex, episode.PeakIndex);
+            FillTrailingSeries(row, candles, latestIndex);
             return row;
+        }
+
+        private void FillTrailingSeries(
+            ResearchDatasetRow row,
+            List<Candle> candles,
+            int scanIndex)
+        {
+            row.DailyMaDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct);
+            row.DailyBollingerMidDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidDistancePct);
+            row.DailyBollingerUpperDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct);
+            row.DailyBollingerBandWidths = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct);
+            row.DailyRsiValues = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
+            row.DailyMacdValues = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
+
+            row.WeeklyMaDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
+            row.WeeklyBollingerMidDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct);
+            row.WeeklyBollingerUpperDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct);
+            row.WeeklyBollingerBandWidths = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct);
+            row.WeeklyRsiValues = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
+            row.WeeklyMacdValues = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
+
+            row.H4MaDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
+            row.H4BollingerMidDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct);
+            row.H4BollingerUpperDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct);
+            row.H4BollingerBandWidths = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct);
+            row.H4RsiValues = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
+            row.H4MacdValues = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal);
         }
 
         private void FillSeries(
@@ -943,6 +1018,74 @@ namespace IbSwingTrader.App.Commands
                 row.H4RsiValues.Add(features.RSI14);
                 row.H4MacdValues.Add(features.MACDLineMinusSignal);
             }
+        }
+
+        private List<decimal> BuildRecentDailySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentWeeklySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal?> selector)
+        {
+            var indexes = new List<int>();
+            var usedWeeks = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var week = GetWeekStart(candles[i].Time);
+                if (!usedWeeks.Add(week))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentWeeklySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+
+            return [.. indexes
+                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Where(x => x.HasValue)
+                .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentH4Series(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
 
         private static decimal CalculatePullbackByCalendarDays(List<Candle> candles, int days)
