@@ -9,9 +9,9 @@ namespace IbSwingTrader.Infrastructure.Historical
         private readonly string _folder;
         private readonly ITextLogger _logger;
         private readonly IFeatureEngine _featureEngine;
-        private const int RecentDailySeriesLength = 6;
-        private const int RecentWeeklySeriesLength = 5;
-        private const int RecentH4SeriesLength = 12;
+        private const int RecentDailySeriesLength = 12;
+        private const int RecentWeeklySeriesLength = 10;
+        private const int RecentH4SeriesLength = 16;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {

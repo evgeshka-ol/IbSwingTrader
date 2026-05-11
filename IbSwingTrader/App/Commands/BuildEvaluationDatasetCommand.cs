@@ -13,9 +13,9 @@ namespace IbSwingTrader.App.Commands
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
         private const int ProgressLogInterval = 250;
-        private const int RecentDailySeriesLength = 6;
-        private const int RecentWeeklySeriesLength = 5;
-        private const int RecentH4SeriesLength = 12;
+        private const int RecentDailySeriesLength = 12;
+        private const int RecentWeeklySeriesLength = 10;
+        private const int RecentH4SeriesLength = 16;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;

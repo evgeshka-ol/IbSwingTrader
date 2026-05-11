@@ -49,9 +49,9 @@ namespace IbSwingTrader.Application.Candidates
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
-        private const int RecentDailySeriesLength = 6;
-        private const int RecentWeeklySeriesLength = 5;
-        private const int RecentH4SeriesLength = 12;
+        private const int RecentDailySeriesLength = 12;
+        private const int RecentWeeklySeriesLength = 10;
+        private const int RecentH4SeriesLength = 16;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
