@@ -354,7 +354,9 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info($"Same-day market-scan fallback completed. Candidates={candidateResults.Count}");
             }
 
-            var promotedTickers = candidateResults.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var promotedTickers = candidateResults.Values
+                .Select(x => x.Ticker)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var sameDayCandidates = await BuildPremarketSummaryCandidates(
                 mergedWishList,
                 mergedMap,
@@ -371,7 +373,10 @@ namespace IbSwingTrader.Application.Candidates
             _logger.Info($"WishList final. Total={finalWishList.Count}, WithForecast={finalForecastedCount}");
 
             var finalCandidates = ReRankCandidates(
-                candidateResults.Values.ToList(),
+                candidateResults.Values
+                    .Where(x => !sameDayCandidates.Any(y =>
+                        string.Equals(y.Ticker, x.Ticker, StringComparison.OrdinalIgnoreCase)))
+                    .ToList(),
                 getCandidatesSettings.FinalTopCandidates,
                 _nextDayRankingSettings);
 
@@ -1969,6 +1974,12 @@ namespace IbSwingTrader.Application.Candidates
             if (midSlopePct >= settings.UpwardMidSlopeThresholdPct)
             {
                 targetDiscountPct = latestMidDistancePct * settings.MidpointWeightWhenMidUp;
+
+                if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                    bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
+                {
+                    targetDiscountPct = decimal.Min(targetDiscountPct, 0.04m);
+                }
             }
             else if (decimal.Abs(midSlopePct) <= settings.FlatMidSlopeThresholdPct)
             {
