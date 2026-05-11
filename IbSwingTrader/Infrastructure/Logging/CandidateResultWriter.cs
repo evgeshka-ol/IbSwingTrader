@@ -156,8 +156,14 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             return new CandidateFileDocument
             {
-                Candidates = root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ?? [],
-                SameDayCandidates = root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ?? []
+                Candidates =
+                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
+                    root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
+                    [],
+                SameDayCandidates =
+                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
+                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
+                    []
             };
         }
 
@@ -200,8 +206,8 @@ namespace IbSwingTrader.Infrastructure.Logging
             summaryObject["ReversalCandidates"] = reversalArray;
             summaryObject["TodayResearchLikeCandidates"] = todayResearchLikeArray;
             root["Summary"] = summaryObject;
-            root["Candidates"] = candidatesArray;
-            root["SameDayCandidates"] = sameDayCandidatesArray;
+            root["ReversalCandidatesData"] = candidatesArray;
+            root["TodayResearchLikeCandidatesData"] = sameDayCandidatesArray;
 
             return root.ToJsonString(new JsonSerializerOptions
             {

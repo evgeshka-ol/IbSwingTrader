@@ -172,8 +172,14 @@ namespace IbSwingTrader.App.Commands
 
             return new CandidateFileDocument
             {
-                Candidates = root["Candidates"]?.Deserialize<List<CandidateDetails>>() ?? [],
-                SameDayCandidates = root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>() ?? []
+                Candidates =
+                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>() ??
+                    root["Candidates"]?.Deserialize<List<CandidateDetails>>() ??
+                    [],
+                SameDayCandidates =
+                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>() ??
+                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>() ??
+                    []
             };
         }
 
