@@ -412,15 +412,23 @@ namespace IbSwingTrader.Application.Candidates
 
                 var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var entryScore = _candidateScore.Calculate(ctx.Snapshot);
+                var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var isTodayResearchLikeCandidate = IsTodayResearchLikeCandidate(
+                    mergedWishItem,
+                    ctx,
+                    diagnostics,
+                    entryScore,
+                    bbState);
 
-                if (entryScore < settings.MinEntryScore)
+                if (entryScore < settings.MinEntryScore && !isTodayResearchLikeCandidate)
                     continue;
 
-                if (!ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore))
+                if (!ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore) &&
+                    !isTodayResearchLikeCandidate)
                     continue;
 
                 var trade = ctx.Trade ??= await BuildTradePlan(ctx);
-                if (trade.ProfitPercent < settings.MinPlannedProfitPct)
+                if (trade.ProfitPercent < settings.MinPlannedProfitPct && !isTodayResearchLikeCandidate)
                     continue;
 
                 var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
@@ -547,22 +555,53 @@ namespace IbSwingTrader.Application.Candidates
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var candidateFilterSettings = _getCandidatesSettingsProvider.Get().CandidateFilter;
+            var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+            var isTodayResearchLikeCandidate =
+                !isFromWishlist &&
+                IsTodayResearchLikeCandidate(
+                    mergedWishItem,
+                    ctx,
+                    diagnostics,
+                    entryScore,
+                    bbState);
 
             if (!_candidateFilter.Pass(ctx.Snapshot, 0m, ctx.AvgDollarVolumeDaily))
             {
-                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
-                return;
+                if (isTodayResearchLikeCandidate)
+                {
+                    _logger.Info(
+                        $"TodayResearchLike candidate-filter bypass applied: {ctx.Stock.Ticker}. " +
+                        $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
+                        $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                        $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                        $"EntryScore={_fmt.Generic(entryScore)}");
+                }
+                else
+                {
+                    _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
+                    return;
+                }
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
 
             if (trade.ProfitPercent < candidateFilterSettings.MinPlannedProfitPct)
             {
-                _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
-                    $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
-                return;
+                if (isTodayResearchLikeCandidate)
+                {
+                    _logger.Info(
+                        $"TodayResearchLike low-profit override applied: {ctx.Stock.Ticker}. " +
+                        $"ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
+                        $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
+                }
+                else
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
+                        $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
+                    return;
+                }
             }
 
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
@@ -598,6 +637,44 @@ namespace IbSwingTrader.Application.Candidates
                 $"(mid={_fmt.Generic(candidateItem.H4BbMidSlope)}, width={_fmt.Generic(candidateItem.H4BbWidthSlope)}, upper={_fmt.Generic(candidateItem.H4BbUpperDistanceSlope)})");
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+        }
+
+        private bool IsTodayResearchLikeCandidate(
+            WishListItem mergedWishItem,
+            WishListContext ctx,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore,
+            BollingerStateSet bbState)
+        {
+            var firstSeenDate = mergedWishItem.FirstSeen?.Date;
+            if (firstSeenDate != ctx.ScanTimeMarket.Date)
+                return false;
+
+            if (mergedWishItem.ExpectedBarsToTarget != null && mergedWishItem.ExpectedBarsToTarget > 0)
+                return false;
+
+            if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
+                return false;
+
+            var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
+            var constructiveWeekly =
+                string.Equals(bbState.Weekly.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
+                (string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase));
+
+            var actionableDaily =
+                string.Equals(bbState.Daily.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
+                (string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Collapse), StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase));
+
+            var h4Supportive =
+                string.Equals(bbState.H4.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase);
+
+            return strongLiveMove || (constructiveWeekly && actionableDaily && h4Supportive);
         }
 
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(

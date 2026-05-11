@@ -537,8 +537,8 @@
 
         "PremarketSummary": {
             "Enabled": true,
-            "MaxItems": 5,
-            "MinEntryScore": 30.0,
+            "MaxItems": 10,
+            "MinEntryScore": 15.0,
             "MinPlannedProfitPct": 3.0
         }
     },

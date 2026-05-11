@@ -428,8 +428,8 @@ namespace IbSwingTrader.Domain.Settings
     public class PremarketSummarySettings
     {
         public bool Enabled { get; set; } = true;
-        public int MaxItems { get; set; } = 5;
-        public decimal MinEntryScore { get; set; } = 30m;
+        public int MaxItems { get; set; } = 10;
+        public decimal MinEntryScore { get; set; } = 15m;
         public decimal MinPlannedProfitPct { get; set; } = 3.0m;
     }
 
