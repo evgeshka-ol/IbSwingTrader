@@ -983,9 +983,11 @@ namespace IbSwingTrader.Application.Candidates
                 $"DailyRsiDelta3={_fmt.Generic(snapshot.DailyRsiDelta3)}, " +
                 $"DailyMacdDelta3={_fmt.Generic(snapshot.DailyMacdDelta3)}");
 
+            var recentSeries = BuildRecentFeatureSeries(candles);
             var targetForecast = CalculateWishListTargetForecast(
                 stock.Ticker,
                 snapshot,
+                recentSeries,
                 candles,
                 scanTimeMarket);
 
@@ -2307,6 +2309,7 @@ namespace IbSwingTrader.Application.Candidates
         private (int? ExpectedBarsToTarget, DateTime? ExpectedTargetMarketTime) CalculateWishListTargetForecast(
             string ticker,
             CandidateSignalSnapshot snapshot,
+            RecentFeatureSeries recentSeries,
             List<Candle> candles,
             DateTime scanTimeMarket)
         {
@@ -2343,6 +2346,11 @@ namespace IbSwingTrader.Application.Candidates
             {
                 progressPerBar = Math.Abs(currentDistancePct) / 12m;
                 progressSource = "daily-rsi-macd-fallback";
+            }
+            else if (IsReversalBaseRecoveryCandidate(snapshot, recentSeries, candles))
+            {
+                progressPerBar = Math.Abs(currentDistancePct) / 10m;
+                progressSource = "h4-reversal-base";
             }
 
             _logger.Info(
@@ -2381,6 +2389,48 @@ namespace IbSwingTrader.Application.Candidates
                 $"ExpectedTargetMarketTime={expectedTargetMarketTime:yyyy-MM-dd HH:mm:ss}");
 
             return (cappedBars, expectedTargetMarketTime);
+        }
+
+        private bool IsReversalBaseRecoveryCandidate(
+            CandidateSignalSnapshot snapshot,
+            RecentFeatureSeries recentSeries,
+            List<Candle> candles)
+        {
+            if (snapshot.Current.DailyMaSignedDistancePct >= 0m)
+                return false;
+
+            if ((snapshot.Current.WeeklyMaSignedDistancePct ?? decimal.MinValue) <= 0m)
+                return false;
+
+            if (recentSeries.H4MacdSeries.Count < 4 || candles.Count < 5)
+                return false;
+
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+            var h4MacdImproving =
+                h4MacdSlope > 0m &&
+                recentSeries.H4MacdSeries[^1] > recentSeries.H4MacdSeries[^2] &&
+                recentSeries.H4MacdSeries[^2] >= recentSeries.H4MacdSeries[^3];
+
+            if (!h4MacdImproving)
+                return false;
+
+            var recentH4Candles = candles.TakeLast(5).ToList();
+            var higherLowCount = 0;
+
+            for (var i = 1; i < recentH4Candles.Count; i++)
+            {
+                if (recentH4Candles[i].Low >= recentH4Candles[i - 1].Low)
+                    higherLowCount++;
+            }
+
+            var positiveCloses = 0;
+            for (var i = Math.Max(0, recentH4Candles.Count - 3); i < recentH4Candles.Count; i++)
+            {
+                if (recentH4Candles[i].Close >= recentH4Candles[i].Open)
+                    positiveCloses++;
+            }
+
+            return higherLowCount >= 2 && positiveCloses >= 1;
         }
 
         private static TimeSpan EstimateMarketBarStep(List<Candle> candles)
