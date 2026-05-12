@@ -269,6 +269,8 @@ namespace IbSwingTrader.Application.Candidates
                     .ToList();
             }
 
+            var sameDayPromotedResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var mergedWishItem in agedWishListItems)
             {
                 WishListContext? ctx = null;
@@ -316,7 +318,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
 
                 await TryAddCandidate(
-                    candidateResults,
+                    sameDayPromotedResults,
                     mergedWishItem,
                     ctx,
                     isFromWishlist: false,
@@ -342,7 +344,7 @@ namespace IbSwingTrader.Application.Candidates
                         continue;
 
                     await TryAddCandidate(
-                        candidateResults,
+                        sameDayPromotedResults,
                         mergedWishItem,
                         ctx,
                         isFromWishlist: false,
@@ -351,19 +353,37 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day fallback");
                 }
 
-                _logger.Info($"Same-day market-scan fallback completed. Candidates={candidateResults.Count}");
+                _logger.Info($"Same-day market-scan fallback completed. Candidates={sameDayPromotedResults.Count}");
             }
 
             var promotedTickers = candidateResults.Values
+                .Concat(sameDayPromotedResults.Values)
                 .Select(x => x.Ticker)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var sameDayCandidates = await BuildPremarketSummaryCandidates(
+            var sameDayPromotedTickers = sameDayPromotedResults.Values
+                .Select(x => x.Ticker)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var premarketSummaryCandidates = await BuildPremarketSummaryCandidates(
                 mergedWishList,
                 mergedMap,
                 scannedWishListContexts,
                 promotedTickers,
                 marketNow,
                 marketTimezone);
+
+            var sameDayCandidates = sameDayPromotedResults.Values
+                .Concat(premarketSummaryCandidates)
+                .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(y => y.Score.Score)
+                    .First())
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.Score)
+                .Take(getCandidatesSettings.PremarketSummary.MaxItems)
+                .ToList();
 
             var finalWishList = mergedWishList
                 .Where(x => !promotedTickers.Contains(x.Ticker))
@@ -374,8 +394,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var finalCandidates = ReRankCandidates(
                 candidateResults.Values
-                    .Where(x => !sameDayCandidates.Any(y =>
-                        string.Equals(y.Ticker, x.Ticker, StringComparison.OrdinalIgnoreCase)))
+                    .Where(x => !sameDayPromotedTickers.Contains(x.Ticker))
                     .ToList(),
                 getCandidatesSettings.FinalTopCandidates,
                 _nextDayRankingSettings);
