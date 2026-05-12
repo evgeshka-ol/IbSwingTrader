@@ -293,6 +293,30 @@ namespace IbSwingTrader.Application.Candidates
                 if (ctx == null)
                     continue;
 
+                var agedDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+                var agedEntryScore = _candidateScore.Calculate(ctx.Snapshot);
+                var agedBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
+                    mergedWishItem,
+                    ctx,
+                    agedDiagnostics,
+                    agedEntryScore,
+                    agedBbState);
+
+                if (promoteAsTodayResearchLike)
+                {
+                    await TryAddCandidate(
+                        sameDayPromotedResults,
+                        mergedWishItem,
+                        ctx,
+                        isFromWishlist: false,
+                        marketTimezone,
+                        bucketName: "today-research-like promoted candidates",
+                        rejectionLogPrefix: "Entry rejected after today-research-like promotion");
+
+                    continue;
+                }
+
                 await TryAddCandidate(
                     candidateResults,
                     mergedWishItem,
@@ -671,16 +695,17 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState)
         {
             var firstSeenDate = mergedWishItem.FirstSeen?.Date;
-            if (firstSeenDate != ctx.ScanTimeMarket.Date)
-                return false;
-
-            if (mergedWishItem.ExpectedBarsToTarget != null && mergedWishItem.ExpectedBarsToTarget > 0)
-                return false;
-
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
                 return false;
 
             var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
+            var currentSessionLikeMove =
+                string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ctx.Preset.ScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ctx.Preset.ScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ctx.Preset.ScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                strongLiveMove;
+
             var constructiveWeekly =
                 string.Equals(bbState.Weekly.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
                 (string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
@@ -696,9 +721,23 @@ namespace IbSwingTrader.Application.Candidates
 
             var h4Supportive =
                 string.Equals(bbState.H4.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase);
+                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase);
 
-            return strongLiveMove || (constructiveWeekly && actionableDaily && h4Supportive);
+            var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
+            var canIgnoreForecastGate =
+                currentSessionLikeMove &&
+                constructiveWeekly &&
+                actionableDaily &&
+                h4Supportive;
+
+            if (!canIgnoreForecastGate &&
+                mergedWishItem.ExpectedBarsToTarget != null &&
+                mergedWishItem.ExpectedBarsToTarget > 0)
+                return false;
+
+            return (bornToday && strongLiveMove) || canIgnoreForecastGate;
         }
 
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
