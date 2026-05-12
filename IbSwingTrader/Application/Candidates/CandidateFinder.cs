@@ -317,6 +317,14 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
+                if (!IsReversalCandidateContext(ctx.Snapshot))
+                {
+                    _logger.Info(
+                        $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
+                        $"Daily distance is above mid and TodayResearchLike conditions were not confirmed.");
+                    continue;
+                }
+
                 await TryAddCandidate(
                     candidateResults,
                     mergedWishItem,
@@ -341,14 +349,44 @@ namespace IbSwingTrader.Application.Candidates
                 if (!scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var ctx))
                     continue;
 
-                await TryAddCandidate(
-                    sameDayPromotedResults,
+                var sameDayDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+                var sameDayEntryScore = _candidateScore.Calculate(ctx.Snapshot);
+                var sameDayBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
-                    isFromWishlist: false,
-                    marketTimezone,
-                    bucketName: "same-day promoted candidates",
-                    rejectionLogPrefix: "Entry rejected after same-day promotion");
+                    sameDayDiagnostics,
+                    sameDayEntryScore,
+                    sameDayBbState);
+
+                if (promoteAsTodayResearchLike)
+                {
+                    await TryAddCandidate(
+                        sameDayPromotedResults,
+                        mergedWishItem,
+                        ctx,
+                        isFromWishlist: false,
+                        marketTimezone,
+                        bucketName: "same-day promoted candidates",
+                        rejectionLogPrefix: "Entry rejected after same-day promotion");
+                }
+                else if (IsReversalCandidateContext(ctx.Snapshot))
+                {
+                    await TryAddCandidate(
+                        candidateResults,
+                        mergedWishItem,
+                        ctx,
+                        isFromWishlist: true,
+                        marketTimezone,
+                        bucketName: "same-day reversal candidates",
+                        rejectionLogPrefix: "Entry rejected after same-day reversal promotion");
+                }
+                else
+                {
+                    _logger.Info(
+                        $"Skipping same-day classification for {ctx.Stock.Ticker}. " +
+                        $"Daily distance is above mid but TodayResearchLike conditions were not confirmed.");
+                }
             }
 
             if (candidateResults.Count == 0)
@@ -467,6 +505,9 @@ namespace IbSwingTrader.Application.Candidates
                     diagnostics,
                     entryScore,
                     bbState);
+
+                if (!isTodayResearchLikeCandidate)
+                    continue;
 
                 if (entryScore < settings.MinEntryScore && !isTodayResearchLikeCandidate)
                     continue;
@@ -694,6 +735,9 @@ namespace IbSwingTrader.Application.Candidates
             decimal entryScore,
             BollingerStateSet bbState)
         {
+            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m)
+                return false;
+
             var firstSeenDate = mergedWishItem.FirstSeen?.Date;
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
                 return false;
@@ -738,6 +782,11 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
 
             return (bornToday && strongLiveMove) || canIgnoreForecastGate;
+        }
+
+        private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
+        {
+            return snapshot.Current.DailyMaSignedDistancePct < 0m;
         }
 
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
