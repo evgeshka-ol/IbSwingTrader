@@ -72,8 +72,11 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             var existingDocument = await LoadDocumentAsync(filePath);
-            var merged = MergeCandidates(existingDocument.Candidates, candidates);
             var mergedSameDay = MergeCandidates(existingDocument.SameDayCandidates, sameDayCandidates);
+            var merged = MergeCandidates(existingDocument.Candidates, candidates)
+                .Where(x => !mergedSameDay.Any(y =>
+                    string.Equals(BuildCandidateScanKey(y), BuildCandidateScanKey(x), StringComparison.OrdinalIgnoreCase)))
+                .ToList();
             var summary = BuildSummary(candidates, sameDayCandidates);
             var json = BuildJson(summary, merged, mergedSameDay);
             await File.WriteAllTextAsync(filePath, json);
@@ -127,6 +130,13 @@ namespace IbSwingTrader.Infrastructure.Logging
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{candidate.Ticker}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
+        }
+
+        private static string BuildCandidateScanKey(CandidateDetails candidate)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}");
         }
 
         private async Task<CandidateFileDocument> LoadDocumentAsync(string filePath)

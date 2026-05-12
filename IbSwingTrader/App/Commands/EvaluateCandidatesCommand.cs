@@ -218,8 +218,8 @@ namespace IbSwingTrader.App.Commands
                     return x;
                 });
 
-            return primaryCandidates
-                .Concat(sameDayCandidates)
+            return sameDayCandidates
+                .Concat(primaryCandidates)
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.First())
                 .ToList();
