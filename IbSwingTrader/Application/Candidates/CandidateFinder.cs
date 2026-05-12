@@ -79,8 +79,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
-            var processedScannedTickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
             foreach (var preset in _scannerPresets.GetAll())
             {
                 var stocks = await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
@@ -89,12 +87,6 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     if (!_preFilter.Pass(stock))
                         continue;
-
-                    if (!processedScannedTickers.Add(stock.Ticker))
-                    {
-                        _logger.Info($"Skipping duplicate scanned ticker: {stock.Ticker} ({preset.ScanCode})");
-                        continue;
-                    }
 
                     Contract? contract = null;
                     List<Candle>? candles;
