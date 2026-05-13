@@ -848,6 +848,16 @@ namespace IbSwingTrader.Application.Candidates
                 h4SeriesSupportive &&
                 runawaySeriesScore >= 10m;
 
+            var liveSeriesPromotion =
+                currentSessionLikeMove &&
+                weeklyMidLast > 0m &&
+                dailyMidLast > 8m &&
+                h4MidLast > 0m &&
+                weeklyMacdLast > -0.35m &&
+                dailyMacdLast > -0.10m &&
+                h4MacdLast > -0.10m &&
+                runawaySeriesScore >= 8m;
+
             var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
             var canIgnoreForecastGate =
                 (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m) &&
@@ -855,7 +865,7 @@ namespace IbSwingTrader.Application.Candidates
                 (actionableDaily || dailySeriesConstructive) &&
                 (h4Supportive || h4SeriesSupportive);
 
-            if (seriesDrivenTodayResearchLike)
+            if (seriesDrivenTodayResearchLike || liveSeriesPromotion)
                 return true;
 
             if (!canIgnoreForecastGate &&
@@ -866,6 +876,7 @@ namespace IbSwingTrader.Application.Candidates
             return
                 runawaySeriesScore >= 12m ||
                 seriesDrivenTodayResearchLike ||
+                liveSeriesPromotion ||
                 (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m)) ||
                 canIgnoreForecastGate;
         }
@@ -1671,7 +1682,93 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
+            score += CalculateTodayResearchLikeFreshnessAdjustment(
+                presetScanCode,
+                snapshot,
+                recentSeries);
+
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private decimal CalculateTodayResearchLikeFreshnessAdjustment(
+            string presetScanCode,
+            CandidateSignalSnapshot snapshot,
+            RecentFeatureSeries recentSeries)
+        {
+            if (snapshot.Current.DailyMaSignedDistancePct < 0m)
+                return 0m;
+
+            var livePreset =
+                string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase);
+
+            if (!livePreset)
+                return 0m;
+
+            var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
+            var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
+            var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
+            var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
+            var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
+
+            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+            var dailyWidthSlope = CalculateSlope(recentSeries.DailyBbWidthSeries);
+            var h4WidthSlope = CalculateSlope(recentSeries.H4BbWidthSeries);
+
+            decimal score = 0m;
+
+            if (weeklyMidLast > 0m)
+                score += 0.15m;
+            if (dailyMidLast > 10m)
+                score += 0.20m;
+            if (dailyMidLast > 30m)
+                score += 0.20m;
+            if (h4MidLast > 5m)
+                score += 0.15m;
+
+            if (dailyMidSlope > 0m)
+                score += 0.30m;
+            else if (dailyMidSlope < -15m)
+                score -= 0.35m;
+
+            if (h4MidSlope > 0m)
+                score += 0.25m;
+            else if (h4MidSlope < -15m)
+                score -= 0.30m;
+
+            if (dailyMacdLast > 0m)
+                score += 0.20m;
+            if (h4MacdLast >= 0m)
+                score += 0.15m;
+
+            if (dailyMacdSlope > 0m)
+                score += 0.15m;
+            else if (dailyMacdSlope < -0.20m)
+                score -= 0.20m;
+
+            if (h4MacdSlope > 0m)
+                score += 0.10m;
+            else if (h4MacdSlope < -0.15m)
+                score -= 0.15m;
+
+            if (dailyWidthSlope > -20m)
+                score += 0.10m;
+            if (h4WidthSlope > -20m)
+                score += 0.10m;
+
+            if (snapshot.Current.DailyMaSignedDistancePct > 60m &&
+                dailyMidSlope < -10m &&
+                h4MidSlope < -10m)
+            {
+                score -= 0.40m;
+            }
+
+            return score;
         }
 
         private List<CandidateDetails> ReRankCandidates(
