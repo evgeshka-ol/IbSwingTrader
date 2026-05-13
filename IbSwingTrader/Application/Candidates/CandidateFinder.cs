@@ -563,19 +563,26 @@ namespace IbSwingTrader.Application.Candidates
         {
             if (results.TryGetValue(item.Stock.Ticker, out var existing))
             {
-                if (item.WishListItem.Score.Score > existing.WishListItem.Score.Score)
+                var existingPriority = CalculateWishListContextPriority(existing);
+                var itemPriority = CalculateWishListContextPriority(item);
+
+                if (itemPriority > existingPriority ||
+                    (itemPriority == existingPriority &&
+                     item.WishListItem.Score.Score > existing.WishListItem.Score.Score))
                 {
                     results[item.Stock.Ticker] = item;
 
                     _logger.Info(
-                        $"Ticker {item.Stock.Ticker} replaced existing wish list item with higher score. " +
-                        $"Old preset: {existing.Preset.ScanCode}, new preset: {item.Preset.ScanCode}");
+                        $"Ticker {item.Stock.Ticker} replaced existing wish list item with higher priority. " +
+                        $"Old preset: {existing.Preset.ScanCode}, new preset: {item.Preset.ScanCode}, " +
+                        $"OldPriority={existingPriority}, NewPriority={itemPriority}");
                 }
                 else
                 {
                     _logger.Info(
                         $"Ticker {item.Stock.Ticker} already exists in wish list. " +
-                        $"Keeping existing item from preset {existing.Preset.ScanCode}");
+                        $"Keeping existing item from preset {existing.Preset.ScanCode}. " +
+                        $"ExistingPriority={existingPriority}, NewPriority={itemPriority}");
                 }
             }
             else
@@ -583,6 +590,45 @@ namespace IbSwingTrader.Application.Candidates
                 results[item.Stock.Ticker] = item;
                 _logger.Info($"Ticker {item.Stock.Ticker} added to wish list. Preset: {item.Preset.ScanCode}");
             }
+        }
+
+        private int CalculateWishListContextPriority(WishListContext ctx)
+        {
+            var score = 0;
+            var dailyDistance = ctx.Snapshot.Current.DailyMaSignedDistancePct;
+            var weeklyDistance = ctx.Snapshot.Current.WeeklyMaSignedDistancePct ?? 0m;
+            var h4Distance = ctx.Snapshot.Current.H4MaSignedDistancePct;
+            var dailyMacd = ctx.Snapshot.Current.DailyMACDLineMinusSignal;
+            var h4Macd = ctx.Snapshot.Current.MACDLineMinusSignal;
+
+            if (dailyDistance >= 0m)
+                score += 2;
+
+            if (string.Equals(ctx.Preset.ScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase))
+                score += 4;
+            else if (string.Equals(ctx.Preset.ScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase))
+                score += 3;
+            else if (string.Equals(ctx.Preset.ScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase))
+                score += 3;
+            else if (string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase))
+                score += 3;
+
+            if (dailyDistance > 15m)
+                score += 2;
+            if (weeklyDistance > 10m)
+                score++;
+            if (h4Distance > 5m)
+                score++;
+
+            if (dailyMacd > 0m)
+                score += 2;
+            if (h4Macd >= 0m)
+                score++;
+
+            if ((ctx.Snapshot.Current.WeeklyMACDLineMinusSignal ?? 0m) >= 0m)
+                score++;
+
+            return score;
         }
 
         private void AddOrReplaceHigherScore(
@@ -734,6 +780,7 @@ namespace IbSwingTrader.Application.Candidates
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
                 return false;
 
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
             var currentSessionLikeMove =
                 string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
@@ -761,9 +808,13 @@ namespace IbSwingTrader.Application.Candidates
                 string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase);
 
+            var strongRunawayUp = IsStrongRunawayUp(ctx.Snapshot, diagnostics, bbState);
+            var strongSeriesRunawayUp = IsStrongTodayResearchLikeSeries(recentSeries);
+            var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
+
             var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
             var canIgnoreForecastGate =
-                currentSessionLikeMove &&
+                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 10m) &&
                 constructiveWeekly &&
                 actionableDaily &&
                 h4Supportive;
@@ -773,7 +824,144 @@ namespace IbSwingTrader.Application.Candidates
                 mergedWishItem.ExpectedBarsToTarget > 0)
                 return false;
 
-            return (bornToday && strongLiveMove) || canIgnoreForecastGate;
+            return
+                runawaySeriesScore >= 12m ||
+                (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m)) ||
+                canIgnoreForecastGate;
+        }
+
+        private static bool IsStrongRunawayUp(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            BollingerStateSet bbState)
+        {
+            var weeklyDistance = snapshot.Current.WeeklyMaSignedDistancePct ?? 0m;
+            var dailyDistance = snapshot.Current.DailyMaSignedDistancePct;
+            var h4Distance = snapshot.Current.H4MaSignedDistancePct;
+            var weeklyMacd = snapshot.Current.WeeklyMACDLineMinusSignal ?? 0m;
+            var dailyMacd = snapshot.Current.DailyMACDLineMinusSignal;
+            var h4Macd = snapshot.Current.MACDLineMinusSignal;
+            var weeklyUp = string.Equals(
+                bbState.Weekly.Direction,
+                nameof(BollingerFigureDirection.Up),
+                StringComparison.OrdinalIgnoreCase);
+            var dailyUp = string.Equals(
+                bbState.Daily.Direction,
+                nameof(BollingerFigureDirection.Up),
+                StringComparison.OrdinalIgnoreCase);
+            var h4Up = string.Equals(
+                bbState.H4.Direction,
+                nameof(BollingerFigureDirection.Up),
+                StringComparison.OrdinalIgnoreCase);
+
+            var score = 0;
+
+            if (weeklyDistance > 10m)
+                score++;
+            if (dailyDistance > 15m)
+                score++;
+            if (h4Distance > 8m)
+                score++;
+
+            if (weeklyMacd > -0.25m)
+                score++;
+            if (dailyMacd > 0m)
+                score++;
+            if (h4Macd > -0.05m)
+                score++;
+
+            if (weeklyUp)
+                score++;
+            if (dailyUp)
+                score++;
+            if (h4Up)
+                score++;
+
+            if (bbState.Daily.WidthSlope > -15m)
+                score++;
+            if (bbState.H4.WidthSlope > -20m)
+                score++;
+
+            if (diagnostics.VolumeRatio20 >= 0.05m)
+                score++;
+
+            return dailyUp &&
+                   (weeklyUp || h4Up) &&
+                   dailyDistance > 15m &&
+                   dailyMacd > 0m &&
+                   score >= 7;
+        }
+
+        private bool IsStrongTodayResearchLikeSeries(RecentFeatureSeries recentSeries)
+        {
+            return CalculateTodayResearchLikeSeriesScore(recentSeries) >= 10m;
+        }
+
+        private decimal CalculateTodayResearchLikeSeriesScore(RecentFeatureSeries recentSeries)
+        {
+            var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
+            var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
+            var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
+            var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
+            var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
+            var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
+
+            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var weeklyMidSlope = CalculateSlope(recentSeries.WeeklyBbMidDistanceSeries);
+            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var dailyWidthSlope = CalculateSlope(recentSeries.DailyBbWidthSeries);
+            var weeklyWidthSlope = CalculateSlope(recentSeries.WeeklyBbWidthSeries);
+            var h4WidthSlope = CalculateSlope(recentSeries.H4BbWidthSeries);
+            var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
+            var weeklyMacdSlope = CalculateSlope(recentSeries.WeeklyMacdSeries);
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+
+            decimal score = 0m;
+
+            if (dailyMidLast > 15m)
+                score += 2m;
+            if (dailyMidLast > 35m)
+                score += 1m;
+
+            if (weeklyMidLast > 0m)
+                score += 1m;
+            if (weeklyMidLast > 20m)
+                score += 2m;
+
+            if (h4MidLast > 8m)
+                score += 1m;
+            if (h4MidLast > 20m)
+                score += 1m;
+
+            if (dailyMidSlope > -5m)
+                score += 1m;
+            if (weeklyMidSlope > -5m)
+                score += 1m;
+            if (h4MidSlope > -10m)
+                score += 1m;
+
+            if (dailyMacdLast > 0m)
+                score += 2m;
+            if (weeklyMacdLast > 0m)
+                score += 1m;
+            if (h4MacdLast >= 0m)
+                score += 1m;
+
+            if (dailyMacdSlope > -0.2m)
+                score += 1m;
+            if (weeklyMacdSlope > -0.2m)
+                score += 1m;
+            if (h4MacdSlope > -0.15m)
+                score += 1m;
+
+            if (dailyWidthSlope > -30m)
+                score += 1m;
+            if (weeklyWidthSlope > -40m)
+                score += 1m;
+            if (h4WidthSlope > -30m)
+                score += 1m;
+
+            return score;
         }
 
         private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
