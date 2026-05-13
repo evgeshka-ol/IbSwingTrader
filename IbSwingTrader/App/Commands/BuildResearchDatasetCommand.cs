@@ -52,6 +52,8 @@ namespace IbSwingTrader.App.Commands
 
             _logger.Info(
                 $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxBarsToPeak={settings.MaxBarsToPeak}, EpisodeMergeCooldownBars={settings.EpisodeMergeCooldownBars}");
+            if (settings.MinScanTime.HasValue)
+                _logger.Info($"Research MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
             _logger.Info($"Research tickers found: {tickers.Count}");
 
             if (tickers.Count == 0)
@@ -82,6 +84,12 @@ namespace IbSwingTrader.App.Commands
                 .Select(MapToCsvRow)
                 .ToList();
             var existingRows = await ReadExistingRowsAsync(outputPath);
+            if (settings.MinScanTime.HasValue)
+            {
+                existingRows = existingRows
+                    .Where(x => x.ScanTime >= settings.MinScanTime.Value)
+                    .ToList();
+            }
             var allRows = existingRows
                 .Concat(freshRows)
                 .GroupBy(BuildResearchRowKey, StringComparer.OrdinalIgnoreCase)
@@ -104,6 +112,7 @@ namespace IbSwingTrader.App.Commands
 
         private async Task<List<string>> LoadKnownTickersAsync()
         {
+            var settings = _researchSettingsProvider.Get();
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             var candidatesPath = _pathService.GetCandidatesFile();
@@ -140,6 +149,7 @@ namespace IbSwingTrader.App.Commands
                     var delimiter = DetectDelimiter(lines[0]);
                     var headers = SplitCsvLine(lines[0], delimiter);
                     var tickerIndex = headers.FindIndex(x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
+                    var scanTimeIndex = headers.FindIndex(x => string.Equals(x, "ScanTime", StringComparison.OrdinalIgnoreCase));
 
                     if (tickerIndex >= 0)
                     {
@@ -149,8 +159,24 @@ namespace IbSwingTrader.App.Commands
                                 continue;
 
                             var parts = SplitCsvLine(line, delimiter);
-                            if (parts.Count > tickerIndex && !string.IsNullOrWhiteSpace(parts[tickerIndex]))
-                                result.Add(parts[tickerIndex].Trim());
+                            if (parts.Count <= tickerIndex || string.IsNullOrWhiteSpace(parts[tickerIndex]))
+                                continue;
+
+                            if (settings.MinScanTime.HasValue &&
+                                scanTimeIndex >= 0 &&
+                                parts.Count > scanTimeIndex &&
+                                DateTime.TryParseExact(
+                                    parts[scanTimeIndex].Trim(),
+                                    "yyyy-MM-dd HH:mm:ss",
+                                    CultureInfo.InvariantCulture,
+                                    DateTimeStyles.None,
+                                    out var scanTime) &&
+                                scanTime < settings.MinScanTime.Value)
+                            {
+                                continue;
+                            }
+
+                            result.Add(parts[tickerIndex].Trim());
                         }
                     }
                 }

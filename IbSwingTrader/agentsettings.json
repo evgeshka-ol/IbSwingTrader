@@ -102,7 +102,8 @@
         "Mode": "top_gainers",
         "Source": "known_tickers",
         "OutputFile": "datasets/research_top_gainers.csv",
-        "LookbackCalendarDays": 240,
+        "MinScanTime": "2026-05-01",
+        "LookbackCalendarDays": 120,
         "MinimumCandles": 120,
         "MaxParallelTickers": 2,
         "ContractResolveTimeoutSeconds": 60,
@@ -546,7 +547,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 7,
-        "ReevaluateOpenCandidates": true,
+        "ReevaluateOpenCandidates": false,
         "ReevaluateAllCandidatesWithSeries": true,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,

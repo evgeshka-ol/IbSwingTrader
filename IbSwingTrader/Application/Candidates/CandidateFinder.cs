@@ -811,13 +811,52 @@ namespace IbSwingTrader.Application.Candidates
             var strongRunawayUp = IsStrongRunawayUp(ctx.Snapshot, diagnostics, bbState);
             var strongSeriesRunawayUp = IsStrongTodayResearchLikeSeries(recentSeries);
             var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
+            var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
+            var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
+            var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
+            var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
+            var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
+            var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
+            var weeklyMidSlope = CalculateSlope(recentSeries.WeeklyBbMidDistanceSeries);
+            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var weeklyWidthSlope = CalculateSlope(recentSeries.WeeklyBbWidthSeries);
+            var dailyWidthSlope = CalculateSlope(recentSeries.DailyBbWidthSeries);
+            var h4WidthSlope = CalculateSlope(recentSeries.H4BbWidthSeries);
+
+            var weeklySeriesConstructive =
+                weeklyMidLast > 0m &&
+                weeklyMacdLast > -0.35m &&
+                weeklyMidSlope > -20m &&
+                weeklyWidthSlope > -80m;
+
+            var dailySeriesConstructive =
+                dailyMidLast > 10m &&
+                dailyMacdLast > -0.20m &&
+                dailyMidSlope > -25m &&
+                dailyWidthSlope > -60m;
+
+            var h4SeriesSupportive =
+                h4MidLast > 5m &&
+                h4MacdLast > -0.25m &&
+                h4MidSlope > -30m &&
+                h4WidthSlope > -60m;
+
+            var seriesDrivenTodayResearchLike =
+                weeklySeriesConstructive &&
+                dailySeriesConstructive &&
+                h4SeriesSupportive &&
+                runawaySeriesScore >= 10m;
 
             var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
             var canIgnoreForecastGate =
-                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 10m) &&
-                constructiveWeekly &&
-                actionableDaily &&
-                h4Supportive;
+                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m) &&
+                (constructiveWeekly || weeklySeriesConstructive) &&
+                (actionableDaily || dailySeriesConstructive) &&
+                (h4Supportive || h4SeriesSupportive);
+
+            if (seriesDrivenTodayResearchLike)
+                return true;
 
             if (!canIgnoreForecastGate &&
                 mergedWishItem.ExpectedBarsToTarget != null &&
@@ -826,6 +865,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return
                 runawaySeriesScore >= 12m ||
+                seriesDrivenTodayResearchLike ||
                 (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m)) ||
                 canIgnoreForecastGate;
         }
