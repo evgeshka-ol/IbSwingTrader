@@ -381,6 +381,45 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
+            foreach (var ctx in scannedWishListContexts.Values)
+            {
+                if (sameDayPromotedResults.ContainsKey(ctx.Stock.Ticker))
+                    continue;
+
+                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
+                    continue;
+
+                if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m)
+                    continue;
+
+                var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
+                var liveEntryScore = _candidateScore.Calculate(ctx.Snapshot);
+                var liveBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
+                    mergedWishItem,
+                    ctx,
+                    liveDiagnostics,
+                    liveEntryScore,
+                    liveBbState);
+
+                if (!promoteAsTodayResearchLike)
+                    continue;
+
+                _logger.Info(
+                    $"Live above-mid TodayResearchLike promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"FirstSeen={mergedWishItem.FirstSeen?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
+
+                await TryAddCandidate(
+                    sameDayPromotedResults,
+                    mergedWishItem,
+                    ctx,
+                    isFromWishlist: false,
+                    marketTimezone,
+                    bucketName: "live today-research-like candidates",
+                    rejectionLogPrefix: "Entry rejected after live today-research-like promotion");
+            }
+
             if (candidateResults.Count == 0)
             {
                 _logger.Info(
@@ -811,6 +850,13 @@ namespace IbSwingTrader.Application.Candidates
             var strongRunawayUp = IsStrongRunawayUp(ctx.Snapshot, diagnostics, bbState);
             var strongSeriesRunawayUp = IsStrongTodayResearchLikeSeries(recentSeries);
             var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
+            var weeklyDistance = ctx.Snapshot.Current.WeeklyMaSignedDistancePct ?? 0m;
+            var dailyDistance = ctx.Snapshot.Current.DailyMaSignedDistancePct;
+            var h4Distance = ctx.Snapshot.Current.H4MaSignedDistancePct;
+            var dailyMaDelta3 = ctx.Snapshot.DailyMaDelta3;
+            var h4MaDelta3 = ctx.Snapshot.H4MaDelta3;
+            var dailyRsiDelta3 = ctx.Snapshot.DailyRsiDelta3;
+            var dailyMacdDelta3 = ctx.Snapshot.DailyMacdDelta3;
             var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
             var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
             var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
@@ -858,14 +904,35 @@ namespace IbSwingTrader.Application.Candidates
                 h4MacdLast > -0.10m &&
                 runawaySeriesScore >= 8m;
 
+            var liveSnapshotPromotion =
+                currentSessionLikeMove &&
+                weeklyDistance > 25m &&
+                dailyDistance > 15m &&
+                h4Distance > 2m &&
+                dailyMaDelta3 > 0m &&
+                h4MaDelta3 > 0m &&
+                dailyRsiDelta3 > -2m &&
+                dailyMacdDelta3 > -0.05m;
+
+            var staleLiveRunaway =
+                currentSessionLikeMove &&
+                weeklyDistance > 80m &&
+                dailyDistance > 50m &&
+                dailyMaDelta3 < -8m &&
+                h4MaDelta3 < -8m &&
+                dailyRsiDelta3 < -4m;
+
             var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
             var canIgnoreForecastGate =
-                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m) &&
+                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion) &&
                 (constructiveWeekly || weeklySeriesConstructive) &&
                 (actionableDaily || dailySeriesConstructive) &&
                 (h4Supportive || h4SeriesSupportive);
 
-            if (seriesDrivenTodayResearchLike || liveSeriesPromotion)
+            if (staleLiveRunaway)
+                return false;
+
+            if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion)
                 return true;
 
             if (!canIgnoreForecastGate &&
@@ -877,7 +944,8 @@ namespace IbSwingTrader.Application.Candidates
                 runawaySeriesScore >= 12m ||
                 seriesDrivenTodayResearchLike ||
                 liveSeriesPromotion ||
-                (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m)) ||
+                liveSnapshotPromotion ||
+                (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion)) ||
                 canIgnoreForecastGate;
         }
 
