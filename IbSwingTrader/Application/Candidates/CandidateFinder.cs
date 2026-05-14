@@ -914,6 +914,20 @@ namespace IbSwingTrader.Application.Candidates
                 dailyRsiDelta3 > -2m &&
                 dailyMacdDelta3 > -0.05m;
 
+            var earlyRunawayCoolingPromotion =
+                currentSessionLikeMove &&
+                weeklyDistance > 20m &&
+                dailyDistance > 10m &&
+                h4Distance > 0m &&
+                weeklyMacdLast > 0m &&
+                dailyMacdLast > 0m &&
+                h4MacdLast > -0.10m &&
+                dailyMaDelta3 > -12m &&
+                h4MaDelta3 > -14m &&
+                dailyRsiDelta3 > -4m &&
+                dailyMacdDelta3 > -0.08m &&
+                runawaySeriesScore >= 8m;
+
             var staleLiveRunaway =
                 currentSessionLikeMove &&
                 weeklyDistance > 80m &&
@@ -932,7 +946,7 @@ namespace IbSwingTrader.Application.Candidates
             if (staleLiveRunaway)
                 return false;
 
-            if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion)
+            if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion || earlyRunawayCoolingPromotion)
                 return true;
 
             if (!canIgnoreForecastGate &&
@@ -945,6 +959,7 @@ namespace IbSwingTrader.Application.Candidates
                 seriesDrivenTodayResearchLike ||
                 liveSeriesPromotion ||
                 liveSnapshotPromotion ||
+                earlyRunawayCoolingPromotion ||
                 (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion)) ||
                 canIgnoreForecastGate;
         }
@@ -1787,6 +1802,9 @@ namespace IbSwingTrader.Application.Candidates
             var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
             var dailyWidthSlope = CalculateSlope(recentSeries.DailyBbWidthSeries);
             var h4WidthSlope = CalculateSlope(recentSeries.H4BbWidthSeries);
+            var topPercGain = string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase);
+            var hotByVolume = string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase);
+            var mostActive = string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase);
 
             decimal score = 0m;
 
@@ -1835,6 +1853,40 @@ namespace IbSwingTrader.Application.Candidates
             {
                 score -= 0.40m;
             }
+
+            var moderateRunaway =
+                weeklyMidLast > 20m &&
+                dailyMidLast > 15m &&
+                dailyMidLast < 60m &&
+                h4MidLast > 5m &&
+                dailyMacdLast > 0m &&
+                h4MacdLast > -0.10m &&
+                dailyMidSlope > -12m &&
+                h4MidSlope > -12m;
+
+            if (moderateRunaway)
+                score += 0.35m;
+
+            if (moderateRunaway && hotByVolume)
+                score += 0.15m;
+
+            if (moderateRunaway && topPercGain)
+                score += 0.15m;
+
+            if (moderateRunaway && mostActive)
+                score += 0.10m;
+
+            var earlyRunawayStillAlive =
+                weeklyMidLast > 10m &&
+                dailyMidLast > 10m &&
+                h4MidLast > 0m &&
+                dailyMacdLast >= 0m &&
+                h4MacdLast > -0.10m &&
+                dailyWidthSlope > -35m &&
+                h4WidthSlope > -35m;
+
+            if (earlyRunawayStillAlive && dailyMidSlope > -15m && h4MidSlope > -15m)
+                score += 0.20m;
 
             return score;
         }

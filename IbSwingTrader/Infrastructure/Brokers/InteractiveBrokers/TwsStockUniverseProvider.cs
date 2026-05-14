@@ -14,7 +14,8 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         // Было TOP_PERC_GAIN TOP_PERC_LOSE
         private double MinPrice { get; set; } = 5;
-        private double MaxPrice { get; set; } = 200;
+        // 200 was clipping legitimate live winners like AAOI/NBIS before they even reached scanner logic.
+        private double MaxPrice { get; set; } = 300;
 
         private int MinAvgVolume { get; set; } = 1_000_000;
 
