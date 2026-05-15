@@ -14,7 +14,6 @@
         logger.Info("Usage:");
         logger.Info("  build-dataset <trades.csv> <dataset.csv>");
         logger.Info("  build-research-dataset");
-        logger.Info("  build-evaluation-dataset");
         logger.Info("  get-candidates");
         logger.Info("  evaluate-candidates");
         logger.Info("  normalize-evaluations");
@@ -38,12 +37,6 @@
         case "build-research-dataset":
             await services
                 .GetRequiredService<BuildResearchDatasetCommand>()
-                .RunAsync();
-            break;
-
-        case "build-evaluation-dataset":
-            await services
-                .GetRequiredService<BuildEvaluationDatasetCommand>()
                 .RunAsync();
             break;
 

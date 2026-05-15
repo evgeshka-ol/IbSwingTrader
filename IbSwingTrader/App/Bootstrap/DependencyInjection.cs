@@ -65,6 +65,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<IFeatureEngine, FeatureEngine>();
             services.AddSingleton<ICsvWriter, CsvDatasetWriter>();
             services.AddSingleton<IEvaluationDatasetCsvService, EvaluationDatasetCsvService>();
+            services.AddSingleton<IEvaluationDatasetBuilder, EvaluationDatasetBuilder>();
             services.AddSingleton<ITradeDatasetBuilder, TradeDatasetBuilder>();
 
             // wish list
@@ -95,7 +96,6 @@ namespace IbSwingTrader.App.Bootstrap
             // commands
             services.AddTransient<BuildDatasetCommand>();
             services.AddTransient<BuildResearchDatasetCommand>();
-            services.AddTransient<BuildEvaluationDatasetCommand>();
             services.AddTransient<GetCandidatesCommand>();
             services.AddTransient<EvaluateCandidatesCommand>();
             services.AddTransient<NormalizeEvaluationsCommand>();

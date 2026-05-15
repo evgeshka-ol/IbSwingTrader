@@ -8,7 +8,7 @@ namespace IbSwingTrader.App.Commands
 {
     public class CleanUpCommand(
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
-        BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
+        IEvaluationDatasetBuilder evaluationDatasetBuilder,
         IJsonFileService jsonFileService,
         INumberTextFormatter fmt,
         ITextLogger logger,
@@ -18,7 +18,7 @@ namespace IbSwingTrader.App.Commands
         IMarketSettingsProvider marketSettingsProvider) : ICommand
     {
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
-        private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
+        private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
@@ -99,7 +99,7 @@ namespace IbSwingTrader.App.Commands
             var evaluations = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
             if (evaluations.Count > 0)
             {
-                await _buildEvaluationDatasetCommand.RunAsync();
+                await _evaluationDatasetBuilder.RunAsync();
                 return;
             }
 

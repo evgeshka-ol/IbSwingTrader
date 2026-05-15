@@ -7,7 +7,7 @@ namespace IbSwingTrader.App.Commands
         IContractResolver contractResolver,
         IHistoricalDataService historicalDataService,
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
-        BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
+        IEvaluationDatasetBuilder evaluationDatasetBuilder,
         IAgentPathService pathService,
         ITextLogger logger) : ICommand
     {
@@ -17,7 +17,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
-        private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
+        private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITextLogger _logger = logger;
 
@@ -78,7 +78,7 @@ namespace IbSwingTrader.App.Commands
                 $"archiveTotal={archivedRecords.Count}");
 
             _logger.Info("Rebuilding evaluation dataset after normalization...");
-            await _buildEvaluationDatasetCommand.RunAsync();
+            await _evaluationDatasetBuilder.RunAsync();
         }
 
         private void EnsureConnected(int timeoutSeconds)

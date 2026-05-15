@@ -1,6 +1,6 @@
-namespace IbSwingTrader.App.Commands
+namespace IbSwingTrader.Application.Dataset
 {
-    public class BuildEvaluationDatasetCommand(
+    public class EvaluationDatasetBuilder(
         ICandidateEvaluationCsvService evaluationCsvService,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
         IJsonFileService jsonFileService,
@@ -8,7 +8,7 @@ namespace IbSwingTrader.App.Commands
         IFeatureEngine featureEngine,
         IAgentPathService pathService,
         IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
-        ITextLogger logger) : ICommand
+        ITextLogger logger) : IEvaluationDatasetBuilder
     {
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
@@ -564,14 +564,15 @@ namespace IbSwingTrader.App.Commands
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
             int scanIndex,
-            Func<FeatureSet, decimal?> selector)
+            Func<FeatureSet, decimal> selector)
         {
             var indexes = new List<int>();
             var usedWeeks = new HashSet<DateTime>();
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var week = StartOfWeek(candles[i].Time);
+                var candleTime = candles[i].Time;
+                var week = candleTime.Date.AddDays(-(int)candleTime.DayOfWeek);
                 if (!usedWeeks.Add(week))
                     continue;
 
@@ -581,11 +582,7 @@ namespace IbSwingTrader.App.Commands
             }
 
             indexes.Reverse();
-
-            return [.. indexes
-                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
-                .Where(x => x.HasValue)
-                .Select(x => Round(x!.Value))];
+            return [.. indexes.Select(i => Round(selector(_featureEngine.Calculate(candles, i + 1))))];
         }
 
         private List<decimal> BuildRecentH4Series(
@@ -805,10 +802,9 @@ namespace IbSwingTrader.App.Commands
 
         private static decimal CalcPctOrZero(decimal from, decimal to)
         {
-            if (from <= 0m)
-                return 0m;
-
-            return ((to - from) / from) * 100m;
+            return from <= 0m
+                ? 0m
+                : ((to - from) / from) * 100m;
         }
 
         private static decimal CalcPct(decimal from, decimal to)
@@ -821,30 +817,51 @@ namespace IbSwingTrader.App.Commands
 
         private static decimal CalculateAmplitudePct(
             decimal scanPrice,
-            decimal? maxUpPct,
-            DateTime? maxUpTime,
-            decimal? maxDownPct,
-            DateTime? maxDownTime)
+            decimal? maxPct,
+            DateTime? maxTime,
+            decimal? minPct,
+            DateTime? minTime)
         {
-            var positivePotentialPct = Math.Max(maxUpPct ?? 0m, 0m);
-            var negativePotentialPct = Math.Abs(Math.Min(maxDownPct ?? scanPrice, scanPrice));
-
-            if (positivePotentialPct <= 0m)
+            if (scanPrice <= 0m)
                 return 0m;
 
-            if (maxUpTime.HasValue &&
-                maxDownTime.HasValue &&
-                maxUpTime.Value < maxDownTime.Value)
-            {
-                return positivePotentialPct;
-            }
+            var highPrice = maxPct.HasValue
+                ? scanPrice * (1m + maxPct.Value / 100m)
+                : scanPrice;
+            var lowPrice = minPct.HasValue
+                ? scanPrice * (1m + minPct.Value / 100m)
+                : scanPrice;
 
-            return positivePotentialPct + negativePotentialPct;
+            if (maxTime.HasValue && minTime.HasValue && minTime.Value <= maxTime.Value)
+                return Round(CalcPct(lowPrice, highPrice));
+
+            return Round(Math.Abs(CalcPct(lowPrice, highPrice)));
         }
 
-        private static decimal Round(decimal value)
+        private static string GetMinDepthGroup(decimal? minPct)
         {
-            return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+            var value = minPct ?? 0m;
+            if (value <= -20m) return "Deep";
+            if (value <= -10m) return "Medium";
+            if (value < 0m) return "Shallow";
+            return "None";
+        }
+
+        private static string GetMaxStrengthGroup(decimal? maxPct)
+        {
+            var value = maxPct ?? 0m;
+            if (value >= 50m) return "Explosive";
+            if (value >= 20m) return "Strong";
+            if (value > 0m) return "Weak";
+            return "None";
+        }
+
+        private static string BuildExtremumSubgroup(
+            string extremumOrder,
+            string minDepthGroup,
+            string maxStrengthGroup)
+        {
+            return $"{extremumOrder}_{minDepthGroup}_{maxStrengthGroup}";
         }
 
         private static int? DiffMinutes(DateTime? from, DateTime? to)
@@ -855,154 +872,59 @@ namespace IbSwingTrader.App.Commands
             return (int)Math.Round((to.Value - from.Value).TotalMinutes, MidpointRounding.AwayFromZero);
         }
 
-        private static string GetExtremumOrder(DateTime? minTime, DateTime? maxTime)
+        private static decimal? CalculatePostMaxDrawdownPct(
+            Candle maxAfterEntry,
+            List<Candle> afterEntry)
         {
-            if (minTime.HasValue && maxTime.HasValue)
-            {
-                if (minTime.Value < maxTime.Value)
-                    return "MinFirst";
-
-                if (maxTime.Value < minTime.Value)
-                    return "MaxFirst";
-
-                return "SameBar";
-            }
-
-            if (minTime.HasValue)
-                return "OnlyMin";
-
-            if (maxTime.HasValue)
-                return "OnlyMax";
-
-            return "Unknown";
-        }
-
-        private static string GetMinDepthGroup(decimal? minPct)
-        {
-            if (!minPct.HasValue)
-                return "Unknown";
-
-            if (minPct.Value >= 0m)
-                return "NoDip";
-
-            var drawdownPct = Math.Abs(minPct.Value);
-
-            if (drawdownPct < 1m)
-                return "MicroDip";
-
-            if (drawdownPct < 2m)
-                return "Shallow";
-
-            if (drawdownPct < 5m)
-                return "Medium";
-
-            return "Deep";
-        }
-
-        private static string GetMaxStrengthGroup(decimal? maxPct)
-        {
-            if (!maxPct.HasValue)
-                return "Unknown";
-
-            var upsidePct = Math.Max(maxPct.Value, 0m);
-
-            if (upsidePct < 5m)
-                return "Weak";
-
-            if (upsidePct < 10m)
-                return "Strong";
-
-            if (upsidePct < 20m)
-                return "Explosive";
-
-            return "Parabolic";
-        }
-
-        private static string BuildExtremumSubgroup(
-            string extremumOrder,
-            string minDepthGroup,
-            string maxStrengthGroup)
-        {
-            if (string.IsNullOrWhiteSpace(extremumOrder))
-                return "Unknown";
-
-            return $"{extremumOrder}_{minDepthGroup}_{maxStrengthGroup}";
-        }
-
-        private static DateTime StartOfWeek(DateTime time)
-        {
-            var date = time.Date;
-            var diff = ((int)date.DayOfWeek + 6) % 7;
-            return date.AddDays(-diff);
-        }
-
-        private static DateTime StartOfH4Bucket(DateTime time)
-        {
-            return new DateTime(
-                time.Year,
-                time.Month,
-                time.Day,
-                (time.Hour / 4) * 4,
-                0,
-                0,
-                time.Kind);
-        }
-
-        private static decimal? CalculatePostMaxDrawdownPct(Candle maxCandle, List<Candle> afterEntry)
-        {
-            if (maxCandle.High <= 0m)
-                return null;
-
             var afterMax = afterEntry
-                .Where(x => x.Time >= maxCandle.Time)
-                .OrderBy(x => x.Time)
+                .Where(x => x.Time >= maxAfterEntry.Time)
                 .ToList();
 
-            if (afterMax.Count == 0)
+            if (afterMax.Count == 0 || maxAfterEntry.High <= 0m)
                 return null;
 
-            var minLowAfterMax = afterMax.Min(x => x.Low);
-            return Round(((maxCandle.High - minLowAfterMax) / maxCandle.High) * 100m);
+            var minAfterMax = afterMax.Min(x => x.Low);
+            return Round(CalcPct(maxAfterEntry.High, minAfterMax));
         }
 
         private static (decimal? ExitMissAbs, decimal? ExitMissPct, bool NearTakeProfitMiss) CalculateExitMiss(
             CandidateEvaluationResult evaluation,
-            decimal maxHighAfterEntry)
+            decimal maxHigh)
         {
-            if (evaluation.ExitTouched || evaluation.ExitPrice <= 0m)
+            if (evaluation.ExitPrice <= 0m || maxHigh <= 0m)
                 return (null, null, false);
 
-            var missAbs = Math.Max(evaluation.ExitPrice - maxHighAfterEntry, 0m);
+            var missAbs = Math.Max(evaluation.ExitPrice - maxHigh, 0m);
             var missPct = evaluation.ExitPrice > 0m
-                ? (missAbs / evaluation.ExitPrice) * 100m
-                : 0m;
+                ? (decimal?)Round((missAbs / evaluation.ExitPrice) * 100m)
+                : null;
+            var nearMiss = missAbs > 0m &&
+                           evaluation.ExitPrice > 0m &&
+                           ((missAbs / evaluation.ExitPrice) * 100m) <= 1m;
 
-            return (
-                Round(missAbs),
-                Round(missPct),
-                missAbs > 0m && (missAbs <= 0.01m || missPct <= 0.1m));
+            return (Round(missAbs), missPct, nearMiss);
         }
 
-        private sealed class RecentFeatureSeries
+        private static string GetExtremumOrder(DateTime? minTime, DateTime? maxTime)
         {
-            public List<decimal> DailyMaSeries { get; init; } = [];
-            public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
-            public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> DailyBbWidthSeries { get; init; } = [];
-            public List<decimal> DailyRsiSeries { get; init; } = [];
-            public List<decimal> DailyMacdSeries { get; init; } = [];
-            public List<decimal> WeeklyMaSeries { get; init; } = [];
-            public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
-            public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
-            public List<decimal> WeeklyRsiSeries { get; init; } = [];
-            public List<decimal> WeeklyMacdSeries { get; init; } = [];
-            public List<decimal> H4MaSeries { get; init; } = [];
-            public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
-            public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> H4BbWidthSeries { get; init; } = [];
-            public List<decimal> H4RsiSeries { get; init; } = [];
-            public List<decimal> H4MacdSeries { get; init; } = [];
+            if (!minTime.HasValue || !maxTime.HasValue)
+                return string.Empty;
+
+            if (minTime.Value == maxTime.Value)
+                return "SameBar";
+
+            return minTime.Value < maxTime.Value ? "MinFirst" : "MaxFirst";
+        }
+
+        private static DateTime StartOfH4Bucket(DateTime time)
+        {
+            var hour = time.Hour - (time.Hour % 4);
+            return new DateTime(time.Year, time.Month, time.Day, hour, 0, 0, time.Kind);
+        }
+
+        private static decimal Round(decimal value)
+        {
+            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         private sealed class CacheMetrics
@@ -1029,6 +951,28 @@ namespace IbSwingTrader.App.Commands
             public int? MinutesFromMinToMax { get; init; }
             public int? MinutesFromEntryToMax { get; init; }
             public int? MinutesFromEntryToMin { get; init; }
+        }
+
+        private sealed class RecentFeatureSeries
+        {
+            public List<decimal> DailyMaSeries { get; init; } = [];
+            public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
+            public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> DailyBbWidthSeries { get; init; } = [];
+            public List<decimal> DailyRsiSeries { get; init; } = [];
+            public List<decimal> DailyMacdSeries { get; init; } = [];
+            public List<decimal> WeeklyMaSeries { get; init; } = [];
+            public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
+            public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
+            public List<decimal> WeeklyRsiSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdSeries { get; init; } = [];
+            public List<decimal> H4MaSeries { get; init; } = [];
+            public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
+            public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
+            public List<decimal> H4BbWidthSeries { get; init; } = [];
+            public List<decimal> H4RsiSeries { get; init; } = [];
+            public List<decimal> H4MacdSeries { get; init; } = [];
         }
     }
 }

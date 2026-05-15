@@ -5,7 +5,7 @@ namespace IbSwingTrader.App.Commands
     public class EvaluateCandidatesCommand(
         ITwsConnection twsConnection,
         ICandidateEvaluator candidateEvaluator,
-        BuildEvaluationDatasetCommand buildEvaluationDatasetCommand,
+        IEvaluationDatasetBuilder evaluationDatasetBuilder,
         IJsonFileService jsonFileService,
         ICandidateEvaluationCsvService candidateCsvService,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
@@ -15,7 +15,7 @@ namespace IbSwingTrader.App.Commands
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
-        private readonly BuildEvaluationDatasetCommand _buildEvaluationDatasetCommand = buildEvaluationDatasetCommand;
+        private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICandidateEvaluationCsvService _candidateCsvService = candidateCsvService;
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
@@ -39,7 +39,7 @@ namespace IbSwingTrader.App.Commands
             await EvaluateCandidatesAsync(candidatesPath, evaluationsPath);
 
             _logger.Info("Rebuilding evaluation dataset after candidate evaluation...");
-            await _buildEvaluationDatasetCommand.RunAsync();
+            await _evaluationDatasetBuilder.RunAsync();
 
             _logger.Info("Candidate evaluation completed.");
         }
