@@ -7,7 +7,6 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluator candidateEvaluator,
         IEvaluationDatasetBuilder evaluationDatasetBuilder,
         IJsonFileService jsonFileService,
-        ICandidateEvaluationCsvService candidateCsvService,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         ITextLogger logger,
         IAgentPathService pathService,
@@ -17,7 +16,6 @@ namespace IbSwingTrader.App.Commands
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
         private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
-        private readonly ICandidateEvaluationCsvService _candidateCsvService = candidateCsvService;
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -28,29 +26,21 @@ namespace IbSwingTrader.App.Commands
             var twsSettings = _twsSettingsProvider.Get();
 
             var candidatesPath = _pathService.GetCandidatesFile();
-            var evaluationsPath = _pathService.GetEvaluationsFile();
 
             EnsureConnected(twsSettings.ConnectTimeoutSeconds);
 
-            var evaluationsFolder = Path.GetDirectoryName(evaluationsPath);
-            if (!string.IsNullOrWhiteSpace(evaluationsFolder))
-                Directory.CreateDirectory(evaluationsFolder);
-
-            await EvaluateCandidatesAsync(candidatesPath, evaluationsPath);
-
-            _logger.Info("Rebuilding evaluation dataset after candidate evaluation...");
-            await _evaluationDatasetBuilder.RunAsync();
+            await EvaluateCandidatesAsync(candidatesPath);
 
             _logger.Info("Candidate evaluation completed.");
         }
 
         private async Task EvaluateCandidatesAsync(
-            string candidatesPath,
-            string evaluationsPath)
+            string candidatesPath)
         {
             var candidates = await LoadCandidatesAsync(candidatesPath);
             _logger.Info($"Candidates found: {candidates.Count}");
             var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
+            var existingDatasetRows = await _evaluationDatasetBuilder.ReadCurrentAsync();
 
             var marketToday = MarketTime.Now().Date;
             var evaluationScanDate = marketToday.AddDays(-1);
@@ -66,11 +56,7 @@ namespace IbSwingTrader.App.Commands
                 $"skipped older candidates={olderCandidates}, " +
                 $"skipped current-day candidates={currentDayCandidates}");
 
-            if (!File.Exists(evaluationsPath))
-                await _candidateCsvService.WriteAsync(evaluationsPath, []);
-
-            var existingEvaluations = await _candidateCsvService.ReadAsync(evaluationsPath);
-            var canonicalByScanKey = existingEvaluations
+            var canonicalByScanKey = existingDatasetRows
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     x => x.Key,
@@ -102,7 +88,7 @@ namespace IbSwingTrader.App.Commands
 
             if (evaluationSettings.ReevaluateOpenCandidates)
             {
-                var openCandidates = existingEvaluations
+                var openCandidates = existingDatasetRows
                     .Where(x =>
                         string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
                         !x.IsStaleOpen &&
@@ -111,7 +97,7 @@ namespace IbSwingTrader.App.Commands
                     .Select(x => x
                         .OrderByDescending(y => y.EvaluatedAt)
                         .First())
-                    .Select(RebuildCandidateFromEvaluation)
+                    .Select(RebuildCandidateFromDatasetRow)
                     .ToList();
 
                 foreach (var openCandidate in openCandidates)
@@ -140,13 +126,13 @@ namespace IbSwingTrader.App.Commands
                 if (canonicalByScanKey.TryGetValue(BuildScanKey(result), out var canonical))
                 {
                     result.StrategyVersion = canonical.StrategyVersion;
-                    result.CandidateScore = canonical.CandidateScore;
+                    result.CandidateScore = canonical.CandidateScore ?? result.CandidateScore;
                 }
             }
 
-            _logger.Info($"Evaluation step: writing {results.Count} evaluation rows to CSV");
-            await _candidateCsvService.WriteAsync(evaluationsPath, results);
-            _logger.Info("Evaluation step: evaluation CSV write completed");
+            _logger.Info($"Evaluation step: merging {results.Count} rows directly into evaluation dataset");
+            await _evaluationDatasetBuilder.UpsertAsync(results);
+            _logger.Info("Evaluation step: evaluation dataset merge completed");
             LogCandidateSummary(Path.GetFileName(candidatesPath), results);
         }
 
@@ -262,7 +248,14 @@ namespace IbSwingTrader.App.Commands
                 $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTime:O}");
         }
 
-        private static CandidateDetails RebuildCandidateFromEvaluation(CandidateEvaluationResult evaluation)
+        private static string BuildScanKey(EvaluationDatasetRow result)
+        {
+            return string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{result.Ticker}|{result.PresetScanCode}|{result.ScanTime:O}");
+        }
+
+        private static CandidateDetails RebuildCandidateFromDatasetRow(EvaluationDatasetRow evaluation)
         {
             return new CandidateDetails
             {
@@ -309,7 +302,7 @@ namespace IbSwingTrader.App.Commands
                 },
                 Score = new ScoreInfo
                 {
-                    Score = evaluation.CandidateScore
+                    Score = evaluation.CandidateScore ?? 0m
                 },
                 Context = new MarketContextInfo(),
                 TradePlan = new TradePlanInfo

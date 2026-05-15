@@ -26,6 +26,82 @@ namespace IbSwingTrader.Application.Dataset
         private readonly IBuildEvaluationDatasetSettingsProvider _buildEvaluationDatasetSettingsProvider = buildEvaluationDatasetSettingsProvider;
         private readonly ITextLogger _logger = logger;
 
+        public async Task<List<EvaluationDatasetRow>> ReadCurrentAsync()
+        {
+            var outputPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+
+            var rows = await _evaluationDatasetCsvService.ReadAsync(outputPath);
+            return [.. rows
+                .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAt)
+                    .First())];
+        }
+
+        public async Task UpsertAsync(List<CandidateEvaluationResult> evaluations)
+        {
+            ArgumentNullException.ThrowIfNull(evaluations);
+
+            var settings = _buildEvaluationDatasetSettingsProvider.Get();
+            var outputPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+
+            var activeCandidates = await LoadCurrentCandidatesAsync();
+            var candidateIndex = activeCandidates
+                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x
+                        .OrderByDescending(c => c.Score.Score)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var existingRows = await ReadCurrentAsync();
+            var rebuiltRows = evaluations
+                .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAt)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
+                .Select(x => BuildRow(x, candidateIndex))
+                .ToList();
+
+            var rebuildKeys = rebuiltRows
+                .Select(BuildDatasetKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var mergedRows = existingRows
+                .Where(x => !rebuildKeys.Contains(BuildDatasetKey(x)))
+                .Concat(rebuiltRows)
+                .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.AmplitudePct)
+                    .ThenByDescending(r => r.PositivePotentialPct)
+                    .ThenByDescending(r => r.EvaluatedAt)
+                    .First())
+                .ToList();
+
+            if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
+            {
+                var recentCutoff = MarketTime.Now().Date.AddDays(-settings.RecentScanDays.Value);
+                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= recentCutoff)];
+            }
+
+            if (settings.MinScanTime.HasValue)
+            {
+                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= settings.MinScanTime.Value)];
+            }
+
+            if (settings.MinAmplitudePct.HasValue)
+            {
+                mergedRows = [.. mergedRows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
+            }
+
+            mergedRows.Sort((left, right) => CompareRows(left, right, settings));
+            await _evaluationDatasetCsvService.WriteAsync(outputPath, mergedRows);
+        }
+
         public async Task RunAsync()
         {
             var settings = _buildEvaluationDatasetSettingsProvider.Get();

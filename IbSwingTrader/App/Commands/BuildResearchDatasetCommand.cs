@@ -9,6 +9,7 @@ namespace IbSwingTrader.App.Commands
     public class BuildResearchDatasetCommand(
         IJsonFileService jsonFileService,
         ICsvWriter csvWriter,
+        IEvaluationDatasetCsvService evaluationDatasetCsvService,
         ITwsConnection connection,
         IContractResolver contractResolver,
         IHistoricalDataService historicalService,
@@ -21,6 +22,7 @@ namespace IbSwingTrader.App.Commands
     {
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICsvWriter _csvWriter = csvWriter;
+        private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly ITwsConnection _connection = connection;
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalService = historicalService;
@@ -140,45 +142,23 @@ namespace IbSwingTrader.App.Commands
             foreach (var item in wishList)
                 result.Add(item.Ticker);
 
-            var evaluationsPath = _pathService.GetEvaluationsFile();
-            if (File.Exists(evaluationsPath))
+            var evaluationDatasetPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+            if (File.Exists(evaluationDatasetPath))
             {
-                var lines = await File.ReadAllLinesAsync(evaluationsPath);
-                if (lines.Length > 1)
+                var datasetRows = await _evaluationDatasetCsvService.ReadAsync(evaluationDatasetPath);
+                foreach (var row in datasetRows)
                 {
-                    var delimiter = DetectDelimiter(lines[0]);
-                    var headers = SplitCsvLine(lines[0], delimiter);
-                    var tickerIndex = headers.FindIndex(x => string.Equals(x, "Ticker", StringComparison.OrdinalIgnoreCase));
-                    var scanTimeIndex = headers.FindIndex(x => string.Equals(x, "ScanTime", StringComparison.OrdinalIgnoreCase));
+                    if (string.IsNullOrWhiteSpace(row.Ticker))
+                        continue;
 
-                    if (tickerIndex >= 0)
+                    if (settings.MinScanTime.HasValue &&
+                        row.ScanTime < settings.MinScanTime.Value)
                     {
-                        foreach (var line in lines.Skip(1))
-                        {
-                            if (string.IsNullOrWhiteSpace(line))
-                                continue;
-
-                            var parts = SplitCsvLine(line, delimiter);
-                            if (parts.Count <= tickerIndex || string.IsNullOrWhiteSpace(parts[tickerIndex]))
-                                continue;
-
-                            if (settings.MinScanTime.HasValue &&
-                                scanTimeIndex >= 0 &&
-                                parts.Count > scanTimeIndex &&
-                                DateTime.TryParseExact(
-                                    parts[scanTimeIndex].Trim(),
-                                    "yyyy-MM-dd HH:mm:ss",
-                                    CultureInfo.InvariantCulture,
-                                    DateTimeStyles.None,
-                                    out var scanTime) &&
-                                scanTime < settings.MinScanTime.Value)
-                            {
-                                continue;
-                            }
-
-                            result.Add(parts[tickerIndex].Trim());
-                        }
+                        continue;
                     }
+
+                    result.Add(row.Ticker.Trim());
                 }
             }
 
