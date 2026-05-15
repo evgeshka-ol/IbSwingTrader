@@ -85,7 +85,7 @@ namespace IbSwingTrader.App.Commands
 
             if (evaluationSettings.ReevaluateAllCandidatesWithSeries)
             {
-                var candidatesWithSeries = candidates
+                var candidatesWithSeries = latestScanCandidates
                     .Where(HasRecentSeries)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x.First())
@@ -95,8 +95,9 @@ namespace IbSwingTrader.App.Commands
                     .ToDictionary(BuildScanKey, x => x, StringComparer.OrdinalIgnoreCase);
 
                 _logger.Info(
-                    $"Full reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
-                    $"ignoredWithoutSeries={candidates.Count - candidatesToEvaluate.Count}");
+                    $"Previous-day reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
+                    $"ignoredWithoutSeries={latestScanCandidates.Count - candidatesToEvaluate.Count}, " +
+                    $"skippedOlderSeriesCandidates={candidates.Count - latestScanCandidates.Count}");
             }
 
             if (evaluationSettings.ReevaluateOpenCandidates)

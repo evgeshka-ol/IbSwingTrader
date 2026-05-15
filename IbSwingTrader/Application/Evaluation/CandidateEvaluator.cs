@@ -6,14 +6,13 @@ namespace IbSwingTrader.Application.Evaluation
         IContractResolver contractResolver,
         IHistoricalDataService historicalDataService,
         IAmbiguousBarResolver ambiguousBarResolver,
+        ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         ITextLogger logger) : ICandidateEvaluator
     {
-        private static readonly TimeSpan MaxEvaluationWindow = TimeSpan.FromDays(7);
-        private static readonly TimeSpan FreshDataSafetyLag = TimeSpan.FromMinutes(10);
-
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
         private readonly IAmbiguousBarResolver _ambiguousBarResolver = ambiguousBarResolver;
+        private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly ITextLogger _logger = logger;
 
         public async Task<List<CandidateEvaluationResult>> EvaluateAsync(
@@ -52,6 +51,10 @@ namespace IbSwingTrader.Application.Evaluation
         private async Task<CandidateEvaluationResult> EvaluateOneAsync(
             CandidateDetails candidate)
         {
+            var settings = _candidateEvaluationSettingsProvider.Get();
+            var maxEvaluationWindow = TimeSpan.FromDays(Math.Max(1, settings.ForwardEvaluationDays));
+            var freshDataSafetyLag = TimeSpan.FromMinutes(Math.Max(0, settings.FreshDataSafetyLagMinutes));
+
             var result = CreateBaseResult(candidate);
             result.EvaluatedAt = MarketTime.Now();
 
@@ -61,8 +64,8 @@ namespace IbSwingTrader.Application.Evaluation
             _logger.Info($"Evaluation step: contract resolved for {candidate.Ticker}");
 
             var start = candidate.Scan.ScanTime;
-            var requestedEnd = candidate.Scan.ScanTime.Add(MaxEvaluationWindow);
-            var availableNow = MarketTime.Now() - FreshDataSafetyLag;
+            var requestedEnd = candidate.Scan.ScanTime.Add(maxEvaluationWindow);
+            var availableNow = MarketTime.Now() - freshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
             result.EvaluationStartTime = start;
