@@ -1,3 +1,5 @@
+using IbSwingTrader.Common.Time;
+
 namespace IbSwingTrader.Application.Dataset
 {
     public class EvaluationDatasetBuilder(
@@ -599,12 +601,12 @@ namespace IbSwingTrader.Application.Dataset
                 DailyBbWidthSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerBandWidthPct),
                 DailyRsiSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyRSI14),
                 DailyMacdSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyMACDLineMinusSignal),
-                WeeklyMaSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMaSignedDistancePct),
-                WeeklyBbMidDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerMidDistancePct),
-                WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerUpperDistancePct),
-                WeeklyBbWidthSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerBandWidthPct),
-                WeeklyRsiSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyRSI14),
-                WeeklyMacdSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDLineMinusSignal),
+                WeeklyMaSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMaSignedDistancePct ?? 0m),
+                WeeklyBbMidDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerMidDistancePct ?? 0m),
+                WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerUpperDistancePct ?? 0m),
+                WeeklyBbWidthSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyBollingerBandWidthPct ?? 0m),
+                WeeklyRsiSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyRSI14 ?? 0m),
+                WeeklyMacdSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDLineMinusSignal ?? 0m),
                 H4MaSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4MaSignedDistancePct),
                 H4BbMidDistanceSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerMidDistancePct),
                 H4BbUpperDistanceSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerUpperDistancePct),

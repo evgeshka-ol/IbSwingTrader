@@ -2004,6 +2004,52 @@ namespace IbSwingTrader.Application.Candidates
             if (coolingButAlive && hotByVolume)
                 score += 0.12m;
 
+            var smoothContinuationAlive =
+                weeklyMidLast > 15m &&
+                dailyMidLast > 20m &&
+                h4MidLast > 8m &&
+                dailyMacdLast > 0m &&
+                h4MacdLast >= 0m &&
+                dailyMidSlope > -18m &&
+                h4MidSlope > -18m &&
+                dailyMacdSlope > -0.12m &&
+                h4MacdSlope > -0.10m &&
+                dailyWidthSlope > -45m &&
+                h4WidthSlope > -45m;
+
+            if (smoothContinuationAlive)
+                score += 0.24m;
+
+            if (smoothContinuationAlive && topPercGain)
+                score += 0.12m;
+
+            if (smoothContinuationAlive && hotByVolume)
+                score += 0.10m;
+
+            if (smoothContinuationAlive && mostActive)
+                score += 0.08m;
+
+            var moderateAliveNotExplosive =
+                weeklyMidLast > 10m &&
+                dailyMidLast > 12m &&
+                dailyMidLast < 80m &&
+                h4MidLast > 4m &&
+                dailyMacdLast > 0m &&
+                h4MacdLast > -0.05m &&
+                dailyMidSlope > -14m &&
+                h4MidSlope > -14m &&
+                dailyWidthSlope > -35m &&
+                h4WidthSlope > -35m;
+
+            if (moderateAliveNotExplosive)
+                score += 0.18m;
+
+            if (moderateAliveNotExplosive && hotByVolume)
+                score += 0.08m;
+
+            if (moderateAliveNotExplosive && topPercGain)
+                score += 0.10m;
+
             return score;
         }
 
