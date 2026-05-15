@@ -85,7 +85,10 @@
 
     "BuildEvaluationDataset": {
         "MinScanTime": "2026-04-01",
+        "RecentScanDays": 21,
         "MinAmplitudePct": 0.0,
+        "SkipSeriesRebuildWhenPresent": true,
+        "SkipCacheMetricsRebuildWhenPresent": true,
         "SortColumns": [
             {
                 "Column": "ScanTime",

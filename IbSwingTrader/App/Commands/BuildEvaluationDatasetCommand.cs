@@ -2,10 +2,10 @@ namespace IbSwingTrader.App.Commands
 {
     public class BuildEvaluationDatasetCommand(
         ICandidateEvaluationCsvService evaluationCsvService,
+        IEvaluationDatasetCsvService evaluationDatasetCsvService,
         IJsonFileService jsonFileService,
         IHistoricalCache historicalCache,
         IFeatureEngine featureEngine,
-        ICsvWriter csvWriter,
         IAgentPathService pathService,
         IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
         ITextLogger logger) : ICommand
@@ -18,10 +18,10 @@ namespace IbSwingTrader.App.Commands
         private const int RecentH4SeriesLength = 16;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
+        private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly IHistoricalCache _historicalCache = historicalCache;
         private readonly IFeatureEngine _featureEngine = featureEngine;
-        private readonly ICsvWriter _csvWriter = csvWriter;
         private readonly IAgentPathService _pathService = pathService;
         private readonly IBuildEvaluationDatasetSettingsProvider _buildEvaluationDatasetSettingsProvider = buildEvaluationDatasetSettingsProvider;
         private readonly ITextLogger _logger = logger;
@@ -48,6 +48,15 @@ namespace IbSwingTrader.App.Commands
                     .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
                     .First())
                 .ToList();
+
+            if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
+            {
+                var recentCutoff = MarketTime.Now().Date.AddDays(-settings.RecentScanDays.Value);
+                evaluations = evaluations
+                    .Where(x => x.ScanTime >= recentCutoff)
+                    .ToList();
+            }
+
             if (settings.MinScanTime.HasValue)
             {
                 evaluations = evaluations
@@ -62,6 +71,8 @@ namespace IbSwingTrader.App.Commands
             }
 
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
+            if (settings.RecentScanDays.HasValue)
+                _logger.Info($"RecentScanDays filter: {settings.RecentScanDays.Value}");
             if (settings.MinScanTime.HasValue)
                 _logger.Info($"MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
             if (settings.MinAmplitudePct.HasValue)
@@ -77,19 +88,50 @@ namespace IbSwingTrader.App.Commands
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var rows = new List<EvaluationDatasetRow>();
+            var existingRows = await _evaluationDatasetCsvService.ReadAsync(outputPath);
+            existingRows = [.. existingRows
+                .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAt)
+                    .First())];
 
-            for (var i = 0; i < evaluations.Count; i++)
+            var existingRowIndex = existingRows.ToDictionary(
+                BuildDatasetKey,
+                x => x,
+                StringComparer.OrdinalIgnoreCase);
+
+            var evaluationKeys = evaluations
+                .Select(BuildEvaluationKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var rebuildEvaluations = evaluations
+                .Where(x => ShouldRebuildRow(x, candidateIndex, existingRowIndex))
+                .ToList();
+
+            var rebuildKeys = rebuildEvaluations
+                .Select(BuildEvaluationKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var rows = existingRows
+                .Where(x => evaluationKeys.Contains(BuildDatasetKey(x)) &&
+                            !rebuildKeys.Contains(BuildDatasetKey(x)))
+                .ToList();
+
+            _logger.Info($"Existing evaluation dataset rows loaded: {existingRows.Count}");
+            _logger.Info($"Evaluation rows to rebuild: {rebuildEvaluations.Count}");
+            _logger.Info($"Evaluation rows reused: {rows.Count}");
+
+            for (var i = 0; i < rebuildEvaluations.Count; i++)
             {
-                var evaluation = evaluations[i];
+                var evaluation = rebuildEvaluations[i];
                 rows.Add(BuildRow(evaluation, candidateIndex));
 
                 var processed = i + 1;
                 if (processed == 1 ||
-                    processed == evaluations.Count ||
+                    processed == rebuildEvaluations.Count ||
                     processed % ProgressLogInterval == 0)
                 {
-                    _logger.Info($"Evaluation dataset progress: {processed}/{evaluations.Count}");
+                    _logger.Info($"Evaluation dataset progress: {processed}/{rebuildEvaluations.Count}");
                 }
             }
 
@@ -108,7 +150,7 @@ namespace IbSwingTrader.App.Commands
 
             rows.Sort((left, right) => CompareRows(left, right, settings));
 
-            _csvWriter.Write(outputPath, rows);
+            await _evaluationDatasetCsvService.WriteAsync(outputPath, rows);
 
             _logger.Info($"Evaluation rows: {evaluations.Count}");
             _logger.Info($"Rows with active candidate snapshot: {rows.Count(x => x.HasActiveCandidateSnapshot)}");
@@ -159,14 +201,15 @@ namespace IbSwingTrader.App.Commands
             CandidateEvaluationResult evaluation,
             Dictionary<string, CandidateDetails> candidateIndex)
         {
+            var settings = _buildEvaluationDatasetSettingsProvider.Get();
             var key = BuildEvaluationKey(evaluation);
             candidateIndex.TryGetValue(key, out var candidate);
             var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
             var candidateSource = candidate?.CandidateSource ?? evaluation.CandidateSource;
             if (string.IsNullOrWhiteSpace(candidateSource))
                 candidateSource = "Primary";
-            var cacheMetrics = TryBuildCacheMetrics(evaluation);
-            var recentSeries = TryBuildRecentSeries(evaluation);
+            var cacheMetrics = TryBuildCacheMetrics(evaluation, settings);
+            var recentSeries = TryBuildRecentSeries(evaluation, settings);
 
             var maxPct = cacheMetrics?.MaxPct ?? evaluation.MaxPct;
             var maxPrice = cacheMetrics?.MaxPrice ?? evaluation.MaxPrice;
@@ -318,8 +361,16 @@ namespace IbSwingTrader.App.Commands
             };
         }
 
-        private CacheMetrics? TryBuildCacheMetrics(CandidateEvaluationResult evaluation)
+        private CacheMetrics? TryBuildCacheMetrics(
+            CandidateEvaluationResult evaluation,
+            BuildEvaluationDatasetSettings settings)
         {
+            if (settings.SkipCacheMetricsRebuildWhenPresent &&
+                HasEvaluationCacheMetrics(evaluation))
+            {
+                return null;
+            }
+
             if (!_historicalCache.TryLoad(evaluation.Ticker, Timeframe.M5, out var cached) ||
                 cached == null ||
                 cached.Count == 0)
@@ -437,8 +488,16 @@ namespace IbSwingTrader.App.Commands
             };
         }
 
-        private RecentFeatureSeries? TryBuildRecentSeries(CandidateEvaluationResult evaluation)
+        private RecentFeatureSeries? TryBuildRecentSeries(
+            CandidateEvaluationResult evaluation,
+            BuildEvaluationDatasetSettings settings)
         {
+            if (settings.SkipSeriesRebuildWhenPresent &&
+                HasEvaluationSeries(evaluation))
+            {
+                return null;
+            }
+
             if (!_historicalCache.TryLoad(evaluation.Ticker, Timeframe.M5, out var cached) ||
                 cached == null ||
                 cached.Count == 0)
@@ -574,9 +633,56 @@ namespace IbSwingTrader.App.Commands
             return [];
         }
 
+        private static bool HasEvaluationSeries(CandidateEvaluationResult evaluation)
+        {
+            return (evaluation.RecentDailyMaSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentDailyBbMidDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentDailyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentDailyBbWidthSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentDailyMacdSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyMaSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyBbMidDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyBbWidthSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyRsiSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentWeeklyMacdSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4MaSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4BbMidDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4BbUpperDistanceSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4BbWidthSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4RsiSeries?.Count ?? 0) > 0 ||
+                   (evaluation.RecentH4MacdSeries?.Count ?? 0) > 0;
+        }
+
+        private static bool HasEvaluationCacheMetrics(CandidateEvaluationResult evaluation)
+        {
+            return evaluation.MaxPct.HasValue &&
+                   evaluation.MaxPrice.HasValue &&
+                   evaluation.MaxTime.HasValue &&
+                   evaluation.MinPct.HasValue &&
+                   evaluation.MinPrice.HasValue &&
+                   evaluation.MinTime.HasValue;
+        }
+
         private static string BuildCandidateKey(CandidateDetails row)
         {
             return $"{row.Ticker}|{row.Scan.PresetScanCode}|{row.Scan.ScanTime:yyyy-MM-dd HH:mm:ss}";
+        }
+
+        private static bool ShouldRebuildRow(
+            CandidateEvaluationResult evaluation,
+            Dictionary<string, CandidateDetails> candidateIndex,
+            Dictionary<string, EvaluationDatasetRow> existingRowIndex)
+        {
+            var key = BuildEvaluationKey(evaluation);
+            if (!existingRowIndex.TryGetValue(key, out var existing))
+                return true;
+
+            if (existing.EvaluatedAt != evaluation.EvaluatedAt)
+                return true;
+
+            return candidateIndex.ContainsKey(key);
         }
 
         private static string BuildDatasetKey(EvaluationDatasetRow row)

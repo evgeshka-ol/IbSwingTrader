@@ -4,7 +4,13 @@ namespace IbSwingTrader.Domain.Settings
     {
         public DateTime? MinScanTime { get; set; }
 
+        public int? RecentScanDays { get; set; }
+
         public decimal? MinAmplitudePct { get; set; }
+
+        public bool SkipSeriesRebuildWhenPresent { get; set; } = true;
+
+        public bool SkipCacheMetricsRebuildWhenPresent { get; set; } = true;
 
         public List<BuildEvaluationDatasetSortColumnSettings> SortColumns { get; set; } =
         [
