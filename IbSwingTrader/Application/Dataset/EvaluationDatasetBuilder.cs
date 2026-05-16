@@ -465,28 +465,34 @@ namespace IbSwingTrader.Application.Dataset
                 .OrderBy(x => x.Time)
                 .ToList();
 
-            if (ordered.Count == 0 || !evaluation.EntryTouched || !evaluation.EntryTime.HasValue)
+            if (ordered.Count == 0)
                 return null;
 
-            var beforeEntry = ordered
-                .Where(x => x.Time <= evaluation.EntryTime.Value)
-                .OrderBy(x => x.Time)
-                .ToList();
+            var scanWindow = ordered;
+            var hasEntry = evaluation.EntryTouched && evaluation.EntryTime.HasValue;
+            var afterEntry = hasEntry
+                ? ordered
+                    .Where(x => x.Time >= evaluation.EntryTime!.Value)
+                    .OrderBy(x => x.Time)
+                    .ToList()
+                : [];
+            var beforeEntry = hasEntry
+                ? ordered
+                    .Where(x => x.Time <= evaluation.EntryTime!.Value)
+                    .OrderBy(x => x.Time)
+                    .ToList()
+                : [];
 
-            var afterEntry = ordered
-                .Where(x => x.Time >= evaluation.EntryTime.Value)
-                .OrderBy(x => x.Time)
-                .ToList();
+            var extremumWindow = hasEntry && afterEntry.Count > 0
+                ? afterEntry
+                : scanWindow;
 
-            if (afterEntry.Count == 0)
-                return null;
-
-            var maxAfterEntry = afterEntry
+            var maxAfterScan = extremumWindow
                 .OrderByDescending(x => x.High)
                 .ThenBy(x => x.Time)
                 .First();
 
-            var minAfterEntry = afterEntry
+            var minAfterScan = extremumWindow
                 .OrderBy(x => x.Low)
                 .ThenBy(x => x.Time)
                 .First();
@@ -500,7 +506,7 @@ namespace IbSwingTrader.Application.Dataset
             decimal? entryUndercutBeforeEntryAbs = null;
             decimal? entryUndercutBeforeEntryPct = null;
 
-            if (beforeEntry.Count > 0 && evaluation.ScanPrice > 0m)
+            if (hasEntry && beforeEntry.Count > 0 && evaluation.ScanPrice > 0m)
             {
                 var maxBeforeEntry = beforeEntry
                     .OrderByDescending(x => x.High)
@@ -527,26 +533,30 @@ namespace IbSwingTrader.Application.Dataset
             }
 
             var maxPct = evaluation.ScanPrice > 0m
-                ? Round(CalcPct(evaluation.ScanPrice, maxAfterEntry.High))
+                ? Round(CalcPct(evaluation.ScanPrice, maxAfterScan.High))
                 : (decimal?)null;
-            var maxPrice = Round(maxAfterEntry.High);
+            var maxPrice = Round(maxAfterScan.High);
 
             var minPct = evaluation.ScanPrice > 0m
-                ? Round(CalcPct(evaluation.ScanPrice, minAfterEntry.Low))
+                ? Round(CalcPct(evaluation.ScanPrice, minAfterScan.Low))
                 : (decimal?)null;
-            var minPrice = Round(minAfterEntry.Low);
+            var minPrice = Round(minAfterScan.Low);
 
-            var postMaxDrawdownPct = CalculatePostMaxDrawdownPct(maxAfterEntry, afterEntry);
-            var (exitMissAbs, exitMissPct, nearTakeProfitMiss) = CalculateExitMiss(evaluation, maxAfterEntry.High);
+            var postMaxDrawdownPct = hasEntry && afterEntry.Count > 0
+                ? CalculatePostMaxDrawdownPct(maxAfterScan, afterEntry)
+                : CalculatePostMaxDrawdownPct(maxAfterScan, scanWindow);
+            var (exitMissAbs, exitMissPct, nearTakeProfitMiss) = hasEntry
+                ? CalculateExitMiss(evaluation, maxAfterScan.High)
+                : (null, null, false);
 
             return new CacheMetrics
             {
                 MaxPct = maxPct,
                 MaxPrice = maxPrice,
-                MaxTime = maxAfterEntry.Time,
+                MaxTime = maxAfterScan.Time,
                 MinPct = minPct,
                 MinPrice = minPrice,
-                MinTime = minAfterEntry.Time,
+                MinTime = minAfterScan.Time,
                 MaxPctBeforeEntry = maxPctBeforeEntry,
                 MaxPriceBeforeEntry = maxPriceBeforeEntry,
                 MaxTimeBeforeEntry = maxTimeBeforeEntry,
@@ -559,10 +569,10 @@ namespace IbSwingTrader.Application.Dataset
                 ExitMissPct = exitMissPct,
                 NearTakeProfitMiss = nearTakeProfitMiss,
                 PostMaxDrawdownPct = postMaxDrawdownPct,
-                ExtremumOrder = GetExtremumOrder(minAfterEntry.Time, maxAfterEntry.Time),
-                MinutesFromMinToMax = DiffMinutes(minAfterEntry.Time, maxAfterEntry.Time),
-                MinutesFromEntryToMax = DiffMinutes(evaluation.EntryTime, maxAfterEntry.Time),
-                MinutesFromEntryToMin = DiffMinutes(evaluation.EntryTime, minAfterEntry.Time)
+                ExtremumOrder = GetExtremumOrder(minAfterScan.Time, maxAfterScan.Time),
+                MinutesFromMinToMax = DiffMinutes(minAfterScan.Time, maxAfterScan.Time),
+                MinutesFromEntryToMax = hasEntry ? DiffMinutes(evaluation.EntryTime, maxAfterScan.Time) : null,
+                MinutesFromEntryToMin = hasEntry ? DiffMinutes(evaluation.EntryTime, minAfterScan.Time) : null
             };
         }
 
