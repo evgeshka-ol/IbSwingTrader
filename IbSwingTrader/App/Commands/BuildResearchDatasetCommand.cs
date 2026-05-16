@@ -53,9 +53,11 @@ namespace IbSwingTrader.App.Commands
             var tickers = await LoadKnownTickersAsync();
 
             _logger.Info(
-                $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxBarsToPeak={settings.MaxBarsToPeak}, EpisodeMergeCooldownBars={settings.EpisodeMergeCooldownBars}");
+                $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxParallelTickers={settings.MaxParallelTickers}");
             if (settings.MinScanTime.HasValue)
                 _logger.Info($"Research MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
+            if (settings.RecentEvaluationScanDays.HasValue)
+                _logger.Info($"Research RecentEvaluationScanDays filter: {settings.RecentEvaluationScanDays.Value}");
             _logger.Info($"Research tickers found: {tickers.Count}");
 
             if (tickers.Count == 0)
@@ -147,6 +149,10 @@ namespace IbSwingTrader.App.Commands
             if (File.Exists(evaluationDatasetPath))
             {
                 var datasetRows = await _evaluationDatasetCsvService.ReadAsync(evaluationDatasetPath);
+                var recentEvaluationCutoff = settings.RecentEvaluationScanDays.HasValue && settings.RecentEvaluationScanDays.Value > 0
+                    ? MarketTime.Now().Date.AddDays(-settings.RecentEvaluationScanDays.Value)
+                    : (DateTime?)null;
+
                 foreach (var row in datasetRows)
                 {
                     if (string.IsNullOrWhiteSpace(row.Ticker))
@@ -154,6 +160,12 @@ namespace IbSwingTrader.App.Commands
 
                     if (settings.MinScanTime.HasValue &&
                         row.ScanTime < settings.MinScanTime.Value)
+                    {
+                        continue;
+                    }
+
+                    if (recentEvaluationCutoff.HasValue &&
+                        row.ScanTime < recentEvaluationCutoff.Value)
                     {
                         continue;
                     }
@@ -711,6 +723,7 @@ namespace IbSwingTrader.App.Commands
                 return [];
 
             var drawdownPct = (minLow - previousClose) / previousClose * 100m;
+            var featureCache = new Dictionary<int, FeatureSet>();
 
             return
             [
@@ -722,110 +735,9 @@ namespace IbSwingTrader.App.Commands
                     sessionStartIndex,
                     peakIndex,
                     peakGainPct,
-                    drawdownPct)
+                    drawdownPct,
+                    featureCache)
             ];
-        }
-
-        private static List<ResearchEpisodeCandidate> BuildEpisodeCandidates(
-            List<Candle> candles,
-            ResearchSettings settings)
-        {
-            var episodes = new List<ResearchEpisodeCandidate>();
-
-            for (var i = settings.LocalExtremaLookbackBars; i < candles.Count - settings.LocalExtremaLookbackBars - 1; i++)
-            {
-                if (!IsLocalMinimum(candles, i, settings.LocalExtremaLookbackBars))
-                    continue;
-
-                var maxForwardIndex = Math.Min(candles.Count - 1, i + settings.MaxBarsToPeak);
-                var peakIndex = i;
-                var peakHigh = candles[i].High;
-                var minLowAfterReference = candles[i].Low;
-
-                for (var j = i + 1; j <= maxForwardIndex; j++)
-                {
-                    if (candles[j].High > peakHigh)
-                    {
-                        peakHigh = candles[j].High;
-                        peakIndex = j;
-                    }
-
-                    if (candles[j].Low < minLowAfterReference)
-                        minLowAfterReference = candles[j].Low;
-                }
-
-                var referencePrice = candles[i].Close;
-                if (referencePrice <= 0m || peakIndex <= i)
-                    continue;
-
-                var runupPct = (peakHigh - referencePrice) / referencePrice * 100m;
-                if (runupPct < settings.MinRunupPct)
-                    continue;
-
-                var maxDrawdownPct = (minLowAfterReference - referencePrice) / referencePrice * 100m;
-
-                episodes.Add(new ResearchEpisodeCandidate
-                {
-                    ReferenceIndex = i,
-                    PeakIndex = peakIndex,
-                    PeakHigh = peakHigh,
-                    MinLowAfterReference = minLowAfterReference,
-                    RunupPct = runupPct,
-                    MaxDrawdownPct = maxDrawdownPct
-                });
-            }
-
-            return episodes;
-        }
-
-        private static List<ResearchEpisodeCandidate> MergeEpisodeCandidates(
-            List<ResearchEpisodeCandidate> episodes,
-            int cooldownBars)
-        {
-            if (episodes.Count == 0)
-                return [];
-
-            var ordered = episodes
-                .OrderBy(x => x.ReferenceIndex)
-                .ThenByDescending(x => x.RunupPct)
-                .ToList();
-
-            var result = new List<ResearchEpisodeCandidate>();
-            var clusterBest = ordered[0];
-            var clusterEnd = ordered[0].PeakIndex;
-
-            for (var i = 1; i < ordered.Count; i++)
-            {
-                var next = ordered[i];
-
-                if (next.ReferenceIndex <= clusterEnd + cooldownBars)
-                {
-                    clusterEnd = Math.Max(clusterEnd, next.PeakIndex);
-
-                    if (IsBetterEpisode(next, clusterBest))
-                        clusterBest = next;
-
-                    continue;
-                }
-
-                result.Add(clusterBest);
-                clusterBest = next;
-                clusterEnd = next.PeakIndex;
-            }
-
-            result.Add(clusterBest);
-            return result;
-        }
-
-        private static bool IsBetterEpisode(ResearchEpisodeCandidate candidate, ResearchEpisodeCandidate currentBest)
-        {
-            if (candidate.RunupPct != currentBest.RunupPct)
-                return candidate.RunupPct > currentBest.RunupPct;
-
-            if (candidate.MaxDrawdownPct != currentBest.MaxDrawdownPct)
-                return candidate.MaxDrawdownPct > currentBest.MaxDrawdownPct;
-
-            return candidate.ReferenceIndex < currentBest.ReferenceIndex;
         }
 
         private ResearchDatasetRow BuildSessionSnapshotRow(
@@ -836,9 +748,10 @@ namespace IbSwingTrader.App.Commands
             int sessionStartIndex,
             int peakIndex,
             decimal peakGainPct,
-            decimal drawdownPct)
+            decimal drawdownPct,
+            Dictionary<int, FeatureSet> featureCache)
         {
-            var snapshotFeatures = _featureEngine.Calculate(candles, latestIndex + 1);
+            var snapshotFeatures = GetFeatures(candles, latestIndex, featureCache);
             var snapshotPrice = candles[latestIndex].Close;
             var snapshotCandles = candles.Take(latestIndex + 1).ToList();
 
@@ -880,155 +793,42 @@ namespace IbSwingTrader.App.Commands
                 WeeklyMacdHistDelta = CalculateWeeklyMacdHistDelta(snapshotCandles)
             };
 
-            FillTrailingSeries(row, candles, latestIndex);
+            FillTrailingSeries(row, candles, latestIndex, featureCache);
             return row;
         }
 
         private void FillTrailingSeries(
             ResearchDatasetRow row,
             List<Candle> candles,
-            int scanIndex)
+            int scanIndex,
+            Dictionary<int, FeatureSet> featureCache)
         {
-            row.DailyMaDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMaSignedDistancePct);
-            row.DailyBollingerMidDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidDistancePct);
-            row.DailyBollingerUpperDistances = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct);
-            row.DailyBollingerBandWidths = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct);
-            row.DailyRsiValues = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
-            row.DailyMacdValues = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
+            row.DailyMaDistances = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMaSignedDistancePct);
+            row.DailyBollingerMidDistances = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyBollingerMidDistancePct);
+            row.DailyBollingerUpperDistances = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyBollingerUpperDistancePct);
+            row.DailyBollingerBandWidths = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyBollingerBandWidthPct);
+            row.DailyRsiValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyRSI14);
+            row.DailyMacdValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDLineMinusSignal);
 
-            row.WeeklyMaDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
-            row.WeeklyBollingerMidDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct);
-            row.WeeklyBollingerUpperDistances = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct);
-            row.WeeklyBollingerBandWidths = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct);
-            row.WeeklyRsiValues = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
-            row.WeeklyMacdValues = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
+            row.WeeklyMaDistances = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMaSignedDistancePct);
+            row.WeeklyBollingerMidDistances = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerMidDistancePct);
+            row.WeeklyBollingerUpperDistances = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerUpperDistancePct);
+            row.WeeklyBollingerBandWidths = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerBandWidthPct);
+            row.WeeklyRsiValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyRSI14);
+            row.WeeklyMacdValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDLineMinusSignal);
 
-            row.H4MaDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
-            row.H4BollingerMidDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct);
-            row.H4BollingerUpperDistances = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct);
-            row.H4BollingerBandWidths = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct);
-            row.H4RsiValues = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
-            row.H4MacdValues = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal);
-        }
-
-        private void FillSeries(
-            ResearchDatasetRow row,
-            List<Candle> candles,
-            int entryIndex,
-            int exitIndex)
-        {
-            FillDailySeries(row, candles, entryIndex, exitIndex);
-            FillWeeklySeries(row, candles, entryIndex, exitIndex);
-            FillH4Series(row, candles, entryIndex, exitIndex);
-        }
-
-        private void FillDailySeries(
-            ResearchDatasetRow row,
-            List<Candle> candles,
-            int entryIndex,
-            int exitIndex)
-        {
-            DateTime? lastDay = null;
-
-            for (var i = entryIndex; i <= exitIndex; i++)
-            {
-                var day = candles[i].Time.Date;
-
-                if (lastDay.HasValue && lastDay.Value == day)
-                    continue;
-
-                lastDay = day;
-
-                var lastBarIndexOfDay = i;
-                while (lastBarIndexOfDay + 1 <= exitIndex &&
-                       candles[lastBarIndexOfDay + 1].Time.Date == day)
-                {
-                    lastBarIndexOfDay++;
-                }
-
-                var features = _featureEngine.Calculate(candles, lastBarIndexOfDay + 1);
-                row.DailyMaDistances.Add(features.DailyMaSignedDistancePct);
-                row.DailyBollingerMidDistances.Add(features.DailyBollingerMidDistancePct);
-                row.DailyBollingerUpperDistances.Add(features.DailyBollingerUpperDistancePct);
-                row.DailyBollingerBandWidths.Add(features.DailyBollingerBandWidthPct);
-                row.DailyRsiValues.Add(features.DailyRSI14);
-                row.DailyMacdValues.Add(features.DailyMACDLineMinusSignal);
-            }
-        }
-
-        private void FillWeeklySeries(
-            ResearchDatasetRow row,
-            List<Candle> candles,
-            int entryIndex,
-            int exitIndex)
-        {
-            DateTime? lastWeekStart = null;
-
-            for (var i = entryIndex; i <= exitIndex; i++)
-            {
-                var weekStart = GetWeekStart(candles[i].Time);
-
-                if (lastWeekStart.HasValue && lastWeekStart.Value == weekStart)
-                    continue;
-
-                lastWeekStart = weekStart;
-
-                var lastBarIndexOfWeek = i;
-                while (lastBarIndexOfWeek + 1 <= exitIndex)
-                {
-                    var nextWeekStart = GetWeekStart(candles[lastBarIndexOfWeek + 1].Time);
-                    if (nextWeekStart != weekStart)
-                        break;
-                    lastBarIndexOfWeek++;
-                }
-
-                var features = _featureEngine.Calculate(candles, lastBarIndexOfWeek + 1);
-
-                if (features.WeeklyMaSignedDistancePct.HasValue)
-                    row.WeeklyMaDistances.Add(features.WeeklyMaSignedDistancePct.Value);
-                if (features.WeeklyBollingerMidDistancePct.HasValue)
-                    row.WeeklyBollingerMidDistances.Add(features.WeeklyBollingerMidDistancePct.Value);
-                if (features.WeeklyBollingerUpperDistancePct.HasValue)
-                    row.WeeklyBollingerUpperDistances.Add(features.WeeklyBollingerUpperDistancePct.Value);
-                if (features.WeeklyBollingerBandWidthPct.HasValue)
-                    row.WeeklyBollingerBandWidths.Add(features.WeeklyBollingerBandWidthPct.Value);
-
-                if (features.WeeklyRSI14.HasValue)
-                    row.WeeklyRsiValues.Add(features.WeeklyRSI14.Value);
-
-                if (features.WeeklyMACDLineMinusSignal.HasValue)
-                    row.WeeklyMacdValues.Add(features.WeeklyMACDLineMinusSignal.Value);
-            }
-        }
-
-        private void FillH4Series(
-            ResearchDatasetRow row,
-            List<Candle> candles,
-            int entryIndex,
-            int exitIndex)
-        {
-            row.H4MaDistances = [];
-            row.H4BollingerMidDistances = [];
-            row.H4BollingerUpperDistances = [];
-            row.H4BollingerBandWidths = [];
-            row.H4RsiValues = [];
-            row.H4MacdValues = [];
-
-            for (var i = entryIndex; i <= exitIndex; i++)
-            {
-                var features = _featureEngine.Calculate(candles, i + 1);
-                row.H4MaDistances.Add(features.H4MaSignedDistancePct);
-                row.H4BollingerMidDistances.Add(features.H4BollingerMidDistancePct);
-                row.H4BollingerUpperDistances.Add(features.H4BollingerUpperDistancePct);
-                row.H4BollingerBandWidths.Add(features.H4BollingerBandWidthPct);
-                row.H4RsiValues.Add(features.RSI14);
-                row.H4MacdValues.Add(features.MACDLineMinusSignal);
-            }
+            row.H4MaDistances = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4MaSignedDistancePct);
+            row.H4BollingerMidDistances = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerMidDistancePct);
+            row.H4BollingerUpperDistances = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerUpperDistancePct);
+            row.H4BollingerBandWidths = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerBandWidthPct);
+            row.H4RsiValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.RSI14);
+            row.H4MacdValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDLineMinusSignal);
         }
 
         private List<decimal> BuildRecentDailySeries(
             List<Candle> candles,
             int scanIndex,
+            Dictionary<int, FeatureSet> featureCache,
             Func<FeatureSet, decimal> selector)
         {
             var indexes = new List<int>();
@@ -1046,12 +846,13 @@ namespace IbSwingTrader.App.Commands
             }
 
             indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+            return [.. indexes.Select(i => decimal.Round(selector(GetFeatures(candles, i, featureCache)), 2, MidpointRounding.AwayFromZero))];
         }
 
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
             int scanIndex,
+            Dictionary<int, FeatureSet> featureCache,
             Func<FeatureSet, decimal?> selector)
         {
             var indexes = new List<int>();
@@ -1071,7 +872,7 @@ namespace IbSwingTrader.App.Commands
             indexes.Reverse();
 
             return [.. indexes
-                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Select(i => selector(GetFeatures(candles, i, featureCache)))
                 .Where(x => x.HasValue)
                 .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
         }
@@ -1079,6 +880,7 @@ namespace IbSwingTrader.App.Commands
         private List<decimal> BuildRecentH4Series(
             List<Candle> candles,
             int scanIndex,
+            Dictionary<int, FeatureSet> featureCache,
             Func<FeatureSet, decimal> selector)
         {
             var indexes = new List<int>();
@@ -1091,7 +893,20 @@ namespace IbSwingTrader.App.Commands
             }
 
             indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+            return [.. indexes.Select(i => decimal.Round(selector(GetFeatures(candles, i, featureCache)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private FeatureSet GetFeatures(
+            List<Candle> candles,
+            int candleIndex,
+            Dictionary<int, FeatureSet> featureCache)
+        {
+            if (featureCache.TryGetValue(candleIndex, out var cached))
+                return cached;
+
+            var features = _featureEngine.Calculate(candles, candleIndex + 1);
+            featureCache[candleIndex] = features;
+            return features;
         }
 
         private static decimal CalculatePullbackByCalendarDays(List<Candle> candles, int days)
@@ -1297,22 +1112,6 @@ namespace IbSwingTrader.App.Commands
             return result;
         }
 
-        private static bool IsLocalMinimum(List<Candle> candles, int index, int radius)
-        {
-            var low = candles[index].Low;
-
-            for (var i = Math.Max(0, index - radius); i <= Math.Min(candles.Count - 1, index + radius); i++)
-            {
-                if (i == index)
-                    continue;
-
-                if (candles[i].Low <= low)
-                    return false;
-            }
-
-            return true;
-        }
-
         private void EnsureConnected(int timeoutSeconds)
         {
             if (_connection.IsConnected)
@@ -1343,16 +1142,6 @@ namespace IbSwingTrader.App.Commands
                 Ticker = ticker,
                 Problem = problem
             });
-        }
-
-        private sealed class ResearchEpisodeCandidate
-        {
-            public int ReferenceIndex { get; set; }
-            public int PeakIndex { get; set; }
-            public decimal PeakHigh { get; set; }
-            public decimal MinLowAfterReference { get; set; }
-            public decimal RunupPct { get; set; }
-            public decimal MaxDrawdownPct { get; set; }
         }
 
         private sealed class MacdPoint
