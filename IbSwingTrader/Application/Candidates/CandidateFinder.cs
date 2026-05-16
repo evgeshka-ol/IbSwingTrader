@@ -1863,13 +1863,17 @@ namespace IbSwingTrader.Application.Candidates
             var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
             var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
             var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
+            var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
             var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
             var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
 
+            var weeklyMidSlope = CalculateSlope(recentSeries.WeeklyBbMidDistanceSeries);
             var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
             var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var weeklyMacdSlope = CalculateSlope(recentSeries.WeeklyMacdSeries);
             var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
             var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+            var weeklyWidthSlope = CalculateSlope(recentSeries.WeeklyBbWidthSeries);
             var dailyWidthSlope = CalculateSlope(recentSeries.DailyBbWidthSeries);
             var h4WidthSlope = CalculateSlope(recentSeries.H4BbWidthSeries);
             var topPercGain = string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase);
@@ -2115,6 +2119,56 @@ namespace IbSwingTrader.Application.Candidates
 
             if (flatWeakContinuation)
                 score -= 0.28m;
+
+            var strongAmplitudeProxy =
+                weeklyMidLast > 10m &&
+                dailyMidLast > 12m &&
+                h4MidLast > 4m &&
+                weeklyMacdLast > -0.05m &&
+                dailyMacdLast > 0.08m &&
+                h4MacdLast >= 0m &&
+                weeklyMidSlope > -8m &&
+                dailyMidSlope > -8m &&
+                h4MidSlope > -8m &&
+                weeklyMacdSlope > -0.05m &&
+                dailyMacdSlope > -0.05m &&
+                h4MacdSlope > -0.05m &&
+                weeklyWidthSlope > -15m &&
+                dailyWidthSlope > -10m &&
+                h4WidthSlope > -10m;
+
+            if (strongAmplitudeProxy)
+                score += 0.34m;
+
+            if (strongAmplitudeProxy && topPercGain)
+                score += 0.18m;
+
+            if (strongAmplitudeProxy && hotByVolume)
+                score += 0.14m;
+
+            if (strongAmplitudeProxy && mostActive)
+                score += 0.10m;
+
+            var weakAmplitudeProxy =
+                weeklyMidLast > 0m &&
+                dailyMidLast > 8m &&
+                h4MidLast >= 0m &&
+                dailyMidLast < 45m &&
+                weeklyMacdLast < 0.12m &&
+                dailyMacdLast < 0.12m &&
+                h4MacdLast < 0.08m &&
+                weeklyMidSlope < 0m &&
+                dailyMidSlope < -4m &&
+                h4MidSlope < -4m &&
+                weeklyWidthSlope < -8m &&
+                dailyWidthSlope < -6m &&
+                h4WidthSlope < -6m;
+
+            if (weakAmplitudeProxy)
+                score -= 0.38m;
+
+            if (weakAmplitudeProxy && snapshot.Current.DailyMaSignedDistancePct > 20m)
+                score -= 0.12m;
 
             return score;
         }
