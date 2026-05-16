@@ -86,6 +86,7 @@
     "BuildEvaluationDataset": {
         "MinScanTime": "2026-04-01",
         "RecentScanDays": 21,
+        "BackfillLegacyNoEntryZeroAmplitudeDays": 2,
         "MinAmplitudePct": 0.0,
         "SkipSeriesRebuildWhenPresent": true,
         "SkipCacheMetricsRebuildWhenPresent": true,

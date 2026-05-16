@@ -6,6 +6,8 @@ namespace IbSwingTrader.Domain.Settings
 
         public int? RecentScanDays { get; set; }
 
+        public int? BackfillLegacyNoEntryZeroAmplitudeDays { get; set; }
+
         public decimal? MinAmplitudePct { get; set; }
 
         public bool SkipSeriesRebuildWhenPresent { get; set; } = true;

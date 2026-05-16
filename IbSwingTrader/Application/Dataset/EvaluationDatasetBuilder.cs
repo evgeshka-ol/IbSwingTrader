@@ -69,6 +69,15 @@ namespace IbSwingTrader.Application.Dataset
                 .Select(x => BuildRow(x, candidateIndex))
                 .ToList();
 
+            var legacyBackfillRows = await BuildLegacyNoEntryZeroAmplitudeBackfillRowsAsync(
+                settings,
+                existingRows,
+                candidateIndex);
+            if (legacyBackfillRows.Count > 0)
+            {
+                rebuiltRows.AddRange(legacyBackfillRows);
+            }
+
             var rebuildKeys = rebuiltRows
                 .Select(BuildDatasetKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -151,6 +160,8 @@ namespace IbSwingTrader.Application.Dataset
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
             if (settings.RecentScanDays.HasValue)
                 _logger.Info($"RecentScanDays filter: {settings.RecentScanDays.Value}");
+            if (settings.BackfillLegacyNoEntryZeroAmplitudeDays.HasValue)
+                _logger.Info($"BackfillLegacyNoEntryZeroAmplitudeDays: {settings.BackfillLegacyNoEntryZeroAmplitudeDays.Value}");
             if (settings.MinScanTime.HasValue)
                 _logger.Info($"MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
             if (settings.MinAmplitudePct.HasValue)
@@ -185,6 +196,18 @@ namespace IbSwingTrader.Application.Dataset
             var rebuildEvaluations = evaluations
                 .Where(x => ShouldRebuildRow(x, candidateIndex, existingRowIndex))
                 .ToList();
+
+            var legacyBackfillKeys = BuildLegacyNoEntryZeroAmplitudeKeys(settings, existingRowIndex);
+            if (legacyBackfillKeys.Count > 0)
+            {
+                rebuildEvaluations = [.. rebuildEvaluations
+                    .Concat(evaluations.Where(x => legacyBackfillKeys.Contains(BuildEvaluationKey(x))))
+                    .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x
+                        .OrderByDescending(r => r.EvaluatedAt)
+                        .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                        .First())];
+            }
 
             var rebuildKeys = rebuildEvaluations
                 .Select(BuildEvaluationKey)
@@ -768,6 +791,54 @@ namespace IbSwingTrader.Application.Dataset
                 return true;
 
             return candidateIndex.ContainsKey(key);
+        }
+
+        private async Task<List<EvaluationDatasetRow>> BuildLegacyNoEntryZeroAmplitudeBackfillRowsAsync(
+            BuildEvaluationDatasetSettings settings,
+            List<EvaluationDatasetRow> existingRows,
+            Dictionary<string, CandidateDetails> candidateIndex)
+        {
+            var backfillKeys = BuildLegacyNoEntryZeroAmplitudeKeys(
+                settings,
+                existingRows.ToDictionary(BuildDatasetKey, x => x, StringComparer.OrdinalIgnoreCase));
+            if (backfillKeys.Count == 0)
+                return [];
+
+            var evaluationsPath = _pathService.GetEvaluationsFile();
+            var evaluationsArchivePath = _pathService.GetEvaluationsArchiveFile();
+
+            var evaluations = await _evaluationCsvService.ReadAsync(evaluationsPath);
+            var archivedEvaluations = await _evaluationCsvService.ReadAsync(evaluationsArchivePath);
+            evaluations.AddRange(archivedEvaluations);
+
+            return [.. evaluations
+                .Where(x => backfillKeys.Contains(BuildEvaluationKey(x)))
+                .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAt)
+                    .ThenByDescending(r => r.EvaluationEndTime ?? DateTime.MinValue)
+                    .First())
+                .Select(x => BuildRow(x, candidateIndex))];
+        }
+
+        private static HashSet<string> BuildLegacyNoEntryZeroAmplitudeKeys(
+            BuildEvaluationDatasetSettings settings,
+            Dictionary<string, EvaluationDatasetRow> existingRowIndex)
+        {
+            if (!settings.BackfillLegacyNoEntryZeroAmplitudeDays.HasValue ||
+                settings.BackfillLegacyNoEntryZeroAmplitudeDays.Value <= 0)
+            {
+                return [];
+            }
+
+            var cutoff = MarketTime.Now().Date.AddDays(-Math.Max(1, settings.BackfillLegacyNoEntryZeroAmplitudeDays.Value));
+
+            return [.. existingRowIndex.Values
+                .Where(x =>
+                    x.ScanTime >= cutoff &&
+                    string.Equals(x.Outcome, "NoEntry", StringComparison.OrdinalIgnoreCase) &&
+                    x.AmplitudePct == 0m)
+                .Select(BuildDatasetKey)];
         }
 
         private static string BuildDatasetKey(EvaluationDatasetRow row)
