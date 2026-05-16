@@ -2170,6 +2170,52 @@ namespace IbSwingTrader.Application.Candidates
             if (weakAmplitudeProxy && snapshot.Current.DailyMaSignedDistancePct > 20m)
                 score -= 0.12m;
 
+            var repairedHighAmplitudeLike =
+                weeklyMidLast > 8m &&
+                dailyMidLast > 10m &&
+                h4MidLast > 4m &&
+                dailyMacdLast > 0.18m &&
+                h4MacdLast > 0.05m &&
+                weeklyMacdLast > -0.10m &&
+                dailyMidSlope > -6m &&
+                h4MidSlope > -6m &&
+                dailyMacdSlope > -0.04m &&
+                h4MacdSlope > -0.04m &&
+                dailyWidthSlope > -5m &&
+                h4WidthSlope > -5m;
+
+            if (repairedHighAmplitudeLike)
+                score += 0.30m;
+
+            if (repairedHighAmplitudeLike && hotByVolume)
+                score += 0.16m;
+
+            if (repairedHighAmplitudeLike && mostActive)
+                score += 0.12m;
+
+            if (repairedHighAmplitudeLike && topPercGain)
+                score += 0.10m;
+
+            var repairedLowAmplitudeLike =
+                weeklyMidLast > 0m &&
+                dailyMidLast > 8m &&
+                dailyMidLast < 35m &&
+                h4MidLast > 0m &&
+                h4MidLast < 25m &&
+                dailyMacdLast < 0.15m &&
+                h4MacdLast < 0.10m &&
+                weeklyMacdLast < 0.35m &&
+                dailyMidSlope < 4m &&
+                h4MidSlope < 4m &&
+                dailyWidthSlope < 8m &&
+                h4WidthSlope < 8m;
+
+            if (repairedLowAmplitudeLike)
+                score -= 0.34m;
+
+            if (repairedLowAmplitudeLike && snapshot.Current.DailyRSI14 > 55m)
+                score -= 0.10m;
+
             return score;
         }
 
@@ -3547,9 +3593,14 @@ namespace IbSwingTrader.Application.Candidates
 
             var minRecentClose = recentBars.Min(x => x.Close);
             var minRecentLow = recentBars.Min(x => x.Low);
+            var maxRecentClose = recentBars.Max(x => x.Close);
+            var recoveredWellAboveCloseFloor =
+                settings.MinRecentDailyClosePrice > 0m &&
+                maxRecentClose >= settings.MinRecentDailyClosePrice + 1.0m;
 
             if (settings.MinRecentDailyClosePrice > 0m &&
-                minRecentClose < settings.MinRecentDailyClosePrice)
+                minRecentClose < settings.MinRecentDailyClosePrice &&
+                !(minRecentClose >= settings.MinRecentDailyClosePrice - 0.10m && recoveredWellAboveCloseFloor))
             {
                 reason =
                     $"recent daily close floor veto. " +
