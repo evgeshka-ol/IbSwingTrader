@@ -5,11 +5,11 @@ namespace IbSwingTrader.Domain.Settings
         public string Mode { get; set; } = "top_gainers";
         public string Source { get; set; } = "known_tickers";
         public string OutputFile { get; set; } = "datasets/research_top_gainers.csv";
-        public DateTime? MinScanTime { get; set; }
+        public int? RecentScanDays { get; set; } = 1;
         public int? RecentEvaluationScanDays { get; set; } = 7;
         public int LookbackCalendarDays { get; set; } = 240;
         public int MinimumCandles { get; set; } = 120;
-        public int MaxParallelTickers { get; set; } = 2;
+        public int MaxParallelTickers { get; set; } = 3;
         public int ContractResolveTimeoutSeconds { get; set; } = 60;
         public int LocalExtremaLookbackBars { get; set; } = 3;
         public int EpisodeMergeCooldownBars { get; set; } = 8;

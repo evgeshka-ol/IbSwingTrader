@@ -43,6 +43,7 @@ namespace IbSwingTrader.App.Commands
             var settings = _researchSettingsProvider.Get();
             var twsSettings = _twsSettingsProvider.Get();
             var outputPath = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), settings.OutputFile));
+            var recentScanCutoff = GetRecentScanCutoff(settings);
 
             if (!string.Equals(settings.Mode, "top_gainers", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Unsupported research mode: {settings.Mode}");
@@ -54,8 +55,8 @@ namespace IbSwingTrader.App.Commands
 
             _logger.Info(
                 $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxParallelTickers={settings.MaxParallelTickers}");
-            if (settings.MinScanTime.HasValue)
-                _logger.Info($"Research MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
+            if (settings.RecentScanDays.HasValue)
+                _logger.Info($"Research RecentScanDays filter: {settings.RecentScanDays.Value}");
             if (settings.RecentEvaluationScanDays.HasValue)
                 _logger.Info($"Research RecentEvaluationScanDays filter: {settings.RecentEvaluationScanDays.Value}");
             _logger.Info($"Research tickers found: {tickers.Count}");
@@ -88,10 +89,10 @@ namespace IbSwingTrader.App.Commands
                 .Select(MapToCsvRow)
                 .ToList();
             var existingRows = await ReadExistingRowsAsync(outputPath);
-            if (settings.MinScanTime.HasValue)
+            if (recentScanCutoff.HasValue)
             {
                 existingRows = existingRows
-                    .Where(x => x.ScanTime >= settings.MinScanTime.Value)
+                    .Where(x => x.ScanTime >= recentScanCutoff.Value)
                     .ToList();
             }
             var allRows = existingRows
@@ -117,6 +118,7 @@ namespace IbSwingTrader.App.Commands
         private async Task<List<string>> LoadKnownTickersAsync()
         {
             var settings = _researchSettingsProvider.Get();
+            var recentScanCutoff = GetRecentScanCutoff(settings);
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             var candidatesPath = _pathService.GetCandidatesFile();
@@ -158,8 +160,8 @@ namespace IbSwingTrader.App.Commands
                     if (string.IsNullOrWhiteSpace(row.Ticker))
                         continue;
 
-                    if (settings.MinScanTime.HasValue &&
-                        row.ScanTime < settings.MinScanTime.Value)
+                    if (recentScanCutoff.HasValue &&
+                        row.ScanTime < recentScanCutoff.Value)
                     {
                         continue;
                     }
@@ -175,6 +177,15 @@ namespace IbSwingTrader.App.Commands
             }
 
             return [.. result.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        private static DateTime? GetRecentScanCutoff(ResearchSettings settings)
+        {
+            if (!settings.RecentScanDays.HasValue || settings.RecentScanDays.Value <= 0)
+                return null;
+
+            var normalizedDays = Math.Max(1, settings.RecentScanDays.Value);
+            return MarketTime.Now().Date.AddDays(-(normalizedDays - 1));
         }
 
         private static string BuildResearchRowKey(ResearchTopGainerDatasetRow row)
