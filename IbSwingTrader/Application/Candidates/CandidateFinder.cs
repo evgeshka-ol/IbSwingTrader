@@ -2017,6 +2017,32 @@ namespace IbSwingTrader.Application.Candidates
             if (coolingButAlive && hotByVolume)
                 score += 0.12m;
 
+            var healthyConstructiveContinuation =
+                dailyMidLast > 8m &&
+                dailyMidLast < 55m &&
+                h4MidLast > 2m &&
+                h4MidLast < 45m &&
+                dailyMacdLast > 0m &&
+                h4MacdLast >= 0m &&
+                dailyMidSlope > -10m &&
+                h4MidSlope > -10m &&
+                dailyMacdSlope > -0.08m &&
+                h4MacdSlope > -0.08m &&
+                dailyWidthSlope > -25m &&
+                h4WidthSlope > -25m;
+
+            if (healthyConstructiveContinuation)
+                score += 0.26m;
+
+            if (healthyConstructiveContinuation && topPercGain)
+                score += 0.12m;
+
+            if (healthyConstructiveContinuation && hotByVolume)
+                score += 0.10m;
+
+            if (healthyConstructiveContinuation && mostActive)
+                score += 0.08m;
+
             var smoothContinuationAlive =
                 weeklyMidLast > 15m &&
                 dailyMidLast > 20m &&
@@ -2062,6 +2088,33 @@ namespace IbSwingTrader.Application.Candidates
 
             if (moderateAliveNotExplosive && topPercGain)
                 score += 0.10m;
+
+            var staleCoolingContinuation =
+                dailyMidLast > 20m &&
+                h4MidLast > 0m &&
+                dailyMidSlope < -12m &&
+                h4MidSlope < -12m &&
+                dailyMacdSlope <= -0.08m &&
+                h4MacdSlope <= -0.08m;
+
+            if (staleCoolingContinuation)
+                score -= 0.45m;
+
+            if (staleCoolingContinuation && snapshot.Current.DailyMaSignedDistancePct > 35m)
+                score -= 0.20m;
+
+            var flatWeakContinuation =
+                dailyMidLast > 10m &&
+                h4MidLast > 0m &&
+                dailyMacdLast <= 0.08m &&
+                h4MacdLast <= 0.05m &&
+                dailyMidSlope <= 0m &&
+                h4MidSlope <= 0m &&
+                dailyWidthSlope < -10m &&
+                h4WidthSlope < -10m;
+
+            if (flatWeakContinuation)
+                score -= 0.28m;
 
             return score;
         }
