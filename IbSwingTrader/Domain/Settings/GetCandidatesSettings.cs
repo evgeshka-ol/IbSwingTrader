@@ -449,5 +449,8 @@ namespace IbSwingTrader.Domain.Settings
         public List<string> DenyList { get; set; } = [];
         public List<string> AllowedStockTypeMarkers { get; set; } = [];
         public List<string> RejectTickersEndingWith { get; set; } = [];
+        public int RecentDailyPriceFloorDays { get; set; } = 3;
+        public decimal MinRecentDailyClosePrice { get; set; } = 5m;
+        public decimal MinRecentDailyLowPrice { get; set; } = 4m;
     }
 }

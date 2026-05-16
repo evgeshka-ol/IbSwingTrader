@@ -6,6 +6,7 @@ namespace IbSwingTrader.Domain.Settings
         public string Source { get; set; } = "known_tickers";
         public string OutputFile { get; set; } = "datasets/research_top_gainers.csv";
         public DateTime? MinScanTime { get; set; }
+        public int? RecentEvaluationScanDays { get; set; } = 7;
         public int LookbackCalendarDays { get; set; } = 240;
         public int MinimumCandles { get; set; } = 120;
         public int MaxParallelTickers { get; set; } = 2;

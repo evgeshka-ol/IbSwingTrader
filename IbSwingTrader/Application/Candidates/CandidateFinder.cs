@@ -134,6 +134,12 @@ namespace IbSwingTrader.Application.Candidates
                         $"Ticker history prepared: {stock.Ticker}. " +
                         $"H4={candles.Count}, D1={dailyBars.Count}, W1={weeklyBars.Count}");
 
+                    if (TryRejectByRecentDailyPriceFloor(stock.Ticker, dailyBars, out var recentPriceFloorReason))
+                    {
+                        _logger.Info($"Skipping {stock.Ticker}: {recentPriceFloorReason}");
+                        continue;
+                    }
+
                     CandidateSignalSnapshot snapshot;
 
                     try
@@ -1147,6 +1153,13 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info(
                     $"Skipping {item.Ticker}: not enough wish list candles " +
                     $"({candles?.Count ?? 0} < {finderSettings.MinimumCandles}).");
+                return null;
+            }
+
+            var dailyBars = BuildDailyBars(candles);
+            if (TryRejectByRecentDailyPriceFloor(item.Ticker, dailyBars, out var recentPriceFloorReason))
+            {
+                _logger.Info($"Skipping {item.Ticker}: {recentPriceFloorReason}");
                 return null;
             }
 
@@ -3393,6 +3406,62 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return result;
+        }
+
+        private bool TryRejectByRecentDailyPriceFloor(
+            string ticker,
+            List<Candle> dailyBars,
+            out string reason)
+        {
+            var settings = _getCandidatesSettingsProvider.Get().PreFilter;
+            reason = string.Empty;
+
+            if (settings.RecentDailyPriceFloorDays <= 0 ||
+                (settings.MinRecentDailyClosePrice <= 0m && settings.MinRecentDailyLowPrice <= 0m) ||
+                dailyBars.Count == 0)
+            {
+                return false;
+            }
+
+            var completedDailyBars = dailyBars.Count > 1
+                ? dailyBars.Take(dailyBars.Count - 1).ToList()
+                : dailyBars;
+
+            if (completedDailyBars.Count == 0)
+                completedDailyBars = dailyBars;
+
+            var recentWindow = Math.Max(settings.RecentDailyPriceFloorDays, RecentDailySeriesLength);
+            var recentBars = completedDailyBars
+                .TakeLast(recentWindow)
+                .ToList();
+
+            if (recentBars.Count == 0)
+                return false;
+
+            var minRecentClose = recentBars.Min(x => x.Close);
+            var minRecentLow = recentBars.Min(x => x.Low);
+
+            if (settings.MinRecentDailyClosePrice > 0m &&
+                minRecentClose < settings.MinRecentDailyClosePrice)
+            {
+                reason =
+                    $"recent daily close floor veto. " +
+                    $"MinCloseLast{recentBars.Count}D={_fmt.Price(minRecentClose)}, " +
+                    $"Required>={_fmt.Price(settings.MinRecentDailyClosePrice)}";
+                return true;
+            }
+
+            if (settings.MinRecentDailyLowPrice > 0m &&
+                minRecentLow < settings.MinRecentDailyLowPrice)
+            {
+                reason =
+                    $"recent daily low floor veto. " +
+                    $"MinLowLast{recentBars.Count}D={_fmt.Price(minRecentLow)}, " +
+                    $"Required>={_fmt.Price(settings.MinRecentDailyLowPrice)}";
+                return true;
+            }
+
+            return false;
         }
 
         private static List<Candle> BuildWeeklyBars(List<Candle> candles)

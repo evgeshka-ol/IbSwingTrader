@@ -264,7 +264,10 @@
             "RequiredCurrency": "USD",
             "DenyList": [ "UVIX", "AGQ", "SCO", "MSTZ" ],
             "AllowedStockTypeMarkers": [ "STK", "CORP", "ADR" ],
-            "RejectTickersEndingWith": [ "U", "W" ]
+            "RejectTickersEndingWith": [ "U", "W" ],
+            "RecentDailyPriceFloorDays": 12,
+            "MinRecentDailyClosePrice": 5.0,
+            "MinRecentDailyLowPrice": 4.0
         },
 
         "TradePlan": {
