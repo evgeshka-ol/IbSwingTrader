@@ -3,12 +3,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
+using IbSwingTrader.Infrastructure.Serialization;
 
 namespace IbSwingTrader.App.Commands
 {
     public class CleanUpCommand(
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
-        IEvaluationDatasetBuilder evaluationDatasetBuilder,
+        IEvaluationDatasetCsvService evaluationDatasetCsvService,
         IJsonFileService jsonFileService,
         INumberTextFormatter fmt,
         ITextLogger logger,
@@ -18,7 +19,7 @@ namespace IbSwingTrader.App.Commands
         IMarketSettingsProvider marketSettingsProvider) : ICommand
     {
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
-        private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
+        private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
@@ -27,6 +28,17 @@ namespace IbSwingTrader.App.Commands
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
 
+        private static readonly JsonSerializerOptions CandidateReadOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        static CleanUpCommand()
+        {
+            CandidateReadOptions.Converters.Add(new FlexibleDateTimeConverter());
+            CandidateReadOptions.Converters.Add(new FlexibleNullableDateTimeConverter());
+        }
+
         public async Task RunAsync()
         {
             var settings = _cleanUpSettingsProvider.Get();
@@ -34,7 +46,7 @@ namespace IbSwingTrader.App.Commands
 
             var candidatesRemoved = await CleanCandidatesAsync(settings);
             var evaluationsRemoved = await CleanEvaluationsAsync(settings);
-            await SyncEvaluationDatasetAsync(evaluationsRemoved > 0);
+            await SyncEvaluationDatasetAsync(settings, evaluationsRemoved > 0);
             var wishListRemoved = await CleanWishListAsync(settings, marketNow);
             var deletedFiles = CleanOldFiles(settings, marketNow);
 
@@ -71,7 +83,7 @@ namespace IbSwingTrader.App.Commands
                 .ToList();
 
             var removed = candidates.Count - filtered.Count;
-            var rebuiltSummary = BuildSummary(filtered);
+            var rebuiltSummary = BuildSummary(filtered, candidateDocument.SameDayCandidates);
             var summaryChanged = !AreSummariesEqual(candidateDocument.Summary, rebuiltSummary);
 
             if (removed <= 0 && !summaryChanged)
@@ -87,7 +99,9 @@ namespace IbSwingTrader.App.Commands
             return removed;
         }
 
-        private async Task SyncEvaluationDatasetAsync(bool evaluationsChanged)
+        private async Task SyncEvaluationDatasetAsync(
+            CleanUpSettings settings,
+            bool evaluationsChanged)
         {
             if (!evaluationsChanged)
                 return;
@@ -97,17 +111,40 @@ namespace IbSwingTrader.App.Commands
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
 
             var evaluations = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
-            if (evaluations.Count > 0)
+            if (evaluations.Count == 0)
             {
-                await _evaluationDatasetBuilder.RunAsync();
+                if (!File.Exists(datasetPath))
+                    return;
+
+                File.Delete(datasetPath);
+                _logger.Info($"Evaluation dataset deleted: {datasetPath}");
                 return;
             }
 
             if (!File.Exists(datasetPath))
                 return;
 
-            File.Delete(datasetPath);
-            _logger.Info($"Evaluation dataset deleted: {datasetPath}");
+            var removableOutcomes = settings.EvaluationOutcomesToRemove
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (removableOutcomes.Count == 0)
+                return;
+
+            var datasetRows = await _evaluationDatasetCsvService.ReadAsync(datasetPath);
+            var filteredRows = datasetRows
+                .Where(x => !removableOutcomes.Contains(x.Outcome ?? string.Empty))
+                .ToList();
+
+            var removed = datasetRows.Count - filteredRows.Count;
+            if (removed <= 0)
+                return;
+
+            await _evaluationDatasetCsvService.WriteAsync(datasetPath, filteredRows);
+
+            _logger.Info(
+                $"Evaluation dataset cleaned: removed={removed}, kept={filteredRows.Count}, " +
+                $"outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
         }
 
         private async Task<int> CleanEvaluationsAsync(CleanUpSettings settings)
@@ -173,56 +210,81 @@ namespace IbSwingTrader.App.Commands
             return new CandidateFileDocument
             {
                 Candidates =
-                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>() ??
-                    root["Candidates"]?.Deserialize<List<CandidateDetails>>() ??
+                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
+                    root["Candidates"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
                     [],
                 SameDayCandidates =
-                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>() ??
-                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>() ??
+                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
+                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
                     []
             };
         }
 
-        private CandidateSummarySections BuildSummary(List<CandidateDetails> candidates)
+        private CandidateSummarySections BuildSummary(
+            List<CandidateDetails> candidates,
+            List<CandidateDetails> sameDayCandidates)
         {
-            if (candidates.Count == 0)
+            if (candidates.Count == 0 && sameDayCandidates.Count == 0)
                 return new CandidateSummarySections();
 
-            var latestScanTime = candidates.Max(x => x.Scan.ScanTime);
+            var latestCandidateScanTime = candidates.Count == 0
+                ? (DateTime?)null
+                : candidates.Max(x => x.Scan.ScanTime);
+
+            var latestSameDayScanTime = sameDayCandidates.Count == 0
+                ? (DateTime?)null
+                : sameDayCandidates.Max(x => x.Scan.ScanTime);
 
             return new CandidateSummarySections
             {
                 ReversalCandidates = candidates
-                    .Where(x => x.Scan.ScanTime == latestScanTime)
+                    .Where(x => latestCandidateScanTime.HasValue && x.Scan.ScanTime == latestCandidateScanTime.Value)
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
                     .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                     .Select(x => new CandidateSummaryItem
                     {
-                        Ticker = BuildSummaryTickerText(x)
+                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: false)
                     })
                     .ToList(),
-                TodayResearchLikeCandidates = []
+                TodayResearchLikeCandidates = sameDayCandidates
+                    .Where(x => latestSameDayScanTime.HasValue && x.Scan.ScanTime == latestSameDayScanTime.Value)
+                    .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                    .ThenByDescending(x => x.Score.Score)
+                    .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => new CandidateSummaryItem
+                    {
+                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: true)
+                    })
+                    .ToList()
             };
         }
 
-        private string BuildSummaryTickerText(CandidateDetails candidate)
+        private string BuildSummaryTickerText(
+            CandidateDetails candidate,
+            bool includeTodayResearchLikeMarker)
         {
             return
                 $"{candidate.Ticker} " +
                 $"{_fmt.Price(candidate.TradePlan.EntryPrice)} " +
                 $"{_fmt.Price(candidate.TradePlan.ExitPrice)} " +
-                $"{_fmt.Price(candidate.TradePlan.StopLoss)} " +
+                $"{_fmt.Price(candidate.TradePlan.StopLoss)}/{_fmt.Price(candidate.TradePlan.StopLimitPrice)} " +
                 $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
                 $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
                 $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
-                $"{BuildSummaryMarkers(candidate)}";
+                $"{BuildSummaryMarkers(candidate, includeTodayResearchLikeMarker)}";
         }
 
-        private string BuildSummaryMarkers(CandidateDetails candidate)
+        private string BuildSummaryMarkers(
+            CandidateDetails candidate,
+            bool includeTodayResearchLikeMarker)
         {
             var markers = new List<string>();
+
+            if (includeTodayResearchLikeMarker)
+                markers.Add("today-research-like");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");

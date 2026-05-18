@@ -143,7 +143,7 @@
         "RowsPerScan": 100,
         "FinalTopCandidates": 10,
         "UseWishListFirst": true,
-        "MaxWishListItems": 150,
+        "MaxWishListItems": 300,
 
         "ScanCodes": [
             {
@@ -594,7 +594,7 @@
         "DeleteLogsOlderThanCutoff": true,
         "DeleteLegacyCandidatesOlderThanCutoff": true,
         "DeleteLegacyEvaluationsOlderThanCutoff": true,
-        "FileRetentionDays": 3
+        "FileRetentionDays": 5
     },
 
     "CsvTradeReader": {
