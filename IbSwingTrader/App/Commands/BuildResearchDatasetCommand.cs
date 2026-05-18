@@ -14,6 +14,7 @@ namespace IbSwingTrader.App.Commands
         IContractResolver contractResolver,
         IHistoricalDataService historicalService,
         IFeatureEngine featureEngine,
+        IStockUniverseProvider stockUniverseProvider,
         ITextLogger logger,
         IAgentPathService pathService,
         ITwsSettingsProvider twsSettingsProvider,
@@ -27,6 +28,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalService = historicalService;
         private readonly IFeatureEngine _featureEngine = featureEngine;
+        private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
@@ -48,10 +50,8 @@ namespace IbSwingTrader.App.Commands
             if (!string.Equals(settings.Mode, "top_gainers", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Unsupported research mode: {settings.Mode}");
 
-            if (!string.Equals(settings.Source, "known_tickers", StringComparison.OrdinalIgnoreCase))
+            if (!IsSupportedResearchSource(settings.Source))
                 throw new InvalidOperationException($"Unsupported research source: {settings.Source}");
-
-            var tickers = await LoadKnownTickersAsync();
 
             _logger.Info(
                 $"Research settings: Mode={settings.Mode}, Source={settings.Source}, LookbackCalendarDays={settings.LookbackCalendarDays}, MinimumCandles={settings.MinimumCandles}, MinRunupPct={settings.MinRunupPct}, MaxParallelTickers={settings.MaxParallelTickers}");
@@ -59,6 +59,11 @@ namespace IbSwingTrader.App.Commands
                 _logger.Info($"Research RecentScanDays filter: {settings.RecentScanDays.Value}");
             if (settings.RecentEvaluationScanDays.HasValue)
                 _logger.Info($"Research RecentEvaluationScanDays filter: {settings.RecentEvaluationScanDays.Value}");
+
+            if (UsesTwsScannerSource(settings))
+                EnsureConnected(twsSettings);
+
+            var tickers = await LoadResearchTickersAsync(settings);
             _logger.Info($"Research tickers found: {tickers.Count}");
 
             if (tickers.Count == 0)
@@ -115,9 +120,62 @@ namespace IbSwingTrader.App.Commands
             _logger.InfoBlock("FAILED HISTORY REQUESTS", _failedHistoryRequestTableFormatter.Format(_failedRequests));
         }
 
-        private async Task<List<string>> LoadKnownTickersAsync()
+        private static bool IsSupportedResearchSource(string source)
         {
-            var settings = _researchSettingsProvider.Get();
+            return string.Equals(source, "known_tickers", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(source, "tws_top_gainers", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(source, "tws_scanner", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool UsesTwsScannerSource(ResearchSettings settings)
+        {
+            return string.Equals(settings.Source, "tws_top_gainers", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(settings.Source, "tws_scanner", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<List<string>> LoadResearchTickersAsync(ResearchSettings settings)
+        {
+            if (!UsesTwsScannerSource(settings))
+                return await LoadKnownTickersAsync(settings);
+
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var scanCodes = GetResearchScanCodes(settings);
+
+            foreach (var scanCode in scanCodes)
+            {
+                _logger.Info($"Research scanner source request: {scanCode}");
+                var stocks = await _stockUniverseProvider.GetStocksAsync(scanCode);
+
+                foreach (var stock in stocks)
+                {
+                    if (string.IsNullOrWhiteSpace(stock.Ticker))
+                        continue;
+
+                    result.TryAdd(stock.Ticker.Trim(), stock.Rank);
+                }
+
+                _logger.Info($"Research scanner source returned {stocks.Count} rows: {scanCode}");
+            }
+
+            return [.. result
+                .OrderBy(x => x.Value)
+                .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.Key)];
+        }
+
+        private static List<string> GetResearchScanCodes(ResearchSettings settings)
+        {
+            if (settings.ScanCodes is { Count: > 0 })
+                return [.. settings.ScanCodes
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+            return ["TOP_PERC_GAIN", "TOP_OPEN_PERC_GAIN"];
+        }
+
+        private async Task<List<string>> LoadKnownTickersAsync(ResearchSettings settings)
+        {
             var recentScanCutoff = GetRecentScanCutoff(settings);
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -137,6 +195,8 @@ namespace IbSwingTrader.App.Commands
                 {
                     var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
                     foreach (var candidate in document?.Candidates ?? [])
+                        result.Add(candidate.Ticker);
+                    foreach (var candidate in document?.SameDayCandidates ?? [])
                         result.Add(candidate.Ticker);
                 }
             }

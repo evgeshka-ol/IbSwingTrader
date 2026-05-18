@@ -16,7 +16,7 @@
 
     "Tws": {
         "Host": "127.0.0.1",
-        "Port": 7497,
+        "Port": 7496,
         "ClientId": 7,
         "UseRth": false,
         "ConnectTimeoutSeconds": 15,
@@ -104,9 +104,13 @@
 
     "Research": {
         "Mode": "top_gainers",
-        "Source": "known_tickers",
+        "Source": "tws_top_gainers",
         "OutputFile": "datasets/research_top_gainers.csv",
         "RecentScanDays": 1,
+        "ScanCodes": [
+            "TOP_PERC_GAIN",
+            "TOP_OPEN_PERC_GAIN"
+        ],
         "LookbackCalendarDays": 120,
         "MinimumCandles": 120,
         "MaxParallelTickers": 3,
@@ -114,7 +118,7 @@
         "LocalExtremaLookbackBars": 3,
         "EpisodeMergeCooldownBars": 8,
         "MaxBarsToPeak": 30,
-        "MinRunupPct": 20.0,
+        "MinRunupPct": 10.0,
         "SortColumns": [
             {
                 "Column": "ScanTime",
