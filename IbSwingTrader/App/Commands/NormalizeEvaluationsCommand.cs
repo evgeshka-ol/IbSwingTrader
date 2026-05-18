@@ -44,7 +44,7 @@ namespace IbSwingTrader.App.Commands
                     $"Kept={records.Count}");
             }
 
-            EnsureConnected(_twsSettingsProvider.Get().ConnectTimeoutSeconds);
+            EnsureConnected(_twsSettingsProvider.Get());
             var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
 
             foreach (var record in records)
@@ -81,17 +81,17 @@ namespace IbSwingTrader.App.Commands
             await _evaluationDatasetBuilder.RunAsync();
         }
 
-        private void EnsureConnected(int timeoutSeconds)
+        private void EnsureConnected(TwsSettings twsSettings)
         {
             if (_twsConnection.IsConnected)
                 return;
 
             _logger.Info("Connecting to TWS...");
 
-            _twsConnection.Connect();
+            _twsConnection.Connect(twsSettings.Host, twsSettings.Port, twsSettings.ClientId);
 
             var connected = _twsConnection.Ready.Task
-                .Wait(TimeSpan.FromSeconds(timeoutSeconds));
+                .Wait(TimeSpan.FromSeconds(twsSettings.ConnectTimeoutSeconds));
 
             if (!connected || !_twsConnection.IsConnected)
                 throw new InvalidOperationException("Failed to connect to TWS.");

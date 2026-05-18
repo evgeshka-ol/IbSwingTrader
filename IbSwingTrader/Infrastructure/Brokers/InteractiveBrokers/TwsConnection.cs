@@ -31,6 +31,9 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         private int _nextRequestId = 1;
         private volatile bool _ibConnected = false;
+        private string _host = "127.0.0.1";
+        private int _port = 7496;
+        private int _clientId = 1;
 
         private TaskCompletionSource<string>? _scannerParametersTcs;
 
@@ -43,6 +46,10 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void Connect(string host = "127.0.0.1", int port = 7496, int clientId = 1)
         {
+            _host = host;
+            _port = port;
+            _clientId = clientId;
+
             Client.eConnect(host, port, clientId);
 
             if (!Client.IsConnected())
@@ -408,7 +415,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
             if (!Client.IsConnected())
             {
                 _logger.Info("Connecting to TWS...");
-                Connect();
+                Connect(_host, _port, _clientId);
             }
 
             await Ready.Task;

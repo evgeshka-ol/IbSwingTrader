@@ -67,7 +67,7 @@ namespace IbSwingTrader.App.Commands
                 return;
             }
 
-            EnsureConnected(twsSettings.ConnectTimeoutSeconds);
+            EnsureConnected(twsSettings);
 
             var semaphore = new SemaphoreSlim(settings.MaxParallelTickers);
             var tasks = tickers.Select(async ticker =>
@@ -1123,15 +1123,15 @@ namespace IbSwingTrader.App.Commands
             return result;
         }
 
-        private void EnsureConnected(int timeoutSeconds)
+        private void EnsureConnected(TwsSettings twsSettings)
         {
             if (_connection.IsConnected)
                 return;
 
             _logger.Info("Connecting to TWS...");
-            _connection.Connect();
+            _connection.Connect(twsSettings.Host, twsSettings.Port, twsSettings.ClientId);
 
-            var connected = _connection.Ready.Task.Wait(TimeSpan.FromSeconds(timeoutSeconds));
+            var connected = _connection.Ready.Task.Wait(TimeSpan.FromSeconds(twsSettings.ConnectTimeoutSeconds));
 
             if (!connected || !_connection.IsConnected)
                 throw new InvalidOperationException("Failed to connect to TWS.");

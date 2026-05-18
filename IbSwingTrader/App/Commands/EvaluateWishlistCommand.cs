@@ -29,7 +29,7 @@ namespace IbSwingTrader.App.Commands
             var wishListPath = _pathService.GetWishListFile();
             var wishListEvaluationsPath = _pathService.GetWishListEvaluationsFile();
 
-            EnsureConnected(twsSettings.ConnectTimeoutSeconds);
+            EnsureConnected(twsSettings);
 
             await EvaluateWishListAsync(wishListPath, wishListEvaluationsPath);
 
@@ -107,17 +107,17 @@ namespace IbSwingTrader.App.Commands
             LogWishListSummary(evaluations, items.Count, updatedItems.Count);
         }
 
-        private void EnsureConnected(int timeoutSeconds)
+        private void EnsureConnected(TwsSettings twsSettings)
         {
             if (_twsConnection.IsConnected)
                 return;
 
             _logger.Info("Connecting to TWS...");
 
-            _twsConnection.Connect();
+            _twsConnection.Connect(twsSettings.Host, twsSettings.Port, twsSettings.ClientId);
 
             var connected = _twsConnection.Ready.Task
-                .Wait(TimeSpan.FromSeconds(timeoutSeconds));
+                .Wait(TimeSpan.FromSeconds(twsSettings.ConnectTimeoutSeconds));
 
             if (!connected || !_twsConnection.IsConnected)
                 throw new InvalidOperationException("Failed to connect to TWS.");
