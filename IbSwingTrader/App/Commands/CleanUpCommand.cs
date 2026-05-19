@@ -227,18 +227,9 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0 && sameDayCandidates.Count == 0)
                 return new CandidateSummarySections();
 
-            var latestCandidateScanTime = candidates.Count == 0
-                ? (DateTime?)null
-                : candidates.Max(x => x.Scan.ScanTime);
-
-            var latestSameDayScanTime = sameDayCandidates.Count == 0
-                ? (DateTime?)null
-                : sameDayCandidates.Max(x => x.Scan.ScanTime);
-
             return new CandidateSummarySections
             {
                 ReversalCandidates = candidates
-                    .Where(x => latestCandidateScanTime.HasValue && x.Scan.ScanTime == latestCandidateScanTime.Value)
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
@@ -249,7 +240,6 @@ namespace IbSwingTrader.App.Commands
                     })
                     .ToList(),
                 TodayResearchLikeCandidates = sameDayCandidates
-                    .Where(x => latestSameDayScanTime.HasValue && x.Scan.ScanTime == latestSameDayScanTime.Value)
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)

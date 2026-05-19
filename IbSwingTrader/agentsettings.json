@@ -549,7 +549,7 @@
 
         "PremarketSummary": {
             "Enabled": true,
-            "MaxItems": 10,
+            "MaxItems": 20,
             "MinEntryScore": 15.0,
             "MinPlannedProfitPct": 3.0
         }
@@ -578,7 +578,7 @@
     },
 
     "CleanUp": {
-        "RemoveEvaluatedCandidates": true,
+        "RemoveEvaluatedCandidates": false,
         "CandidateOutcomesToRemove": [
             "Loss"
         ],
