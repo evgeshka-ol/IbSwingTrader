@@ -829,9 +829,17 @@ namespace IbSwingTrader.Application.Candidates
                 diagnostics,
                 bbState,
                 recentSeries);
+            var shortHistoryLiveMover = IsShortHistoryLiveMoverCandidate(
+                ctx,
+                diagnostics,
+                recentSeries);
 
-            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m && !preLaunchResearchLike)
+            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
+                !preLaunchResearchLike &&
+                !shortHistoryLiveMover)
+            {
                 return false;
+            }
 
             var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
             var currentSessionLikeMove =
@@ -971,6 +979,19 @@ namespace IbSwingTrader.Application.Candidates
                 return true;
             }
 
+            if (shortHistoryLiveMover)
+            {
+                _logger.Info(
+                    $"TodayResearchLike short-history live-mover promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"DailyDistance={_fmt.Generic(dailyDistance)}%, " +
+                    $"H4Distance={_fmt.Generic(h4Distance)}%, " +
+                    $"DistanceTo20dHigh={_fmt.Generic(ctx.Snapshot.Current.DistanceTo20dHigh)}%, " +
+                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
+                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
+                return true;
+            }
+
             if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion || earlyRunawayCoolingPromotion)
                 return true;
 
@@ -1053,6 +1074,71 @@ namespace IbSwingTrader.Application.Candidates
                    dailyTryingToTurn &&
                    h4NotBreakingDown &&
                    (weeklyRunawayUp || weeklyDistance > -30m || diagnostics.ATRRatio >= 2.5m);
+        }
+
+        private static bool IsShortHistoryLiveMoverCandidate(
+            WishListContext ctx,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries)
+        {
+            var preset = ctx.Preset.ScanCode;
+            var isLiveMoverPreset =
+                string.Equals(preset, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(preset, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(preset, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(preset, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase);
+
+            if (!isLiveMoverPreset)
+                return false;
+
+            var hasUsableWeeklyBb =
+                recentSeries.WeeklyBbMidDistanceSeries.Count >= 3 &&
+                recentSeries.WeeklyBbWidthSeries.Count >= 3;
+
+            if (hasUsableWeeklyBb)
+                return false;
+
+            var current = ctx.Snapshot.Current;
+            var dailyDistance = current.DailyMaSignedDistancePct;
+            var h4Distance = current.H4MaSignedDistancePct;
+            var dailyMacd = current.DailyMACDLineMinusSignal;
+            var h4Macd = current.MACDLineMinusSignal;
+            var weeklyMacd = current.WeeklyMACDLineMinusSignal;
+
+            if (dailyDistance < -35m || dailyDistance > 320m)
+                return false;
+
+            if (h4Distance < -35m)
+                return false;
+
+            if (current.DistanceTo20dHigh > -0.25m)
+                return false;
+
+            if (current.DailyRSI14 < 35m || current.DailyRSI14 > 92m)
+                return false;
+
+            if (weeklyMacd.HasValue && weeklyMacd.Value < -3.0m)
+                return false;
+
+            var dailyTurningOrExplosive =
+                ctx.Snapshot.DailyMaDelta3 >= -2m ||
+                ctx.Snapshot.DailyRsiDelta3 >= 8m ||
+                dailyDistance >= 10m ||
+                diagnostics.ATRRatio >= 4m;
+
+            var h4Confirming =
+                ctx.Snapshot.H4MaDelta3 >= -8m ||
+                h4Distance >= 0m ||
+                h4Macd >= -0.50m;
+
+            var momentumConfirming =
+                dailyMacd >= -0.75m &&
+                h4Macd >= -0.65m &&
+                diagnostics.ATRRatio >= 2.0m;
+
+            return dailyTurningOrExplosive &&
+                   h4Confirming &&
+                   momentumConfirming;
         }
 
         private static bool IsStrongRunawayUp(
@@ -1920,12 +2006,146 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
+            if (IsResearchLikePreLaunchRankProxy(snapshot, diagnostics, recentSeries))
+            {
+                score += 0.85m;
+
+                if (presetScanCode is "TOP_PERC_GAIN" or "TOP_OPEN_PERC_GAIN")
+                    score += 0.20m;
+
+                if (diagnostics.ATRRatio >= 2.5m)
+                    score += 0.15m;
+            }
+
+            if (IsShortHistoryLiveMoverRankProxy(presetScanCode, snapshot, diagnostics, recentSeries))
+            {
+                score += 1.10m;
+
+                if (presetScanCode is "TOP_PERC_GAIN" or "TOP_OPEN_PERC_GAIN")
+                    score += 0.25m;
+
+                if (diagnostics.ATRRatio >= 4.0m)
+                    score += 0.20m;
+            }
+
             score += CalculateTodayResearchLikeFreshnessAdjustment(
                 presetScanCode,
                 snapshot,
                 recentSeries);
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private static bool IsResearchLikePreLaunchRankProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries)
+        {
+            var current = snapshot.Current;
+            var dailyDistance = current.DailyMaSignedDistancePct;
+            var weeklyDistance = current.WeeklyMaSignedDistancePct ?? 0m;
+
+            if (dailyDistance < -55m || dailyDistance > 8m)
+                return false;
+
+            if (current.DistanceTo20dHigh > -8m)
+                return false;
+
+            if (current.DailyRSI14 < 35m || current.DailyRSI14 > 62m)
+                return false;
+
+            if (current.WeeklyMACDLineMinusSignal.HasValue &&
+                current.WeeklyMACDLineMinusSignal.Value > 0.8m)
+            {
+                return false;
+            }
+
+            var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
+            var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
+            var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
+            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+
+            var dailyTryingToTurn =
+                snapshot.DailyMaDelta3 >= -12m &&
+                snapshot.DailyRsiDelta3 >= -5m &&
+                snapshot.H4MaDelta3 >= -14m &&
+                dailyMacdLast > -0.75m;
+
+            var h4NotBreakingDown =
+                h4MidLast > -20m &&
+                h4MacdLast > -0.65m &&
+                dailyMidSlope > -35m &&
+                h4MidSlope > -35m;
+
+            return dailyTryingToTurn &&
+                   h4NotBreakingDown &&
+                   (weeklyDistance > -30m || diagnostics.ATRRatio >= 2.5m);
+        }
+
+        private static bool IsShortHistoryLiveMoverRankProxy(
+            string presetScanCode,
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries)
+        {
+            var livePreset =
+                string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase);
+
+            if (!livePreset)
+                return false;
+
+            var hasUsableWeeklyBb =
+                recentSeries.WeeklyBbMidDistanceSeries.Count >= 3 &&
+                recentSeries.WeeklyBbWidthSeries.Count >= 3;
+
+            if (hasUsableWeeklyBb)
+                return false;
+
+            var current = snapshot.Current;
+            var dailyDistance = current.DailyMaSignedDistancePct;
+            var h4Distance = current.H4MaSignedDistancePct;
+
+            if (dailyDistance < -35m || dailyDistance > 320m)
+                return false;
+
+            if (h4Distance < -35m)
+                return false;
+
+            if (current.DistanceTo20dHigh > -0.25m)
+                return false;
+
+            if (current.DailyRSI14 < 35m || current.DailyRSI14 > 92m)
+                return false;
+
+            if (current.WeeklyMACDLineMinusSignal.HasValue &&
+                current.WeeklyMACDLineMinusSignal.Value < -3.0m)
+            {
+                return false;
+            }
+
+            var dailyTurningOrExplosive =
+                snapshot.DailyMaDelta3 >= -2m ||
+                snapshot.DailyRsiDelta3 >= 8m ||
+                dailyDistance >= 10m ||
+                diagnostics.ATRRatio >= 4m;
+
+            var h4Confirming =
+                snapshot.H4MaDelta3 >= -8m ||
+                h4Distance >= 0m ||
+                current.MACDLineMinusSignal >= -0.50m;
+
+            var momentumConfirming =
+                current.DailyMACDLineMinusSignal >= -0.75m &&
+                current.MACDLineMinusSignal >= -0.65m &&
+                diagnostics.ATRRatio >= 2.0m;
+
+            return dailyTurningOrExplosive &&
+                   h4Confirming &&
+                   momentumConfirming;
         }
 
         private decimal CalculateTodayResearchLikeFreshnessAdjustment(
