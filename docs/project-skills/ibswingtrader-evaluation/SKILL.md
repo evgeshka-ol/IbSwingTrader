@@ -22,6 +22,9 @@ For scanner quality, the key metric is `AmplitudePct`.
 
 - High amplitude + `NoEntry` means scanner may be right and `TradePlan` may be wrong.
 - Low amplitude means the scanner likely surfaced a weak ticker.
+- The count of `Win` rows measures `TradePlan` conversion, not scanner recall.
+- Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude point to `TradePlan` failure.
+- `ReversalCandidates` should still clear meaningful amplitude, normally `> 10%`; below that is scanner failure.
 
 ## Main code
 

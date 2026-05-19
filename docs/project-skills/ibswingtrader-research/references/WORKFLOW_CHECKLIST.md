@@ -9,6 +9,7 @@ Daily loop:
    - yesterday's scanner
    - today's research
 5. Decide what kind of problem you have:
+   - `TodayResearchLikeCandidates -> next-day research` miss
    - recall
    - `WishList -> TodayResearchLike` promotion
    - ranking
@@ -28,6 +29,12 @@ Fix promotion and gating.
 
 Fix ranking.
 
+### If `TodayResearchLikeCandidates` summary names do not become research winners
+
+Fix scanner selection/ranking first.
+
+This is the top-priority feedback loop.
+
 ### If winners are in summary but `NoEntry` with strong amplitude
 
 Fix `TradePlan`.
@@ -35,3 +42,9 @@ Fix `TradePlan`.
 ### If summary names repeatedly show low amplitude
 
 Fix scanner ranking and stale-candidate suppression.
+
+### If many rows are `Loss`, `NoEntry`, or `Open` but amplitude is strong
+
+Fix `TradePlan`.
+
+The scanner found movement; execution failed to convert it.

@@ -14,6 +14,7 @@ The scanner's job is to find future fat moves early.
 - For scanner quality, the main oracle is `AmplitudePct`, not `Win/Loss/NoEntry`.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.
+- Priority #1: names in today's summary `TodayResearchLikeCandidates` should be in tomorrow's `research_top_gainers.csv`.
 
 ## Pipeline
 
@@ -28,6 +29,12 @@ The scanner's job is to find future fat moves early.
 - `TodayResearchLikeCandidates`: above-mid / runaway / continuation style ideas.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
+
+Both families should produce meaningful future amplitude:
+
+- `TodayResearchLikeCandidates` should be the strongest next-day research proxy.
+- `ReversalCandidates` should still usually produce `AmplitudePct > 10%`.
+- If `ReversalCandidates` amplitude is below 10%, treat that as scanner failure, not a trade-plan issue.
 
 ## Main code
 

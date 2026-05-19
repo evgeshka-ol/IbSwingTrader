@@ -16,6 +16,12 @@ Suggested mental buckets:
 - `5% to <10%` borderline
 - `<5%` weak / likely poor list quality
 
+For both scanner families:
+
+- `TodayResearchLikeCandidates` should be judged by whether it becomes the next research dataset.
+- `ReversalCandidates` should still produce meaningful amplitude, normally `> 10%`.
+- If amplitude is below 10%, treat that as scanner failure, even when the trade plan correctly avoids entry.
+
 ### Trade plan oracle
 
 Use:
@@ -27,6 +33,11 @@ Use:
 - `PlannedLossPct`
 
 These tell you whether execution worked after the scanner already found the move.
+
+The number of winners is a trade-plan conversion metric.
+
+Many `Win` rows mean the trade plan is converting scanner opportunities.
+Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude mean the trade plan is failing to convert movement.
 
 ## Interpretations
 
@@ -54,7 +65,15 @@ Can indicate:
 - late entry
 - bad plan
 
-Do not use this alone to condemn the scanner.
+Do not use this alone to condemn the scanner. Large amplitude means the scanner
+still found movement; the failure is usually downstream unless the move direction
+or setup family was wrong.
+
+### Many winners but low amplitude
+
+This can make the trade plan look good while the scanner is still weak.
+
+Do not let a high win count hide weak scanner recall/ranking.
 
 ## Recent project behavior
 
