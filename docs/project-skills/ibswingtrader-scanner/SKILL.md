@@ -7,6 +7,12 @@ description: Use when working on the scanner, candidate ranking, wishlist promot
 
 Use this skill when changing scanner behavior or analyzing why a ticker was or was not surfaced by `get-candidates`.
 
+## Responsibility boundary
+
+Codex only analyzes data/code, changes code, and creates or updates documentation from that analysis.
+
+The user runs builds, the application, scanner/research/evaluation commands, and tests. Do not try to launch them unless the user explicitly asks to change this rule.
+
 ## Core intent
 
 The scanner's job is to find future fat moves early.

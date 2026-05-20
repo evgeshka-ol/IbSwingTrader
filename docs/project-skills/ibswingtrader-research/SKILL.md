@@ -7,6 +7,12 @@ description: Use when working on the research oracle, comparing yesterday's scan
 
 Use this skill when comparing scanner output to the daily oracle of strong movers.
 
+## Responsibility boundary
+
+Codex only analyzes data/code, changes code, and creates or updates documentation from that analysis.
+
+The user runs builds, the application, scanner/research/evaluation commands, and tests. Do not try to launch them unless the user explicitly asks to change this rule.
+
 ## Core intent
 
 `research_top_gainers.csv` is the oracle for today's strongest moves.

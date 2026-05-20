@@ -7,6 +7,12 @@ description: Use when working on candidate evaluation, evaluation-dataset interp
 
 Use this skill when interpreting `evaluation-dataset.csv` or changing evaluation logic.
 
+## Responsibility boundary
+
+Codex only analyzes data/code, changes code, and creates or updates documentation from that analysis.
+
+The user runs builds, the application, scanner/research/evaluation commands, and tests. Do not try to launch them unless the user explicitly asks to change this rule.
+
 ## Core intent
 
 Evaluation exists to answer two different questions:
