@@ -168,12 +168,32 @@ namespace IbSwingTrader.Application.Candidates
                     var entryScore = _candidateScore.Calculate(snapshot);
                     var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles));
 
-                    if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
+                    var weeklyBbRejected = ShouldRejectByWeeklyBbForWishlist(bbState.Weekly);
+                    var weeklyBbVetoBypassed = weeklyBbRejected &&
+                        ShouldBypassWeeklyBbVetoForLiveMover(
+                            stock,
+                            preset.ScanCode,
+                            snapshot,
+                            diagnostics,
+                            entryScore);
+
+                    if (weeklyBbRejected && !weeklyBbVetoBypassed)
                     {
                         _logger.Info(
                             $"Wish list BB veto applied: {stock.Ticker}. " +
                             $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}");
                         continue;
+                    }
+
+                    if (weeklyBbVetoBypassed)
+                    {
+                        _logger.Info(
+                            $"Wish list BB veto bypassed for live mover: {stock.Ticker}. " +
+                            $"Preset={preset.ScanCode}, Rank={stock.Rank}, " +
+                            $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
+                            $"ATRRatio={diagnostics.ATRRatio:0.##}, " +
+                            $"DailyRsi14={snapshot.Current.DailyRSI14:0.##}, " +
+                            $"EntryScore={entryScore:0.##}");
                     }
 
                     if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
@@ -819,8 +839,16 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState)
         {
             var firstSeenDate = mergedWishItem.FirstSeen?.Date;
-            if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly))
+            if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly) &&
+                !ShouldBypassWeeklyBbVetoForLiveMover(
+                    ctx.Stock,
+                    ctx.Preset.ScanCode,
+                    ctx.Snapshot,
+                    diagnostics,
+                    entryScore))
+            {
                 return false;
+            }
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
@@ -3424,6 +3452,36 @@ namespace IbSwingTrader.Application.Candidates
                    IsExplosiveBreakoutProxy(snapshot);
         }
 
+        private static bool ShouldBypassWeeklyBbVetoForLiveMover(
+            StockInfo stock,
+            string presetScanCode,
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore)
+        {
+            if (!IsLiveMoverPreset(presetScanCode))
+                return false;
+
+            var rank = stock.Rank > 0 ? stock.Rank : int.MaxValue;
+            if (rank > 10)
+                return false;
+
+            if (snapshot.Current.DistanceTo20dHigh > -0.25m)
+                return false;
+
+            return diagnostics.ATRRatio >= 4m ||
+                   snapshot.Current.DailyRSI14 >= 60m ||
+                   entryScore >= 20m;
+        }
+
+        private static bool IsLiveMoverPreset(string presetScanCode)
+        {
+            return string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(presetScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static decimal ResolvePresetBonus(string presetScanCode, NextDayRankingSettings settings)
         {
             return presetScanCode switch
@@ -4038,11 +4096,12 @@ namespace IbSwingTrader.Application.Candidates
             var maxRecentClose = recentBars.Max(x => x.Close);
             var recoveredWellAboveCloseFloor =
                 settings.MinRecentDailyClosePrice > 0m &&
-                maxRecentClose >= settings.MinRecentDailyClosePrice + 1.0m;
+                maxRecentClose >= settings.MinRecentDailyClosePrice + settings.RecoveredCloseFloorBuffer;
+            var closeFloorTolerance = Math.Max(0m, settings.RecentDailyCloseFloorTolerance);
 
             if (settings.MinRecentDailyClosePrice > 0m &&
                 minRecentClose < settings.MinRecentDailyClosePrice &&
-                !(minRecentClose >= settings.MinRecentDailyClosePrice - 0.10m && recoveredWellAboveCloseFloor))
+                !(minRecentClose >= settings.MinRecentDailyClosePrice - closeFloorTolerance && recoveredWellAboveCloseFloor))
             {
                 reason =
                     $"recent daily close floor veto. " +

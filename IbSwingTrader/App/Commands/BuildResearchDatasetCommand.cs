@@ -15,6 +15,7 @@ namespace IbSwingTrader.App.Commands
         IHistoricalDataService historicalService,
         IFeatureEngine featureEngine,
         IStockUniverseProvider stockUniverseProvider,
+        IStockPreFilter stockPreFilter,
         ITextLogger logger,
         IAgentPathService pathService,
         ITwsSettingsProvider twsSettingsProvider,
@@ -29,6 +30,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IHistoricalDataService _historicalService = historicalService;
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly IStockUniverseProvider _stockUniverseProvider = stockUniverseProvider;
+        private readonly IStockPreFilter _stockPreFilter = stockPreFilter;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
@@ -149,6 +151,9 @@ namespace IbSwingTrader.App.Commands
                 foreach (var stock in stocks)
                 {
                     if (string.IsNullOrWhiteSpace(stock.Ticker))
+                        continue;
+
+                    if (!_stockPreFilter.Pass(stock))
                         continue;
 
                     result.TryAdd(stock.Ticker.Trim(), stock.Rank);

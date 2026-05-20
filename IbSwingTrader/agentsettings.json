@@ -272,7 +272,9 @@
             "RejectTickersEndingWith": [ "U", "W" ],
             "RecentDailyPriceFloorDays": 12,
             "MinRecentDailyClosePrice": 5.0,
-            "MinRecentDailyLowPrice": 4.0
+            "MinRecentDailyLowPrice": 4.0,
+            "RecentDailyCloseFloorTolerance": 0.25,
+            "RecoveredCloseFloorBuffer": 1.0
         },
 
         "TradePlan": {

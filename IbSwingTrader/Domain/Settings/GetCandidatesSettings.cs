@@ -472,5 +472,7 @@ namespace IbSwingTrader.Domain.Settings
         public int RecentDailyPriceFloorDays { get; set; } = 3;
         public decimal MinRecentDailyClosePrice { get; set; } = 5m;
         public decimal MinRecentDailyLowPrice { get; set; } = 4m;
+        public decimal RecentDailyCloseFloorTolerance { get; set; } = 0.25m;
+        public decimal RecoveredCloseFloorBuffer { get; set; } = 1.0m;
     }
 }
