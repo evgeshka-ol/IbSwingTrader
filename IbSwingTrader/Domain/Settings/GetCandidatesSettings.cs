@@ -136,7 +136,27 @@ namespace IbSwingTrader.Domain.Settings
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
         public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
+        public SeriesEntryProfileSettings SeriesEntryProfile { get; set; } = new();
         public H4BollingerEntrySettings H4BollingerEntry { get; set; } = new();
+    }
+
+    public class SeriesEntryProfileSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal LossLikeAdverseMoveDiscountPct { get; set; } = 0.09m;
+        public decimal WaitPullbackDiscountPct { get; set; } = 0.08m;
+        public decimal ConfirmFirstDiscountPct { get; set; } = 0.06m;
+        public decimal AvoidEarlySpikeDiscountPct { get; set; } = 0.07m;
+        public decimal FastContinuationMaxDiscountPct { get; set; } = 0.025m;
+        public decimal DailyStrongSlopeThreshold { get; set; } = 10.0m;
+        public decimal DailyRsiSlopeThreshold { get; set; } = 8.0m;
+        public decimal H4WeakSlopeThreshold { get; set; } = -1.0m;
+        public decimal H4MacdWeakDeltaThreshold { get; set; } = -0.10m;
+        public decimal DailyOverheatedRsiThreshold { get; set; } = 68.0m;
+        public decimal H4OverheatedRsiThreshold { get; set; } = 74.0m;
+        public decimal MinAtrRatioForDeepEntry { get; set; } = 4.0m;
+        public decimal NearHighDistanceTo20dHighThreshold { get; set; } = -8.0m;
+        public decimal MaxDiscountPct { get; set; } = 0.10m;
     }
 
     public class H4BollingerEntrySettings

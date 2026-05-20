@@ -415,6 +415,23 @@
                 "MinH4MacdSlope": 0.15,
                 "MinH4RsiUpMoves": 8
             },
+            "SeriesEntryProfile": {
+                "Enabled": true,
+                "LossLikeAdverseMoveDiscountPct": 0.09,
+                "WaitPullbackDiscountPct": 0.08,
+                "ConfirmFirstDiscountPct": 0.06,
+                "AvoidEarlySpikeDiscountPct": 0.07,
+                "FastContinuationMaxDiscountPct": 0.025,
+                "DailyStrongSlopeThreshold": 10.0,
+                "DailyRsiSlopeThreshold": 8.0,
+                "H4WeakSlopeThreshold": -1.0,
+                "H4MacdWeakDeltaThreshold": -0.10,
+                "DailyOverheatedRsiThreshold": 68.0,
+                "H4OverheatedRsiThreshold": 74.0,
+                "MinAtrRatioForDeepEntry": 4.0,
+                "NearHighDistanceTo20dHighThreshold": -8.0,
+                "MaxDiscountPct": 0.10
+            },
             "H4BollingerEntry": {
                 "Enabled": true,
                 "FlatMidSlopeThresholdPct": 1.0,

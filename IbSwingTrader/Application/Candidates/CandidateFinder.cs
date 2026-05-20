@@ -1631,6 +1631,32 @@ namespace IbSwingTrader.Application.Candidates
 
             entryDiscountOverridePct = triangleEntryDiscountOverridePct;
 
+            var seriesEntryProfile = ResolveSeriesEntryProfileDiscountOverridePct(
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                bbState,
+                tradeSettings.SeriesEntryProfile,
+                entryDiscountOverridePct);
+
+            if (seriesEntryProfile.EntryDiscountPct != entryDiscountOverridePct)
+            {
+                _logger.Info(
+                    $"Trade plan series entry profile applied for {ctx.Stock.Ticker}. " +
+                    $"Profile={seriesEntryProfile.Profile}, " +
+                    $"EntryDiscountPct={_fmt.Percent(seriesEntryProfile.EntryDiscountPct ?? 0m)}, " +
+                    $"DailyMidSlope={_fmt.Percent(seriesEntryProfile.DailyMidSlope / 100m)}, " +
+                    $"DailyRsiSlope={seriesEntryProfile.DailyRsiSlope:0.##}, " +
+                    $"H4MidSlope={_fmt.Percent(seriesEntryProfile.H4MidSlope / 100m)}, " +
+                    $"H4RsiSlope={seriesEntryProfile.H4RsiSlope:0.##}, " +
+                    $"H4MacdSlope={seriesEntryProfile.H4MacdSlope:0.####}, " +
+                    $"ATRRatio={diagnostics.ATRRatio:0.##}, " +
+                    $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                    $"H4={bbState.H4.Regime}/{bbState.H4.Direction}");
+            }
+
+            entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
+
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
                 entryCandles,
@@ -3118,6 +3144,110 @@ namespace IbSwingTrader.Application.Candidates
             return adjusted;
         }
 
+        private static SeriesEntryProfileDecision ResolveSeriesEntryProfileDiscountOverridePct(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState,
+            SeriesEntryProfileSettings settings,
+            decimal? currentEntryDiscountPct)
+        {
+            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var dailyRsiSlope = CalculateSlope(recentSeries.DailyRsiSeries);
+            var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
+            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+
+            if (!settings.Enabled)
+            {
+                return new SeriesEntryProfileDecision(
+                    currentEntryDiscountPct,
+                    "Disabled",
+                    dailyMidSlope,
+                    dailyRsiSlope,
+                    dailyMacdSlope,
+                    h4MidSlope,
+                    h4RsiSlope,
+                    h4MacdSlope);
+            }
+
+            var dailyStrong =
+                dailyMidSlope >= settings.DailyStrongSlopeThreshold ||
+                dailyRsiSlope >= settings.DailyRsiSlopeThreshold ||
+                snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold;
+
+            var h4Weakening =
+                h4MidSlope <= settings.H4WeakSlopeThreshold ||
+                h4RsiSlope < 0m ||
+                h4MacdSlope <= settings.H4MacdWeakDeltaThreshold ||
+                bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse);
+
+            var constructiveH4 =
+                h4MidSlope > 0m &&
+                h4RsiSlope > 0m &&
+                h4MacdSlope > 0m &&
+                bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or
+                                     nameof(BollingerFigureRegime.Reacceleration);
+
+            var overheated =
+                snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold ||
+                GetLatestValue(recentSeries.H4RsiSeries) >= settings.H4OverheatedRsiThreshold;
+
+            var nearHigh = snapshot.Current.DistanceTo20dHigh >= settings.NearHighDistanceTo20dHighThreshold;
+            var highAtr = diagnostics.ATRRatio >= settings.MinAtrRatioForDeepEntry;
+            var targetDiscountPct = currentEntryDiscountPct;
+            var profile = "None";
+
+            if (dailyStrong && h4Weakening && highAtr)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.LossLikeAdverseMoveDiscountPct, settings.MaxDiscountPct));
+                profile = "WaitPullback";
+            }
+            else if (dailyStrong && h4Weakening)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.WaitPullbackDiscountPct, settings.MaxDiscountPct));
+                profile = "WaitPullback";
+            }
+            else if (overheated && nearHigh)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.AvoidEarlySpikeDiscountPct, settings.MaxDiscountPct));
+                profile = "AvoidEarlySpike";
+            }
+            else if (h4Weakening)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.ConfirmFirstDiscountPct, settings.MaxDiscountPct));
+                profile = "ConfirmFirst";
+            }
+            else if (dailyStrong && constructiveH4)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.FastContinuationMaxDiscountPct, settings.MaxDiscountPct));
+                profile = "FastContinuation";
+            }
+
+            return new SeriesEntryProfileDecision(
+                targetDiscountPct,
+                profile,
+                dailyMidSlope,
+                dailyRsiSlope,
+                dailyMacdSlope,
+                h4MidSlope,
+                h4RsiSlope,
+                h4MacdSlope);
+        }
+
         private static decimal? ResolveH4BbFigureEntryDiscountPct(
             decimal? currentEntryDiscountPct,
             BollingerStateSet bbState,
@@ -3263,6 +3393,13 @@ namespace IbSwingTrader.Application.Candidates
             return series.Count == 0
                 ? 0m
                 : series[^1] / 100m;
+        }
+
+        private static decimal GetLatestValue(List<decimal> series)
+        {
+            return series.Count == 0
+                ? 0m
+                : series[^1];
         }
 
         private static decimal CalculateRelativeMovePct(decimal from, decimal to)
@@ -4129,6 +4266,16 @@ namespace IbSwingTrader.Application.Candidates
             public decimal WidthSlope { get; init; }
             public decimal UpperDistanceSlope { get; init; }
         }
+
+        private sealed record SeriesEntryProfileDecision(
+            decimal? EntryDiscountPct,
+            string Profile,
+            decimal DailyMidSlope,
+            decimal DailyRsiSlope,
+            decimal DailyMacdSlope,
+            decimal H4MidSlope,
+            decimal H4RsiSlope,
+            decimal H4MacdSlope);
 
         private sealed class WishListContext
         {
