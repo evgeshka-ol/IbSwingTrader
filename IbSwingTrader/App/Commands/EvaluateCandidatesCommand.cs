@@ -43,18 +43,56 @@ namespace IbSwingTrader.App.Commands
             var existingDatasetRows = await _evaluationDatasetBuilder.ReadCurrentAsync();
 
             var marketToday = MarketTime.Now().Date;
-            var evaluationScanDate = marketToday.AddDays(-1);
-            var latestScanCandidates = candidates
-                .Where(x => x.Scan.ScanTime.Date == evaluationScanDate)
+            var availableNow = MarketTime.Now().AddMinutes(-Math.Max(0, evaluationSettings.FreshDataSafetyLagMinutes));
+            var evaluableScanDates = candidates
+                .Where(x => x.Scan.ScanTime < availableNow)
+                .Select(x => x.Scan.ScanTime.Date)
+                .Distinct()
+                .OrderByDescending(x => x)
                 .ToList();
-            var currentDayCandidates = candidates.Count(x => x.Scan.ScanTime.Date >= marketToday);
-            var olderCandidates = candidates.Count - latestScanCandidates.Count - currentDayCandidates;
+            var latestEvaluatedScanDate = existingDatasetRows.Count == 0
+                ? DateTime.MinValue
+                : existingDatasetRows.Max(x => x.ScanTime.Date);
+            var recentScanDateCount = Math.Max(1, evaluationSettings.ForwardEvaluationDays + 1);
+            var recentScanDates = evaluableScanDates
+                .Take(recentScanDateCount)
+                .ToHashSet();
+            var selectedScanDates = evaluableScanDates
+                .Where(x => recentScanDates.Contains(x) || x > latestEvaluatedScanDate)
+                .OrderBy(x => x)
+                .ToList();
+
+            if (selectedScanDates.Count == 0)
+            {
+                _logger.Info(
+                    $"Nothing to evaluate. Current market date={marketToday:yyyy-MM-dd}, " +
+                    $"availableUntil={availableNow:yyyy-MM-dd HH:mm:ss}, " +
+                    $"latestEvaluatedScanDate={FormatDate(latestEvaluatedScanDate)}, " +
+                    $"candidates={candidates.Count}");
+                return;
+            }
+
+            var selectedScanDateSet = selectedScanDates.ToHashSet();
+            var selectedScanCandidates = candidates
+                .Where(x => selectedScanDateSet.Contains(x.Scan.ScanTime.Date))
+                .ToList();
+            var newestSelectedScanDate = selectedScanDates.Max();
+            var oldestSelectedScanDate = selectedScanDates.Min();
+            var newerCandidates = candidates.Count(x => x.Scan.ScanTime.Date > newestSelectedScanDate);
+            var olderCandidates = candidates.Count(x => x.Scan.ScanTime.Date < oldestSelectedScanDate);
+            var betweenSkippedCandidates = candidates.Count -
+                                           selectedScanCandidates.Count -
+                                           newerCandidates -
+                                           olderCandidates;
 
             _logger.Info(
-                $"Evaluating previous scan date only: {evaluationScanDate:yyyy-MM-dd}. " +
-                $"Previous-day candidates={latestScanCandidates.Count}, " +
+                $"Evaluating available scan dates: {string.Join(", ", selectedScanDates.Select(x => x.ToString("yyyy-MM-dd")))}. " +
+                $"Selected candidates={selectedScanCandidates.Count}, " +
                 $"skipped older candidates={olderCandidates}, " +
-                $"skipped current-day candidates={currentDayCandidates}");
+                $"skipped between candidates={betweenSkippedCandidates}, " +
+                $"skipped newer candidates={newerCandidates}, " +
+                $"latestEvaluatedScanDate={FormatDate(latestEvaluatedScanDate)}, " +
+                $"availableUntil={availableNow:yyyy-MM-dd HH:mm:ss}");
 
             var canonicalByScanKey = existingDatasetRows
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
@@ -65,13 +103,13 @@ namespace IbSwingTrader.App.Commands
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var candidatesToEvaluate = latestScanCandidates
+            var candidatesToEvaluate = selectedScanCandidates
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
 
             if (evaluationSettings.ReevaluateAllCandidatesWithSeries)
             {
-                var candidatesWithSeries = latestScanCandidates
+                var candidatesWithSeries = selectedScanCandidates
                     .Where(HasRecentSeries)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x.First())
@@ -81,18 +119,19 @@ namespace IbSwingTrader.App.Commands
                     .ToDictionary(BuildScanKey, x => x, StringComparer.OrdinalIgnoreCase);
 
                 _logger.Info(
-                    $"Previous-day reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
-                    $"ignoredWithoutSeries={latestScanCandidates.Count - candidatesToEvaluate.Count}, " +
-                    $"skippedOlderSeriesCandidates={candidates.Count - latestScanCandidates.Count}");
+                    $"Selected-date reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
+                    $"ignoredWithoutSeries={selectedScanCandidates.Count - candidatesToEvaluate.Count}, " +
+                    $"skippedOtherSeriesCandidates={candidates.Count - selectedScanCandidates.Count}");
             }
 
             if (evaluationSettings.ReevaluateOpenCandidates)
             {
+                var oldestSelectedDate = selectedScanDates.Min();
                 var openCandidates = existingDatasetRows
                     .Where(x =>
                         string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
                         !x.IsStaleOpen &&
-                        x.ScanTime.Date < evaluationScanDate)
+                        x.ScanTime.Date < oldestSelectedDate)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x
                         .OrderByDescending(y => y.EvaluatedAt)
@@ -114,7 +153,8 @@ namespace IbSwingTrader.App.Commands
             {
                 _logger.Info(
                     $"Nothing to evaluate. Current market date={marketToday:yyyy-MM-dd}, " +
-                    $"expected scan date={evaluationScanDate:yyyy-MM-dd}, candidates={candidates.Count}");
+                    $"selected scan dates={string.Join(", ", selectedScanDates.Select(x => x.ToString("yyyy-MM-dd")))}, " +
+                    $"candidates={candidates.Count}");
                 return;
             }
 
@@ -152,6 +192,13 @@ namespace IbSwingTrader.App.Commands
                 throw new InvalidOperationException("Failed to connect to TWS.");
 
             _logger.Info("TWS connected.");
+        }
+
+        private static string FormatDate(DateTime value)
+        {
+            return value == DateTime.MinValue
+                ? "none"
+                : value.ToString("yyyy-MM-dd");
         }
 
         private void LogCandidateSummary(

@@ -64,7 +64,8 @@ namespace IbSwingTrader.Application.Evaluation
             _logger.Info($"Evaluation step: contract resolved for {candidate.Ticker}");
 
             var start = candidate.Scan.ScanTime;
-            var requestedEnd = candidate.Scan.ScanTime.Add(maxEvaluationWindow);
+            var effectiveWindowStart = ResolveEffectiveEvaluationWindowStart(candidate.Scan.ScanTime);
+            var requestedEnd = effectiveWindowStart.Add(maxEvaluationWindow);
             var availableNow = MarketTime.Now() - freshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
 
@@ -76,6 +77,15 @@ namespace IbSwingTrader.Application.Evaluation
                 result.Outcome = "InsufficientFutureData";
                 _logger.Info($"Evaluation step: insufficient future data for {candidate.Ticker}");
                 return result;
+            }
+
+            if (effectiveWindowStart.Date != candidate.Scan.ScanTime.Date)
+            {
+                _logger.Info(
+                    $"Evaluation step: non-trading scan window adjusted for {candidate.Ticker}. " +
+                    $"ScanTime={candidate.Scan.ScanTime:yyyy-MM-dd HH:mm:ss}, " +
+                    $"EffectiveWindowStart={effectiveWindowStart:yyyy-MM-dd HH:mm:ss}, " +
+                    $"End={end:yyyy-MM-dd HH:mm:ss}");
             }
 
             _logger.Info(
@@ -286,6 +296,18 @@ namespace IbSwingTrader.Application.Evaluation
             result.Outcome = "Open";
             _logger.Info($"Evaluation step: position still open for {candidate.Ticker}");
             return result;
+        }
+
+        private static DateTime ResolveEffectiveEvaluationWindowStart(DateTime scanTime)
+        {
+            var date = scanTime.Date;
+
+            while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                date = date.AddDays(1);
+
+            return date == scanTime.Date
+                ? scanTime
+                : date;
         }
 
         private static CandidateEvaluationResult CreateBaseResult(CandidateDetails candidate)
