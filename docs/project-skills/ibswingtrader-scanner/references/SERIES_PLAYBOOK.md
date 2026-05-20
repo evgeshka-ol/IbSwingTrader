@@ -72,6 +72,10 @@ Typical signs:
 
 This is a valid setup, but execution may require deeper entry.
 
+For `TradePlan`, min-first is not just a label. It means entry should be
+predicted from the expected local pullback path. A strong-amplitude loss often
+means the entry was too early and the stop was hit before the real move.
+
 ### Triangle Growth
 
 Typical signs on H4:
@@ -94,3 +98,12 @@ The question is:
 
 - does the scanner see the same structural regime early enough
 - and if yes, does it rank it high enough
+
+When tuning `TradePlan`, use the same series to predict:
+
+- pullback depth before continuation
+- whether to wait for H4/Daily turn confirmation
+- entry timing relative to `MinFirst` / `MaxFirst`
+- exit placement for the setup family
+
+Flat discounts from current price are not enough for this project direction.
