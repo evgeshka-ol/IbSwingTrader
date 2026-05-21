@@ -4,6 +4,8 @@ namespace IbSwingTrader.Domain.Candidates
     {
         public required ScanInfo Scan { get; set; }
 
+        public required TradePlanInfo TradePlan { get; set; }
+
         public string CandidateSource { get; set; } = "Primary";
 
         public List<decimal> RecentDailyMaSeries { get; set; } = [];
@@ -60,8 +62,6 @@ namespace IbSwingTrader.Domain.Candidates
         public required ScoreInfo Score { get; set; }
 
         public required MarketContextInfo Context { get; set; }
-
-        public required TradePlanInfo TradePlan { get; set; }
 
         public CandidateDiagnostics? Diagnostics { get; set; }
     }
