@@ -3186,6 +3186,10 @@ namespace IbSwingTrader.Application.Candidates
             var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
             var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
             var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+            var dailyMidLast = GetLatestValue(recentSeries.DailyBbMidDistanceSeries);
+            var h4MidLast = GetLatestValue(recentSeries.H4BbMidDistanceSeries);
+            var dailyMacdLast = GetLatestValue(recentSeries.DailyMacdSeries);
+            var h4MacdLast = GetLatestValue(recentSeries.H4MacdSeries);
 
             if (!settings.Enabled)
             {
@@ -3220,6 +3224,22 @@ namespace IbSwingTrader.Application.Candidates
                 bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or
                                      nameof(BollingerFigureRegime.Reacceleration);
 
+            var cleanContinuation =
+                dailyStrong &&
+                !h4Weakening &&
+                dailyMidLast > 5m &&
+                h4MidLast > 0m &&
+                h4MidSlope >= settings.H4ContinuationMidSlopeThreshold &&
+                h4RsiSlope >= settings.H4ContinuationRsiSlopeThreshold &&
+                h4MacdSlope >= settings.H4ContinuationMacdSlopeThreshold &&
+                dailyMacdLast >= 0m &&
+                h4MacdLast >= 0m &&
+                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.Daily.Regime is nameof(BollingerFigureRegime.Runaway) or
+                                      nameof(BollingerFigureRegime.Pullback) or
+                                      nameof(BollingerFigureRegime.Collapse) or
+                                      nameof(BollingerFigureRegime.Reacceleration);
+
             var overheated =
                 snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold ||
                 GetLatestValue(recentSeries.H4RsiSeries) >= settings.H4OverheatedRsiThreshold;
@@ -3229,7 +3249,12 @@ namespace IbSwingTrader.Application.Candidates
             var targetDiscountPct = currentEntryDiscountPct;
             var profile = "None";
 
-            if (dailyStrong && h4Weakening && highAtr)
+            if (cleanContinuation)
+            {
+                targetDiscountPct = CapDiscount(currentEntryDiscountPct, settings.FastContinuationMaxDiscountPct);
+                profile = "FastContinuation";
+            }
+            else if (dailyStrong && h4Weakening && highAtr)
             {
                 targetDiscountPct = MaxDiscount(
                     currentEntryDiscountPct,
@@ -3259,7 +3284,7 @@ namespace IbSwingTrader.Application.Candidates
             }
             else if (dailyStrong && constructiveH4)
             {
-                targetDiscountPct = MaxDiscount(
+                targetDiscountPct = CapDiscount(
                     currentEntryDiscountPct,
                     Math.Min(settings.FastContinuationMaxDiscountPct, settings.MaxDiscountPct));
                 profile = "FastContinuation";
@@ -3413,6 +3438,13 @@ namespace IbSwingTrader.Application.Candidates
         {
             return currentValue == null || candidateValue > currentValue.Value
                 ? candidateValue
+                : currentValue;
+        }
+
+        private static decimal? CapDiscount(decimal? currentValue, decimal maxValue)
+        {
+            return currentValue == null || currentValue.Value > maxValue
+                ? maxValue
                 : currentValue;
         }
 

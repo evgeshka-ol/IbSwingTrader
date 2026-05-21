@@ -150,6 +150,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal FastContinuationMaxDiscountPct { get; set; } = 0.025m;
         public decimal DailyStrongSlopeThreshold { get; set; } = 10.0m;
         public decimal DailyRsiSlopeThreshold { get; set; } = 8.0m;
+        public decimal H4ContinuationMidSlopeThreshold { get; set; } = 8.0m;
+        public decimal H4ContinuationRsiSlopeThreshold { get; set; } = 12.0m;
+        public decimal H4ContinuationMacdSlopeThreshold { get; set; } = 0.12m;
         public decimal H4WeakSlopeThreshold { get; set; } = -1.0m;
         public decimal H4MacdWeakDeltaThreshold { get; set; } = -0.10m;
         public decimal DailyOverheatedRsiThreshold { get; set; } = 68.0m;
