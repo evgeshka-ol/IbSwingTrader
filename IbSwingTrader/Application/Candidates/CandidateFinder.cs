@@ -3550,15 +3550,38 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
 
             var rank = stock.Rank > 0 ? stock.Rank : int.MaxValue;
-            if (rank > 10)
-                return false;
-
             if (snapshot.Current.DistanceTo20dHigh > -0.25m)
                 return false;
 
-            return diagnostics.ATRRatio >= 4m ||
-                   snapshot.Current.DailyRSI14 >= 60m ||
-                   entryScore >= 20m;
+            var aboveAllMeanContinuation =
+                rank <= 50 &&
+                (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) > 0m &&
+                snapshot.Current.DailyMaSignedDistancePct > 0m &&
+                snapshot.Current.H4MaSignedDistancePct > 0m &&
+                (snapshot.DailyMaDelta3 > 0m ||
+                 snapshot.H4MaDelta3 > 0m ||
+                 entryScore >= 20m) &&
+                (diagnostics.ATRRatio >= 2.5m ||
+                 snapshot.Current.DailyRSI14 >= 50m ||
+                 entryScore >= 20m);
+
+            var strongTopRankMover =
+                rank <= 10 &&
+                (diagnostics.ATRRatio >= 4m ||
+                 snapshot.Current.DailyRSI14 >= 60m ||
+                 entryScore >= 20m);
+
+            var constructiveLiveRecovery =
+                rank <= 50 &&
+                snapshot.Current.DailyMaSignedDistancePct > 0m &&
+                snapshot.DailyMaDelta3 > 0m &&
+                snapshot.H4MaDelta3 > 0m &&
+                snapshot.DailyRsiDelta3 > -2m &&
+                (diagnostics.ATRRatio >= 3.5m ||
+                 snapshot.Current.DailyRSI14 >= 55m ||
+                 entryScore >= 20m);
+
+            return aboveAllMeanContinuation || strongTopRankMover || constructiveLiveRecovery;
         }
 
         private static bool IsLiveMoverPreset(string presetScanCode)
