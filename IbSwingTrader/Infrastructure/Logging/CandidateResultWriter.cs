@@ -91,10 +91,10 @@ namespace IbSwingTrader.Infrastructure.Logging
             var map = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in existing)
-                UpsertCandidate(map, item, preferIncomingOnSameScan: true);
+                UpsertCandidate(map, item, preferIncomingOnSameScan: false);
 
             foreach (var item in incoming)
-                UpsertCandidate(map, item, preferIncomingOnSameScan: false);
+                UpsertCandidate(map, item, preferIncomingOnSameScan: true);
 
             return map.Values
                 .OrderByDescending(x => x.Scan.ScanTime)
@@ -116,7 +116,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             var keepIncoming =
-                candidate.Scan.ScanTime < existing.Scan.ScanTime ||
+                candidate.Scan.ScanTime > existing.Scan.ScanTime ||
                 (candidate.Scan.ScanTime == existing.Scan.ScanTime &&
                  preferIncomingOnSameScan &&
                  candidate.Score.Score >= existing.Score.Score);
@@ -129,7 +129,7 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{candidate.Ticker}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
+                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
         }
 
         private static string BuildCandidateScanKey(CandidateDetails candidate)
@@ -230,7 +230,10 @@ namespace IbSwingTrader.Infrastructure.Logging
             IEnumerable<CandidateDetails> sameDayCandidates)
         {
             var orderedCandidates = OrderPrimaryForDisplay(candidates);
-            var orderedSameDayCandidates = OrderSameDayForDisplay(sameDayCandidates);
+            var premarketSummarySettings = _getCandidatesSettingsProvider.Get().PremarketSummary;
+            var orderedSameDayCandidates = OrderSameDayForDisplay(sameDayCandidates)
+                .Take(premarketSummarySettings.MaxItems)
+                .ToList();
             return new CandidateSummarySections
             {
                 ReversalCandidates = orderedCandidates

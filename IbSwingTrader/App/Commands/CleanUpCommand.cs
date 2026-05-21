@@ -227,6 +227,8 @@ namespace IbSwingTrader.App.Commands
             if (candidates.Count == 0 && sameDayCandidates.Count == 0)
                 return new CandidateSummarySections();
 
+            var premarketSummarySettings = _getCandidatesSettingsProvider.Get().PremarketSummary;
+
             return new CandidateSummarySections
             {
                 ReversalCandidates = candidates
@@ -244,6 +246,7 @@ namespace IbSwingTrader.App.Commands
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
                     .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Take(premarketSummarySettings.MaxItems)
                     .Select(x => new CandidateSummaryItem
                     {
                         Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: true)

@@ -339,7 +339,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
-                        $"Daily distance is above mid and TodayResearchLike conditions were not confirmed.");
+                        $"Reversal context was not confirmed and TodayResearchLike conditions were not confirmed.");
                     continue;
                 }
 
@@ -403,7 +403,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     _logger.Info(
                         $"Skipping same-day classification for {ctx.Stock.Ticker}. " +
-                        $"Daily distance is above mid but TodayResearchLike conditions were not confirmed.");
+                        $"Reversal context was not confirmed and TodayResearchLike conditions were not confirmed.");
                 }
             }
 
@@ -501,7 +501,6 @@ namespace IbSwingTrader.Application.Candidates
                 .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)
-                .Take(getCandidatesSettings.PremarketSummary.MaxItems)
                 .ToList();
 
             var finalWishList = mergedWishList
@@ -843,6 +842,11 @@ namespace IbSwingTrader.Application.Candidates
                 !ShouldBypassWeeklyBbVetoForLiveMover(
                     ctx.Stock,
                     ctx.Preset.ScanCode,
+                    ctx.Snapshot,
+                    diagnostics,
+                    entryScore) &&
+                !ShouldBypassAgedWeeklyBbVeto(
+                    mergedWishItem,
                     ctx.Snapshot,
                     diagnostics,
                     entryScore))
@@ -1305,7 +1309,8 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
         {
-            return snapshot.Current.DailyMaSignedDistancePct < 0m;
+            return snapshot.Current.DailyMaSignedDistancePct < 0m &&
+                   (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) < 0m;
         }
 
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
@@ -1375,14 +1380,33 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
+            var diagnostics = BuildDiagnostics(snapshot, candles);
+            var entryScore = _candidateScore.Calculate(snapshot);
             var weeklyBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles)).Weekly;
 
-            if (ShouldRejectByWeeklyBbForWishlist(weeklyBbState))
+            var weeklyBbRejected = ShouldRejectByWeeklyBbForWishlist(weeklyBbState);
+            var weeklyBbBypassed = weeklyBbRejected &&
+                ShouldBypassAgedWeeklyBbVeto(item, snapshot, diagnostics, entryScore);
+
+            if (weeklyBbRejected && !weeklyBbBypassed)
             {
                 _logger.Info(
                     $"Skipping {item.Ticker}: weekly BB veto on aged wish list item. " +
                     $"Weekly={weeklyBbState.Regime}/{weeklyBbState.Direction}");
                 return null;
+            }
+
+            if (weeklyBbBypassed)
+            {
+                _logger.Info(
+                    $"Aged wish list weekly BB veto bypassed: {item.Ticker}. " +
+                    $"Preset={item.Scan.PresetScanCode}, " +
+                    $"Weekly={weeklyBbState.Regime}/{weeklyBbState.Direction}, " +
+                    $"DailyDistance={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}%, " +
+                    $"DistanceTo20dHigh={_fmt.Generic(snapshot.Current.DistanceTo20dHigh)}%, " +
+                    $"ATRRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
+                    $"DailyRsi14={_fmt.Generic(snapshot.Current.DailyRSI14)}, " +
+                    $"EntryScore={_fmt.Generic(entryScore)}");
             }
 
             _logger.Info(
@@ -3001,6 +3025,37 @@ namespace IbSwingTrader.Application.Candidates
             return weekly.Direction == nameof(BollingerFigureDirection.Down) &&
                    (weekly.Regime is nameof(BollingerFigureRegime.Collapse) or
                     nameof(BollingerFigureRegime.Runaway));
+        }
+
+        private bool ShouldBypassAgedWeeklyBbVeto(
+            WishListItem item,
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore)
+        {
+            if (!IsLiveMoverPreset(item.Scan.PresetScanCode))
+                return false;
+
+            if (snapshot.Current.DistanceTo20dHigh > -0.25m)
+                return false;
+
+            if (ShouldBypassWishListFilterForLiveScan(snapshot, diagnostics, entryScore))
+                return true;
+
+            var recoveredSeries =
+                snapshot.Current.DailyMaSignedDistancePct > -35m &&
+                snapshot.Current.DailyRSI14 >= 35m &&
+                snapshot.DailyRsiDelta3 >= -5m &&
+                snapshot.H4MaDelta3 >= -14m &&
+                diagnostics.ATRRatio >= 3m;
+
+            var strongEnough =
+                diagnostics.ATRRatio >= 4m ||
+                snapshot.Current.DailyRSI14 >= 60m ||
+                entryScore >= 20m ||
+                item.Score.Score >= 20m;
+
+            return recoveredSeries && strongEnough;
         }
 
         private static bool ShouldAllowWeeklyBbWishlistBypass(BollingerStateOutput weekly)
