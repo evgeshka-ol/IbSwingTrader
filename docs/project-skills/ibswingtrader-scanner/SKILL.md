@@ -36,6 +36,11 @@ The scanner's job is to find future fat moves early.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
+Hard classification rule:
+
+- Anything above its mean context can only be considered for `TodayResearchLikeCandidates`.
+- `ReversalCandidates` must be below mean on both the daily and weekly contexts.
+
 Both families should produce meaningful future amplitude:
 
 - `TodayResearchLikeCandidates` should be the strongest next-day research proxy.

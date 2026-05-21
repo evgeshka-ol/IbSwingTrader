@@ -20,7 +20,17 @@ scanner recall, promotion, and ranking before tuning entries/exits.
 
 ### ReversalCandidates
 
-Use reversal logic when the ticker is below the relevant daily mean context.
+Use reversal logic only when the ticker is below the relevant daily and weekly
+mean context.
+
+Hard rule:
+
+- If the ticker is above mean on any relevant mean context, it is not a
+  `ReversalCandidates` candidate.
+- A `ReversalCandidates` candidate must be below mean on both daily and weekly
+  context.
+- Above-mean tickers may only be considered through `TodayResearchLikeCandidates`
+  continuation/promotion logic.
 
 Typical traits:
 
