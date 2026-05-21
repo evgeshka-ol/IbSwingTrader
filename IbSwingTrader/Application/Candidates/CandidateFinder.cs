@@ -865,10 +865,15 @@ namespace IbSwingTrader.Application.Candidates
                 ctx,
                 diagnostics,
                 recentSeries);
+            var mixedMeanLiveWinner = IsMixedMeanLiveWinnerCandidate(
+                ctx,
+                diagnostics,
+                entryScore);
 
             if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
                 !preLaunchResearchLike &&
-                !shortHistoryLiveMover)
+                !shortHistoryLiveMover &&
+                !mixedMeanLiveWinner)
             {
                 return false;
             }
@@ -1024,6 +1029,21 @@ namespace IbSwingTrader.Application.Candidates
                 return true;
             }
 
+            if (mixedMeanLiveWinner)
+            {
+                _logger.Info(
+                    $"TodayResearchLike mixed-mean live-winner promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"Rank={ctx.Stock.Rank}, " +
+                    $"WeeklyDistance={_fmt.Generic(weeklyDistance)}%, " +
+                    $"DailyDistance={_fmt.Generic(dailyDistance)}%, " +
+                    $"H4Distance={_fmt.Generic(h4Distance)}%, " +
+                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
+                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
+                    $"EntryScore={_fmt.Generic(entryScore)}");
+                return true;
+            }
+
             if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion || earlyRunawayCoolingPromotion)
                 return true;
 
@@ -1106,6 +1126,32 @@ namespace IbSwingTrader.Application.Candidates
                    dailyTryingToTurn &&
                    h4NotBreakingDown &&
                    (weeklyRunawayUp || weeklyDistance > -30m || diagnostics.ATRRatio >= 2.5m);
+        }
+
+        private static bool IsMixedMeanLiveWinnerCandidate(
+            WishListContext ctx,
+            CandidateDiagnostics diagnostics,
+            decimal entryScore)
+        {
+            if (!IsLiveMoverPreset(ctx.Preset.ScanCode))
+                return false;
+
+            var rank = ctx.Stock.Rank > 0 ? ctx.Stock.Rank : int.MaxValue;
+            if (rank > 10)
+                return false;
+
+            var current = ctx.Snapshot.Current;
+            var weeklyDistance = current.WeeklyMaSignedDistancePct ?? 0m;
+
+            return weeklyDistance > 0m &&
+                   current.DailyMaSignedDistancePct >= -8m &&
+                   current.H4MaSignedDistancePct >= -12m &&
+                   (ctx.Snapshot.DailyMaDelta3 > 0m ||
+                    ctx.Snapshot.H4MaDelta3 > 0m ||
+                    entryScore >= 20m) &&
+                   (diagnostics.ATRRatio >= 3m ||
+                    current.DailyRSI14 >= 50m ||
+                    entryScore >= 20m);
         }
 
         private static bool IsShortHistoryLiveMoverCandidate(
@@ -2725,7 +2771,42 @@ namespace IbSwingTrader.Application.Candidates
                 seriesPenaltyScore * settings.SecondPassSeriesPenaltyWeight -
                 latePenaltyScore * settings.SecondPassLatePenaltyWeight -
                 overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight +
-                bbAdjustment;
+                bbAdjustment +
+                CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics);
+        }
+
+        private static decimal CalculateLiveWinnerContinuationAdjustment(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics)
+        {
+            if (candidate.Scan.PresetScanCode is not ("TOP_PERC_GAIN" or "TOP_OPEN_PERC_GAIN"))
+                return 0m;
+
+            if (candidate.Context.WeeklyMaSignedDistancePct <= 0m ||
+                candidate.Context.DailyMaSignedDistancePct <= 0m)
+            {
+                return 0m;
+            }
+
+            if (candidate.TradePlan.ProfitPercent < 3m)
+                return 0m;
+
+            if (diagnostics.ATRRatio < 4m ||
+                candidate.Context.DailyRSI14 < 55m ||
+                diagnostics.VolumeRatio20 < 0.05m)
+            {
+                return 0m;
+            }
+
+            var score = 0.90m;
+
+            if (candidate.Context.H4MaSignedDistancePct > 0m)
+                score += 0.20m;
+
+            if (candidate.TradePlan.ProfitPercent >= 4m)
+                score += 0.15m;
+
+            return score;
         }
 
         private decimal CalculatePatternSeriesAdjustment(
