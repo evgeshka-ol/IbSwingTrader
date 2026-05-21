@@ -21,6 +21,7 @@ The scanner's job is to find future fat moves early.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.
 - Priority #1: names in today's summary `TodayResearchLikeCandidates` should be in tomorrow's `research_top_gainers.csv`.
+- Series shape is a primary scanner signal: compare candidate rows literally against winner rows from `research_top_gainers.csv` and high-amplitude rows from `evaluation-dataset.csv`.
 
 ## Pipeline
 
@@ -46,6 +47,19 @@ Both families should produce meaningful future amplitude:
 - `TodayResearchLikeCandidates` should be the strongest next-day research proxy.
 - `ReversalCandidates` should still usually produce `AmplitudePct > 10%`.
 - If `ReversalCandidates` amplitude is below 10%, treat that as scanner failure, not a trade-plan issue.
+
+## Series-template direction
+
+When improving scanner recall, promotion, or ranking, prefer a literal series
+similarity signal before adding more derived heuristics.
+
+- Compare rows point-by-point with small tolerance, not only by computed slopes.
+- Normalize comparable series from their first point so shape matters more than absolute level.
+- Use `research_top_gainers.csv` as the main `TodayResearchLikeCandidates` template source.
+- Use high-amplitude `evaluation-dataset.csv` rows as an additional template source.
+- For `ReversalCandidates`, use only high-amplitude reversal rows from the evaluation dataset.
+- A candidate close to historical winner templates should get promotion/ranking support.
+- A candidate close to low-amplitude or failed templates can later be penalized, but do not add that before the positive winner-template signal is stable.
 
 ## Main code
 

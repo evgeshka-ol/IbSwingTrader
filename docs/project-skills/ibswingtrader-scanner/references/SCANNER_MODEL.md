@@ -110,3 +110,25 @@ The current direction is:
 3. keep `ReversalCandidates` separate
 4. require `ReversalCandidates` to produce meaningful amplitude too
 5. only then tune `TradePlan`
+
+## Series-template matching
+
+The scanner should move toward literal row-shape matching.
+
+For `TodayResearchLikeCandidates`:
+
+- compare the current candidate series against rows in `research_top_gainers.csv`
+- also compare against high-amplitude rows in `evaluation-dataset.csv`
+- treat close matches to research winners as promotion/ranking evidence
+
+For `ReversalCandidates`:
+
+- compare only against high-amplitude reversal rows from `evaluation-dataset.csv`
+- do not let above-mean continuation templates promote reversal candidates
+
+Comparison principle:
+
+- compare each series point-by-point with modest tolerance
+- normalize each compared series from its first point
+- use Daily, Weekly, and H4 contexts together
+- avoid replacing this with only slope/aggregate statistics

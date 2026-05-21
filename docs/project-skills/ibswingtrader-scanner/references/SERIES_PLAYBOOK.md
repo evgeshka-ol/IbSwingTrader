@@ -93,11 +93,24 @@ When comparing scanner output to research winners:
 - first compare `Weekly`
 - then `Daily`
 - then `H4`
+- compare the actual row values point-by-point after normalizing each series from its first point
+- prefer close literal similarity to winner rows over broad slope-only matches
 
 The question is:
 
 - does the scanner see the same structural regime early enough
 - and if yes, does it rank it high enough
+
+## Template sources
+
+Use two positive template families:
+
+- `research_top_gainers.csv`: primary templates for `TodayResearchLikeCandidates`
+- `evaluation-dataset.csv`: high-amplitude templates for both `TodayResearchLikeCandidates` and `ReversalCandidates`
+
+For `ReversalCandidates`, keep templates below-mean and high-amplitude. The goal is
+not just being a pullback, but being a pullback shape that historically produced
+`AmplitudePct > 10%`.
 
 When tuning `TradePlan`, use the same series to predict:
 
