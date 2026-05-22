@@ -148,6 +148,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ConfirmFirstDiscountPct { get; set; } = 0.06m;
         public decimal AvoidEarlySpikeDiscountPct { get; set; } = 0.07m;
         public decimal FastContinuationMaxDiscountPct { get; set; } = 0.025m;
+        public decimal ShallowContinuationMaxDiscountPct { get; set; } = 0.015m;
+        public decimal ModeratePullbackMaxDiscountPct { get; set; } = 0.035m;
+        public decimal DeepPullbackDiscountPct { get; set; } = 0.07m;
+        public decimal LateSpikeAvoidDiscountPct { get; set; } = 0.09m;
         public decimal DailyStrongSlopeThreshold { get; set; } = 10.0m;
         public decimal DailyRsiSlopeThreshold { get; set; } = 8.0m;
         public decimal H4ContinuationMidSlopeThreshold { get; set; } = 8.0m;
@@ -159,6 +163,15 @@ namespace IbSwingTrader.Domain.Settings
         public decimal H4OverheatedRsiThreshold { get; set; } = 74.0m;
         public decimal MinAtrRatioForDeepEntry { get; set; } = 4.0m;
         public decimal NearHighDistanceTo20dHighThreshold { get; set; } = -8.0m;
+        public decimal FastContinuationMinDailyMaDistancePct { get; set; } = 0.0m;
+        public decimal FastContinuationMinH4MaDistancePct { get; set; } = -3.0m;
+        public decimal ModeratePullbackMinDailyMaDistancePct { get; set; } = -8.0m;
+        public decimal ModeratePullbackMinH4MaDistancePct { get; set; } = -8.0m;
+        public decimal DeepPullbackMaxMaDistancePct { get; set; } = -8.0m;
+        public decimal LateSpikeDailyRsiThreshold { get; set; } = 78.0m;
+        public decimal LateSpikeH4RsiThreshold { get; set; } = 74.0m;
+        public decimal LateSpikeDailyMaSlopeThreshold { get; set; } = 25.0m;
+        public decimal LateSpikeH4MaSlopeThreshold { get; set; } = 15.0m;
         public decimal MaxDiscountPct { get; set; } = 0.10m;
     }
 

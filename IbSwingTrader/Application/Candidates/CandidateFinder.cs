@@ -4025,13 +4025,19 @@ namespace IbSwingTrader.Application.Candidates
             decimal? currentEntryDiscountPct)
         {
             var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
+            var dailyMaSlope = CalculateSlope(recentSeries.DailyMaSeries);
             var dailyRsiSlope = CalculateSlope(recentSeries.DailyRsiSeries);
             var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
             var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
+            var h4MaSlope = CalculateSlope(recentSeries.H4MaSeries);
             var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
             var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+            var dailyMaLast = GetLatestValue(recentSeries.DailyMaSeries);
             var dailyMidLast = GetLatestValue(recentSeries.DailyBbMidDistanceSeries);
+            var h4MaLast = GetLatestValue(recentSeries.H4MaSeries);
             var h4MidLast = GetLatestValue(recentSeries.H4BbMidDistanceSeries);
+            var dailyRsiLast = GetLatestValue(recentSeries.DailyRsiSeries);
+            var h4RsiLast = GetLatestValue(recentSeries.H4RsiSeries);
             var dailyMacdLast = GetLatestValue(recentSeries.DailyMacdSeries);
             var h4MacdLast = GetLatestValue(recentSeries.H4MacdSeries);
 
@@ -4086,17 +4092,83 @@ namespace IbSwingTrader.Application.Candidates
 
             var overheated =
                 snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold ||
-                GetLatestValue(recentSeries.H4RsiSeries) >= settings.H4OverheatedRsiThreshold;
+                h4RsiLast >= settings.H4OverheatedRsiThreshold;
 
             var nearHigh = snapshot.Current.DistanceTo20dHigh >= settings.NearHighDistanceTo20dHighThreshold;
             var highAtr = diagnostics.ATRRatio >= settings.MinAtrRatioForDeepEntry;
+            var lateSpike =
+                nearHigh &&
+                (dailyRsiLast >= settings.LateSpikeDailyRsiThreshold ||
+                 h4RsiLast >= settings.LateSpikeH4RsiThreshold) &&
+                (dailyMaSlope >= settings.LateSpikeDailyMaSlopeThreshold ||
+                 h4MaSlope >= settings.LateSpikeH4MaSlopeThreshold ||
+                 dailyMidLast >= 20m ||
+                 h4MidLast >= 10m) &&
+                (h4Weakening ||
+                 h4MacdSlope <= 0m ||
+                 IsRollingOver(recentSeries.H4RsiSeries));
+
+            var fastContinuationShallow =
+                !lateSpike &&
+                (cleanContinuation ||
+                 (dailyStrong && constructiveH4) ||
+                 (dailyMaLast >= settings.FastContinuationMinDailyMaDistancePct &&
+                  h4MaLast >= settings.FastContinuationMinH4MaDistancePct &&
+                  dailyRsiLast >= 55m &&
+                  h4RsiLast >= 50m &&
+                  dailyMacdLast >= 0m &&
+                  h4MacdLast >= -0.05m &&
+                  !h4Weakening));
+
+            var moderatePullback =
+                !lateSpike &&
+                !fastContinuationShallow &&
+                dailyMaLast >= settings.ModeratePullbackMinDailyMaDistancePct &&
+                h4MaLast >= settings.ModeratePullbackMinH4MaDistancePct &&
+                dailyRsiLast >= 45m &&
+                h4RsiLast >= 42m &&
+                h4MacdLast >= -0.35m;
+
+            var deepPullback =
+                !lateSpike &&
+                !fastContinuationShallow &&
+                !moderatePullback &&
+                (dailyMaLast <= settings.DeepPullbackMaxMaDistancePct ||
+                 h4MaLast <= settings.DeepPullbackMaxMaDistancePct) &&
+                (highAtr || h4Weakening || dailyStrong);
+
             var targetDiscountPct = currentEntryDiscountPct;
             var profile = "None";
 
-            if (cleanContinuation)
+            if (lateSpike)
             {
-                targetDiscountPct = CapDiscount(currentEntryDiscountPct, settings.FastContinuationMaxDiscountPct);
-                profile = "FastContinuation";
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.LateSpikeAvoidDiscountPct, settings.MaxDiscountPct));
+                profile = "AvoidLateSpike";
+            }
+            else if (fastContinuationShallow)
+            {
+                targetDiscountPct = CapDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(
+                        Math.Min(settings.ShallowContinuationMaxDiscountPct, settings.FastContinuationMaxDiscountPct),
+                        settings.MaxDiscountPct));
+                profile = "FastContinuationShallow";
+            }
+            else if (moderatePullback)
+            {
+                targetDiscountPct = CapDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.ModeratePullbackMaxDiscountPct, settings.MaxDiscountPct));
+                profile = "ModeratePullback";
+            }
+            else if (deepPullback)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.DeepPullbackDiscountPct, settings.MaxDiscountPct));
+                profile = "DeepPullback";
             }
             else if (dailyStrong && h4Weakening && highAtr)
             {
@@ -4130,8 +4202,10 @@ namespace IbSwingTrader.Application.Candidates
             {
                 targetDiscountPct = CapDiscount(
                     currentEntryDiscountPct,
-                    Math.Min(settings.FastContinuationMaxDiscountPct, settings.MaxDiscountPct));
-                profile = "FastContinuation";
+                    Math.Min(
+                        Math.Min(settings.ShallowContinuationMaxDiscountPct, settings.FastContinuationMaxDiscountPct),
+                        settings.MaxDiscountPct));
+                profile = "FastContinuationShallow";
             }
 
             return new SeriesEntryProfileDecision(
