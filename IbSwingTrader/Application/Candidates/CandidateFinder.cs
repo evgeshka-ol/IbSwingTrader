@@ -1,4 +1,7 @@
-﻿using IBApi;
+﻿using System.Globalization;
+using System.Reflection;
+using System.Text;
+using IBApi;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
 
@@ -24,6 +27,8 @@ namespace IbSwingTrader.Application.Candidates
         IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
+        IResearchSettingsProvider researchSettingsProvider,
+        IEvaluationDatasetCsvService evaluationDatasetCsvService,
         INumberTextFormatter fmt,
         ITextLogger logger) : ICandidateFinder
     {
@@ -46,6 +51,8 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
+        private readonly IResearchSettingsProvider _researchSettingsProvider = researchSettingsProvider;
+        private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
@@ -64,6 +71,8 @@ namespace IbSwingTrader.Application.Candidates
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
             var todayMarketDate = marketNow.Date;
+            var seriesSimilarityTemplates = await LoadSeriesSimilarityTemplatesAsync(
+                getCandidatesSettings.NextDayRanking.SeriesSimilarity);
 
             _logger.Info(
                 $"CandidateFinder settings: " +
@@ -319,7 +328,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     agedDiagnostics,
                     agedEntryScore,
-                    agedBbState);
+                    agedBbState,
+                    seriesSimilarityTemplates);
 
                 if (promoteAsTodayResearchLike)
                 {
@@ -330,7 +340,8 @@ namespace IbSwingTrader.Application.Candidates
                         isFromWishlist: false,
                         marketTimezone,
                         bucketName: "today-research-like promoted candidates",
-                        rejectionLogPrefix: "Entry rejected after today-research-like promotion");
+                        rejectionLogPrefix: "Entry rejected after today-research-like promotion",
+                        seriesSimilarityTemplates);
 
                     continue;
                 }
@@ -350,7 +361,8 @@ namespace IbSwingTrader.Application.Candidates
                     isFromWishlist: true,
                     marketTimezone,
                     bucketName: "candidates",
-                    rejectionLogPrefix: "Entry rejected after wish list pass");
+                    rejectionLogPrefix: "Entry rejected after wish list pass",
+                    seriesSimilarityTemplates);
             }
 
             var sameDayWishListItems = mergedWishList
@@ -375,7 +387,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     sameDayDiagnostics,
                     sameDayEntryScore,
-                    sameDayBbState);
+                    sameDayBbState,
+                    seriesSimilarityTemplates);
 
                 if (promoteAsTodayResearchLike)
                 {
@@ -386,7 +399,8 @@ namespace IbSwingTrader.Application.Candidates
                         isFromWishlist: false,
                         marketTimezone,
                         bucketName: "same-day promoted candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day promotion");
+                        rejectionLogPrefix: "Entry rejected after same-day promotion",
+                        seriesSimilarityTemplates);
                 }
                 else if (IsReversalCandidateContext(ctx.Snapshot))
                 {
@@ -397,7 +411,8 @@ namespace IbSwingTrader.Application.Candidates
                         isFromWishlist: true,
                         marketTimezone,
                         bucketName: "same-day reversal candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day reversal promotion");
+                        rejectionLogPrefix: "Entry rejected after same-day reversal promotion",
+                        seriesSimilarityTemplates);
                 }
                 else
                 {
@@ -426,7 +441,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     liveDiagnostics,
                     liveEntryScore,
-                    liveBbState);
+                    liveBbState,
+                    seriesSimilarityTemplates);
 
                 if (!promoteAsTodayResearchLike)
                     continue;
@@ -443,7 +459,8 @@ namespace IbSwingTrader.Application.Candidates
                     isFromWishlist: false,
                     marketTimezone,
                     bucketName: "live today-research-like candidates",
-                    rejectionLogPrefix: "Entry rejected after live today-research-like promotion");
+                    rejectionLogPrefix: "Entry rejected after live today-research-like promotion",
+                    seriesSimilarityTemplates);
             }
 
             if (candidateResults.Count == 0)
@@ -469,7 +486,8 @@ namespace IbSwingTrader.Application.Candidates
                         isFromWishlist: false,
                         marketTimezone,
                         bucketName: "fallback candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day fallback");
+                        rejectionLogPrefix: "Entry rejected after same-day fallback",
+                        seriesSimilarityTemplates);
                 }
 
                 _logger.Info($"Same-day market-scan fallback completed. Candidates={sameDayPromotedResults.Count}");
@@ -489,7 +507,8 @@ namespace IbSwingTrader.Application.Candidates
                 scannedWishListContexts,
                 promotedTickers,
                 marketNow,
-                marketTimezone);
+                marketTimezone,
+                seriesSimilarityTemplates);
 
             var sameDayCandidates = sameDayPromotedResults.Values
                 .Concat(premarketSummaryCandidates)
@@ -498,10 +517,14 @@ namespace IbSwingTrader.Application.Candidates
                     .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(y => y.Score.Score)
                     .First())
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.Score)
                 .ToList();
+
+            sameDayCandidates = ReRankCandidates(
+                sameDayCandidates,
+                getCandidatesSettings.PremarketSummary.MaxItems,
+                _nextDayRankingSettings,
+                seriesSimilarityTemplates,
+                SeriesTemplateFamily.TodayResearchLike);
 
             var finalWishList = mergedWishList
                 .Where(x => !promotedTickers.Contains(x.Ticker))
@@ -515,7 +538,9 @@ namespace IbSwingTrader.Application.Candidates
                     .Where(x => !sameDayPromotedTickers.Contains(x.Ticker))
                     .ToList(),
                 getCandidatesSettings.FinalTopCandidates,
-                _nextDayRankingSettings);
+                _nextDayRankingSettings,
+                seriesSimilarityTemplates,
+                SeriesTemplateFamily.Reversal);
 
             return new CandidateSearchResult
             {
@@ -531,7 +556,8 @@ namespace IbSwingTrader.Application.Candidates
             Dictionary<string, WishListContext> scannedWishListContexts,
             HashSet<string> promotedTickers,
             DateTime marketNow,
-            string marketTimezone)
+            string marketTimezone,
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
             var settings = _getCandidatesSettingsProvider.Get().PremarketSummary;
             if (!settings.Enabled || settings.MaxItems <= 0)
@@ -560,7 +586,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     diagnostics,
                     entryScore,
-                    bbState);
+                    bbState,
+                    seriesSimilarityTemplates);
 
                 if (!isTodayResearchLikeCandidate)
                     continue;
@@ -740,7 +767,8 @@ namespace IbSwingTrader.Application.Candidates
             bool isFromWishlist,
             string marketTimezone,
             string bucketName,
-            string rejectionLogPrefix)
+            string rejectionLogPrefix,
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
@@ -754,7 +782,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     diagnostics,
                     entryScore,
-                    bbState);
+                    bbState,
+                    seriesSimilarityTemplates);
 
             if (!_candidateFilter.Pass(ctx.Snapshot, 0m, ctx.AvgDollarVolumeDaily))
             {
@@ -835,7 +864,8 @@ namespace IbSwingTrader.Application.Candidates
             WishListContext ctx,
             CandidateDiagnostics diagnostics,
             decimal entryScore,
-            BollingerStateSet bbState)
+            BollingerStateSet bbState,
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
             var firstSeenDate = mergedWishItem.FirstSeen?.Date;
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly) &&
@@ -869,15 +899,6 @@ namespace IbSwingTrader.Application.Candidates
                 ctx,
                 diagnostics,
                 entryScore);
-
-            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
-                !preLaunchResearchLike &&
-                !shortHistoryLiveMover &&
-                !mixedMeanLiveWinner)
-            {
-                return false;
-            }
-
             var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
             var currentSessionLikeMove =
                 string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
@@ -885,6 +906,24 @@ namespace IbSwingTrader.Application.Candidates
                 string.Equals(ctx.Preset.ScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(ctx.Preset.ScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
                 strongLiveMove;
+            var seriesTemplateMatch = CalculateSeriesSimilarityMatch(
+                recentSeries,
+                seriesSimilarityTemplates,
+                SeriesTemplateFamily.TodayResearchLike,
+                _nextDayRankingSettings.SeriesSimilarity);
+            var seriesTemplatePromotion =
+                currentSessionLikeMove &&
+                seriesTemplateMatch.Bonus > 0m &&
+                (entryScore >= 15m || diagnostics.ATRRatio >= 3m || ctx.Stock.Rank <= 20);
+
+            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
+                !preLaunchResearchLike &&
+                !shortHistoryLiveMover &&
+                !mixedMeanLiveWinner &&
+                !seriesTemplatePromotion)
+            {
+                return false;
+            }
 
             var constructiveWeekly =
                 string.Equals(bbState.Weekly.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
@@ -1044,6 +1083,22 @@ namespace IbSwingTrader.Application.Candidates
                 return true;
             }
 
+            if (seriesTemplatePromotion)
+            {
+                _logger.Info(
+                    $"TodayResearchLike series-template promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"Template={seriesTemplateMatch.TemplateTicker}, " +
+                    $"Distance={_fmt.Generic(seriesTemplateMatch.TotalDistance ?? 0m)}, " +
+                    $"Daily={_fmt.Generic(seriesTemplateMatch.DailyDistance ?? 0m)}, " +
+                    $"Weekly={_fmt.Generic(seriesTemplateMatch.WeeklyDistance ?? 0m)}, " +
+                    $"H4={_fmt.Generic(seriesTemplateMatch.H4Distance ?? 0m)}, " +
+                    $"Bonus={_fmt.Generic(seriesTemplateMatch.Bonus)}, " +
+                    $"EntryScore={_fmt.Generic(entryScore)}, " +
+                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
+                return true;
+            }
+
             if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion || earlyRunawayCoolingPromotion)
                 return true;
 
@@ -1058,6 +1113,7 @@ namespace IbSwingTrader.Application.Candidates
                 liveSeriesPromotion ||
                 liveSnapshotPromotion ||
                 earlyRunawayCoolingPromotion ||
+                seriesTemplatePromotion ||
                 (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion)) ||
                 canIgnoreForecastGate;
         }
@@ -2651,7 +2707,9 @@ namespace IbSwingTrader.Application.Candidates
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
             int finalTopCandidates,
-            NextDayRankingSettings settings)
+            NextDayRankingSettings settings,
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
+            SeriesTemplateFamily family)
         {
             if (candidates.Count <= 1)
                 return candidates;
@@ -2661,20 +2719,42 @@ namespace IbSwingTrader.Application.Candidates
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)
                 .ToList();
+            var rankedInputs = ordered
+                .Select(x =>
+                {
+                    var seriesSimilarityMatch = CalculateSeriesSimilarityMatch(
+                        x,
+                        seriesSimilarityTemplates,
+                        family,
+                        settings.SeriesSimilarity);
+
+                    ApplySeriesSimilarityDiagnostics(x, seriesSimilarityMatch);
+
+                    return new
+                    {
+                        Candidate = x,
+                        SeriesSimilarityMatch = seriesSimilarityMatch
+                    };
+                })
+                .ToList();
 
             var window = Math.Min(
-                ordered.Count,
+                rankedInputs.Count,
                 Math.Max(settings.SecondPassMinimumWindow, finalTopCandidates * settings.SecondPassWindowMultiplier));
 
             if (window <= 1)
-                return ordered;
+                return rankedInputs.Select(x => x.Candidate).ToList();
 
-            var topWindow = ordered
+            var topWindow = rankedInputs
                 .Take(window)
-                .Select(x => new
+                .Select(x =>
                 {
-                    Candidate = x,
-                    AdjustedRank = (x.Score.NextDayRank ?? decimal.MinValue) + CalculateSecondPassAdjustment(x, settings)
+                    return new
+                    {
+                        x.Candidate,
+                        AdjustedRank = (x.Candidate.Score.NextDayRank ?? decimal.MinValue) +
+                            CalculateSecondPassAdjustment(x.Candidate, settings, x.SeriesSimilarityMatch.Bonus)
+                    };
                 })
                 .OrderByDescending(x => x.AdjustedRank)
                 .ThenByDescending(x => x.Candidate.TradePlan.ProfitPercent)
@@ -2692,13 +2772,14 @@ namespace IbSwingTrader.Application.Candidates
             return
             [
                 .. topWindow.Select(x => x.Candidate),
-                .. ordered.Skip(window)
+                .. rankedInputs.Skip(window).Select(x => x.Candidate)
             ];
         }
 
         private decimal CalculateSecondPassAdjustment(
             CandidateDetails candidate,
-            NextDayRankingSettings settings)
+            NextDayRankingSettings settings,
+            decimal seriesSimilarityBonus)
         {
             var diagnostics = candidate.Diagnostics;
             if (diagnostics == null)
@@ -2772,7 +2853,8 @@ namespace IbSwingTrader.Application.Candidates
                 latePenaltyScore * settings.SecondPassLatePenaltyWeight -
                 overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight +
                 bbAdjustment +
-                CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics);
+                CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics) +
+                seriesSimilarityBonus;
         }
 
         private static decimal CalculateLiveWinnerContinuationAdjustment(
@@ -2782,8 +2864,12 @@ namespace IbSwingTrader.Application.Candidates
             if (candidate.Scan.PresetScanCode is not ("TOP_PERC_GAIN" or "TOP_OPEN_PERC_GAIN"))
                 return 0m;
 
-            if (candidate.Context.WeeklyMaSignedDistancePct <= 0m ||
-                candidate.Context.DailyMaSignedDistancePct <= 0m)
+            var weeklyMaDistance = GetLatestValue(candidate.RecentWeeklyMaSeries);
+            var dailyMaDistance = GetLatestValue(candidate.RecentDailyMaSeries);
+            var h4MaDistance = GetLatestValue(candidate.RecentH4MaSeries);
+
+            if (weeklyMaDistance <= 0m ||
+                dailyMaDistance <= 0m)
             {
                 return 0m;
             }
@@ -2800,13 +2886,635 @@ namespace IbSwingTrader.Application.Candidates
 
             var score = 0.90m;
 
-            if (candidate.Context.H4MaSignedDistancePct > 0m)
+            if (h4MaDistance > 0m)
                 score += 0.20m;
 
             if (candidate.TradePlan.ProfitPercent >= 4m)
                 score += 0.15m;
 
             return score;
+        }
+
+        private async Task<IReadOnlyList<SeriesSimilarityTemplate>> LoadSeriesSimilarityTemplatesAsync(
+            SeriesSimilaritySettings settings)
+        {
+            if (!settings.Enabled)
+                return [];
+
+            var templates = new List<SeriesSimilarityTemplate>();
+            var researchPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), _researchSettingsProvider.Get().OutputFile));
+            var evaluationPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+
+            foreach (var row in await ReadResearchRowsAsync(researchPath))
+            {
+                if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
+                    continue;
+
+                var features = BuildTemplateFeatures(
+                    row.DailyMaSeries,
+                    row.DailyBbMidDistanceSeries,
+                    row.DailyBbUpperDistanceSeries,
+                    row.DailyBbWidthSeries,
+                    row.DailyRsiSeries,
+                    row.DailyMacdSeries,
+                    row.WeeklyMaSeries,
+                    row.WeeklyBbMidDistanceSeries,
+                    row.WeeklyBbUpperDistanceSeries,
+                    row.WeeklyBbWidthSeries,
+                    row.WeeklyRsiSeries,
+                    row.WeeklyMacdSeries,
+                    row.H4MaSeries ?? [],
+                    row.H4BbMidDistanceSeries ?? [],
+                    row.H4BbUpperDistanceSeries ?? [],
+                    row.H4BbWidthSeries ?? [],
+                    row.H4RsiSeries ?? [],
+                    row.H4MacdSeries ?? []);
+
+                if (features.HasUsefulSeries)
+                    templates.Add(new SeriesSimilarityTemplate(
+                        row.Ticker,
+                        SeriesTemplateFamily.TodayResearchLike,
+                        row.AmplitudePct,
+                        features));
+            }
+
+            var evaluationRows = await _evaluationDatasetCsvService.ReadAsync(evaluationPath);
+            foreach (var row in evaluationRows)
+            {
+                if (row.AmplitudePct < settings.MinTemplateAmplitudePct ||
+                    !row.HasActiveCandidateSnapshot)
+                {
+                    continue;
+                }
+
+                var family = row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase)
+                    ? SeriesTemplateFamily.TodayResearchLike
+                    : SeriesTemplateFamily.Reversal;
+
+                if (family == SeriesTemplateFamily.Reversal &&
+                    !IsBelowMeanReversalTemplate(row))
+                {
+                    continue;
+                }
+
+                var features = BuildTemplateFeatures(
+                    row.RecentDailyMaSeries,
+                    row.RecentDailyBbMidDistanceSeries,
+                    row.RecentDailyBbUpperDistanceSeries,
+                    row.RecentDailyBbWidthSeries,
+                    row.RecentDailyRsiSeries,
+                    row.RecentDailyMacdSeries,
+                    row.RecentWeeklyMaSeries,
+                    row.RecentWeeklyBbMidDistanceSeries,
+                    row.RecentWeeklyBbUpperDistanceSeries,
+                    row.RecentWeeklyBbWidthSeries,
+                    row.RecentWeeklyRsiSeries,
+                    row.RecentWeeklyMacdSeries,
+                    row.RecentH4MaSeries,
+                    row.RecentH4BbMidDistanceSeries,
+                    row.RecentH4BbUpperDistanceSeries,
+                    row.RecentH4BbWidthSeries,
+                    row.RecentH4RsiSeries,
+                    row.RecentH4MacdSeries);
+
+                if (features.HasUsefulSeries)
+                    templates.Add(new SeriesSimilarityTemplate(row.Ticker, family, row.AmplitudePct, features));
+            }
+
+            var selected = templates
+                .GroupBy(x => x.Family)
+                .SelectMany(x => x
+                    .OrderByDescending(y => y.AmplitudePct)
+                    .ThenBy(y => y.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Take(settings.MaxTemplatesPerFamily))
+                .ToList();
+
+            _logger.Info(
+                $"Series similarity templates loaded: Total={selected.Count}, " +
+                $"TodayResearchLike={selected.Count(x => x.Family == SeriesTemplateFamily.TodayResearchLike)}, " +
+                $"Reversal={selected.Count(x => x.Family == SeriesTemplateFamily.Reversal)}");
+
+            return selected;
+        }
+
+        private static bool IsBelowMeanReversalTemplate(EvaluationDatasetRow row)
+        {
+            if (row.RecentDailyMaSeries.Count == 0 ||
+                row.RecentWeeklyMaSeries.Count == 0)
+            {
+                return false;
+            }
+
+            return row.RecentDailyMaSeries[^1] < 0m &&
+                   row.RecentWeeklyMaSeries[^1] < 0m;
+        }
+
+        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
+            CandidateDetails candidate,
+            IReadOnlyList<SeriesSimilarityTemplate> templates,
+            SeriesTemplateFamily family,
+            SeriesSimilaritySettings settings)
+        {
+            if (!settings.Enabled || templates.Count == 0)
+                return SeriesSimilarityMatch.Empty;
+
+            var candidateFeatures = BuildTemplateFeatures(
+                candidate.RecentDailyMaSeries,
+                candidate.RecentDailyBbMidDistanceSeries,
+                candidate.RecentDailyBbUpperDistanceSeries,
+                candidate.RecentDailyBbWidthSeries,
+                candidate.RecentDailyRsiSeries,
+                candidate.RecentDailyMacdSeries,
+                candidate.RecentWeeklyMaSeries,
+                candidate.RecentWeeklyBbMidDistanceSeries,
+                candidate.RecentWeeklyBbUpperDistanceSeries,
+                candidate.RecentWeeklyBbWidthSeries,
+                candidate.RecentWeeklyRsiSeries,
+                candidate.RecentWeeklyMacdSeries,
+                candidate.RecentH4MaSeries,
+                candidate.RecentH4BbMidDistanceSeries,
+                candidate.RecentH4BbUpperDistanceSeries,
+                candidate.RecentH4BbWidthSeries,
+                candidate.RecentH4RsiSeries,
+                candidate.RecentH4MacdSeries);
+
+            return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
+        }
+
+        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
+            RecentFeatureSeries recentSeries,
+            IReadOnlyList<SeriesSimilarityTemplate> templates,
+            SeriesTemplateFamily family,
+            SeriesSimilaritySettings settings)
+        {
+            var candidateFeatures = BuildTemplateFeatures(
+                recentSeries.DailyMaSeries,
+                recentSeries.DailyBbMidDistanceSeries,
+                recentSeries.DailyBbUpperDistanceSeries,
+                recentSeries.DailyBbWidthSeries,
+                recentSeries.DailyRsiSeries,
+                recentSeries.DailyMacdSeries,
+                recentSeries.WeeklyMaSeries,
+                recentSeries.WeeklyBbMidDistanceSeries,
+                recentSeries.WeeklyBbUpperDistanceSeries,
+                recentSeries.WeeklyBbWidthSeries,
+                recentSeries.WeeklyRsiSeries,
+                recentSeries.WeeklyMacdSeries,
+                recentSeries.H4MaSeries,
+                recentSeries.H4BbMidDistanceSeries,
+                recentSeries.H4BbUpperDistanceSeries,
+                recentSeries.H4BbWidthSeries,
+                recentSeries.H4RsiSeries,
+                recentSeries.H4MacdSeries);
+
+            return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
+        }
+
+        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
+            SeriesFeatureSet candidateFeatures,
+            IReadOnlyList<SeriesSimilarityTemplate> templates,
+            SeriesTemplateFamily family,
+            SeriesSimilaritySettings settings)
+        {
+            if (!settings.Enabled || templates.Count == 0)
+                return SeriesSimilarityMatch.Empty;
+
+            if (!candidateFeatures.HasUsefulSeries)
+                return SeriesSimilarityMatch.Empty;
+
+            var bestMatch = templates
+                .Where(x => x.Family == family)
+                .Select(x => new
+                {
+                    Template = x,
+                    Distance = CalculateSeriesDistance(candidateFeatures, x.Features, settings)
+                })
+                .Where(x => x.Distance.HasValue)
+                .OrderBy(x => x.Distance!.Value.Total)
+                .FirstOrDefault();
+
+            if (bestMatch == null || bestMatch.Distance!.Value.Total > settings.WeakMatchDistance)
+                return SeriesSimilarityMatch.Empty;
+
+            var distance = bestMatch.Distance.Value.Total;
+            decimal bonus;
+
+            if (distance <= settings.FullMatchDistance)
+            {
+                bonus = settings.FullMatchBonus;
+            }
+            else
+            {
+                var range = settings.WeakMatchDistance - settings.FullMatchDistance;
+                if (range <= 0m)
+                {
+                    bonus = settings.WeakMatchBonus;
+                }
+                else
+                {
+                    var closeness = (settings.WeakMatchDistance - distance) / range;
+                    bonus = settings.WeakMatchBonus +
+                            closeness * (settings.FullMatchBonus - settings.WeakMatchBonus);
+                }
+            }
+
+            return new SeriesSimilarityMatch(
+                bestMatch.Template.Ticker,
+                bestMatch.Template.Family.ToString(),
+                bestMatch.Template.AmplitudePct,
+                distance,
+                bestMatch.Distance.Value.Daily,
+                bestMatch.Distance.Value.Weekly,
+                bestMatch.Distance.Value.H4,
+                bonus);
+        }
+
+        private static void ApplySeriesSimilarityDiagnostics(
+            CandidateDetails candidate,
+            SeriesSimilarityMatch match)
+        {
+            if (candidate.Diagnostics == null)
+                return;
+
+            candidate.Diagnostics.SeriesSimilarityTemplateTicker = match.TemplateTicker;
+            candidate.Diagnostics.SeriesSimilarityTemplateFamily = match.TemplateFamily;
+            candidate.Diagnostics.SeriesSimilarityTemplateAmplitudePct = match.TemplateAmplitudePct;
+            candidate.Diagnostics.SeriesSimilarityDistance = match.TotalDistance;
+            candidate.Diagnostics.SeriesSimilarityDailyDistance = match.DailyDistance;
+            candidate.Diagnostics.SeriesSimilarityWeeklyDistance = match.WeeklyDistance;
+            candidate.Diagnostics.SeriesSimilarityH4Distance = match.H4Distance;
+            candidate.Diagnostics.SeriesSimilarityBonus = match.Bonus > 0m ? match.Bonus : null;
+        }
+
+
+        private static SeriesFeatureSet BuildTemplateFeatures(
+            List<decimal> dailyMa,
+            List<decimal> dailyBbMid,
+            List<decimal> dailyBbUpper,
+            List<decimal> dailyBbWidth,
+            List<decimal> dailyRsi,
+            List<decimal> dailyMacd,
+            List<decimal> weeklyMa,
+            List<decimal> weeklyBbMid,
+            List<decimal> weeklyBbUpper,
+            List<decimal> weeklyBbWidth,
+            List<decimal> weeklyRsi,
+            List<decimal> weeklyMacd,
+            List<decimal> h4Ma,
+            List<decimal> h4BbMid,
+            List<decimal> h4BbUpper,
+            List<decimal> h4BbWidth,
+            List<decimal> h4Rsi,
+            List<decimal> h4Macd)
+        {
+            return new SeriesFeatureSet(
+                Daily: [
+                    dailyMa,
+                    dailyBbMid,
+                    dailyBbUpper,
+                    dailyBbWidth,
+                    dailyRsi,
+                    dailyMacd
+                ],
+                Weekly: [
+                    weeklyMa,
+                    weeklyBbMid,
+                    weeklyBbUpper,
+                    weeklyBbWidth,
+                    weeklyRsi,
+                    weeklyMacd
+                ],
+                H4: [
+                    h4Ma,
+                    h4BbMid,
+                    h4BbUpper,
+                    h4BbWidth,
+                    h4Rsi,
+                    h4Macd
+                ]);
+        }
+
+        private static SeriesDistance? CalculateSeriesDistance(
+            SeriesFeatureSet candidate,
+            SeriesFeatureSet template,
+            SeriesSimilaritySettings settings)
+        {
+            var weightedDistance = 0m;
+            var weight = 0m;
+            var daily = CalculateGroupDistance(candidate.Daily, template.Daily, settings.DailyWeight, settings);
+            var weekly = CalculateGroupDistance(candidate.Weekly, template.Weekly, settings.WeeklyWeight, settings);
+            var h4 = CalculateGroupDistance(candidate.H4, template.H4, settings.H4Weight, settings);
+
+            AddWeightedGroup(daily, settings.DailyWeight, ref weightedDistance, ref weight);
+            AddWeightedGroup(weekly, settings.WeeklyWeight, ref weightedDistance, ref weight);
+            AddWeightedGroup(h4, settings.H4Weight, ref weightedDistance, ref weight);
+
+            return weight > 0m
+                ? new SeriesDistance(weightedDistance / weight, daily, weekly, h4)
+                : null;
+        }
+
+        private static void AddWeightedGroup(
+            decimal? groupDistance,
+            decimal groupWeight,
+            ref decimal weightedDistance,
+            ref decimal weight)
+        {
+            if (!groupDistance.HasValue)
+                return;
+
+            weightedDistance += groupDistance.Value * groupWeight;
+            weight += groupWeight;
+        }
+
+        private static decimal? CalculateGroupDistance(
+            IReadOnlyList<List<decimal>> candidate,
+            IReadOnlyList<List<decimal>> template,
+            decimal groupWeight,
+            SeriesSimilaritySettings settings)
+        {
+            var seriesWeights = new[]
+            {
+                settings.MaSeriesWeight,
+                settings.BbMidSeriesWeight,
+                settings.BbUpperSeriesWeight,
+                settings.BbWidthSeriesWeight,
+                settings.RsiSeriesWeight,
+                settings.MacdSeriesWeight
+            };
+            var pointTolerances = new[]
+            {
+                settings.MaPointTolerance,
+                settings.BbMidPointTolerance,
+                settings.BbUpperPointTolerance,
+                settings.BbWidthPointTolerance,
+                settings.RsiPointTolerance,
+                settings.MacdPointTolerance
+            };
+            var weightedDistance = 0m;
+            var weight = 0m;
+
+            for (var i = 0; i < Math.Min(candidate.Count, template.Count); i++)
+            {
+                var distance = CalculateNormalizedPointDistance(
+                    candidate[i],
+                    template[i],
+                    pointTolerances[i],
+                    settings.RelativePointTolerance);
+                if (!distance.HasValue)
+                    continue;
+
+                var currentWeight = groupWeight * seriesWeights[i];
+                weightedDistance += distance.Value * currentWeight;
+                weight += currentWeight;
+            }
+
+            return weight > 0m ? weightedDistance / weight : null;
+        }
+
+        private static decimal? CalculateNormalizedPointDistance(
+            List<decimal> left,
+            List<decimal> right,
+            decimal baseTolerance,
+            decimal relativeTolerance)
+        {
+            var count = Math.Min(left.Count, right.Count);
+            if (count < 3)
+                return null;
+
+            var leftTail = left.TakeLast(count).ToArray();
+            var rightTail = right.TakeLast(count).ToArray();
+            var leftBase = leftTail[0];
+            var rightBase = rightTail[0];
+            var total = 0m;
+
+            for (var i = 0; i < count; i++)
+            {
+                var leftDelta = leftTail[i] - leftBase;
+                var rightDelta = rightTail[i] - rightBase;
+                var diff = Math.Abs(leftDelta - rightDelta);
+                var tolerance = Math.Max(baseTolerance, Math.Abs(rightDelta) * relativeTolerance);
+
+                total += Positive(diff - tolerance);
+            }
+
+            return total / count;
+        }
+
+        private async Task<List<ResearchTopGainerDatasetRow>> ReadResearchRowsAsync(string path)
+        {
+            if (!File.Exists(path))
+                return [];
+
+            var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8);
+            if (lines.Length <= 1)
+                return [];
+
+            var headers = SplitCsvLine(lines[0]);
+            var headerIndex = headers
+                .Select((name, index) => new { name, index })
+                .ToDictionary(x => x.name.TrimStart('\ufeff'), x => x.index, StringComparer.OrdinalIgnoreCase);
+
+            var properties = typeof(ResearchTopGainerDatasetRow)
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(x => x.CanWrite)
+                .ToArray();
+
+            var rows = new List<ResearchTopGainerDatasetRow>();
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var values = SplitCsvLine(line);
+                var row = new ResearchTopGainerDatasetRow { Ticker = string.Empty };
+
+                foreach (var property in properties)
+                {
+                    if (!TryGetResearchColumnIndex(headerIndex, property.Name, out var index) ||
+                        index >= values.Count)
+                    {
+                        continue;
+                    }
+
+                    property.SetValue(row, ParseResearchValue(property.PropertyType, values[index]));
+                }
+
+                if (!string.IsNullOrWhiteSpace(row.Ticker))
+                    rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private static object? ParseResearchValue(Type type, string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                if (Nullable.GetUnderlyingType(type) != null)
+                    return null;
+
+                if (type == typeof(string))
+                    return string.Empty;
+
+                if (type == typeof(List<decimal>))
+                    return new List<decimal>();
+
+                return Activator.CreateInstance(type);
+            }
+
+            var targetType = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (targetType == typeof(string))
+                return raw;
+
+            if (targetType == typeof(DateTime))
+            {
+                if (DateTime.TryParseExact(raw, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                    return dt;
+
+                if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out dt))
+                    return dt;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : default(DateTime);
+            }
+
+            if (targetType == typeof(decimal))
+            {
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec))
+                    return dec;
+
+                return Nullable.GetUnderlyingType(type) != null ? null : 0m;
+            }
+
+            if (targetType == typeof(int))
+            {
+                if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var i))
+                    return i;
+
+                return 0;
+            }
+
+            if (targetType == typeof(List<decimal>))
+                return ParseDecimalList(raw);
+
+            return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
+        }
+
+        private static List<decimal> ParseDecimalList(string raw)
+        {
+            var trimmed = raw.Trim();
+            if (trimmed.Length < 2 || trimmed == "[]")
+                return [];
+
+            if (trimmed[0] == '[' && trimmed[^1] == ']')
+                trimmed = trimmed[1..^1];
+
+            if (string.IsNullOrWhiteSpace(trimmed))
+                return [];
+
+            return
+            [
+                .. trimmed
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec)
+                        ? dec
+                        : 0m)
+            ];
+        }
+
+        private static bool TryGetResearchColumnIndex(
+            Dictionary<string, int> headerIndex,
+            string propertyName,
+            out int index)
+        {
+            if (headerIndex.TryGetValue(propertyName, out index))
+                return true;
+
+            foreach (var alias in GetResearchColumnAliases(propertyName))
+            {
+                if (headerIndex.TryGetValue(alias, out index))
+                    return true;
+            }
+
+            index = -1;
+            return false;
+        }
+
+        private static List<string> GetResearchColumnAliases(string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(ResearchTopGainerDatasetRow.ScanTime) => ["ReferenceTime"],
+                nameof(ResearchTopGainerDatasetRow.ScanPrice) => ["ReferencePrice"],
+                nameof(ResearchTopGainerDatasetRow.MaxTime) => ["PeakTime"],
+                nameof(ResearchTopGainerDatasetRow.MaxPrice) => ["PeakPrice"],
+                nameof(ResearchTopGainerDatasetRow.AmplitudePct) => ["RunupPct"],
+                nameof(ResearchTopGainerDatasetRow.PositivePotentialPct) => ["RunupPct"],
+                nameof(ResearchTopGainerDatasetRow.NegativePotentialPct) => ["MaxDrawdownBeforePeakPct"],
+                nameof(ResearchTopGainerDatasetRow.BarsToMax) => ["BarsToPeak"],
+                nameof(ResearchTopGainerDatasetRow.DailyMaSeries) => ["DailyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbMidDistanceSeries) => ["DailyBollingerMidDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbUpperDistanceSeries) => ["DailyBollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbWidthSeries) => ["DailyBollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbMidDistanceSeries) => ["WeeklyBollingerMidDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbUpperDistanceSeries) => ["WeeklyBollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbWidthSeries) => ["WeeklyBollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4BbMidDistanceSeries) => ["H4BollingerMidDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4BbUpperDistanceSeries) => ["H4BollingerUpperDistances"],
+                nameof(ResearchTopGainerDatasetRow.H4BbWidthSeries) => ["H4BollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
+                _ => []
+            };
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var result = new List<string>();
+            var sb = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var c = line[i];
+
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (c == ',' && !inQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            result.Add(sb.ToString());
+            return result;
         }
 
         private decimal CalculatePatternSeriesAdjustment(
@@ -4526,6 +5234,49 @@ namespace IbSwingTrader.Application.Candidates
             decimal H4MidSlope,
             decimal H4RsiSlope,
             decimal H4MacdSlope);
+
+        private enum SeriesTemplateFamily
+        {
+            TodayResearchLike,
+            Reversal
+        }
+
+        private sealed record SeriesSimilarityTemplate(
+            string Ticker,
+            SeriesTemplateFamily Family,
+            decimal AmplitudePct,
+            SeriesFeatureSet Features);
+
+        private sealed record SeriesSimilarityMatch(
+            string? TemplateTicker,
+            string? TemplateFamily,
+            decimal? TemplateAmplitudePct,
+            decimal? TotalDistance,
+            decimal? DailyDistance,
+            decimal? WeeklyDistance,
+            decimal? H4Distance,
+            decimal Bonus)
+        {
+            public static SeriesSimilarityMatch Empty { get; } =
+                new(null, null, null, null, null, null, null, 0m);
+        }
+
+        private readonly record struct SeriesDistance(
+            decimal Total,
+            decimal? Daily,
+            decimal? Weekly,
+            decimal? H4);
+
+        private sealed record SeriesFeatureSet(
+            IReadOnlyList<List<decimal>> Daily,
+            IReadOnlyList<List<decimal>> Weekly,
+            IReadOnlyList<List<decimal>> H4)
+        {
+            public bool HasUsefulSeries =>
+                Daily.Any(x => x.Count >= 3) ||
+                Weekly.Any(x => x.Count >= 3) ||
+                H4.Any(x => x.Count >= 3);
+        }
 
         private sealed class WishListContext
         {

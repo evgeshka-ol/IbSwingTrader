@@ -429,6 +429,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ResearchSeriesDailyRsiUpMovesTolerance { get; set; } = 2m;
         public decimal ResearchSeriesH4RsiUpMovesTarget { get; set; } = 13m;
         public decimal ResearchSeriesH4RsiUpMovesTolerance { get; set; } = 4m;
+        public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;
@@ -437,6 +438,33 @@ namespace IbSwingTrader.Domain.Settings
         public decimal TopOpenPercGainPresetBonus { get; set; } = 0.2m;
         public decimal TopOpenPercLosePresetBonus { get; set; } = 0.1m;
         public decimal DefaultPresetBonus { get; set; } = 0m;
+    }
+
+    public class SeriesSimilaritySettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinTemplateAmplitudePct { get; set; } = 10m;
+        public int MaxTemplatesPerFamily { get; set; } = 160;
+        public decimal FullMatchDistance { get; set; } = 1.20m;
+        public decimal WeakMatchDistance { get; set; } = 2.20m;
+        public decimal FullMatchBonus { get; set; } = 0.85m;
+        public decimal WeakMatchBonus { get; set; } = 0.25m;
+        public decimal DailyWeight { get; set; } = 0.35m;
+        public decimal WeeklyWeight { get; set; } = 0.25m;
+        public decimal H4Weight { get; set; } = 0.40m;
+        public decimal RelativePointTolerance { get; set; } = 0.06m;
+        public decimal MaSeriesWeight { get; set; } = 0.45m;
+        public decimal BbMidSeriesWeight { get; set; } = 0.45m;
+        public decimal BbUpperSeriesWeight { get; set; } = 0.35m;
+        public decimal BbWidthSeriesWeight { get; set; } = 0.35m;
+        public decimal RsiSeriesWeight { get; set; } = 0.70m;
+        public decimal MacdSeriesWeight { get; set; } = 8.00m;
+        public decimal MaPointTolerance { get; set; } = 0.25m;
+        public decimal BbMidPointTolerance { get; set; } = 0.25m;
+        public decimal BbUpperPointTolerance { get; set; } = 0.35m;
+        public decimal BbWidthPointTolerance { get; set; } = 0.60m;
+        public decimal RsiPointTolerance { get; set; } = 1.20m;
+        public decimal MacdPointTolerance { get; set; } = 0.03m;
     }
 
     public class CandidateFilterSettings
