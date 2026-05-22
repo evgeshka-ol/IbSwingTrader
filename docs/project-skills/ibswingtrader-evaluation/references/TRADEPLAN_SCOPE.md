@@ -62,6 +62,16 @@ Useful fields include:
 Do not patch this by only increasing stop size or applying a flat entry discount.
 That hides the need for a predictive entry/exit model.
 
+The active direction for entry prediction is four series-driven profiles:
+
+- `FastContinuationShallow`: winner-like rows with no deep-pullback signature should use near-current/shallow entry. If earlier rules made entry too deep, cap the discount.
+- `ModeratePullback`: alive but cooling rows should wait for a moderate pullback, not the old deep default.
+- `DeepPullback`: deep entry is valid only when Daily/H4 rows show a real below-mean/deep-pullback shape.
+- `AvoidLateSpike`: overheated late spikes near highs should require a very deep entry or be skipped by practical non-fill.
+
+High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
+High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
+
 ## Current project principle
 
 The project should first produce:

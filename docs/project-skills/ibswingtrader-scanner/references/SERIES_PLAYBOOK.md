@@ -124,3 +124,11 @@ When tuning `TradePlan`, use the same series to predict:
 - exit placement for the setup family
 
 Flat discounts from current price are not enough for this project direction.
+
+For entry prediction, keep four distinct profile classes instead of one global
+discount:
+
+- fast continuation / winner-template: cap entry near current price
+- cooling but alive: moderate pullback
+- real below-mean reversal: deep pullback
+- overheated late spike: avoid or require a very deep non-chasing entry
