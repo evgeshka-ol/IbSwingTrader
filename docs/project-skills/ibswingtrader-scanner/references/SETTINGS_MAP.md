@@ -35,6 +35,25 @@ Controls final ordering.
 
 Use this when the right names are present but top summary is wrong.
 
+### `GetCandidates.NextDayRanking.SeriesSimilarity`
+
+Controls literal row-shape matching against winner templates.
+
+Use this when candidates are present but the ranking misses names whose Daily,
+Weekly, and H4 rows look like past `research_top_gainers.csv` winners or
+high-amplitude evaluation rows.
+
+Important knobs:
+
+- `MinTemplateAmplitudePct`: minimum amplitude for a row to become a positive template.
+- `FullMatchDistance` / `WeakMatchDistance`: row-similarity thresholds.
+- `FullMatchBonus` / `WeakMatchBonus`: second-pass rank boost for close matches.
+- `DailyWeight`, `WeeklyWeight`, `H4Weight`: timeframe balance.
+- `RelativePointTolerance` and `*PointTolerance`: per-point tolerance before a
+  row difference is counted as real distance. Small differences such as `3.8`
+  vs `4.0` should usually be treated as the same shape; larger differences
+  should quickly reduce similarity.
+
 ### `GetCandidates.TradePlan`
 
 Do not use this to solve scanner recall/ranking issues.

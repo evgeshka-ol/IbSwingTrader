@@ -94,12 +94,16 @@ When comparing scanner output to research winners:
 - then `Daily`
 - then `H4`
 - compare the actual row values point-by-point after normalizing each series from its first point
+- use modest per-point tolerance, not exact equality; tiny deviations are the
+  same shape, but differences beyond tolerance should reduce the match
 - prefer close literal similarity to winner rows over broad slope-only matches
 
 The question is:
 
 - does the scanner see the same structural regime early enough
 - and if yes, does it rank it high enough
+- close winner-template matches can support `TodayResearchLike` promotion for
+  live movers when rank, ATR, or entry score confirms the setup
 
 ## Template sources
 
