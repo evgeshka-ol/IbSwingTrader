@@ -132,3 +132,7 @@ discount:
 - cooling but alive: moderate pullback
 - real below-mean reversal: deep pullback
 - overheated late spike: avoid or require a very deep non-chasing entry
+
+A ticker can start below daily mean and still be a fast continuation if H4 is
+already accelerating hard. Do not force those rows into deep-pullback entry just
+because the daily MA distance is still negative.

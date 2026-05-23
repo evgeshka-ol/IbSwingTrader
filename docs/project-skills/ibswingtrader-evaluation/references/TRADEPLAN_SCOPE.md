@@ -69,6 +69,11 @@ The active direction for entry prediction is four series-driven profiles:
 - `DeepPullback`: deep entry is valid only when Daily/H4 rows show a real below-mean/deep-pullback shape.
 - `AvoidLateSpike`: overheated late spikes near highs should require a very deep entry or be skipped by practical non-fill.
 
+Daily below mean is not automatically a deep-pullback entry. If the row shows a
+fresh launch from below daily mean with strong H4 acceleration, treat it as
+`FastContinuationShallow`; otherwise winners like `AKAN` can become high-amplitude
+`NoEntry` rows.
+
 High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
 High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
 
