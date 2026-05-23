@@ -136,3 +136,7 @@ discount:
 A ticker can start below daily mean and still be a fast continuation if H4 is
 already accelerating hard. Do not force those rows into deep-pullback entry just
 because the daily MA distance is still negative.
+
+For explosive min-first continuation, H4 BB pullback logic must not push entry
+too far below current price. Cap the entry discount separately, then tune the
+profit target with the setup's default profit percent.

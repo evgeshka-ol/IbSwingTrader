@@ -76,6 +76,10 @@ fresh launch from below daily mean with strong H4 acceleration, treat it as
 
 High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
 High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
+High-amplitude `Win` rows with large `ExitMissPct` or low captured percent mean
+the exit target is too conservative for that setup family. For explosive
+min-first rows, tune `DefaultProfitPct`; `MaxProfitPct` only caps the target and
+does not raise it by itself.
 
 ## Current project principle
 
