@@ -4112,6 +4112,13 @@ namespace IbSwingTrader.Application.Candidates
                 !lateSpike &&
                 (cleanContinuation ||
                  (dailyStrong && constructiveH4) ||
+                 (dailyMaLast >= settings.LaunchContinuationMinDailyMaDistancePct &&
+                  dailyMaLast < settings.FastContinuationMinDailyMaDistancePct &&
+                  h4MaLast >= settings.LaunchContinuationMinH4MaDistancePct &&
+                  dailyMaSlope >= settings.LaunchContinuationMinDailyMaSlopePct &&
+                  h4RsiLast >= settings.LaunchContinuationMinH4Rsi &&
+                  h4MacdLast >= settings.LaunchContinuationMinH4Macd &&
+                  !h4Weakening) ||
                  (dailyMaLast >= settings.FastContinuationMinDailyMaDistancePct &&
                   h4MaLast >= settings.FastContinuationMinH4MaDistancePct &&
                   dailyRsiLast >= 55m &&

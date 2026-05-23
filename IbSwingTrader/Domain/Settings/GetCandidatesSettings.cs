@@ -149,7 +149,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal AvoidEarlySpikeDiscountPct { get; set; } = 0.07m;
         public decimal FastContinuationMaxDiscountPct { get; set; } = 0.025m;
         public decimal ShallowContinuationMaxDiscountPct { get; set; } = 0.015m;
-        public decimal ModeratePullbackMaxDiscountPct { get; set; } = 0.035m;
+        public decimal ModeratePullbackMaxDiscountPct { get; set; } = 0.025m;
         public decimal DeepPullbackDiscountPct { get; set; } = 0.07m;
         public decimal LateSpikeAvoidDiscountPct { get; set; } = 0.09m;
         public decimal DailyStrongSlopeThreshold { get; set; } = 10.0m;
@@ -165,6 +165,11 @@ namespace IbSwingTrader.Domain.Settings
         public decimal NearHighDistanceTo20dHighThreshold { get; set; } = -8.0m;
         public decimal FastContinuationMinDailyMaDistancePct { get; set; } = 0.0m;
         public decimal FastContinuationMinH4MaDistancePct { get; set; } = -3.0m;
+        public decimal LaunchContinuationMinDailyMaDistancePct { get; set; } = -15.0m;
+        public decimal LaunchContinuationMinH4MaDistancePct { get; set; } = -3.0m;
+        public decimal LaunchContinuationMinDailyMaSlopePct { get; set; } = 20.0m;
+        public decimal LaunchContinuationMinH4Rsi { get; set; } = 60.0m;
+        public decimal LaunchContinuationMinH4Macd { get; set; } = 0.10m;
         public decimal ModeratePullbackMinDailyMaDistancePct { get; set; } = -8.0m;
         public decimal ModeratePullbackMinH4MaDistancePct { get; set; } = -8.0m;
         public decimal DeepPullbackMaxMaDistancePct { get; set; } = -8.0m;
