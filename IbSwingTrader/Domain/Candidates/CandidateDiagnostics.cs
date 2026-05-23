@@ -33,5 +33,13 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? SeriesSimilarityH4Distance { get; set; }
 
         public decimal? SeriesSimilarityBonus { get; set; }
+
+        public string? LowAmplitudeTemplateTicker { get; set; }
+
+        public decimal? LowAmplitudeTemplateAmplitudePct { get; set; }
+
+        public decimal? LowAmplitudeDistance { get; set; }
+
+        public decimal? LowAmplitudePenalty { get; set; }
     }
 }

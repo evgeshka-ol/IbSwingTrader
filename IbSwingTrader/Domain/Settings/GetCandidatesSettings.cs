@@ -466,8 +466,12 @@ namespace IbSwingTrader.Domain.Settings
         public int MaxTemplatesPerFamily { get; set; } = 160;
         public decimal FullMatchDistance { get; set; } = 1.20m;
         public decimal WeakMatchDistance { get; set; } = 2.20m;
-        public decimal FullMatchBonus { get; set; } = 0.85m;
-        public decimal WeakMatchBonus { get; set; } = 0.25m;
+        public decimal FullMatchBonus { get; set; } = 1.20m;
+        public decimal WeakMatchBonus { get; set; } = 0.35m;
+        public bool EnableLowAmplitudePenalty { get; set; } = true;
+        public decimal LowAmplitudeMinTemplateAmplitudePct { get; set; } = 3m;
+        public decimal LowAmplitudeMaxTemplateAmplitudePct { get; set; } = 10m;
+        public decimal LowAmplitudePenaltyWeight { get; set; } = 0.90m;
         public decimal DailyWeight { get; set; } = 0.35m;
         public decimal WeeklyWeight { get; set; } = 0.25m;
         public decimal H4Weight { get; set; } = 0.40m;

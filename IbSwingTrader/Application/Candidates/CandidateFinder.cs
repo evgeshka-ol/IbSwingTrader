@@ -2745,13 +2745,21 @@ namespace IbSwingTrader.Application.Candidates
                         seriesSimilarityTemplates,
                         family,
                         settings.SeriesSimilarity);
+                    var lowAmplitudeMatch = family == SeriesTemplateFamily.TodayResearchLike
+                        ? CalculateSeriesSimilarityMatch(
+                            x,
+                            seriesSimilarityTemplates,
+                            SeriesTemplateFamily.LowAmplitudeSameDay,
+                            settings.SeriesSimilarity)
+                        : SeriesSimilarityMatch.Empty;
 
-                    ApplySeriesSimilarityDiagnostics(x, seriesSimilarityMatch);
+                    ApplySeriesSimilarityDiagnostics(x, seriesSimilarityMatch, lowAmplitudeMatch, settings.SeriesSimilarity);
 
                     return new
                     {
                         Candidate = x,
-                        SeriesSimilarityMatch = seriesSimilarityMatch
+                        SeriesSimilarityMatch = seriesSimilarityMatch,
+                        LowAmplitudeMatch = lowAmplitudeMatch
                     };
                 })
                 .ToList();
@@ -2771,7 +2779,11 @@ namespace IbSwingTrader.Application.Candidates
                     {
                         x.Candidate,
                         AdjustedRank = (x.Candidate.Score.NextDayRank ?? decimal.MinValue) +
-                            CalculateSecondPassAdjustment(x.Candidate, settings, x.SeriesSimilarityMatch.Bonus)
+                            CalculateSecondPassAdjustment(
+                                x.Candidate,
+                                settings,
+                                x.SeriesSimilarityMatch.Bonus,
+                                x.LowAmplitudeMatch.Bonus)
                     };
                 })
                 .OrderByDescending(x => x.AdjustedRank)
@@ -2797,7 +2809,8 @@ namespace IbSwingTrader.Application.Candidates
         private decimal CalculateSecondPassAdjustment(
             CandidateDetails candidate,
             NextDayRankingSettings settings,
-            decimal seriesSimilarityBonus)
+            decimal seriesSimilarityBonus,
+            decimal lowAmplitudeSimilarityPenalty)
         {
             var diagnostics = candidate.Diagnostics;
             if (diagnostics == null)
@@ -2872,7 +2885,8 @@ namespace IbSwingTrader.Application.Candidates
                 overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight +
                 bbAdjustment +
                 CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics) +
-                seriesSimilarityBonus;
+                seriesSimilarityBonus -
+                lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
         }
 
         private static decimal CalculateLiveWinnerContinuationAdjustment(
@@ -2961,11 +2975,48 @@ namespace IbSwingTrader.Application.Candidates
             var evaluationRows = await _evaluationDatasetCsvService.ReadAsync(evaluationPath);
             foreach (var row in evaluationRows)
             {
-                if (row.AmplitudePct < settings.MinTemplateAmplitudePct ||
-                    !row.HasActiveCandidateSnapshot)
+                if (!row.HasActiveCandidateSnapshot)
                 {
                     continue;
                 }
+
+                if (settings.EnableLowAmplitudePenalty &&
+                    row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase) &&
+                    row.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
+                    row.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
+                {
+                    var lowAmplitudeFeatures = BuildTemplateFeatures(
+                        row.RecentDailyMaSeries,
+                        row.RecentDailyBbMidDistanceSeries,
+                        row.RecentDailyBbUpperDistanceSeries,
+                        row.RecentDailyBbWidthSeries,
+                        row.RecentDailyRsiSeries,
+                        row.RecentDailyMacdSeries,
+                        row.RecentWeeklyMaSeries,
+                        row.RecentWeeklyBbMidDistanceSeries,
+                        row.RecentWeeklyBbUpperDistanceSeries,
+                        row.RecentWeeklyBbWidthSeries,
+                        row.RecentWeeklyRsiSeries,
+                        row.RecentWeeklyMacdSeries,
+                        row.RecentH4MaSeries,
+                        row.RecentH4BbMidDistanceSeries,
+                        row.RecentH4BbUpperDistanceSeries,
+                        row.RecentH4BbWidthSeries,
+                        row.RecentH4RsiSeries,
+                        row.RecentH4MacdSeries);
+
+                    if (lowAmplitudeFeatures.HasUsefulSeries)
+                    {
+                        templates.Add(new SeriesSimilarityTemplate(
+                            row.Ticker,
+                            SeriesTemplateFamily.LowAmplitudeSameDay,
+                            row.AmplitudePct,
+                            lowAmplitudeFeatures));
+                    }
+                }
+
+                if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
+                    continue;
 
                 var family = row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase)
                     ? SeriesTemplateFamily.TodayResearchLike
@@ -3012,7 +3063,8 @@ namespace IbSwingTrader.Application.Candidates
             _logger.Info(
                 $"Series similarity templates loaded: Total={selected.Count}, " +
                 $"TodayResearchLike={selected.Count(x => x.Family == SeriesTemplateFamily.TodayResearchLike)}, " +
-                $"Reversal={selected.Count(x => x.Family == SeriesTemplateFamily.Reversal)}");
+                $"Reversal={selected.Count(x => x.Family == SeriesTemplateFamily.Reversal)}, " +
+                $"LowAmplitudeSameDay={selected.Count(x => x.Family == SeriesTemplateFamily.LowAmplitudeSameDay)}");
 
             return selected;
         }
@@ -3151,7 +3203,9 @@ namespace IbSwingTrader.Application.Candidates
 
         private static void ApplySeriesSimilarityDiagnostics(
             CandidateDetails candidate,
-            SeriesSimilarityMatch match)
+            SeriesSimilarityMatch match,
+            SeriesSimilarityMatch lowAmplitudeMatch,
+            SeriesSimilaritySettings settings)
         {
             if (candidate.Diagnostics == null)
                 return;
@@ -3164,6 +3218,12 @@ namespace IbSwingTrader.Application.Candidates
             candidate.Diagnostics.SeriesSimilarityWeeklyDistance = match.WeeklyDistance;
             candidate.Diagnostics.SeriesSimilarityH4Distance = match.H4Distance;
             candidate.Diagnostics.SeriesSimilarityBonus = match.Bonus > 0m ? match.Bonus : null;
+            candidate.Diagnostics.LowAmplitudeTemplateTicker = lowAmplitudeMatch.TemplateTicker;
+            candidate.Diagnostics.LowAmplitudeTemplateAmplitudePct = lowAmplitudeMatch.TemplateAmplitudePct;
+            candidate.Diagnostics.LowAmplitudeDistance = lowAmplitudeMatch.TotalDistance;
+            candidate.Diagnostics.LowAmplitudePenalty = lowAmplitudeMatch.Bonus > 0m
+                ? lowAmplitudeMatch.Bonus * settings.LowAmplitudePenaltyWeight
+                : null;
         }
 
 
@@ -5337,7 +5397,8 @@ namespace IbSwingTrader.Application.Candidates
         private enum SeriesTemplateFamily
         {
             TodayResearchLike,
-            Reversal
+            Reversal,
+            LowAmplitudeSameDay
         }
 
         private sealed record SeriesSimilarityTemplate(
