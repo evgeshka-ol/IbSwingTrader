@@ -257,6 +257,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinProfitPct { get; set; } = 0.06m;
         public decimal MaxProfitPct { get; set; } = 0.14m;
         public decimal EntryDiscountPct { get; set; } = 0m;
+        public decimal MaxEntryDiscountPct { get; set; } = 0.012m;
     }
 
     public class ConstructiveDeepMinFirstSettings

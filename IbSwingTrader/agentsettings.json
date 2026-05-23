@@ -337,10 +337,11 @@
                 "MinAtrRatio": 3.0,
                 "MinDailyRsi14": 55.0,
                 "MaxDistanceTo20dHigh": -3.0,
-                "DefaultProfitPct": 0.10,
+                "DefaultProfitPct": 0.12,
                 "MinProfitPct": 0.07,
-                "MaxProfitPct": 0.16,
-                "EntryDiscountPct": 0.0
+                "MaxProfitPct": 0.18,
+                "EntryDiscountPct": 0.0,
+                "MaxEntryDiscountPct": 0.012
             },
             "ConstructiveDeepMinFirst": {
                 "Enabled": true,

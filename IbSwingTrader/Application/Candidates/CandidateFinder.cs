@@ -1768,6 +1768,24 @@ namespace IbSwingTrader.Application.Candidates
                     $"H4MidSlope={_fmt.Percent(bbState.H4.MidSlope)}");
             }
 
+            if (isExplosiveMinFirst &&
+                tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct >= 0m)
+            {
+                var explosiveEntryDiscountOverridePct = CapDiscount(
+                    bbEntryDiscountOverridePct,
+                    tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct);
+
+                if (explosiveEntryDiscountOverridePct != bbEntryDiscountOverridePct)
+                {
+                    _logger.Info(
+                        $"Trade plan explosive MinFirst entry cap applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(explosiveEntryDiscountOverridePct ?? 0m)}, " +
+                        $"PreviousEntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}");
+                }
+
+                bbEntryDiscountOverridePct = explosiveEntryDiscountOverridePct;
+            }
+
             entryDiscountOverridePct = bbEntryDiscountOverridePct;
 
             var triangleEntryDiscountOverridePct = ResolveH4TriangleEntryDiscountOverridePct(
