@@ -140,3 +140,14 @@ because the daily MA distance is still negative.
 For explosive min-first continuation, H4 BB pullback logic must not push entry
 too far below current price. Cap the entry discount separately, then tune the
 profit target with the setup's default profit percent.
+
+For summary ranking, compare rows in both directions:
+
+- positive templates: `research_top_gainers.csv` and high-amplitude evaluation
+  rows should lift candidates even when RSI already looks high
+- negative templates: `SameDayContinuation` evaluation rows with
+  `AmplitudePct < 10%` should penalize candidates that look unlikely to clear
+  the 10% amplitude line
+
+Do not use the negative templates as a hard scanner filter. They are a ranking
+tool for keeping weak lookalikes out of `Summary.TodayResearchLikeCandidates`.

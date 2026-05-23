@@ -48,6 +48,12 @@ Important knobs:
 - `MinTemplateAmplitudePct`: minimum amplitude for a row to become a positive template.
 - `FullMatchDistance` / `WeakMatchDistance`: row-similarity thresholds.
 - `FullMatchBonus` / `WeakMatchBonus`: second-pass rank boost for close matches.
+- `EnableLowAmplitudePenalty`: enables negative templates from
+  `SameDayContinuation` evaluation rows that did not reach 10% amplitude.
+- `LowAmplitudeMinTemplateAmplitudePct` / `LowAmplitudeMaxTemplateAmplitudePct`:
+  amplitude band for negative templates.
+- `LowAmplitudePenaltyWeight`: second-pass rank penalty for candidates matching
+  low-amplitude row shapes.
 - `DailyWeight`, `WeeklyWeight`, `H4Weight`: timeframe balance.
 - `RelativePointTolerance` and `*PointTolerance`: per-point tolerance before a
   row difference is counted as real distance. Small differences such as `3.8`

@@ -81,6 +81,11 @@ the exit target is too conservative for that setup family. For explosive
 min-first rows, tune `DefaultProfitPct`; `MaxProfitPct` only caps the target and
 does not raise it by itself.
 
+When using evaluation rows for scanner feedback, split the series templates by
+amplitude. Rows with `AmplitudePct >= 10%` are positive templates. Rows with
+`SameDayContinuation` and `AmplitudePct < 10%` are negative ranking templates:
+they should lower summary priority for candidates whose rows look similar.
+
 ## Current project principle
 
 The project should first produce:
