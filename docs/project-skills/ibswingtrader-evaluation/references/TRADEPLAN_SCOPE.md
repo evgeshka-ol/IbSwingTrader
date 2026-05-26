@@ -2,6 +2,19 @@
 
 `TradePlan` is downstream of the list.
 
+## Minimal Near-Term Goal
+
+The project is currently optimizing for a simple playable loop:
+
+- the #1 current `TodayResearchLikeCandidates` row should win consistently
+- the trade plan should capture more than 10% when that row has enough amplitude
+
+Analyze top-1 failures before broad aggregate metrics. If top-1 has strong
+amplitude but `NoEntry`, the entry model is too deep or mistimed. If top-1 has
+strong amplitude but captures less than 10%, the exit model is too conservative
+or the entry is too late. If top-1 has weak or negative amplitude, scanner
+ranking selected the wrong leader.
+
 ## Fix the scanner first when:
 
 - many top candidates have low amplitude

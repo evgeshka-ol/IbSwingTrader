@@ -8,9 +8,19 @@ The scanner should not be judged primarily by entry precision. That is `TradePla
 
 ## Current top priority
 
+The nearest minimal target is top-1 quality:
+
+- the #1 current `TodayResearchLikeCandidates` row should be stable enough to
+  play
+- it should convert into a practical winner
+- the plan should capture more than 10%
+
+Use this as the first decision point before optimizing broad recall or average
+list quality.
+
 The highest-priority scanner goal is:
 
-- tickers in today's summary `TodayResearchLikeCandidates`
+- tickers in today's current top-ranked `TodayResearchLikeCandidates`
 - should appear in tomorrow's `research_top_gainers.csv`
 
 This is the main next-day feedback loop. If this relationship is weak, tune

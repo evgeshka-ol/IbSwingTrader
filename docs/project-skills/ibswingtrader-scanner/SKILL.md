@@ -17,6 +17,9 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 The scanner's job is to find future fat moves early.
 
+- Minimal near-term goal: the #1 current `TodayResearchLikeCandidates` row should
+  consistently become a practical winning idea and capture more than 10%.
+  Optimize top-1 quality before widening attention to the rest of the list.
 - For scanner quality, the main oracle is `AmplitudePct`, not `Win/Loss/NoEntry`.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.

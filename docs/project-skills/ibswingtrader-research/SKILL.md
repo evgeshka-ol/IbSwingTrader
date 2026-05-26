@@ -26,6 +26,15 @@ Its main job is to answer:
 
 Priority #1 is next-day research coverage from `TodayResearchLikeCandidates`.
 
+The nearest minimal target is top-1 quality:
+
+- the first current `TodayResearchLikeCandidates` row in `candidates.csv`
+- should become a practical winner
+- should capture more than 10%
+
+Treat top-1 misses as the highest-signal feedback. A broad list is useful only
+after rank #1 is consistently good enough to play.
+
 Tickers that appear in today's `candidates.csv` current scan rows
 `TodayResearchLikeCandidates` should appear in tomorrow's
 `research_top_gainers.csv`.
