@@ -26,7 +26,7 @@ The scanner's job is to find future fat moves early.
 ## Pipeline
 
 1. `get-candidates`
-2. inspect `Data/Tickers/candidates.json`
+2. inspect `Data/Tickers/candidates.csv`
 3. inspect `Data/Tickers/wishlist.json`
 4. compare yesterday's scan with today's `research_top_gainers.csv`
 
@@ -80,7 +80,7 @@ similarity signal before adding more derived heuristics.
 When scanner quality is weak:
 
 1. Check whether the ticker was fully missed, only reached `WishList`, or was present but ranked too low.
-2. Use the series in `candidates.json` and `research_top_gainers.csv`.
+2. Use the series in `candidates.csv` and `research_top_gainers.csv`.
 3. Prefer fixing:
    - recall
    - `WishList -> TodayResearchLike` promotion

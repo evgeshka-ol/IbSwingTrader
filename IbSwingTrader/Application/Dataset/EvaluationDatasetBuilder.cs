@@ -5,7 +5,7 @@ namespace IbSwingTrader.Application.Dataset
     public class EvaluationDatasetBuilder(
         ICandidateEvaluationCsvService evaluationCsvService,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
-        IJsonFileService jsonFileService,
+        ICandidateFileService candidateFileService,
         IHistoricalCache historicalCache,
         IFeatureEngine featureEngine,
         IAgentPathService pathService,
@@ -21,7 +21,7 @@ namespace IbSwingTrader.Application.Dataset
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly IHistoricalCache _historicalCache = historicalCache;
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly IAgentPathService _pathService = pathService;
@@ -264,18 +264,7 @@ namespace IbSwingTrader.Application.Dataset
         private async Task<List<CandidateDetails>> LoadCurrentCandidatesAsync()
         {
             var path = _pathService.GetCandidatesFile();
-            if (!File.Exists(path))
-                return [];
-
-            var json = await File.ReadAllTextAsync(path);
-            var first = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
-
-            if (first == '[')
-                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(path) ?? [];
-
-            var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(path);
-            if (document == null)
-                return [];
+            var document = await _candidateFileService.ReadAsync(path);
 
             var primaryCandidates = document.Candidates
                 .Select(x =>

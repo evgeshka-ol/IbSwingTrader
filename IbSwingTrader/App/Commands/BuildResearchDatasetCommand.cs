@@ -10,6 +10,7 @@ namespace IbSwingTrader.App.Commands
         IJsonFileService jsonFileService,
         ICsvWriter csvWriter,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
+        ICandidateFileService candidateFileService,
         ITwsConnection connection,
         IContractResolver contractResolver,
         IHistoricalDataService historicalService,
@@ -25,6 +26,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly ICsvWriter _csvWriter = csvWriter;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly ITwsConnection _connection = connection;
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalService = historicalService;
@@ -185,26 +187,11 @@ namespace IbSwingTrader.App.Commands
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             var candidatesPath = _pathService.GetCandidatesFile();
-            if (File.Exists(candidatesPath))
-            {
-                var json = await File.ReadAllTextAsync(candidatesPath);
-                var first = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
-
-                if (first == '[')
-                {
-                    var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
-                    foreach (var candidate in candidates)
-                        result.Add(candidate.Ticker);
-                }
-                else
-                {
-                    var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
-                    foreach (var candidate in document?.Candidates ?? [])
-                        result.Add(candidate.Ticker);
-                    foreach (var candidate in document?.SameDayCandidates ?? [])
-                        result.Add(candidate.Ticker);
-                }
-            }
+            var document = await _candidateFileService.ReadAsync(candidatesPath);
+            foreach (var candidate in document.Candidates)
+                result.Add(candidate.Ticker);
+            foreach (var candidate in document.SameDayCandidates)
+                result.Add(candidate.Ticker);
 
             var wishListPath = _pathService.GetWishListFile();
             var wishList = await _jsonFileService.ReadAsync<List<WishListItem>>(wishListPath) ?? [];

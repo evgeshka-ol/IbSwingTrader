@@ -26,7 +26,7 @@ Its main job is to answer:
 
 Priority #1 is next-day research coverage from `TodayResearchLikeCandidates`.
 
-Tickers that appear in today's `candidates.json` summary section
+Tickers that appear in today's `candidates.csv` current scan rows
 `TodayResearchLikeCandidates` should appear in tomorrow's
 `research_top_gainers.csv`.
 
@@ -54,7 +54,7 @@ When this does not happen, treat it as the primary scanner feedback loop:
 ## Practical workflow
 
 1. build today's research dataset
-2. compare it with yesterday's `candidates.json`
+2. compare it with yesterday's `candidates.csv`
 3. classify:
    - caught in summary
    - summary name failed to become a research winner

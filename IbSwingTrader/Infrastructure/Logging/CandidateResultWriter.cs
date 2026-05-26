@@ -1,43 +1,22 @@
-﻿using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using IbSwingTrader.Common.Time;
+﻿using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
-using IbSwingTrader.Infrastructure.Serialization;
 
 namespace IbSwingTrader.Infrastructure.Logging
 {
     public class CandidateResultWriter(
-        IAgentPathService pathService,
-        IJsonFileService jsonFileService,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
         IMarketSettingsProvider marketSettingsProvider,
         ITextLogger logger,
         IConsoleColorWriter console,
-        ICompositePropertyJsonBuilder jsonBuilder,
-        ICandidateCsvRowBuilder candidateCsvRowBuilder,
+        ICandidateFileService candidateFileService,
         INumberTextFormatter fmt) : ICandidateResultWriter
     {
-        private static readonly JsonSerializerOptions ReadOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
-        private readonly IAgentPathService _pathService = pathService;
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IConsoleColorWriter _console = console;
-        private readonly ICompositePropertyJsonBuilder _jsonBuilder = jsonBuilder;
-        private readonly ICandidateCsvRowBuilder _candidateCsvRowBuilder = candidateCsvRowBuilder;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly INumberTextFormatter _fmt = fmt;
-
-        static CandidateResultWriter()
-        {
-            ReadOptions.Converters.Add(new FlexibleDateTimeConverter());
-            ReadOptions.Converters.Add(new FlexibleNullableDateTimeConverter());
-        }
 
         public async Task WriteAsync(string filePath, CandidateSearchResult result)
         {
@@ -74,16 +53,22 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteCandidateToConsole(candidate);
             }
 
-            var existingDocument = await LoadDocumentAsync(filePath);
+            var existingDocument = await _candidateFileService.ReadAsync(filePath);
             var mergedSameDay = MergeCandidates(existingDocument.SameDayCandidates, sameDayCandidates);
             var merged = MergeCandidates(existingDocument.Candidates, candidates)
                 .Where(x => !mergedSameDay.Any(y =>
                     string.Equals(BuildCandidateScanKey(y), BuildCandidateScanKey(x), StringComparison.OrdinalIgnoreCase)))
                 .ToList();
             var summary = BuildSummary(candidates, sameDayCandidates);
-            var json = BuildJson(summary, merged, mergedSameDay);
-            await File.WriteAllTextAsync(filePath, json);
-            await WriteCsvAsync(filePath, merged, mergedSameDay, candidates.Concat(sameDayCandidates));
+            await _candidateFileService.WriteAsync(
+                filePath,
+                new CandidateFileDocument
+                {
+                    Summary = summary,
+                    Candidates = merged,
+                    SameDayCandidates = mergedSameDay
+                },
+                candidates.Concat(sameDayCandidates));
 
             _logger.Info($"Candidate results saved: {filePath}");
         }
@@ -139,92 +124,6 @@ namespace IbSwingTrader.Infrastructure.Logging
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}");
-        }
-
-        private async Task<CandidateFileDocument> LoadDocumentAsync(string filePath)
-        {
-            if (!File.Exists(filePath))
-                return new CandidateFileDocument();
-
-            var json = await File.ReadAllTextAsync(filePath);
-            if (string.IsNullOrWhiteSpace(json))
-                return new CandidateFileDocument();
-
-            json = NormalizeLegacyJson(json);
-
-            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
-
-            if (firstNonWhitespace == '[')
-            {
-                return new CandidateFileDocument
-                {
-                    Candidates = JsonSerializer.Deserialize<List<CandidateDetails>>(json, ReadOptions) ?? []
-                };
-            }
-
-            var root = JsonNode.Parse(json) as JsonObject;
-            if (root == null)
-                return new CandidateFileDocument();
-
-            return new CandidateFileDocument
-            {
-                Candidates =
-                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
-                    root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
-                    [],
-                SameDayCandidates =
-                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
-                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
-                    []
-            };
-        }
-
-        private static string NormalizeLegacyJson(string json)
-        {
-            return json
-                .Replace("\"ScanTimeMarket\"", "\"ScanTime\"", StringComparison.Ordinal)
-                .Replace("\"FirstSeenMarketTime\"", "\"FirstSeen\"", StringComparison.Ordinal)
-                .Replace("\"LastEvaluatedMarketTime\"", "\"LastEvaluatedAt\"", StringComparison.Ordinal)
-                .Replace("\"ExpectedTargetMarketTime\"", "\"ExpectedTargetTime\"", StringComparison.Ordinal)
-                .Replace("\"LastStatusMarketTime\"", "\"LastStatusTime\"", StringComparison.Ordinal)
-                .Replace("\"EvaluatedAtMarketTime\"", "\"EvaluatedAt\"", StringComparison.Ordinal)
-                .Replace("\"ScanTimeNy\"", "\"ScanTime\"", StringComparison.Ordinal);
-        }
-
-        private string BuildJson(
-            CandidateSummarySections summary,
-            IEnumerable<CandidateDetails> candidates,
-            IEnumerable<CandidateDetails> sameDayCandidates)
-        {
-            var root = new JsonObject();
-            var summaryObject = new JsonObject();
-            var reversalArray = new JsonArray();
-            var todayResearchLikeArray = new JsonArray();
-            var candidatesArray = new JsonArray();
-            var sameDayCandidatesArray = new JsonArray();
-
-            foreach (var item in summary.ReversalCandidates)
-                reversalArray.Add(BuildSummaryJson(item));
-
-            foreach (var item in summary.TodayResearchLikeCandidates)
-                todayResearchLikeArray.Add(BuildSummaryJson(item));
-
-            foreach (var candidate in candidates)
-                candidatesArray.Add(_jsonBuilder.BuildObject(candidate));
-
-            foreach (var candidate in sameDayCandidates)
-                sameDayCandidatesArray.Add(_jsonBuilder.BuildObject(candidate));
-
-            summaryObject["ReversalCandidates"] = reversalArray;
-            summaryObject["TodayResearchLikeCandidates"] = todayResearchLikeArray;
-            root["Summary"] = summaryObject;
-            root["ReversalCandidatesData"] = candidatesArray;
-            root["TodayResearchLikeCandidatesData"] = sameDayCandidatesArray;
-
-            return root.ToJsonString(new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
         }
 
         private CandidateSummarySections BuildSummary(
@@ -284,14 +183,6 @@ namespace IbSwingTrader.Infrastructure.Logging
             return new CandidateSummaryItem
             {
                 Ticker = ticker
-            };
-        }
-
-        private static JsonObject BuildSummaryJson(CandidateSummaryItem item)
-        {
-            return new JsonObject
-            {
-                ["Ticker"] = item.Ticker
             };
         }
 
@@ -479,43 +370,6 @@ namespace IbSwingTrader.Infrastructure.Logging
                    diagnostics.ATRRatio >= settings.MinAtrRatio &&
                    context.DailyRSI14 >= settings.MinDailyRsi14 &&
                    diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
-        }
-
-        private async Task WriteCsvAsync(
-            string jsonFilePath,
-            IEnumerable<CandidateDetails> candidates,
-            IEnumerable<CandidateDetails> sameDayCandidates,
-            IEnumerable<CandidateDetails> currentScanOutput)
-        {
-            var csvPath = Path.ChangeExtension(jsonFilePath, ".csv");
-            var currentOperationKeys = currentScanOutput
-                .Select(BuildCandidateOperationKey)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var table = _candidateCsvRowBuilder.Build(candidates, sameDayCandidates, currentOperationKeys);
-            var sb = new StringBuilder();
-
-            if (table.Headers.Count > 0)
-                sb.AppendLine(string.Join(",", table.Headers.Select(EscapeCsv)));
-
-            foreach (var row in table.Rows)
-            {
-                var values = table.Headers
-                    .Select(header => row.TryGetValue(header, out var value) ? value : string.Empty)
-                    .Select(EscapeCsv);
-
-                sb.AppendLine(string.Join(",", values));
-            }
-
-            await File.WriteAllTextAsync(csvPath, sb.ToString(), Encoding.UTF8);
-            _logger.Info($"Candidate CSV results saved: {csvPath}");
-        }
-
-        private static string EscapeCsv(string value)
-        {
-            if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-                return $"\"{value.Replace("\"", "\"\"")}\"";
-
-            return value;
         }
 
         private void WriteCandidateToConsole(CandidateDetails candidate)

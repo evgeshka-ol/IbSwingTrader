@@ -20,7 +20,7 @@ This measures whether the scanner surfaced fat movement early enough.
 
 The most important benchmark is:
 
-- today's `Summary.TodayResearchLikeCandidates`
+- today's current top-ranked `TodayResearchLikeCandidates` rows in `candidates.csv`
 - should become tomorrow's `research_top_gainers.csv` names
 
 This is the primary direction for scanner tuning.
@@ -28,23 +28,23 @@ This is the primary direction for scanner tuning.
 `TodayResearchLikeCandidates` is not just a live-watch section. It is the
 project's best attempt to predict the next research dataset.
 
-When a `TodayResearchLikeCandidates` summary name does not show up in the next
+When a current top-ranked `TodayResearchLikeCandidates` name does not show up in the next
 research dataset with strong amplitude, treat that as scanner selection/ranking
 feedback before touching `TradePlan`.
 
 ## Classification
 
-### Caught in summary
+### Caught in current top rows
 
-The ticker was already in yesterday's top summary.
+The ticker was already in yesterday's current top-ranked candidate rows.
 
 This is the desired outcome.
 
 For `TodayResearchLikeCandidates`, this is the highest-value success case.
 
-### Summary name failed next-day research
+### Current top row failed next-day research
 
-The ticker was in yesterday's `TodayResearchLikeCandidates` summary, but did
+The ticker was in yesterday's current top-ranked `TodayResearchLikeCandidates` rows, but did
 not become a strong mover in today's research dataset.
 
 This is scanner selection/ranking failure unless the amplitude was still strong
@@ -52,7 +52,7 @@ but the research threshold or universe missed it.
 
 ### Seen but not promoted
 
-The ticker existed in yesterday's `WishList` or full `candidates.json`, but not in summary.
+The ticker existed in yesterday's `WishList` or full `candidates.csv`, but not in current top-ranked rows.
 
 This is promotion or ranking failure.
 

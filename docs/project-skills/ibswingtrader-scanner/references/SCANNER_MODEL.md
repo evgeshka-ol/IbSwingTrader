@@ -93,7 +93,7 @@ This is promotion or gating failure.
 
 ### In candidates but not summary
 
-The ticker exists in `candidates.json` but not in top summary.
+The ticker exists in `candidates.csv` but not in current top-ranked rows.
 
 This is ranking failure.
 

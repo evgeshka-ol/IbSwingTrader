@@ -150,4 +150,4 @@ For summary ranking, compare rows in both directions:
   the 10% amplitude line
 
 Do not use the negative templates as a hard scanner filter. They are a ranking
-tool for keeping weak lookalikes out of `Summary.TodayResearchLikeCandidates`.
+tool for keeping weak lookalikes out of the current top-ranked `TodayResearchLikeCandidates` rows.

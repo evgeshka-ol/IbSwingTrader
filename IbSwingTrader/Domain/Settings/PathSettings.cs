@@ -6,7 +6,7 @@ namespace IbSwingTrader.Domain.Settings
         public string TradesFile { get; set; } = "trades.csv";
         public string DatasetFile { get; set; } = "datasets/trade_dataset.csv";
         public string CacheFolder { get; set; } = "cache";
-        public string CandidatesFile { get; set; } = "Tickers/candidates.json";
+        public string CandidatesFile { get; set; } = "Tickers/candidates.csv";
         public string EvaluationsFile { get; set; } = "Tickers/evaluations.csv";
         public string EvaluationsArchiveFile { get; set; } = "Tickers/evaluations_archive.csv";
         public string WishListFile { get; set; } = "Tickers/wishlist.json";

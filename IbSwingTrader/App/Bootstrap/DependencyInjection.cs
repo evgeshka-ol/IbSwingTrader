@@ -36,6 +36,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<IConsoleColorWriter, ConsoleColorWriter>();
             services.AddSingleton<ITextLogger, TextLogger>();
             services.AddSingleton<ICandidateCsvRowBuilder, CandidateCsvRowBuilder>();
+            services.AddSingleton<ICandidateFileService, CandidateFileService>();
             services.AddSingleton<ICandidateResultWriter, CandidateResultWriter>();
             services.AddSingleton<IWishListResultWriter, WishListResultWriter>();
 

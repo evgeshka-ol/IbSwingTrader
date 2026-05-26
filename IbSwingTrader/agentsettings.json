@@ -6,7 +6,7 @@
         "TradesFile": "trades.csv",
         "DatasetFile": "datasets/trade_dataset.csv",
         "CacheFolder": "cache",
-        "CandidatesFile": "Tickers/candidates.json",
+        "CandidatesFile": "Tickers/candidates.csv",
         "EvaluationsFile": "Tickers/evaluations.csv",
         "EvaluationsArchiveFile": "Tickers/evaluations_archive.csv",
         "WishListFile": "Tickers/wishlist.json",

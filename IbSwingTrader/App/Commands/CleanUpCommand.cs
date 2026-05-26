@@ -1,15 +1,13 @@
 using System.Globalization;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
-using IbSwingTrader.Infrastructure.Serialization;
 
 namespace IbSwingTrader.App.Commands
 {
     public class CleanUpCommand(
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
+        ICandidateFileService candidateFileService,
         IJsonFileService jsonFileService,
         INumberTextFormatter fmt,
         ITextLogger logger,
@@ -20,6 +18,7 @@ namespace IbSwingTrader.App.Commands
     {
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly IJsonFileService _jsonFileService = jsonFileService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
@@ -27,17 +26,6 @@ namespace IbSwingTrader.App.Commands
         private readonly ICleanUpSettingsProvider _cleanUpSettingsProvider = cleanUpSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
-
-        private static readonly JsonSerializerOptions CandidateReadOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
-        static CleanUpCommand()
-        {
-            CandidateReadOptions.Converters.Add(new FlexibleDateTimeConverter());
-            CandidateReadOptions.Converters.Add(new FlexibleNullableDateTimeConverter());
-        }
 
         public async Task RunAsync()
         {
@@ -62,7 +50,7 @@ namespace IbSwingTrader.App.Commands
             var candidatesPath = _pathService.GetCandidatesFile();
             var evaluationsPath = _pathService.GetEvaluationsFile();
 
-            var candidateDocument = await LoadCandidateDocumentAsync(candidatesPath);
+            var candidateDocument = await _candidateFileService.ReadAsync(candidatesPath);
             var candidates = candidateDocument.Candidates;
             if (candidates.Count == 0 || !File.Exists(evaluationsPath))
                 return 0;
@@ -91,7 +79,7 @@ namespace IbSwingTrader.App.Commands
 
             candidateDocument.Candidates = filtered;
             candidateDocument.Summary = rebuiltSummary;
-            await _jsonFileService.WriteAsync(candidatesPath, candidateDocument);
+            await _candidateFileService.WriteAsync(candidatesPath, candidateDocument, []);
 
             _logger.Info(
                 $"Candidates cleaned: removed={removed}, kept={filtered.Count}, summaryChanged={summaryChanged}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
@@ -181,43 +169,6 @@ namespace IbSwingTrader.App.Commands
                 $"Evaluation report cleaned: removed={removed}, kept={filtered.Count}, outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
 
             return removed;
-        }
-
-        private async Task<CandidateFileDocument> LoadCandidateDocumentAsync(string candidatesPath)
-        {
-            if (!File.Exists(candidatesPath))
-                return new CandidateFileDocument();
-
-            var json = await File.ReadAllTextAsync(candidatesPath);
-            if (string.IsNullOrWhiteSpace(json))
-                return new CandidateFileDocument();
-
-            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
-
-            if (firstNonWhitespace == '[')
-            {
-                var candidates = await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
-                return new CandidateFileDocument
-                {
-                    Candidates = candidates
-                };
-            }
-
-            var root = JsonNode.Parse(json) as JsonObject;
-            if (root == null)
-                return new CandidateFileDocument();
-
-            return new CandidateFileDocument
-            {
-                Candidates =
-                    root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
-                    root["Candidates"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
-                    [],
-                SameDayCandidates =
-                    root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
-                    root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(CandidateReadOptions) ??
-                    []
-            };
         }
 
         private CandidateSummarySections BuildSummary(

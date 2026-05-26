@@ -6,7 +6,7 @@ namespace IbSwingTrader.App.Commands
         ITwsConnection twsConnection,
         ICandidateEvaluator candidateEvaluator,
         IEvaluationDatasetBuilder evaluationDatasetBuilder,
-        IJsonFileService jsonFileService,
+        ICandidateFileService candidateFileService,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         ITextLogger logger,
         IAgentPathService pathService,
@@ -15,7 +15,7 @@ namespace IbSwingTrader.App.Commands
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateEvaluator _candidateEvaluator = candidateEvaluator;
         private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -222,21 +222,7 @@ namespace IbSwingTrader.App.Commands
 
         private async Task<List<CandidateDetails>> LoadCandidatesAsync(string candidatesPath)
         {
-            if (!File.Exists(candidatesPath))
-                return [];
-
-            var json = await File.ReadAllTextAsync(candidatesPath);
-            if (string.IsNullOrWhiteSpace(json))
-                return [];
-
-            var firstNonWhitespace = json.FirstOrDefault(x => !char.IsWhiteSpace(x));
-
-            if (firstNonWhitespace == '[')
-                return await _jsonFileService.ReadAsync<List<CandidateDetails>>(candidatesPath) ?? [];
-
-            var document = await _jsonFileService.ReadAsync<CandidateFileDocument>(candidatesPath);
-            if (document == null)
-                return [];
+            var document = await _candidateFileService.ReadAsync(candidatesPath);
 
             var primaryCandidates = document.Candidates
                 .Select(x =>
