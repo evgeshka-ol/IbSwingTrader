@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
@@ -14,6 +15,7 @@ namespace IbSwingTrader.Infrastructure.Logging
         ITextLogger logger,
         IConsoleColorWriter console,
         ICompositePropertyJsonBuilder jsonBuilder,
+        ICandidateCsvRowBuilder candidateCsvRowBuilder,
         INumberTextFormatter fmt) : ICandidateResultWriter
     {
         private static readonly JsonSerializerOptions ReadOptions = new()
@@ -28,6 +30,7 @@ namespace IbSwingTrader.Infrastructure.Logging
         private readonly ITextLogger _logger = logger;
         private readonly IConsoleColorWriter _console = console;
         private readonly ICompositePropertyJsonBuilder _jsonBuilder = jsonBuilder;
+        private readonly ICandidateCsvRowBuilder _candidateCsvRowBuilder = candidateCsvRowBuilder;
         private readonly INumberTextFormatter _fmt = fmt;
 
         static CandidateResultWriter()
@@ -80,6 +83,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var summary = BuildSummary(candidates, sameDayCandidates);
             var json = BuildJson(summary, merged, mergedSameDay);
             await File.WriteAllTextAsync(filePath, json);
+            await WriteCsvAsync(filePath, merged, mergedSameDay, candidates.Concat(sameDayCandidates));
 
             _logger.Info($"Candidate results saved: {filePath}");
         }
@@ -127,9 +131,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private static string BuildCandidateOperationKey(CandidateDetails candidate)
         {
-            return string.Create(
-                System.Globalization.CultureInfo.InvariantCulture,
-                $"{candidate.Ticker}|{candidate.Scan.PresetScanCode}|{candidate.Scan.ScanTime:O}|{candidate.TradePlan.EntryPrice:G29}|{candidate.TradePlan.ExitPrice:G29}|{candidate.TradePlan.StopLoss:G29}");
+            return CandidateCsvRowBuilder.BuildCandidateOperationKey(candidate);
         }
 
         private static string BuildCandidateScanKey(CandidateDetails candidate)
@@ -477,6 +479,43 @@ namespace IbSwingTrader.Infrastructure.Logging
                    diagnostics.ATRRatio >= settings.MinAtrRatio &&
                    context.DailyRSI14 >= settings.MinDailyRsi14 &&
                    diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
+        }
+
+        private async Task WriteCsvAsync(
+            string jsonFilePath,
+            IEnumerable<CandidateDetails> candidates,
+            IEnumerable<CandidateDetails> sameDayCandidates,
+            IEnumerable<CandidateDetails> currentScanOutput)
+        {
+            var csvPath = Path.ChangeExtension(jsonFilePath, ".csv");
+            var currentOperationKeys = currentScanOutput
+                .Select(BuildCandidateOperationKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var table = _candidateCsvRowBuilder.Build(candidates, sameDayCandidates, currentOperationKeys);
+            var sb = new StringBuilder();
+
+            if (table.Headers.Count > 0)
+                sb.AppendLine(string.Join(",", table.Headers.Select(EscapeCsv)));
+
+            foreach (var row in table.Rows)
+            {
+                var values = table.Headers
+                    .Select(header => row.TryGetValue(header, out var value) ? value : string.Empty)
+                    .Select(EscapeCsv);
+
+                sb.AppendLine(string.Join(",", values));
+            }
+
+            await File.WriteAllTextAsync(csvPath, sb.ToString(), Encoding.UTF8);
+            _logger.Info($"Candidate CSV results saved: {csvPath}");
+        }
+
+        private static string EscapeCsv(string value)
+        {
+            if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+
+            return value;
         }
 
         private void WriteCandidateToConsole(CandidateDetails candidate)
