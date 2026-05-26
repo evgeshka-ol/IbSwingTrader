@@ -56,12 +56,12 @@ namespace IbSwingTrader.Infrastructure.Logging
                     var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
                     Add(row, headers, "Ticker", candidate.Ticker);
+                    Add(row, headers, nameof(candidate.Scan.ScanTime), FormatValue(candidate.Scan.ScanTime));
                     Add(row, headers, "CandidateGroup", groupName);
+                    FlattenObject(row, headers, "TradePlan", candidate.TradePlan);
                     Add(row, headers, "DisplayRank", rank.ToString(CultureInfo.InvariantCulture));
                     Add(row, headers, "IsCurrentScanOutput", currentOperationKeys.Contains(BuildCandidateOperationKey(candidate)) ? "true" : "false");
-
                     FlattenObject(row, headers, string.Empty, candidate.Scan);
-                    FlattenObject(row, headers, "TradePlan", candidate.TradePlan);
 
                     Add(row, headers, nameof(candidate.CandidateSource), candidate.CandidateSource);
                     Add(row, headers, nameof(candidate.IsFromWishlist), FormatValue(candidate.IsFromWishlist));

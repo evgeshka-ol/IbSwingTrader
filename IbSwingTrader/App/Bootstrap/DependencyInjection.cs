@@ -24,6 +24,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<ICandidateEvaluationSettingsProvider, CandidateEvaluationSettingsProvider>();
             services.AddSingleton<IWishListEvaluationSettingsProvider, WishListEvaluationSettingsProvider>();
             services.AddSingleton<ICleanUpSettingsProvider, CleanUpSettingsProvider>();
+            services.AddSingleton<INormalizeReportsSettingsProvider, NormalizeReportsSettingsProvider>();
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
             services.AddSingleton<IMarketSessionSettingsProvider, MarketSessionSettingsProvider>();
             services.AddSingleton<ILoggingSettingsProvider, LoggingSettingsProvider>();
@@ -101,6 +102,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddTransient<GetCandidatesCommand>();
             services.AddTransient<EvaluateCandidatesCommand>();
             services.AddTransient<NormalizeEvaluationsCommand>();
+            services.AddTransient<NormalizeReportsCommand>();
             services.AddTransient<EvaluateWishlistCommand>();
             services.AddTransient<CleanUpCommand>();
             services.AddTransient<GetScannerParamsCommand>();

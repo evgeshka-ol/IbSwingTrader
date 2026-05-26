@@ -8,5 +8,7 @@ namespace IbSwingTrader.Abstractions.Logging
             string candidatesPath,
             CandidateFileDocument document,
             IEnumerable<CandidateDetails> currentScanOutput);
+
+        Task NormalizeAsync(string candidatesPath);
     }
 }

@@ -16,7 +16,7 @@
         logger.Info("  build-research-dataset");
         logger.Info("  get-candidates");
         logger.Info("  evaluate-candidates");
-        logger.Info("  normalize-evaluations");
+        logger.Info("  normalize-reports");
         logger.Info("  evaluate-wishlist");
         logger.Info("  clean-up");
         logger.Info("  get-scanner-params");
@@ -52,9 +52,9 @@
                 .RunAsync();
             break;
 
-        case "normalize-evaluations":
+        case "normalize-reports":
             await services
-                .GetRequiredService<NormalizeEvaluationsCommand>()
+                .GetRequiredService<NormalizeReportsCommand>()
                 .RunAsync();
             break;
 

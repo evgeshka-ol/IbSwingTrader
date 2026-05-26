@@ -35,7 +35,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             if (File.Exists(csvPath) && new FileInfo(csvPath).Length > 0)
             {
                 DeleteLegacyJsonIfPresent(csvPath, jsonPath);
-                return await ReadCsvAsync(csvPath);
+                return (await ReadCsvAsync(csvPath)).Document;
             }
 
             if (!File.Exists(jsonPath))
@@ -64,6 +64,35 @@ namespace IbSwingTrader.Infrastructure.Logging
             var currentOperationKeys = currentScanOutput
                 .Select(CandidateCsvRowBuilder.BuildCandidateOperationKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            await WriteCsvAsync(candidatesPath, document, currentOperationKeys);
+        }
+
+        public async Task NormalizeAsync(string candidatesPath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(candidatesPath);
+
+            var csvPath = GetCsvPath(candidatesPath);
+            if (File.Exists(csvPath) && new FileInfo(csvPath).Length > 0)
+            {
+                var result = await ReadCsvAsync(csvPath);
+                await WriteCsvAsync(candidatesPath, result.Document, result.CurrentOperationKeys);
+                return;
+            }
+
+            var document = await ReadAsync(candidatesPath);
+            await WriteAsync(candidatesPath, document, []);
+        }
+
+        private async Task WriteCsvAsync(
+            string candidatesPath,
+            CandidateFileDocument document,
+            IReadOnlySet<string> currentOperationKeys)
+        {
+            var csvPath = GetCsvPath(candidatesPath);
+            var folder = Path.GetDirectoryName(csvPath);
+            if (!string.IsNullOrWhiteSpace(folder))
+                Directory.CreateDirectory(folder);
+
             var table = _candidateCsvRowBuilder.Build(document.Candidates, document.SameDayCandidates, currentOperationKeys);
             var sb = new StringBuilder();
 
@@ -87,15 +116,20 @@ namespace IbSwingTrader.Infrastructure.Logging
             _logger.Info($"Candidate CSV results saved: {csvPath}");
         }
 
-        private async Task<CandidateFileDocument> ReadCsvAsync(string csvPath)
+        private async Task<CandidateCsvReadResult> ReadCsvAsync(string csvPath)
         {
             var lines = await File.ReadAllLinesAsync(csvPath, Encoding.UTF8);
             if (lines.Length <= 1)
-                return new CandidateFileDocument();
+            {
+                return new CandidateCsvReadResult(
+                    new CandidateFileDocument(),
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            }
 
             var delimiter = DetectDelimiter(lines[0]);
             var headers = SplitCsvLine(lines[0], delimiter);
             var document = new CandidateFileDocument();
+            var currentOperationKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var line in lines.Skip(1))
             {
@@ -108,14 +142,21 @@ namespace IbSwingTrader.Infrastructure.Logging
                     .ToDictionary(x => x.header, x => x.value, StringComparer.OrdinalIgnoreCase);
                 var candidate = BuildCandidate(row);
                 var group = row.GetValueOrDefault("CandidateGroup") ?? string.Empty;
+                var isCurrentScanOutput =
+                    row.TryGetValue("IsCurrentScanOutput", out var currentRaw) &&
+                    bool.TryParse(currentRaw, out var current) &&
+                    current;
 
                 if (group.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
                     document.SameDayCandidates.Add(candidate);
                 else
                     document.Candidates.Add(candidate);
+
+                if (isCurrentScanOutput)
+                    currentOperationKeys.Add(CandidateCsvRowBuilder.BuildCandidateOperationKey(candidate));
             }
 
-            return document;
+            return new CandidateCsvReadResult(document, currentOperationKeys);
         }
 
         private CandidateDetails BuildCandidate(IReadOnlyDictionary<string, string> row)
@@ -385,5 +426,9 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             return value;
         }
+
+        private sealed record CandidateCsvReadResult(
+            CandidateFileDocument Document,
+            IReadOnlySet<string> CurrentOperationKeys);
     }
 }

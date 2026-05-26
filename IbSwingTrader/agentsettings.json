@@ -667,6 +667,12 @@
         "FileRetentionDays": 5
     },
 
+    "NormalizeReports": {
+        "Candidates": true,
+        "Evaluations": false,
+        "EvaluationDataset": false
+    },
+
     "CsvTradeReader": {
         "Separator": ";",
         "HasHeader": true,
