@@ -26,6 +26,8 @@ namespace IbSwingTrader.App.Commands
         public async Task RunAsync()
         {
             var settings = _normalizeReportsSettingsProvider.Get();
+            _logger.Info(
+                $"Normalize reports started. Candidates={settings.Candidates} Evaluations={settings.Evaluations} EvaluationDataset={settings.EvaluationDataset}");
 
             if (settings.Candidates)
                 await NormalizeCandidatesAsync();
@@ -43,7 +45,12 @@ namespace IbSwingTrader.App.Commands
         private async Task NormalizeCandidatesAsync()
         {
             var path = _pathService.GetCandidatesFile();
+            _logger.Info($"Candidates report normalization started: {path}");
+
             var document = await _candidateFileService.ReadAsync(path);
+            _logger.Info(
+                $"Candidates report loaded: Reversal={document.Candidates.Count}, TodayResearchLike={document.SameDayCandidates.Count}");
+
             var recalculated = RecalculateCandidateBollingerBandSeries(document);
             var latestScanTime = document.Candidates
                 .Concat(document.SameDayCandidates)
@@ -64,9 +71,15 @@ namespace IbSwingTrader.App.Commands
         private int RecalculateCandidateBollingerBandSeries(CandidateFileDocument document)
         {
             var recalculated = 0;
+            var processed = 0;
+            var allCandidates = document.Candidates.Concat(document.SameDayCandidates).ToList();
 
-            foreach (var candidate in document.Candidates.Concat(document.SameDayCandidates))
+            _logger.Info($"Candidate Bollinger band series recalculation started: Total={allCandidates.Count}");
+
+            foreach (var candidate in allCandidates)
             {
+                processed++;
+
                 if (!_historicalCache.TryLoad(candidate.Ticker, Timeframe.H4, out var candles) ||
                     candles == null ||
                     candles.Count == 0)
@@ -95,6 +108,12 @@ namespace IbSwingTrader.App.Commands
                 candidate.RecentH4BbLowerBandSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerLowerBand);
 
                 recalculated++;
+
+                if (processed % 100 == 0 || processed == allCandidates.Count)
+                {
+                    _logger.Info(
+                        $"Candidate Bollinger band series recalculation progress: {processed}/{allCandidates.Count}, Recalculated={recalculated}");
+                }
             }
 
             return recalculated;
