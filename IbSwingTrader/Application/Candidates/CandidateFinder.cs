@@ -2764,9 +2764,11 @@ namespace IbSwingTrader.Application.Candidates
                 })
                 .ToList();
 
-            var window = Math.Min(
-                rankedInputs.Count,
-                Math.Max(settings.SecondPassMinimumWindow, finalTopCandidates * settings.SecondPassWindowMultiplier));
+            var window = family == SeriesTemplateFamily.TodayResearchLike
+                ? rankedInputs.Count
+                : Math.Min(
+                    rankedInputs.Count,
+                    Math.Max(settings.SecondPassMinimumWindow, finalTopCandidates * settings.SecondPassWindowMultiplier));
 
             if (window <= 1)
                 return rankedInputs.Select(x => x.Candidate).ToList();
@@ -2875,6 +2877,11 @@ namespace IbSwingTrader.Application.Candidates
                     candidate.DailyBbDirection,
                     candidate.H4BbRegime,
                     candidate.H4BbDirection);
+            var freshExpansionWinnerAdjustment = CalculateFreshExpansionWinnerAdjustment(
+                candidate,
+                diagnostics,
+                settings,
+                seriesSimilarityBonus);
 
             return
                 dailySeriesScore * settings.SecondPassDailySeriesWeight +
@@ -2885,8 +2892,78 @@ namespace IbSwingTrader.Application.Candidates
                 overextendedPenaltyScore * settings.SecondPassOverextendedPenaltyWeight +
                 bbAdjustment +
                 CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics) +
+                freshExpansionWinnerAdjustment +
                 seriesSimilarityBonus -
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+        }
+
+        private static decimal CalculateFreshExpansionWinnerAdjustment(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            decimal seriesSimilarityBonus)
+        {
+            diagnostics.FreshExpansionWinnerScore = null;
+
+            if (candidate.TradePlan.ProfitPercent < settings.FreshExpansionMinProfitPct ||
+                diagnostics.ATRRatio < settings.FreshExpansionMinAtrRatio)
+            {
+                return 0m;
+            }
+
+            var weeklyMaLast = GetLatestValue(candidate.RecentWeeklyMaSeries);
+            var dailyMaLast = GetLatestValue(candidate.RecentDailyMaSeries);
+            var h4MaLast = GetLatestValue(candidate.RecentH4MaSeries);
+            var dailyBbWidthLast = GetLatestValue(candidate.RecentDailyBbWidthSeries);
+            var h4BbWidthLast = GetLatestValue(candidate.RecentH4BbWidthSeries);
+            var dailyRsiLast = GetLatestValue(candidate.RecentDailyRsiSeries);
+            var h4RsiLast = GetLatestValue(candidate.RecentH4RsiSeries);
+            var weeklyMacdLast = GetLatestValue(candidate.RecentWeeklyMacdSeries);
+            var dailyMacdLast = GetLatestValue(candidate.RecentDailyMacdSeries);
+            var h4MacdLast = GetLatestValue(candidate.RecentH4MacdSeries);
+
+            var hasFreshWeeklyRecovery =
+                weeklyMaLast >= settings.FreshExpansionMinWeeklyMa &&
+                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMaSeries, settings.FreshExpansionMaxPreviousWeeklyMa) &&
+                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMaSeries, settings.FreshExpansionMinPreviousWeeklyLow);
+            var hasDailyExpansion =
+                dailyMaLast >= settings.FreshExpansionMinDailyMa &&
+                dailyBbWidthLast >= settings.FreshExpansionMinDailyBbWidth &&
+                dailyRsiLast >= settings.FreshExpansionMinDailyRsi &&
+                dailyMacdLast > settings.FreshExpansionMinMacd;
+            var hasH4Expansion =
+                h4MaLast >= settings.FreshExpansionMinH4Ma &&
+                AverageLast(candidate.RecentH4MaSeries, 3) >= settings.FreshExpansionMinH4Ma &&
+                h4BbWidthLast >= settings.FreshExpansionMinH4BbWidth &&
+                h4RsiLast >= settings.FreshExpansionMinH4Rsi &&
+                h4MacdLast > settings.FreshExpansionMinMacd;
+            var hasWeeklyMacdRecovery =
+                weeklyMacdLast >= -0.05m &&
+                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMacdSeries, 0m);
+
+            if (!hasFreshWeeklyRecovery ||
+                !hasDailyExpansion ||
+                !hasH4Expansion ||
+                !hasWeeklyMacdRecovery)
+            {
+                return 0m;
+            }
+
+            var score = settings.FreshExpansionWinnerBonus;
+
+            if (seriesSimilarityBonus >= settings.SeriesSimilarity.FullMatchBonus)
+                score += settings.FreshExpansionExactTemplateBonus;
+
+            if (candidate.Score.Score >= 100m &&
+                candidate.TradePlan.ProfitPercent >= 10m &&
+                dailyBbWidthLast >= 60m &&
+                h4BbWidthLast >= 55m)
+            {
+                score += settings.FreshExpansionHighConvictionBonus;
+            }
+
+            diagnostics.FreshExpansionWinnerScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+            return score;
         }
 
         private static decimal CalculateLiveWinnerContinuationAdjustment(
@@ -4463,6 +4540,21 @@ namespace IbSwingTrader.Application.Candidates
             return series.Count == 0
                 ? 0m
                 : series[^1];
+        }
+
+        private static bool HasPreviousValueAtOrBelow(List<decimal> series, decimal threshold)
+        {
+            return series.Count >= 2 && series.Take(series.Count - 1).Any(x => x <= threshold);
+        }
+
+        private static decimal AverageLast(List<decimal> series, int count)
+        {
+            if (series.Count == 0 || count <= 0)
+                return 0m;
+
+            return series
+                .Skip(Math.Max(0, series.Count - count))
+                .Average();
         }
 
         private static decimal CalculateRelativeMovePct(decimal from, decimal to)
