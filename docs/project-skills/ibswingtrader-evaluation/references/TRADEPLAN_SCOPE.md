@@ -110,6 +110,17 @@ Use the real Bollinger band rows (`*BbUpperBandSeries`, `*BbMidBandSeries`,
 `*BbLowerBandSeries`) to identify the pattern. The old distance/width rows are
 still useful, but they do not show the same visual curve shape as the chart.
 
+The broader trade-plan direction is to use real chart-like indicator rows for
+confidence and ambiguity checks:
+
+- Bollinger real upper/mid/lower lines are the primary pattern shape.
+- RSI real rows add or remove confidence from the launch.
+- MACD should expose chart-like MACD line, signal line, and histogram rows; the
+  current line-minus-signal row is not enough for all pattern judgments.
+- MA should expose real MA line rows, not only distance-to-MA.
+- Distance/width rows remain useful as confirmation and normalization context,
+  but entry/exit decisions should not depend only on derived distances.
+
 High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
 High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
 High-amplitude `Win` rows with large `ExitMissPct` or low captured percent mean

@@ -4,6 +4,10 @@ These are the main series used to understand a ticker before it fully expands.
 
 ## Primary series
 
+Prefer real chart-like indicator lines for pattern detection and confidence.
+Distance/width rows remain useful as derived context, but they should not be
+the only source for visual pattern logic.
+
 - `RecentWeeklyBbMidDistanceSeries`
 - `RecentDailyBbMidDistanceSeries`
 - `RecentH4BbMidDistanceSeries`
@@ -22,6 +26,17 @@ These are the main series used to understand a ticker before it fully expands.
 - `RecentWeeklyMacdSeries`
 - `RecentDailyMacdSeries`
 - `RecentH4MacdSeries`
+
+Migration direction:
+
+- Keep existing distance rows for compatibility while adding real chart rows.
+- Bollinger already has real upper/mid/lower band rows.
+- RSI rows are already real indicator values.
+- MACD should move beyond only `MACDLineMinusSignal` and expose chart-like
+  MACD line, signal line, and histogram rows per timeframe.
+- MA should expose real MA line rows per timeframe, not only distance-to-MA.
+- Pattern detectors should primarily read the real chart rows, with distance
+  rows used as confirmation or normalization context.
 
 ## Main interpretations
 
