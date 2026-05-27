@@ -1674,6 +1674,23 @@ namespace IbSwingTrader.Application.Candidates
                     $"MinProfitPct={_fmt.Percent(constructiveSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(constructiveSettings.MaxProfitPct)}");
             }
+            else if (isFreshExpansionWinner)
+            {
+                var freshExpansionSettings = tradeSettings.FreshExpansionExit;
+                defaultProfitPctOverride = freshExpansionSettings.DefaultProfitPct;
+                minProfitPctOverride = freshExpansionSettings.MinProfitPct;
+                maxProfitPctOverride = freshExpansionSettings.MaxProfitPct;
+                maxLossPctOverride = freshExpansionSettings.MaxLossPct;
+                entryDiscountOverridePct = freshExpansionSettings.EntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan fresh-expansion row-family profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(freshExpansionSettings.EntryDiscountPct)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(freshExpansionSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(freshExpansionSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(freshExpansionSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(freshExpansionSettings.MaxLossPct)}");
+            }
             else if (isExplosiveMinFirst)
             {
                 var explosiveSettings = tradeSettings.ExplosiveMinFirstExit;
@@ -1703,23 +1720,6 @@ namespace IbSwingTrader.Application.Candidates
                     $"MinProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MaxProfitPct)}, " +
                     $"MaxLossPct={_fmt.Percent(explosiveMaxFirstSettings.MaxLossPct)}");
-            }
-            else if (isFreshExpansionWinner)
-            {
-                var freshExpansionSettings = tradeSettings.FreshExpansionExit;
-                defaultProfitPctOverride = freshExpansionSettings.DefaultProfitPct;
-                minProfitPctOverride = freshExpansionSettings.MinProfitPct;
-                maxProfitPctOverride = freshExpansionSettings.MaxProfitPct;
-                maxLossPctOverride = freshExpansionSettings.MaxLossPct;
-                entryDiscountOverridePct = freshExpansionSettings.EntryDiscountPct;
-
-                _logger.Info(
-                    $"Trade plan fresh-expansion row-family profile applied for {ctx.Stock.Ticker}. " +
-                    $"EntryDiscountPct={_fmt.Percent(freshExpansionSettings.EntryDiscountPct)}, " +
-                    $"DefaultProfitPct={_fmt.Percent(freshExpansionSettings.DefaultProfitPct)}, " +
-                    $"MinProfitPct={_fmt.Percent(freshExpansionSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(freshExpansionSettings.MaxProfitPct)}, " +
-                    $"MaxLossPct={_fmt.Percent(freshExpansionSettings.MaxLossPct)}");
             }
             else if (IsStrongMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
             {
@@ -1998,18 +1998,27 @@ namespace IbSwingTrader.Application.Candidates
                 RecentDailyBbMidDistanceSeries = recentSeries.DailyBbMidDistanceSeries,
                 RecentDailyBbUpperDistanceSeries = recentSeries.DailyBbUpperDistanceSeries,
                 RecentDailyBbWidthSeries = recentSeries.DailyBbWidthSeries,
+                RecentDailyBbUpperBandSeries = recentSeries.DailyBbUpperBandSeries,
+                RecentDailyBbMidBandSeries = recentSeries.DailyBbMidBandSeries,
+                RecentDailyBbLowerBandSeries = recentSeries.DailyBbLowerBandSeries,
                 RecentDailyRsiSeries = recentSeries.DailyRsiSeries,
                 RecentDailyMacdSeries = recentSeries.DailyMacdSeries,
                 RecentWeeklyMaSeries = recentSeries.WeeklyMaSeries,
                 RecentWeeklyBbMidDistanceSeries = recentSeries.WeeklyBbMidDistanceSeries,
                 RecentWeeklyBbUpperDistanceSeries = recentSeries.WeeklyBbUpperDistanceSeries,
                 RecentWeeklyBbWidthSeries = recentSeries.WeeklyBbWidthSeries,
+                RecentWeeklyBbUpperBandSeries = recentSeries.WeeklyBbUpperBandSeries,
+                RecentWeeklyBbMidBandSeries = recentSeries.WeeklyBbMidBandSeries,
+                RecentWeeklyBbLowerBandSeries = recentSeries.WeeklyBbLowerBandSeries,
                 RecentWeeklyRsiSeries = recentSeries.WeeklyRsiSeries,
                 RecentWeeklyMacdSeries = recentSeries.WeeklyMacdSeries,
                 RecentH4MaSeries = recentSeries.H4MaSeries,
                 RecentH4BbMidDistanceSeries = recentSeries.H4BbMidDistanceSeries,
                 RecentH4BbUpperDistanceSeries = recentSeries.H4BbUpperDistanceSeries,
                 RecentH4BbWidthSeries = recentSeries.H4BbWidthSeries,
+                RecentH4BbUpperBandSeries = recentSeries.H4BbUpperBandSeries,
+                RecentH4BbMidBandSeries = recentSeries.H4BbMidBandSeries,
+                RecentH4BbLowerBandSeries = recentSeries.H4BbLowerBandSeries,
                 RecentH4RsiSeries = recentSeries.H4RsiSeries,
                 RecentH4MacdSeries = recentSeries.H4MacdSeries,
                 WeeklyBbDirection = bbState.Weekly.Direction,
@@ -2921,6 +2930,10 @@ namespace IbSwingTrader.Application.Candidates
                 diagnostics,
                 settings,
                 seriesSimilarityBonus);
+            var dailyBollingerSqueezeLaunchAdjustment = CalculateDailyBollingerSqueezeLaunchAdjustment(
+                candidate,
+                diagnostics,
+                settings);
 
             return
                 dailySeriesScore * settings.SecondPassDailySeriesWeight +
@@ -2932,8 +2945,75 @@ namespace IbSwingTrader.Application.Candidates
                 bbAdjustment +
                 CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics) +
                 freshExpansionWinnerAdjustment +
+                dailyBollingerSqueezeLaunchAdjustment +
                 seriesSimilarityBonus -
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+        }
+
+        private static decimal CalculateDailyBollingerSqueezeLaunchAdjustment(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            diagnostics.DailyBollingerSqueezeLaunchScore = null;
+
+            if (candidate.RecentDailyBbUpperBandSeries.Count < 6 ||
+                candidate.RecentDailyBbMidBandSeries.Count < 6 ||
+                candidate.RecentDailyBbLowerBandSeries.Count < 6 ||
+                candidate.RecentDailyBbWidthSeries.Count < 6 ||
+                candidate.RecentDailyBbUpperDistanceSeries.Count < 4 ||
+                candidate.RecentDailyRsiSeries.Count < 1 ||
+                candidate.RecentDailyMacdSeries.Count < 1)
+            {
+                return 0m;
+            }
+
+            var upper = candidate.RecentDailyBbUpperBandSeries;
+            var mid = candidate.RecentDailyBbMidBandSeries;
+            var lower = candidate.RecentDailyBbLowerBandSeries;
+            var width = candidate.RecentDailyBbWidthSeries;
+            var upperDistance = candidate.RecentDailyBbUpperDistanceSeries;
+            var baseMid = mid[^4];
+
+            if (baseMid <= 0m)
+                return 0m;
+
+            var widthExpansion = width[^1] - width[^4];
+            var preExpansionWidth = width.Take(width.Count - 3).DefaultIfEmpty(width[^4]).Min();
+            var upperMovePct = (upper[^1] - upper[^4]) / baseMid * 100m;
+            var midMovePct = (mid[^1] - mid[^4]) / baseMid * 100m;
+            var lowerMovePct = (lower[^1] - lower[^4]) / baseMid * 100m;
+            var upperAccelerationPct = ((upper[^1] - upper[^2]) - (upper[^3] - upper[^4])) / baseMid * 100m;
+            var lowerDivergesFromMid = lowerMovePct <= settings.DailyBollingerSqueezeLaunchMaxLowerMovePct ||
+                                        lowerMovePct <= midMovePct * 0.40m;
+            var brokeOrTouchedUpperBand = upperDistance.TakeLast(3).Min() <= settings.DailyBollingerSqueezeLaunchMaxUpperDistancePct;
+            var momentumConfirms =
+                GetLatestValue(candidate.RecentDailyRsiSeries) >= settings.DailyBollingerSqueezeLaunchMinRsi &&
+                GetLatestValue(candidate.RecentDailyMacdSeries) > settings.DailyBollingerSqueezeLaunchMinMacd;
+
+            if (preExpansionWidth > settings.DailyBollingerSqueezeLaunchMaxPreExpansionWidthPct ||
+                widthExpansion < settings.DailyBollingerSqueezeLaunchMinWidthExpansionPct ||
+                upperMovePct < settings.DailyBollingerSqueezeLaunchMinUpperMovePct ||
+                midMovePct < settings.DailyBollingerSqueezeLaunchMinMidMovePct ||
+                upperAccelerationPct <= 0m ||
+                !lowerDivergesFromMid ||
+                !brokeOrTouchedUpperBand ||
+                !momentumConfirms)
+            {
+                return 0m;
+            }
+
+            var score = settings.DailyBollingerSqueezeLaunchBonus;
+
+            if (widthExpansion >= settings.DailyBollingerSqueezeLaunchMinWidthExpansionPct * 1.75m &&
+                upperMovePct >= settings.DailyBollingerSqueezeLaunchMinUpperMovePct * 1.50m &&
+                GetLatestValue(candidate.RecentDailyRsiSeries) >= 70m)
+            {
+                score += settings.DailyBollingerSqueezeLaunchHighConvictionBonus;
+            }
+
+            diagnostics.DailyBollingerSqueezeLaunchScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+            return score;
         }
 
         private static decimal CalculateFreshExpansionWinnerAdjustment(
@@ -3669,18 +3749,27 @@ namespace IbSwingTrader.Application.Candidates
                 nameof(ResearchTopGainerDatasetRow.DailyBbMidDistanceSeries) => ["DailyBollingerMidDistances"],
                 nameof(ResearchTopGainerDatasetRow.DailyBbUpperDistanceSeries) => ["DailyBollingerUpperDistances"],
                 nameof(ResearchTopGainerDatasetRow.DailyBbWidthSeries) => ["DailyBollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbUpperBandSeries) => ["DailyBollingerUpperBands"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbMidBandSeries) => ["DailyBollingerMidBands"],
+                nameof(ResearchTopGainerDatasetRow.DailyBbLowerBandSeries) => ["DailyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
                 nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbMidDistanceSeries) => ["WeeklyBollingerMidDistances"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbUpperDistanceSeries) => ["WeeklyBollingerUpperDistances"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbWidthSeries) => ["WeeklyBollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbUpperBandSeries) => ["WeeklyBollingerUpperBands"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbMidBandSeries) => ["WeeklyBollingerMidBands"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyBbLowerBandSeries) => ["WeeklyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
                 nameof(ResearchTopGainerDatasetRow.H4BbMidDistanceSeries) => ["H4BollingerMidDistances"],
                 nameof(ResearchTopGainerDatasetRow.H4BbUpperDistanceSeries) => ["H4BollingerUpperDistances"],
                 nameof(ResearchTopGainerDatasetRow.H4BbWidthSeries) => ["H4BollingerBandWidths"],
+                nameof(ResearchTopGainerDatasetRow.H4BbUpperBandSeries) => ["H4BollingerUpperBands"],
+                nameof(ResearchTopGainerDatasetRow.H4BbMidBandSeries) => ["H4BollingerMidBands"],
+                nameof(ResearchTopGainerDatasetRow.H4BbLowerBandSeries) => ["H4BollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
                 _ => []
@@ -3767,18 +3856,27 @@ namespace IbSwingTrader.Application.Candidates
                 DailyBbMidDistanceSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidDistancePct),
                 DailyBbUpperDistanceSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct),
                 DailyBbWidthSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct),
+                DailyBbUpperBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperBand),
+                DailyBbMidBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand),
+                DailyBbLowerBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand),
                 DailyRsiSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14),
                 DailyMacdSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal),
                 WeeklyMaSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct),
                 WeeklyBbMidDistanceSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct),
                 WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct),
                 WeeklyBbWidthSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct),
+                WeeklyBbUpperBandSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperBand),
+                WeeklyBbMidBandSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidBand),
+                WeeklyBbLowerBandSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerLowerBand),
                 WeeklyRsiSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14),
                 WeeklyMacdSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal),
                 H4MaSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct),
                 H4BbMidDistanceSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct),
                 H4BbUpperDistanceSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct),
                 H4BbWidthSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct),
+                H4BbUpperBandSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperBand),
+                H4BbMidBandSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidBand),
+                H4BbLowerBandSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerLowerBand),
                 H4RsiSeries = BuildRecentH4Series(candles, scanIndex, x => x.RSI14),
                 H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal)
             };
@@ -5545,18 +5643,27 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
             public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
             public List<decimal> DailyBbWidthSeries { get; init; } = [];
+            public List<decimal> DailyBbUpperBandSeries { get; init; } = [];
+            public List<decimal> DailyBbMidBandSeries { get; init; } = [];
+            public List<decimal> DailyBbLowerBandSeries { get; init; } = [];
             public List<decimal> DailyRsiSeries { get; init; } = [];
             public List<decimal> DailyMacdSeries { get; init; } = [];
             public List<decimal> WeeklyMaSeries { get; init; } = [];
             public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
             public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
             public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
+            public List<decimal> WeeklyBbUpperBandSeries { get; init; } = [];
+            public List<decimal> WeeklyBbMidBandSeries { get; init; } = [];
+            public List<decimal> WeeklyBbLowerBandSeries { get; init; } = [];
             public List<decimal> WeeklyRsiSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSeries { get; init; } = [];
             public List<decimal> H4MaSeries { get; init; } = [];
             public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
             public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
             public List<decimal> H4BbWidthSeries { get; init; } = [];
+            public List<decimal> H4BbUpperBandSeries { get; init; } = [];
+            public List<decimal> H4BbMidBandSeries { get; init; } = [];
+            public List<decimal> H4BbLowerBandSeries { get; init; } = [];
             public List<decimal> H4RsiSeries { get; init; } = [];
             public List<decimal> H4MacdSeries { get; init; } = [];
         }

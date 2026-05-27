@@ -148,7 +148,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.105m;
         public decimal MinProfitPct { get; set; } = 0.09m;
         public decimal MaxProfitPct { get; set; } = 0.14m;
-        public decimal MaxLossPct { get; set; } = 0.05m;
+        public decimal MaxLossPct { get; set; } = 0.06m;
         public decimal MinAtrRatio { get; set; } = 4.0m;
         public decimal MinWeeklyMa { get; set; } = 6.0m;
         public decimal MaxPreviousWeeklyMa { get; set; } = 5.0m;
@@ -469,6 +469,16 @@ namespace IbSwingTrader.Domain.Settings
         public decimal FreshExpansionMinH4BbWidth { get; set; } = 55.0m;
         public decimal FreshExpansionMinH4Rsi { get; set; } = 68.0m;
         public decimal FreshExpansionMinMacd { get; set; } = 0.0m;
+        public decimal DailyBollingerSqueezeLaunchBonus { get; set; } = 1.40m;
+        public decimal DailyBollingerSqueezeLaunchHighConvictionBonus { get; set; } = 0.60m;
+        public decimal DailyBollingerSqueezeLaunchMinWidthExpansionPct { get; set; } = 18.0m;
+        public decimal DailyBollingerSqueezeLaunchMaxPreExpansionWidthPct { get; set; } = 35.0m;
+        public decimal DailyBollingerSqueezeLaunchMinUpperMovePct { get; set; } = 12.0m;
+        public decimal DailyBollingerSqueezeLaunchMaxLowerMovePct { get; set; } = 8.0m;
+        public decimal DailyBollingerSqueezeLaunchMinMidMovePct { get; set; } = 3.0m;
+        public decimal DailyBollingerSqueezeLaunchMaxUpperDistancePct { get; set; } = -4.0m;
+        public decimal DailyBollingerSqueezeLaunchMinRsi { get; set; } = 62.0m;
+        public decimal DailyBollingerSqueezeLaunchMinMacd { get; set; } = 0.0m;
         public decimal ResearchSeriesDailyMaSlopeTarget { get; set; } = 22.95m;
         public decimal ResearchSeriesDailyMaSlopeTolerance { get; set; } = 18m;
         public decimal ResearchSeriesDailyRsiSlopeTarget { get; set; } = 19.56m;

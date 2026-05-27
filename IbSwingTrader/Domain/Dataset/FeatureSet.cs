@@ -9,6 +9,9 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal H4BollingerMidDistancePct { get; set; }
         public decimal H4BollingerUpperDistancePct { get; set; }
         public decimal H4BollingerBandWidthPct { get; set; }
+        public decimal H4BollingerUpperBand { get; set; }
+        public decimal H4BollingerMidBand { get; set; }
+        public decimal H4BollingerLowerBand { get; set; }
         public decimal RSI14 { get; set; }
         public decimal MACDLineMinusSignal { get; set; }
 
@@ -16,6 +19,9 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal DailyBollingerMidDistancePct { get; set; }
         public decimal DailyBollingerUpperDistancePct { get; set; }
         public decimal DailyBollingerBandWidthPct { get; set; }
+        public decimal DailyBollingerUpperBand { get; set; }
+        public decimal DailyBollingerMidBand { get; set; }
+        public decimal DailyBollingerLowerBand { get; set; }
         public decimal DailyRSI14 { get; set; }
         public decimal DailyMACDLineMinusSignal { get; set; }
 
@@ -23,6 +29,9 @@ namespace IbSwingTrader.Domain.Dataset
         public decimal? WeeklyBollingerMidDistancePct { get; set; }
         public decimal? WeeklyBollingerUpperDistancePct { get; set; }
         public decimal? WeeklyBollingerBandWidthPct { get; set; }
+        public decimal? WeeklyBollingerUpperBand { get; set; }
+        public decimal? WeeklyBollingerMidBand { get; set; }
+        public decimal? WeeklyBollingerLowerBand { get; set; }
         public decimal? WeeklyRSI14 { get; set; }
         public decimal? WeeklyMACDLineMinusSignal { get; set; }
     }

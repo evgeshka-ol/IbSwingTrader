@@ -68,6 +68,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> DailyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> DailyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> DailyBbWidthSeries { get; set; } = [];
+        public List<decimal> DailyBbUpperBandSeries { get; set; } = [];
+        public List<decimal> DailyBbMidBandSeries { get; set; } = [];
+        public List<decimal> DailyBbLowerBandSeries { get; set; } = [];
         public List<decimal> DailyRsiSeries { get; set; } = [];
         public List<decimal> DailyMacdSeries { get; set; } = [];
 
@@ -75,6 +78,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> WeeklyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> WeeklyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> WeeklyBbWidthSeries { get; set; } = [];
+        public List<decimal> WeeklyBbUpperBandSeries { get; set; } = [];
+        public List<decimal> WeeklyBbMidBandSeries { get; set; } = [];
+        public List<decimal> WeeklyBbLowerBandSeries { get; set; } = [];
         public List<decimal> WeeklyRsiSeries { get; set; } = [];
         public List<decimal> WeeklyMacdSeries { get; set; } = [];
 
@@ -82,6 +88,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal>? H4BbMidDistanceSeries { get; set; }
         public List<decimal>? H4BbUpperDistanceSeries { get; set; }
         public List<decimal>? H4BbWidthSeries { get; set; }
+        public List<decimal>? H4BbUpperBandSeries { get; set; }
+        public List<decimal>? H4BbMidBandSeries { get; set; }
+        public List<decimal>? H4BbLowerBandSeries { get; set; }
         public List<decimal>? H4RsiSeries { get; set; }
         public List<decimal>? H4MacdSeries { get; set; }
     }

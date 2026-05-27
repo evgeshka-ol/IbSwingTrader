@@ -181,18 +181,27 @@ namespace IbSwingTrader.Infrastructure.Historical
             var dailyBbMid = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidDistancePct);
             var dailyBbUpper = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperDistancePct);
             var dailyBbWidth = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerBandWidthPct);
+            var dailyBbUpperBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperBand);
+            var dailyBbMidBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand);
+            var dailyBbLowerBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand);
             var dailyRsi = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
             var dailyMacd = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal);
             var weeklyMa = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct);
             var weeklyBbMid = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct);
             var weeklyBbUpper = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct);
             var weeklyBbWidth = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerBandWidthPct);
+            var weeklyBbUpperBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperBand);
+            var weeklyBbMidBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidBand);
+            var weeklyBbLowerBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerLowerBand);
             var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
             var weeklyMacd = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal);
             var h4Ma = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct);
             var h4BbMid = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct);
             var h4BbUpper = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct);
             var h4BbWidth = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerBandWidthPct);
+            var h4BbUpperBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperBand);
+            var h4BbMidBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidBand);
+            var h4BbLowerBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerLowerBand);
             var h4Rsi = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
             var h4Macd = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal);
 
@@ -202,18 +211,27 @@ namespace IbSwingTrader.Infrastructure.Historical
                 RecentDailyBbMidDistanceSeries = dailyBbMid,
                 RecentDailyBbUpperDistanceSeries = dailyBbUpper,
                 RecentDailyBbWidthSeries = dailyBbWidth,
+                RecentDailyBbUpperBandSeries = dailyBbUpperBand,
+                RecentDailyBbMidBandSeries = dailyBbMidBand,
+                RecentDailyBbLowerBandSeries = dailyBbLowerBand,
                 RecentDailyRsiSeries = dailyRsi,
                 RecentDailyMacdSeries = dailyMacd,
                 RecentWeeklyMaSeries = weeklyMa,
                 RecentWeeklyBbMidDistanceSeries = weeklyBbMid,
                 RecentWeeklyBbUpperDistanceSeries = weeklyBbUpper,
                 RecentWeeklyBbWidthSeries = weeklyBbWidth,
+                RecentWeeklyBbUpperBandSeries = weeklyBbUpperBand,
+                RecentWeeklyBbMidBandSeries = weeklyBbMidBand,
+                RecentWeeklyBbLowerBandSeries = weeklyBbLowerBand,
                 RecentWeeklyRsiSeries = weeklyRsi,
                 RecentWeeklyMacdSeries = weeklyMacd,
                 RecentH4MaSeries = h4Ma,
                 RecentH4BbMidDistanceSeries = h4BbMid,
                 RecentH4BbUpperDistanceSeries = h4BbUpper,
                 RecentH4BbWidthSeries = h4BbWidth,
+                RecentH4BbUpperBandSeries = h4BbUpperBand,
+                RecentH4BbMidBandSeries = h4BbMidBand,
+                RecentH4BbLowerBandSeries = h4BbLowerBand,
                 RecentH4RsiSeries = h4Rsi,
                 RecentH4MacdSeries = h4Macd,
                 DailyMaSlope = CalculateSlope(dailyMa),

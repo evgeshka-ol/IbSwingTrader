@@ -28,6 +28,9 @@ namespace IbSwingTrader.Domain.Market
         public List<decimal> RecentDailyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentDailyBbWidthSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
+        public List<decimal> RecentDailyBbLowerBandSeries { get; set; } = [];
 
         public List<decimal> RecentDailyRsiSeries { get; set; } = [];
 
@@ -37,6 +40,9 @@ namespace IbSwingTrader.Domain.Market
         public List<decimal> RecentWeeklyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentWeeklyBbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentWeeklyBbWidthSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbUpperBandSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbMidBandSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyBbLowerBandSeries { get; set; } = [];
 
         public List<decimal> RecentWeeklyRsiSeries { get; set; } = [];
 
@@ -46,6 +52,9 @@ namespace IbSwingTrader.Domain.Market
         public List<decimal> RecentH4BbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentH4BbUpperDistanceSeries { get; set; } = [];
         public List<decimal> RecentH4BbWidthSeries { get; set; } = [];
+        public List<decimal> RecentH4BbUpperBandSeries { get; set; } = [];
+        public List<decimal> RecentH4BbMidBandSeries { get; set; } = [];
+        public List<decimal> RecentH4BbLowerBandSeries { get; set; } = [];
 
         public List<decimal> RecentH4RsiSeries { get; set; } = [];
 

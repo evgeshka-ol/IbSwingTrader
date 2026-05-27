@@ -10,6 +10,10 @@ namespace IbSwingTrader.Application.Dataset
             if (index <= 0 || index > candles.Count)
                 throw new ArgumentOutOfRangeException(nameof(index));
 
+            var h4Bands = CalcBollingerBandsFromSeries(BuildH4Closes(candles, index), 20, 2m);
+            var dailyBands = CalcBollingerBandsFromSeries(BuildDailyCloses(candles, index), 20, 2m);
+            var weeklyBands = CalcBollingerBandsFromSeries(BuildWeeklyCloses(candles, index), 20, 2m);
+
             return new FeatureSet
             {
                 DistanceTo20dHigh = CalcDistanceTo20dHigh(candles, index),
@@ -20,6 +24,9 @@ namespace IbSwingTrader.Application.Dataset
                 H4BollingerMidDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 20),
                 H4BollingerUpperDistancePct = CalcH4BollingerUpperDistancePct(candles, index, 20, 2m),
                 H4BollingerBandWidthPct = CalcH4BollingerBandWidthPct(candles, index, 20, 2m),
+                H4BollingerUpperBand = h4Bands?.Upper ?? 0m,
+                H4BollingerMidBand = h4Bands?.Mid ?? 0m,
+                H4BollingerLowerBand = h4Bands?.Lower ?? 0m,
                 RSI14 = CalcRsiFromCandles(candles, index, 14),
                 MACDLineMinusSignal = CalcMacdLineMinusSignalFromCandles(candles, index),
 
@@ -28,6 +35,9 @@ namespace IbSwingTrader.Application.Dataset
                 DailyBollingerMidDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
                 DailyBollingerUpperDistancePct = CalcDailyBollingerUpperDistancePct(candles, index, 20, 2m),
                 DailyBollingerBandWidthPct = CalcDailyBollingerBandWidthPct(candles, index, 20, 2m),
+                DailyBollingerUpperBand = dailyBands?.Upper ?? 0m,
+                DailyBollingerMidBand = dailyBands?.Mid ?? 0m,
+                DailyBollingerLowerBand = dailyBands?.Lower ?? 0m,
                 DailyRSI14 = CalcDailyRsi14(candles, index),
                 DailyMACDLineMinusSignal = CalcDailyMacdLineMinusSignal(candles, index),
 
@@ -36,6 +46,9 @@ namespace IbSwingTrader.Application.Dataset
                 WeeklyBollingerMidDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
                 WeeklyBollingerUpperDistancePct = CalcWeeklyBollingerUpperDistancePct(candles, index, 20, 2m),
                 WeeklyBollingerBandWidthPct = CalcWeeklyBollingerBandWidthPct(candles, index, 20, 2m),
+                WeeklyBollingerUpperBand = weeklyBands?.Upper,
+                WeeklyBollingerMidBand = weeklyBands?.Mid,
+                WeeklyBollingerLowerBand = weeklyBands?.Lower,
                 WeeklyRSI14 = CalcWeeklyRsi14(candles, index),
                 WeeklyMACDLineMinusSignal = CalcWeeklyMacdLineMinusSignal(candles, index)
             };
@@ -399,6 +412,24 @@ namespace IbSwingTrader.Application.Dataset
             return (upperBand - lowerBand) / sma * 100m;
         }
 
+        private static BollingerBands? CalcBollingerBandsFromSeries(
+            List<decimal> closes,
+            int length,
+            decimal stdDevMultiplier)
+        {
+            if (closes.Count < length)
+                return null;
+
+            var window = closes.Skip(closes.Count - length).ToList();
+            var mid = window.Average();
+            var stdDev = CalcStandardDeviation(window, mid);
+
+            return new BollingerBands(
+                mid + stdDevMultiplier * stdDev,
+                mid,
+                mid - stdDevMultiplier * stdDev);
+        }
+
         private static decimal CalcStandardDeviation(List<decimal> values, decimal mean)
         {
             if (values.Count == 0)
@@ -636,5 +667,7 @@ namespace IbSwingTrader.Application.Dataset
             public decimal Signal { get; set; }
             public decimal Histogram { get; set; }
         }
+
+        private sealed record BollingerBands(decimal Upper, decimal Mid, decimal Lower);
     }
 }
