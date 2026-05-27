@@ -51,11 +51,13 @@ namespace IbSwingTrader.Application.Dataset
 
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
-                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     x => x.Key,
                     x => x
-                        .OrderByDescending(c => c.Score.Score)
+                        .OrderBy(c => c.GroupPriority)
+                        .ThenBy(c => c.DisplayRank)
+                        .ThenByDescending(c => c.Candidate.Score.Score)
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
@@ -169,11 +171,13 @@ namespace IbSwingTrader.Application.Dataset
 
             var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
-                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     x => x.Key,
                     x => x
-                        .OrderByDescending(c => c.Score.Score)
+                        .OrderBy(c => c.GroupPriority)
+                        .ThenBy(c => c.DisplayRank)
+                        .ThenByDescending(c => c.Candidate.Score.Score)
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
@@ -261,7 +265,7 @@ namespace IbSwingTrader.Application.Dataset
             _logger.Info($"Group FilterReference: {rows.Count(x => x.GroupLabel == "FilterReference")}");
         }
 
-        private async Task<List<CandidateDetails>> LoadCurrentCandidatesAsync()
+        private async Task<List<RankedCandidateSnapshot>> LoadCurrentCandidatesAsync()
         {
             var path = _pathService.GetCandidatesFile();
             var document = await _candidateFileService.ReadAsync(path);
@@ -280,20 +284,27 @@ namespace IbSwingTrader.Application.Dataset
                     return x;
                 });
 
-            return sameDayCandidates
-                .Concat(primaryCandidates)
-                .GroupBy(BuildCandidateKey, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.First())
+            var snapshots = BuildRankedCandidateSnapshots("TodayResearchLikeCandidates", sameDayCandidates)
+                .Concat(BuildRankedCandidateSnapshots("ReversalCandidates", primaryCandidates));
+
+            return snapshots
+                .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderBy(y => y.GroupPriority)
+                    .ThenBy(y => y.DisplayRank)
+                    .ThenByDescending(y => y.Candidate.Score.Score)
+                    .First())
                 .ToList();
         }
 
         private EvaluationDatasetRow BuildRow(
             CandidateEvaluationResult evaluation,
-            Dictionary<string, CandidateDetails> candidateIndex)
+            Dictionary<string, RankedCandidateSnapshot> candidateIndex)
         {
             var settings = _buildEvaluationDatasetSettingsProvider.Get();
             var key = BuildEvaluationKey(evaluation);
-            candidateIndex.TryGetValue(key, out var candidate);
+            candidateIndex.TryGetValue(key, out var candidateSnapshot);
+            var candidate = candidateSnapshot?.Candidate;
             var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
             var candidateSource = candidate?.CandidateSource ?? evaluation.CandidateSource;
             if (string.IsNullOrWhiteSpace(candidateSource))
@@ -399,6 +410,8 @@ namespace IbSwingTrader.Application.Dataset
                 MaxDownBeforeMaxUp = CompareTimes(minTime, maxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 CandidateSource = candidateSource,
+                CandidateGroup = candidateSnapshot?.GroupName ?? string.Empty,
+                CandidateDisplayRank = candidateSnapshot?.DisplayRank,
                 HasActiveCandidateSnapshot = candidate != null,
                 CandidateScore = candidate?.Score.Score,
                 WeeklyScore = candidate?.Score.WeeklyScore,
@@ -769,7 +782,7 @@ namespace IbSwingTrader.Application.Dataset
 
         private static bool ShouldRebuildRow(
             CandidateEvaluationResult evaluation,
-            Dictionary<string, CandidateDetails> candidateIndex,
+            Dictionary<string, RankedCandidateSnapshot> candidateIndex,
             Dictionary<string, EvaluationDatasetRow> existingRowIndex)
         {
             var key = BuildEvaluationKey(evaluation);
@@ -785,7 +798,7 @@ namespace IbSwingTrader.Application.Dataset
         private async Task<List<EvaluationDatasetRow>> BuildLegacyNoEntryZeroAmplitudeBackfillRowsAsync(
             BuildEvaluationDatasetSettings settings,
             List<EvaluationDatasetRow> existingRows,
-            Dictionary<string, CandidateDetails> candidateIndex)
+            Dictionary<string, RankedCandidateSnapshot> candidateIndex)
         {
             var backfillKeys = BuildLegacyNoEntryZeroAmplitudeKeys(
                 settings,
@@ -903,7 +916,9 @@ namespace IbSwingTrader.Application.Dataset
             var comparison = sortColumn.Column switch
             {
                 nameof(EvaluationDatasetRow.GroupLabel) => CompareString(left.GroupLabel, right.GroupLabel, orderedValues),
-                nameof(EvaluationDatasetRow.ScanTime) => left.ScanTime.Date.CompareTo(right.ScanTime.Date),
+                nameof(EvaluationDatasetRow.ScanTime) => left.ScanTime.CompareTo(right.ScanTime),
+                nameof(EvaluationDatasetRow.CandidateGroup) => CompareString(left.CandidateGroup, right.CandidateGroup, orderedValues),
+                nameof(EvaluationDatasetRow.CandidateDisplayRank) => CompareNullableInt(left.CandidateDisplayRank, right.CandidateDisplayRank),
                 nameof(EvaluationDatasetRow.AmplitudePct) => left.AmplitudePct.CompareTo(right.AmplitudePct),
                 nameof(EvaluationDatasetRow.Outcome) => CompareString(left.Outcome, right.Outcome, orderedValues),
                 nameof(EvaluationDatasetRow.ExtremumOrder) => CompareString(left.ExtremumOrder, right.ExtremumOrder, orderedValues),
@@ -915,6 +930,37 @@ namespace IbSwingTrader.Application.Dataset
                 return 0;
 
             return descending ? -comparison : comparison;
+        }
+
+        private static List<RankedCandidateSnapshot> BuildRankedCandidateSnapshots(
+            string groupName,
+            IEnumerable<CandidateDetails> candidates)
+        {
+            return [.. candidates
+                .GroupBy(x => x.Scan.ScanTime)
+                .SelectMany(scanGroup => OrderForDisplay(scanGroup)
+                    .Select((candidate, index) => new RankedCandidateSnapshot(
+                        candidate,
+                        groupName,
+                        groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase) ? 0 : 1,
+                        index + 1)))];
+        }
+
+        private static List<CandidateDetails> OrderForDisplay(IEnumerable<CandidateDetails> candidates)
+        {
+            return candidates
+                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                .ThenByDescending(x => x.Score.Score)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static int CompareNullableInt(int? left, int? right)
+        {
+            var leftValue = left ?? int.MaxValue;
+            var rightValue = right ?? int.MaxValue;
+            return leftValue.CompareTo(rightValue);
         }
 
         private static int CompareString(
@@ -1122,5 +1168,11 @@ namespace IbSwingTrader.Application.Dataset
             public List<decimal> H4RsiSeries { get; init; } = [];
             public List<decimal> H4MacdSeries { get; init; } = [];
         }
+
+        private sealed record RankedCandidateSnapshot(
+            CandidateDetails Candidate,
+            string GroupName,
+            int GroupPriority,
+            int DisplayRank);
     }
 }

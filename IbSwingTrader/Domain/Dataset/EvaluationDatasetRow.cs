@@ -53,6 +53,10 @@ namespace IbSwingTrader.Domain.Dataset
 
         public string CandidateSource { get; set; } = string.Empty;
 
+        public string CandidateGroup { get; set; } = string.Empty;
+
+        public int? CandidateDisplayRank { get; set; }
+
         public int? DaysAfterEntry { get; set; }
 
 

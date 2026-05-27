@@ -96,8 +96,17 @@
                 "Descending": true
             },
             {
-                "Column": "AmplitudePct",
-                "Descending": true
+                "Column": "CandidateGroup",
+                "OrderedValues": [
+                    "ReversalCandidates",
+                    "TodayResearchLikeCandidates"
+                ]
+            },
+            {
+                "Column": "CandidateDisplayRank"
+            },
+            {
+                "Column": "Ticker"
             }
         ]
     },
