@@ -63,6 +63,10 @@ similarity signal before adding more derived heuristics.
 - For `ReversalCandidates`, use only high-amplitude reversal rows from the evaluation dataset.
 - A candidate close to historical winner templates should get promotion/ranking support.
 - A candidate close to low-amplitude or failed templates can later be penalized, but do not add that before the positive winner-template signal is stable.
+- If a scan has many candidates above `AmplitudePct >= 10%`, treat them as
+  the playable pool and learn low-amplitude rejection from rows below 10%.
+  The goal is to remove the low-amplitude third by similarity to today's
+  low-amplitude report rows, not by broad one-size-fits-all thresholds.
 
 ## Main code
 

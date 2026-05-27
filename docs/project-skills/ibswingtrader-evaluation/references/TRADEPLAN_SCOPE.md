@@ -58,6 +58,12 @@ The goal is to learn/predict:
 - whether the setup is min-first, max-first, same-bar, or stale
 - where exit should be placed for that setup family
 
+Do not tune entry and exit as one global rule for all strong candidates.
+Group high-amplitude rows by literal series similarity first, then tune the
+entry and exit profile per group. A fast continuation group may need a shallow
+entry and earlier exit; a pullback group may need a deeper entry and different
+target logic.
+
 Useful fields include:
 
 - `RecentDaily*Series`
@@ -98,6 +104,12 @@ When using evaluation rows for scanner feedback, split the series templates by
 amplitude. Rows with `AmplitudePct >= 10%` are positive templates. Rows with
 `SameDayContinuation` and `AmplitudePct < 10%` are negative ranking templates:
 they should lower summary priority for candidates whose rows look similar.
+
+When a daily report shows a clear high-amplitude majority and a low-amplitude
+minority, keep the majority as the trade-plan training pool. Use the minority
+as scanner rejection templates. The scanner should learn to avoid low-amplitude
+row families; the trade plan should learn different entries/exits inside the
+remaining high-amplitude row families.
 
 ## Current project principle
 

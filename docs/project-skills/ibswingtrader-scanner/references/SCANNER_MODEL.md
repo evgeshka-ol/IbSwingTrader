@@ -80,6 +80,9 @@ For scanner quality:
 - `AmplitudePct >= 10%` is strong
 - low amplitude is bad scanner quality
 - `NoEntry` alone is not enough to blame the scanner
+- if roughly two thirds of candidates clear `AmplitudePct >= 10%`, preserve
+  that high-amplitude pool and focus scanner work on rejecting the remaining
+  low-amplitude third by row similarity
 
 For trade-plan quality:
 
@@ -130,6 +133,9 @@ For `TodayResearchLikeCandidates`:
 - compare the current candidate series against rows in `research_top_gainers.csv`
 - also compare against high-amplitude rows in `evaluation-dataset.csv`
 - treat close matches to research winners as promotion/ranking evidence
+- compare against today's low-amplitude evaluation rows as negative templates;
+  candidates whose rows look like the low-amplitude third should be demoted or
+  filtered before they occupy the top of the list
 - treat the TE-style fresh expansion as a high-priority winner pattern:
   - weekly MA row recovers from negative/below-mean history into positive territory
   - daily MA, daily Bollinger width, and daily RSI expand together
@@ -149,3 +155,5 @@ Comparison principle:
 - normalize each compared series from its first point
 - use Daily, Weekly, and H4 contexts together
 - avoid replacing this with only slope/aggregate statistics
+- split templates by outcome role: high-amplitude rows are positive scanner
+  templates; low-amplitude rows are rejection templates
