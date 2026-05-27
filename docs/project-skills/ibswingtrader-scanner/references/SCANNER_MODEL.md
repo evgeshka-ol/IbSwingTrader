@@ -130,6 +130,13 @@ For `TodayResearchLikeCandidates`:
 - compare the current candidate series against rows in `research_top_gainers.csv`
 - also compare against high-amplitude rows in `evaluation-dataset.csv`
 - treat close matches to research winners as promotion/ranking evidence
+- treat the TE-style fresh expansion as a high-priority winner pattern:
+  - weekly MA row recovers from negative/below-mean history into positive territory
+  - daily MA, daily Bollinger width, and daily RSI expand together
+  - H4 MA, H4 Bollinger width, and H4 RSI also expand and hold
+  - weekly/daily/H4 MACD are recovering or positive
+  - this pattern can outrank a conflicting low-amplitude template match because
+    the row structure matches a practical next-day winner
 
 For `ReversalCandidates`:
 
