@@ -143,6 +143,14 @@ For `TodayResearchLikeCandidates`:
   - weekly/daily/H4 MACD are recovering or positive
   - this pattern can outrank a conflicting low-amplitude template match because
     the row structure matches a practical next-day winner
+- treat real Bollinger band curve launches as scalable patterns:
+  - use `*BbUpperBandSeries`, `*BbMidBandSeries`, and `*BbLowerBandSeries`
+    alongside width and upper-distance confirmation
+  - the same squeeze/launch shape can matter on Weekly, Daily, or H4
+  - Daily launch is stronger next-day research evidence; H4 launch is often an
+    earlier intraday/next-day trigger; Weekly launch is broad swing background
+  - do not discard a candidate only because the pattern appears on H4 rather
+    than Daily; adjust ranking/trade profile by timeframe instead
 
 For `ReversalCandidates`:
 

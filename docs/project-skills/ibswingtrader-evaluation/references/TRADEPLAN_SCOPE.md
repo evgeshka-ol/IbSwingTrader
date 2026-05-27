@@ -93,6 +93,23 @@ fresh launch from below daily mean with strong H4 acceleration, treat it as
 `FastContinuationShallow`; otherwise winners like `AKAN` can become high-amplitude
 `NoEntry` rows.
 
+Bollinger squeeze/launch patterns are timeframe-scalable and should influence
+the trade profile:
+
+- `Weekly` launch: broad swing background; allow stronger targets only when
+  Daily/H4 do not contradict the setup.
+- `Daily` launch: stronger swing or next-day continuation profile; TE-style
+  moves can justify more ambitious exits.
+- `H4` launch without Daily launch: playable early trigger, but usually use a
+  faster capture/defensive exit profile rather than assuming full Daily-style
+  amplitude.
+- `Daily + H4` launch: higher-confidence continuation; entry can be shallower
+  and exit can be less conservative than H4-only.
+
+Use the real Bollinger band rows (`*BbUpperBandSeries`, `*BbMidBandSeries`,
+`*BbLowerBandSeries`) to identify the pattern. The old distance/width rows are
+still useful, but they do not show the same visual curve shape as the chart.
+
 High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
 High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
 High-amplitude `Win` rows with large `ExitMissPct` or low captured percent mean

@@ -68,6 +68,21 @@ similarity signal before adding more derived heuristics.
   The goal is to remove the low-amplitude third by similarity to today's
   low-amplitude report rows, not by broad one-size-fits-all thresholds.
 
+## Bollinger pattern direction
+
+Bollinger band shape patterns are timeframe-scalable. Do not treat them as
+daily-only signals.
+
+- `Weekly` Bollinger launch: broad background and rare large swing potential.
+- `Daily` Bollinger launch: main swing/next-day potential, as in TE-style moves.
+- `H4` Bollinger launch: early trigger, intraday capture, or next-day
+  continuation, as in ONDS-style moves.
+
+The same upper/mid/lower band pattern can be useful on any available timeframe,
+but the trade decision changes with timeframe. Use the real band series
+(`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
+shape, then use timeframe context to decide ranking strength and trade profile.
+
 ## Main code
 
 - Scanner core: `IbSwingTrader/Application/Candidates/CandidateFinder.cs`

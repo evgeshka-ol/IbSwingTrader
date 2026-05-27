@@ -10,6 +10,15 @@ These are the main series used to understand a ticker before it fully expands.
 - `RecentWeeklyBbWidthSeries`
 - `RecentDailyBbWidthSeries`
 - `RecentH4BbWidthSeries`
+- `RecentWeeklyBbUpperBandSeries`
+- `RecentWeeklyBbMidBandSeries`
+- `RecentWeeklyBbLowerBandSeries`
+- `RecentDailyBbUpperBandSeries`
+- `RecentDailyBbMidBandSeries`
+- `RecentDailyBbLowerBandSeries`
+- `RecentH4BbUpperBandSeries`
+- `RecentH4BbMidBandSeries`
+- `RecentH4BbLowerBandSeries`
 - `RecentWeeklyMacdSeries`
 - `RecentDailyMacdSeries`
 - `RecentH4MacdSeries`
@@ -85,6 +94,42 @@ Typical signs on H4:
 - mean rising under price
 
 Entry should be based near the lows of the short consolidation candles, not blindly at the mid.
+
+### Bollinger Squeeze Launch
+
+This pattern should be detected from the real Bollinger curves, not only from
+distance-to-band fields.
+
+Use:
+
+- `*BbUpperBandSeries`
+- `*BbMidBandSeries`
+- `*BbLowerBandSeries`
+- `*BbWidthSeries`
+- `*BbUpperDistanceSeries` as confirmation that price touches or breaks the
+  upper band
+
+Typical bullish shape:
+
+- the band width was squeezed or flat
+- the upper band bends upward and accelerates
+- the mid band keeps rising, but with a milder bend than the upper band
+- the lower band does not follow the upper band upward; it lags, flattens, or
+  moves lower, so the envelope opens
+- RSI/MACD confirm the impulse
+
+The pattern works on every available timeframe, but the interpretation changes:
+
+- `Weekly`: large background potential; rare but powerful when it aligns.
+- `Daily`: main swing / next-day research-like potential, as in TE.
+- `H4`: early entry or fast intraday/next-day continuation, as in ONDS.
+
+Do not require the pattern to exist on Daily before using it. A clean H4
+Bollinger launch without Daily launch can still be playable, but usually calls
+for a faster, more defensive trade plan than a Daily/Weekly launch.
+
+When comparing band curves across tickers, compare shape rather than absolute
+price. Normalize by the starting point or compare deltas from the first point.
 
 ## Practical use
 
