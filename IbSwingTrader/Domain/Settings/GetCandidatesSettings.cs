@@ -135,9 +135,31 @@ namespace IbSwingTrader.Domain.Settings
         public ExplosiveMaxFirstExitSettings ExplosiveMaxFirstExit { get; set; } = new();
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
+        public FreshExpansionExitSettings FreshExpansionExit { get; set; } = new();
         public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
         public SeriesEntryProfileSettings SeriesEntryProfile { get; set; } = new();
         public H4BollingerEntrySettings H4BollingerEntry { get; set; } = new();
+    }
+
+    public class FreshExpansionExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal EntryDiscountPct { get; set; } = 0.0m;
+        public decimal DefaultProfitPct { get; set; } = 0.105m;
+        public decimal MinProfitPct { get; set; } = 0.09m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal MaxLossPct { get; set; } = 0.05m;
+        public decimal MinAtrRatio { get; set; } = 4.0m;
+        public decimal MinWeeklyMa { get; set; } = 6.0m;
+        public decimal MaxPreviousWeeklyMa { get; set; } = 5.0m;
+        public decimal MinPreviousWeeklyLow { get; set; } = -5.0m;
+        public decimal MinDailyMa { get; set; } = 50.0m;
+        public decimal MinDailyBbWidth { get; set; } = 45.0m;
+        public decimal MinDailyRsi { get; set; } = 68.0m;
+        public decimal MinH4Ma { get; set; } = 45.0m;
+        public decimal MinH4BbWidth { get; set; } = 55.0m;
+        public decimal MinH4Rsi { get; set; } = 68.0m;
+        public decimal MinMacd { get; set; } = 0.0m;
     }
 
     public class SeriesEntryProfileSettings

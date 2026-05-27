@@ -414,6 +414,25 @@
                 "EntryDiscountPct": 0.02,
                 "MaxLossPct": 0.06
             },
+            "FreshExpansionExit": {
+                "Enabled": true,
+                "EntryDiscountPct": 0.0,
+                "DefaultProfitPct": 0.105,
+                "MinProfitPct": 0.09,
+                "MaxProfitPct": 0.14,
+                "MaxLossPct": 0.05,
+                "MinAtrRatio": 4.0,
+                "MinWeeklyMa": 6.0,
+                "MaxPreviousWeeklyMa": 5.0,
+                "MinPreviousWeeklyLow": -5.0,
+                "MinDailyMa": 50.0,
+                "MinDailyBbWidth": 45.0,
+                "MinDailyRsi": 68.0,
+                "MinH4Ma": 45.0,
+                "MinH4BbWidth": 55.0,
+                "MinH4Rsi": 68.0,
+                "MinMacd": 0.0
+            },
             "ResearchLikeExit": {
                 "Enabled": true,
                 "EntryDiscountPct": 0.01,

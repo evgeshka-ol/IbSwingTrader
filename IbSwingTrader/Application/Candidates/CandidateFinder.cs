@@ -1597,6 +1597,10 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries,
                 _nextDayRankingSettings);
             var isResearchLikeReadyNow = IsResearchLikeReadyNow(recentSeries, tradeSettings.ResearchLikeExit);
+            var isFreshExpansionWinner = IsFreshExpansionTradeProfile(
+                diagnostics,
+                recentSeries,
+                tradeSettings.FreshExpansionExit);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -1699,6 +1703,23 @@ namespace IbSwingTrader.Application.Candidates
                     $"MinProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(explosiveMaxFirstSettings.MaxProfitPct)}, " +
                     $"MaxLossPct={_fmt.Percent(explosiveMaxFirstSettings.MaxLossPct)}");
+            }
+            else if (isFreshExpansionWinner)
+            {
+                var freshExpansionSettings = tradeSettings.FreshExpansionExit;
+                defaultProfitPctOverride = freshExpansionSettings.DefaultProfitPct;
+                minProfitPctOverride = freshExpansionSettings.MinProfitPct;
+                maxProfitPctOverride = freshExpansionSettings.MaxProfitPct;
+                maxLossPctOverride = freshExpansionSettings.MaxLossPct;
+                entryDiscountOverridePct = freshExpansionSettings.EntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan fresh-expansion row-family profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(freshExpansionSettings.EntryDiscountPct)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(freshExpansionSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(freshExpansionSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(freshExpansionSettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(freshExpansionSettings.MaxLossPct)}");
             }
             else if (IsStrongMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit))
             {
@@ -1828,6 +1849,24 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
+
+            if (isFreshExpansionWinner &&
+                tradeSettings.FreshExpansionExit.EntryDiscountPct >= 0m)
+            {
+                var freshExpansionEntryDiscountOverridePct = CapDiscount(
+                    entryDiscountOverridePct,
+                    tradeSettings.FreshExpansionExit.EntryDiscountPct);
+
+                if (freshExpansionEntryDiscountOverridePct != entryDiscountOverridePct)
+                {
+                    _logger.Info(
+                        $"Trade plan fresh-expansion entry cap applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(freshExpansionEntryDiscountOverridePct ?? 0m)}, " +
+                        $"PreviousEntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
+                }
+
+                entryDiscountOverridePct = freshExpansionEntryDiscountOverridePct;
+            }
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
@@ -4912,6 +4951,53 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.ATRRatio >= settings.MinAtrRatio &&
                    snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
                    diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
+        }
+
+        private static bool IsFreshExpansionTradeProfile(
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            FreshExpansionExitSettings settings)
+        {
+            if (!settings.Enabled ||
+                diagnostics.ATRRatio < settings.MinAtrRatio)
+            {
+                return false;
+            }
+
+            var weeklyMaLast = GetLatestValue(recentSeries.WeeklyMaSeries);
+            var dailyMaLast = GetLatestValue(recentSeries.DailyMaSeries);
+            var h4MaLast = GetLatestValue(recentSeries.H4MaSeries);
+            var dailyBbWidthLast = GetLatestValue(recentSeries.DailyBbWidthSeries);
+            var h4BbWidthLast = GetLatestValue(recentSeries.H4BbWidthSeries);
+            var dailyRsiLast = GetLatestValue(recentSeries.DailyRsiSeries);
+            var h4RsiLast = GetLatestValue(recentSeries.H4RsiSeries);
+            var weeklyMacdLast = GetLatestValue(recentSeries.WeeklyMacdSeries);
+            var dailyMacdLast = GetLatestValue(recentSeries.DailyMacdSeries);
+            var h4MacdLast = GetLatestValue(recentSeries.H4MacdSeries);
+
+            var hasFreshWeeklyRecovery =
+                weeklyMaLast >= settings.MinWeeklyMa &&
+                HasPreviousValueAtOrBelow(recentSeries.WeeklyMaSeries, settings.MaxPreviousWeeklyMa) &&
+                HasPreviousValueAtOrBelow(recentSeries.WeeklyMaSeries, settings.MinPreviousWeeklyLow);
+            var hasDailyExpansion =
+                dailyMaLast >= settings.MinDailyMa &&
+                dailyBbWidthLast >= settings.MinDailyBbWidth &&
+                dailyRsiLast >= settings.MinDailyRsi &&
+                dailyMacdLast > settings.MinMacd;
+            var hasH4Expansion =
+                h4MaLast >= settings.MinH4Ma &&
+                AverageLast(recentSeries.H4MaSeries, 3) >= settings.MinH4Ma &&
+                h4BbWidthLast >= settings.MinH4BbWidth &&
+                h4RsiLast >= settings.MinH4Rsi &&
+                h4MacdLast > settings.MinMacd;
+            var hasWeeklyMacdRecovery =
+                weeklyMacdLast >= -0.05m &&
+                HasPreviousValueAtOrBelow(recentSeries.WeeklyMacdSeries, 0m);
+
+            return hasFreshWeeklyRecovery &&
+                   hasDailyExpansion &&
+                   hasH4Expansion &&
+                   hasWeeklyMacdRecovery;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(
