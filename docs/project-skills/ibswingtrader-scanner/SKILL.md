@@ -83,10 +83,11 @@ but the trade decision changes with timeframe. Use the real band series
 (`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
 shape, then use timeframe context to decide ranking strength and trade profile.
 
-Broader series direction: move pattern logic toward real chart-like indicator
-lines. Bollinger, MA, RSI, and MACD should be available as the same kind of
-lines a trader sees on the chart. Existing distance/width rows can remain for
-compatibility and confirmation, but they should not be the only basis for
+Broader series direction: move pattern logic toward the visual indicators the
+user actually relies on: Bollinger, MACD, and RSI. MA is not a priority signal
+for pattern recognition and should be treated as legacy/context unless a
+specific analysis proves it adds value. Existing distance/width rows can remain
+for compatibility and confirmation, but they should not be the only basis for
 visual pattern recognition.
 
 ## Main code

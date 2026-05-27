@@ -117,7 +117,9 @@ confidence and ambiguity checks:
 - RSI real rows add or remove confidence from the launch.
 - MACD should expose chart-like MACD line, signal line, and histogram rows; the
   current line-minus-signal row is not enough for all pattern judgments.
-- MA should expose real MA line rows, not only distance-to-MA.
+- MA is not a priority decision signal. Keep existing MA/distance rows as
+  legacy/context, but do not add trade-plan complexity around MA unless a
+  specific analysis proves it improves decisions beyond Bollinger/MACD/RSI.
 - Distance/width rows remain useful as confirmation and normalization context,
   but entry/exit decisions should not depend only on derived distances.
 

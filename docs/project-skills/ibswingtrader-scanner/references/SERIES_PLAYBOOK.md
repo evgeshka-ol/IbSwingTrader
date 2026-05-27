@@ -34,7 +34,9 @@ Migration direction:
 - RSI rows are already real indicator values.
 - MACD should move beyond only `MACDLineMinusSignal` and expose chart-like
   MACD line, signal line, and histogram rows per timeframe.
-- MA should expose real MA line rows per timeframe, not only distance-to-MA.
+- MA is not a priority visual signal for this project direction. Keep existing
+  MA/distance rows only as legacy/context unless a specific analysis proves
+  they add value beyond Bollinger/MACD/RSI.
 - Pattern detectors should primarily read the real chart rows, with distance
   rows used as confirmation or normalization context.
 
