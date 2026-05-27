@@ -656,10 +656,15 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var existingPriority = CalculateWishListContextPriority(existing);
                 var itemPriority = CalculateWishListContextPriority(item);
+                var preserveExistingLossScan =
+                    IsLossPreset(existing.Preset.ScanCode) &&
+                    IsNonDirectionalLivePreset(item.Preset.ScanCode) &&
+                    !IsGainPreset(item.Preset.ScanCode);
 
-                if (itemPriority > existingPriority ||
+                if (!preserveExistingLossScan &&
+                    (itemPriority > existingPriority ||
                     (itemPriority == existingPriority &&
-                     item.WishListItem.Score.Score > existing.WishListItem.Score.Score))
+                     item.WishListItem.Score.Score > existing.WishListItem.Score.Score)))
                 {
                     results[item.Stock.Ticker] = item;
 
@@ -673,7 +678,10 @@ namespace IbSwingTrader.Application.Candidates
                     _logger.Info(
                         $"Ticker {item.Stock.Ticker} already exists in wish list. " +
                         $"Keeping existing item from preset {existing.Preset.ScanCode}. " +
-                        $"ExistingPriority={existingPriority}, NewPriority={itemPriority}");
+                        $"ExistingPriority={existingPriority}, NewPriority={itemPriority}" +
+                        (preserveExistingLossScan
+                            ? ", Reason=loss preset is not replaced by non-directional live preset"
+                            : string.Empty));
                 }
             }
             else
@@ -867,7 +875,9 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
-            var firstSeenDate = mergedWishItem.FirstSeen?.Date;
+            if (IsLossPreset(ctx.Preset.ScanCode))
+                return false;
+
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly) &&
                 !ShouldBypassWeeklyBbVetoForLiveMover(
                     ctx.Stock,
@@ -911,9 +921,11 @@ namespace IbSwingTrader.Application.Candidates
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike,
                 _nextDayRankingSettings.SeriesSimilarity);
+            var selfSeriesTemplateMatch = IsSelfSeriesTemplateMatch(ctx.Stock.Ticker, seriesTemplateMatch);
             var seriesTemplatePromotion =
                 currentSessionLikeMove &&
                 seriesTemplateMatch.Bonus > 0m &&
+                !selfSeriesTemplateMatch &&
                 (entryScore >= 15m || diagnostics.ATRRatio >= 3m || ctx.Stock.Rank <= 20);
 
             if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
@@ -925,27 +937,6 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            var constructiveWeekly =
-                string.Equals(bbState.Weekly.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
-                (string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(bbState.Weekly.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase));
-
-            var actionableDaily =
-                string.Equals(bbState.Daily.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) &&
-                (string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Collapse), StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(bbState.Daily.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase));
-
-            var h4Supportive =
-                string.Equals(bbState.H4.Direction, nameof(BollingerFigureDirection.Up), StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Pullback), StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Runaway), StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(bbState.H4.Regime, nameof(BollingerFigureRegime.Reacceleration), StringComparison.OrdinalIgnoreCase);
-
-            var strongRunawayUp = IsStrongRunawayUp(ctx.Snapshot, diagnostics, bbState);
-            var strongSeriesRunawayUp = IsStrongTodayResearchLikeSeries(recentSeries);
             var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
             var weeklyDistance = ctx.Snapshot.Current.WeeklyMaSignedDistancePct ?? 0m;
             var dailyDistance = ctx.Snapshot.Current.DailyMaSignedDistancePct;
@@ -953,7 +944,6 @@ namespace IbSwingTrader.Application.Candidates
             var dailyMaDelta3 = ctx.Snapshot.DailyMaDelta3;
             var h4MaDelta3 = ctx.Snapshot.H4MaDelta3;
             var dailyRsiDelta3 = ctx.Snapshot.DailyRsiDelta3;
-            var dailyMacdDelta3 = ctx.Snapshot.DailyMacdDelta3;
             var weeklyMidLast = recentSeries.WeeklyBbMidDistanceSeries.LastOrDefault();
             var dailyMidLast = recentSeries.DailyBbMidDistanceSeries.LastOrDefault();
             var h4MidLast = recentSeries.H4BbMidDistanceSeries.LastOrDefault();
@@ -991,40 +981,6 @@ namespace IbSwingTrader.Application.Candidates
                 h4SeriesSupportive &&
                 runawaySeriesScore >= 10m;
 
-            var liveSeriesPromotion =
-                currentSessionLikeMove &&
-                weeklyMidLast > 0m &&
-                dailyMidLast > 8m &&
-                h4MidLast > 0m &&
-                weeklyMacdLast > -0.35m &&
-                dailyMacdLast > -0.10m &&
-                h4MacdLast > -0.10m &&
-                runawaySeriesScore >= 8m;
-
-            var liveSnapshotPromotion =
-                currentSessionLikeMove &&
-                weeklyDistance > 25m &&
-                dailyDistance > 15m &&
-                h4Distance > 2m &&
-                dailyMaDelta3 > 0m &&
-                h4MaDelta3 > 0m &&
-                dailyRsiDelta3 > -2m &&
-                dailyMacdDelta3 > -0.05m;
-
-            var earlyRunawayCoolingPromotion =
-                currentSessionLikeMove &&
-                weeklyDistance > 20m &&
-                dailyDistance > 10m &&
-                h4Distance > 0m &&
-                weeklyMacdLast > 0m &&
-                dailyMacdLast > 0m &&
-                h4MacdLast > -0.10m &&
-                dailyMaDelta3 > -12m &&
-                h4MaDelta3 > -14m &&
-                dailyRsiDelta3 > -4m &&
-                dailyMacdDelta3 > -0.08m &&
-                runawaySeriesScore >= 8m;
-
             var staleLiveRunaway =
                 currentSessionLikeMove &&
                 weeklyDistance > 80m &&
@@ -1032,13 +988,6 @@ namespace IbSwingTrader.Application.Candidates
                 dailyMaDelta3 < -8m &&
                 h4MaDelta3 < -8m &&
                 dailyRsiDelta3 < -4m;
-
-            var bornToday = firstSeenDate == ctx.ScanTimeMarket.Date;
-            var canIgnoreForecastGate =
-                (currentSessionLikeMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion) &&
-                (constructiveWeekly || weeklySeriesConstructive) &&
-                (actionableDaily || dailySeriesConstructive) &&
-                (h4Supportive || h4SeriesSupportive);
 
             if (staleLiveRunaway)
                 return false;
@@ -1099,23 +1048,22 @@ namespace IbSwingTrader.Application.Candidates
                 return true;
             }
 
-            if (seriesDrivenTodayResearchLike || liveSeriesPromotion || liveSnapshotPromotion || earlyRunawayCoolingPromotion)
+            if (seriesDrivenTodayResearchLike)
+            {
+                _logger.Info(
+                    $"TodayResearchLike series-driven promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"RunawaySeriesScore={_fmt.Generic(runawaySeriesScore)}, " +
+                    $"WeeklyMidLast={_fmt.Generic(weeklyMidLast)}, " +
+                    $"DailyMidLast={_fmt.Generic(dailyMidLast)}, " +
+                    $"H4MidLast={_fmt.Generic(h4MidLast)}, " +
+                    $"WeeklyMacdLast={_fmt.Generic(weeklyMacdLast)}, " +
+                    $"DailyMacdLast={_fmt.Generic(dailyMacdLast)}, " +
+                    $"H4MacdLast={_fmt.Generic(h4MacdLast)}");
                 return true;
+            }
 
-            if (!canIgnoreForecastGate &&
-                mergedWishItem.ExpectedBarsToTarget != null &&
-                mergedWishItem.ExpectedBarsToTarget > 0)
-                return false;
-
-            return
-                runawaySeriesScore >= 12m ||
-                seriesDrivenTodayResearchLike ||
-                liveSeriesPromotion ||
-                liveSnapshotPromotion ||
-                earlyRunawayCoolingPromotion ||
-                seriesTemplatePromotion ||
-                (bornToday && (strongLiveMove || strongRunawayUp || strongSeriesRunawayUp || runawaySeriesScore >= 9m || liveSnapshotPromotion)) ||
-                canIgnoreForecastGate;
+            return false;
         }
 
         private static bool IsTodayResearchLikePreLaunchCandidate(
@@ -2793,6 +2741,9 @@ namespace IbSwingTrader.Application.Candidates
                         seriesSimilarityTemplates,
                         family,
                         settings.SeriesSimilarity);
+                    if (IsSelfSeriesTemplateMatch(x.Ticker, seriesSimilarityMatch))
+                        seriesSimilarityMatch = SeriesSimilarityMatch.Empty;
+
                     var lowAmplitudeMatch = family == SeriesTemplateFamily.TodayResearchLike
                         ? CalculateSeriesSimilarityMatch(
                             x,
@@ -2800,6 +2751,8 @@ namespace IbSwingTrader.Application.Candidates
                             SeriesTemplateFamily.LowAmplitudeSameDay,
                             settings.SeriesSimilarity)
                         : SeriesSimilarityMatch.Empty;
+                    if (IsSelfSeriesTemplateMatch(x.Ticker, lowAmplitudeMatch))
+                        lowAmplitudeMatch = SeriesSimilarityMatch.Empty;
 
                     ApplySeriesSimilarityDiagnostics(x, seriesSimilarityMatch, lowAmplitudeMatch, settings.SeriesSimilarity);
 
@@ -3142,21 +3095,21 @@ namespace IbSwingTrader.Application.Candidates
 
                 var features = BuildTemplateFeatures(
                     row.DailyMaSeries,
-                    row.DailyBbMidDistanceSeries,
-                    row.DailyBbUpperDistanceSeries,
-                    row.DailyBbWidthSeries,
+                    row.DailyBbMidBandSeries,
+                    row.DailyBbUpperBandSeries,
+                    row.DailyBbLowerBandSeries,
                     row.DailyRsiSeries,
                     row.DailyMacdSeries,
                     row.WeeklyMaSeries,
-                    row.WeeklyBbMidDistanceSeries,
-                    row.WeeklyBbUpperDistanceSeries,
-                    row.WeeklyBbWidthSeries,
+                    row.WeeklyBbMidBandSeries,
+                    row.WeeklyBbUpperBandSeries,
+                    row.WeeklyBbLowerBandSeries,
                     row.WeeklyRsiSeries,
                     row.WeeklyMacdSeries,
                     row.H4MaSeries ?? [],
-                    row.H4BbMidDistanceSeries ?? [],
-                    row.H4BbUpperDistanceSeries ?? [],
-                    row.H4BbWidthSeries ?? [],
+                    row.H4BbMidBandSeries ?? [],
+                    row.H4BbUpperBandSeries ?? [],
+                    row.H4BbLowerBandSeries ?? [],
                     row.H4RsiSeries ?? [],
                     row.H4MacdSeries ?? []);
 
@@ -3197,21 +3150,21 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     var lowAmplitudeFeatures = BuildTemplateFeatures(
                         row.RecentDailyMaSeries,
-                        row.RecentDailyBbMidDistanceSeries,
-                        row.RecentDailyBbUpperDistanceSeries,
-                        row.RecentDailyBbWidthSeries,
+                        row.RecentDailyBbMidBandSeries,
+                        row.RecentDailyBbUpperBandSeries,
+                        row.RecentDailyBbLowerBandSeries,
                         row.RecentDailyRsiSeries,
                         row.RecentDailyMacdSeries,
                         row.RecentWeeklyMaSeries,
-                        row.RecentWeeklyBbMidDistanceSeries,
-                        row.RecentWeeklyBbUpperDistanceSeries,
-                        row.RecentWeeklyBbWidthSeries,
+                        row.RecentWeeklyBbMidBandSeries,
+                        row.RecentWeeklyBbUpperBandSeries,
+                        row.RecentWeeklyBbLowerBandSeries,
                         row.RecentWeeklyRsiSeries,
                         row.RecentWeeklyMacdSeries,
                         row.RecentH4MaSeries,
-                        row.RecentH4BbMidDistanceSeries,
-                        row.RecentH4BbUpperDistanceSeries,
-                        row.RecentH4BbWidthSeries,
+                        row.RecentH4BbMidBandSeries,
+                        row.RecentH4BbUpperBandSeries,
+                        row.RecentH4BbLowerBandSeries,
                         row.RecentH4RsiSeries,
                         row.RecentH4MacdSeries);
 
@@ -3240,21 +3193,21 @@ namespace IbSwingTrader.Application.Candidates
 
                 var features = BuildTemplateFeatures(
                     row.RecentDailyMaSeries,
-                    row.RecentDailyBbMidDistanceSeries,
-                    row.RecentDailyBbUpperDistanceSeries,
-                    row.RecentDailyBbWidthSeries,
+                    row.RecentDailyBbMidBandSeries,
+                    row.RecentDailyBbUpperBandSeries,
+                    row.RecentDailyBbLowerBandSeries,
                     row.RecentDailyRsiSeries,
                     row.RecentDailyMacdSeries,
                     row.RecentWeeklyMaSeries,
-                    row.RecentWeeklyBbMidDistanceSeries,
-                    row.RecentWeeklyBbUpperDistanceSeries,
-                    row.RecentWeeklyBbWidthSeries,
+                    row.RecentWeeklyBbMidBandSeries,
+                    row.RecentWeeklyBbUpperBandSeries,
+                    row.RecentWeeklyBbLowerBandSeries,
                     row.RecentWeeklyRsiSeries,
                     row.RecentWeeklyMacdSeries,
                     row.RecentH4MaSeries,
-                    row.RecentH4BbMidDistanceSeries,
-                    row.RecentH4BbUpperDistanceSeries,
-                    row.RecentH4BbWidthSeries,
+                    row.RecentH4BbMidBandSeries,
+                    row.RecentH4BbUpperBandSeries,
+                    row.RecentH4BbLowerBandSeries,
                     row.RecentH4RsiSeries,
                     row.RecentH4MacdSeries);
 
@@ -3303,21 +3256,21 @@ namespace IbSwingTrader.Application.Candidates
 
             var candidateFeatures = BuildTemplateFeatures(
                 candidate.RecentDailyMaSeries,
-                candidate.RecentDailyBbMidDistanceSeries,
-                candidate.RecentDailyBbUpperDistanceSeries,
-                candidate.RecentDailyBbWidthSeries,
+                candidate.RecentDailyBbMidBandSeries,
+                candidate.RecentDailyBbUpperBandSeries,
+                candidate.RecentDailyBbLowerBandSeries,
                 candidate.RecentDailyRsiSeries,
                 candidate.RecentDailyMacdSeries,
                 candidate.RecentWeeklyMaSeries,
-                candidate.RecentWeeklyBbMidDistanceSeries,
-                candidate.RecentWeeklyBbUpperDistanceSeries,
-                candidate.RecentWeeklyBbWidthSeries,
+                candidate.RecentWeeklyBbMidBandSeries,
+                candidate.RecentWeeklyBbUpperBandSeries,
+                candidate.RecentWeeklyBbLowerBandSeries,
                 candidate.RecentWeeklyRsiSeries,
                 candidate.RecentWeeklyMacdSeries,
                 candidate.RecentH4MaSeries,
-                candidate.RecentH4BbMidDistanceSeries,
-                candidate.RecentH4BbUpperDistanceSeries,
-                candidate.RecentH4BbWidthSeries,
+                candidate.RecentH4BbMidBandSeries,
+                candidate.RecentH4BbUpperBandSeries,
+                candidate.RecentH4BbLowerBandSeries,
                 candidate.RecentH4RsiSeries,
                 candidate.RecentH4MacdSeries);
 
@@ -3332,21 +3285,21 @@ namespace IbSwingTrader.Application.Candidates
         {
             var candidateFeatures = BuildTemplateFeatures(
                 recentSeries.DailyMaSeries,
-                recentSeries.DailyBbMidDistanceSeries,
-                recentSeries.DailyBbUpperDistanceSeries,
-                recentSeries.DailyBbWidthSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
                 recentSeries.DailyRsiSeries,
                 recentSeries.DailyMacdSeries,
                 recentSeries.WeeklyMaSeries,
-                recentSeries.WeeklyBbMidDistanceSeries,
-                recentSeries.WeeklyBbUpperDistanceSeries,
-                recentSeries.WeeklyBbWidthSeries,
+                recentSeries.WeeklyBbMidBandSeries,
+                recentSeries.WeeklyBbUpperBandSeries,
+                recentSeries.WeeklyBbLowerBandSeries,
                 recentSeries.WeeklyRsiSeries,
                 recentSeries.WeeklyMacdSeries,
                 recentSeries.H4MaSeries,
-                recentSeries.H4BbMidDistanceSeries,
-                recentSeries.H4BbUpperDistanceSeries,
-                recentSeries.H4BbWidthSeries,
+                recentSeries.H4BbMidBandSeries,
+                recentSeries.H4BbUpperBandSeries,
+                recentSeries.H4BbLowerBandSeries,
                 recentSeries.H4RsiSeries,
                 recentSeries.H4MacdSeries);
 
@@ -3412,6 +3365,11 @@ namespace IbSwingTrader.Application.Candidates
                 bonus);
         }
 
+        private static bool IsSelfSeriesTemplateMatch(string ticker, SeriesSimilarityMatch match) =>
+            !string.IsNullOrWhiteSpace(ticker) &&
+            !string.IsNullOrWhiteSpace(match.TemplateTicker) &&
+            string.Equals(ticker, match.TemplateTicker, StringComparison.OrdinalIgnoreCase);
+
         private static void ApplySeriesSimilarityDiagnostics(
             CandidateDetails candidate,
             SeriesSimilarityMatch match,
@@ -3442,44 +3400,44 @@ namespace IbSwingTrader.Application.Candidates
             List<decimal> dailyMa,
             List<decimal> dailyBbMid,
             List<decimal> dailyBbUpper,
-            List<decimal> dailyBbWidth,
+            List<decimal> dailyBbLower,
             List<decimal> dailyRsi,
             List<decimal> dailyMacd,
             List<decimal> weeklyMa,
             List<decimal> weeklyBbMid,
             List<decimal> weeklyBbUpper,
-            List<decimal> weeklyBbWidth,
+            List<decimal> weeklyBbLower,
             List<decimal> weeklyRsi,
             List<decimal> weeklyMacd,
             List<decimal> h4Ma,
             List<decimal> h4BbMid,
             List<decimal> h4BbUpper,
-            List<decimal> h4BbWidth,
+            List<decimal> h4BbLower,
             List<decimal> h4Rsi,
             List<decimal> h4Macd)
         {
             return new SeriesFeatureSet(
                 Daily: [
-                    dailyMa,
+                    [],
                     dailyBbMid,
                     dailyBbUpper,
-                    dailyBbWidth,
+                    dailyBbLower,
                     dailyRsi,
                     dailyMacd
                 ],
                 Weekly: [
-                    weeklyMa,
+                    [],
                     weeklyBbMid,
                     weeklyBbUpper,
-                    weeklyBbWidth,
+                    weeklyBbLower,
                     weeklyRsi,
                     weeklyMacd
                 ],
                 H4: [
-                    h4Ma,
+                    [],
                     h4BbMid,
                     h4BbUpper,
-                    h4BbWidth,
+                    h4BbLower,
                     h4Rsi,
                     h4Macd
                 ]);
@@ -4783,6 +4741,18 @@ namespace IbSwingTrader.Application.Candidates
                    string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase);
         }
+
+        private static bool IsGainPreset(string presetScanCode) =>
+            string.Equals(presetScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(presetScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsLossPreset(string presetScanCode) =>
+            string.Equals(presetScanCode, "TOP_PERC_LOSE", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(presetScanCode, "TOP_OPEN_PERC_LOSE", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsNonDirectionalLivePreset(string presetScanCode) =>
+            string.Equals(presetScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(presetScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase);
 
         private static decimal ResolvePresetBonus(string presetScanCode, NextDayRankingSettings settings)
         {
