@@ -3050,6 +3050,18 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var evaluationRows = await _evaluationDatasetCsvService.ReadAsync(evaluationPath);
+            var latestLowAmplitudeScanDate = settings.LowAmplitudeUseLatestScanDateOnly
+                ? evaluationRows
+                    .Where(x =>
+                        x.HasActiveCandidateSnapshot &&
+                        x.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase) &&
+                        x.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
+                        x.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
+                    .Select(x => x.ScanTime.Date)
+                    .DefaultIfEmpty(DateTime.MinValue)
+                    .Max()
+                : DateTime.MinValue;
+
             foreach (var row in evaluationRows)
             {
                 if (!row.HasActiveCandidateSnapshot)
@@ -3059,6 +3071,8 @@ namespace IbSwingTrader.Application.Candidates
 
                 if (settings.EnableLowAmplitudePenalty &&
                     row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase) &&
+                    (!settings.LowAmplitudeUseLatestScanDateOnly ||
+                     row.ScanTime.Date == latestLowAmplitudeScanDate) &&
                     row.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
                     row.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
                 {
@@ -3141,7 +3155,8 @@ namespace IbSwingTrader.Application.Candidates
                 $"Series similarity templates loaded: Total={selected.Count}, " +
                 $"TodayResearchLike={selected.Count(x => x.Family == SeriesTemplateFamily.TodayResearchLike)}, " +
                 $"Reversal={selected.Count(x => x.Family == SeriesTemplateFamily.Reversal)}, " +
-                $"LowAmplitudeSameDay={selected.Count(x => x.Family == SeriesTemplateFamily.LowAmplitudeSameDay)}");
+                $"LowAmplitudeSameDay={selected.Count(x => x.Family == SeriesTemplateFamily.LowAmplitudeSameDay)}, " +
+                $"LowAmplitudeScanDate={(latestLowAmplitudeScanDate == DateTime.MinValue ? "all" : latestLowAmplitudeScanDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
 
             return selected;
         }
