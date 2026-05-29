@@ -901,6 +901,21 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
+            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral)
+            {
+                _logger.Info(
+                    $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
+                    $"Reason=real Bollinger/H4 trigger phase is neutral, " +
+                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
+                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
+                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
+                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
+                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
+                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
+                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
+                return false;
+            }
+
             var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
                 mergedWishItem,
                 ctx,
