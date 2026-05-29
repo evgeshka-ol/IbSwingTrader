@@ -7,7 +7,7 @@
 - `get-candidates`
   - builds scanner output
   - writes `Data/Tickers/candidates.csv`
-  - writes/updates `Data/Tickers/wishlist.json`
+  - writes/updates `Data/Tickers/wishlist.csv`
 - `evaluate-candidates`
   - evaluates candidate outcomes
   - writes directly to `Data/datasets/evaluation-dataset.csv`
@@ -20,7 +20,7 @@
 ## Main artifacts
 
 - `Data/Tickers/candidates.csv`
-- `Data/Tickers/wishlist.json`
+- `Data/Tickers/wishlist.csv`
 - `Data/datasets/evaluation-dataset.csv`
 - `Data/datasets/research_top_gainers.csv`
 - `Data/logs/log-*.log`

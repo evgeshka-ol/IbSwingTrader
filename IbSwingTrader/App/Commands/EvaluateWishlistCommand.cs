@@ -5,7 +5,7 @@ namespace IbSwingTrader.App.Commands
     public class EvaluateWishlistCommand(
         ITwsConnection twsConnection,
         IWishListEvaluator wishListEvaluator,
-        IJsonFileService jsonFileService,
+        IWishListReader wishListReader,
         IWishListEvaluationCsvService wishListEvaluationCsvService,
         IWishListResultWriter wishListWriter,
         ITextLogger logger,
@@ -15,7 +15,7 @@ namespace IbSwingTrader.App.Commands
     {
         private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly IWishListEvaluator _wishListEvaluator = wishListEvaluator;
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly IWishListReader _wishListReader = wishListReader;
         private readonly IWishListEvaluationCsvService _wishListEvaluationCsvService = wishListEvaluationCsvService;
         private readonly IWishListResultWriter _wishListWriter = wishListWriter;
         private readonly ITextLogger _logger = logger;
@@ -38,15 +38,9 @@ namespace IbSwingTrader.App.Commands
 
         private async Task EvaluateWishListAsync(string wishListPath, string wishListEvaluationsPath)
         {
-            if (!File.Exists(wishListPath))
-            {
-                _logger.Info("Wish list file not found. Skipping wish list evaluation.");
-                return;
-            }
+            var items = await _wishListReader.ReadAsync(wishListPath);
 
-            var items = await _jsonFileService.ReadAsync<List<WishListItem>>(wishListPath);
-
-            if (items == null || items.Count == 0)
+            if (items.Count == 0)
             {
                 _logger.Info("Wish list is empty. Skipping wish list evaluation.");
                 return;

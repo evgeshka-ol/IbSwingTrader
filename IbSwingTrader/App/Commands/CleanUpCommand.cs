@@ -8,7 +8,8 @@ namespace IbSwingTrader.App.Commands
         ICandidateEvaluationCsvService candidateEvaluationCsvService,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
         ICandidateFileService candidateFileService,
-        IJsonFileService jsonFileService,
+        IWishListReader wishListReader,
+        IWishListResultWriter wishListWriter,
         INumberTextFormatter fmt,
         ITextLogger logger,
         IAgentPathService pathService,
@@ -19,7 +20,8 @@ namespace IbSwingTrader.App.Commands
         private readonly ICandidateEvaluationCsvService _candidateEvaluationCsvService = candidateEvaluationCsvService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly ICandidateFileService _candidateFileService = candidateFileService;
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly IWishListReader _wishListReader = wishListReader;
+        private readonly IWishListResultWriter _wishListWriter = wishListWriter;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
@@ -429,7 +431,7 @@ namespace IbSwingTrader.App.Commands
                 return 0;
 
             var wishListPath = _pathService.GetWishListFile();
-            var items = await _jsonFileService.ReadAsync<List<WishListItem>>(wishListPath) ?? [];
+            var items = await _wishListReader.ReadAsync(wishListPath);
             if (items.Count == 0)
                 return 0;
 
@@ -454,7 +456,7 @@ namespace IbSwingTrader.App.Commands
             if (removed <= 0)
                 return 0;
 
-            await _jsonFileService.WriteAsync(wishListPath, kept);
+            await _wishListWriter.WriteAsync(wishListPath, kept);
 
             var reasonsText = string.Join(
                 ", ",

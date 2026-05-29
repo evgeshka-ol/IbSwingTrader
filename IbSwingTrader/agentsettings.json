@@ -9,7 +9,7 @@
         "CandidatesFile": "Tickers/candidates.csv",
         "EvaluationsFile": "Tickers/evaluations.csv",
         "EvaluationsArchiveFile": "Tickers/evaluations_archive.csv",
-        "WishListFile": "Tickers/wishlist.json",
+        "WishListFile": "Tickers/wishlist.csv",
         "ProcessedCandidateFilesManifest": "manifests/processed-candidate-files.json",
         "LogsFolder": "logs"
     },
@@ -723,6 +723,7 @@
 
     "NormalizeReports": {
         "Candidates": true,
+        "WishList": true,
         "Evaluations": false,
         "EvaluationDataset": false
     },

@@ -9,7 +9,7 @@ namespace IbSwingTrader.Domain.Settings
         public string CandidatesFile { get; set; } = "Tickers/candidates.csv";
         public string EvaluationsFile { get; set; } = "Tickers/evaluations.csv";
         public string EvaluationsArchiveFile { get; set; } = "Tickers/evaluations_archive.csv";
-        public string WishListFile { get; set; } = "Tickers/wishlist.json";
+        public string WishListFile { get; set; } = "Tickers/wishlist.csv";
         public string WishListEvaluationsFile { get; set; } = "Tickers/wishlist_evaluations.csv";
         public string ProcessedCandidateFilesManifest { get; set; } =
             "manifests/processed-candidate-files.json";

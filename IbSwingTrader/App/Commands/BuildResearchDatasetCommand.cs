@@ -7,7 +7,7 @@ using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.App.Commands
 {
     public class BuildResearchDatasetCommand(
-        IJsonFileService jsonFileService,
+        IWishListReader wishListReader,
         ICsvWriter csvWriter,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
         ICandidateFileService candidateFileService,
@@ -23,7 +23,7 @@ namespace IbSwingTrader.App.Commands
         IResearchSettingsProvider researchSettingsProvider,
         IFailedHistoryRequestTableFormatter failedHistoryRequestTableFormatter) : ICommand
     {
-        private readonly IJsonFileService _jsonFileService = jsonFileService;
+        private readonly IWishListReader _wishListReader = wishListReader;
         private readonly ICsvWriter _csvWriter = csvWriter;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly ICandidateFileService _candidateFileService = candidateFileService;
@@ -194,7 +194,7 @@ namespace IbSwingTrader.App.Commands
                 result.Add(candidate.Ticker);
 
             var wishListPath = _pathService.GetWishListFile();
-            var wishList = await _jsonFileService.ReadAsync<List<WishListItem>>(wishListPath) ?? [];
+            var wishList = await _wishListReader.ReadAsync(wishListPath);
             foreach (var item in wishList)
                 result.Add(item.Ticker);
 

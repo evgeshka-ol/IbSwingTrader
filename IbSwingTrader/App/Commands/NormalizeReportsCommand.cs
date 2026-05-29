@@ -3,6 +3,8 @@ namespace IbSwingTrader.App.Commands
     public class NormalizeReportsCommand(
         INormalizeReportsSettingsProvider normalizeReportsSettingsProvider,
         ICandidateFileService candidateFileService,
+        IWishListReader wishListReader,
+        IWishListResultWriter wishListWriter,
         IHistoricalCache historicalCache,
         IFeatureEngine featureEngine,
         NormalizeEvaluationsCommand normalizeEvaluationsCommand,
@@ -16,6 +18,8 @@ namespace IbSwingTrader.App.Commands
 
         private readonly INormalizeReportsSettingsProvider _normalizeReportsSettingsProvider = normalizeReportsSettingsProvider;
         private readonly ICandidateFileService _candidateFileService = candidateFileService;
+        private readonly IWishListReader _wishListReader = wishListReader;
+        private readonly IWishListResultWriter _wishListWriter = wishListWriter;
         private readonly IHistoricalCache _historicalCache = historicalCache;
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly NormalizeEvaluationsCommand _normalizeEvaluationsCommand = normalizeEvaluationsCommand;
@@ -27,10 +31,13 @@ namespace IbSwingTrader.App.Commands
         {
             var settings = _normalizeReportsSettingsProvider.Get();
             _logger.Info(
-                $"Normalize reports started. Candidates={settings.Candidates} Evaluations={settings.Evaluations} EvaluationDataset={settings.EvaluationDataset}");
+                $"Normalize reports started. Candidates={settings.Candidates} WishList={settings.WishList} Evaluations={settings.Evaluations} EvaluationDataset={settings.EvaluationDataset}");
 
             if (settings.Candidates)
                 await NormalizeCandidatesAsync();
+
+            if (settings.WishList)
+                await NormalizeWishListAsync();
 
             if (settings.Evaluations)
                 await NormalizeEvaluationsAsync();
@@ -39,7 +46,18 @@ namespace IbSwingTrader.App.Commands
                 await NormalizeEvaluationDatasetAsync();
 
             _logger.Info(
-                $"Reports normalized. Candidates={settings.Candidates} Evaluations={settings.Evaluations} EvaluationDataset={settings.EvaluationDataset}");
+                $"Reports normalized. Candidates={settings.Candidates} WishList={settings.WishList} Evaluations={settings.Evaluations} EvaluationDataset={settings.EvaluationDataset}");
+        }
+
+        private async Task NormalizeWishListAsync()
+        {
+            var path = _pathService.GetWishListFile();
+            _logger.Info($"Wish list report normalization started: {path}");
+
+            var items = await _wishListReader.ReadAsync(path);
+            await _wishListWriter.WriteAsync(path, items);
+
+            _logger.Info($"Wish list report normalized: Count={items.Count}");
         }
 
         private async Task NormalizeCandidatesAsync()
