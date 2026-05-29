@@ -83,6 +83,24 @@ but the trade decision changes with timeframe. Use the real band series
 (`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
 shape, then use timeframe context to decide ranking strength and trade profile.
 
+When the same runway pattern appears, split it by phase using only the saved
+pre-move rows:
+
+- `ReadyNow`: H4 real Bollinger trigger confirms the launch. The upper band
+  expands upward, mid is not falling, lower band is not simply being dragged
+  upward, and H4 RSI/MACD do not contradict the trigger. These candidates can
+  be promoted to `TodayResearchLikeCandidates`.
+- `WishListOnly`: Daily/weekly runway shape exists, but H4 trigger is not ready
+  yet. Keep it in `wishlist.csv` even though it is not a reversal. Do not force
+  it into `ReversalCandidates`.
+
+This split is important for same-pattern candidates: UMAC/ONDS-like rows are
+ready for immediate `TodayResearchLikeCandidates` promotion, while SHLS-like
+rows have the same higher-frame runway pattern but belong in `wishlist.csv`
+until the H4 real Bollinger/RSI/MACD rows confirm readiness. Decisions must use
+the saved rows from `candidates.csv`, because those rows represent the
+pre-move state.
+
 Broader series direction: move pattern logic toward the visual indicators the
 user actually relies on: Bollinger, MACD, and RSI. The priority order for
 scanner prediction, filters, promotion, and ranking is:

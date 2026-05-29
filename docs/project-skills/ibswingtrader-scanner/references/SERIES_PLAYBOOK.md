@@ -148,6 +148,16 @@ Do not require the pattern to exist on Daily before using it. A clean H4
 Bollinger launch without Daily launch can still be playable, but usually calls
 for a faster, more defensive trade plan than a Daily/Weekly launch.
 
+When the higher-frame runway shape is present, separate the phase by the saved
+pre-move H4 rows:
+
+- `ReadyNow`: UMAC/ONDS-like. H4 upper band is opening upward, H4 mid is not
+  falling, H4 lower is not simply following upward, and H4 RSI/MACD do not roll
+  over. These rows can be promoted and ranked for same-day trading.
+- `WishListOnly`: SHLS-like. Daily/weekly runway is visible, but H4 trigger is
+  not ready. Keep it in `wishlist.csv`; it is still a runway watch, not a
+  reversal.
+
 When comparing band curves across tickers, compare shape rather than absolute
 price. Normalize by the starting point or compare deltas from the first point.
 
