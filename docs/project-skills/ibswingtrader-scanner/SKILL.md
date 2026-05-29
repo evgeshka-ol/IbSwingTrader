@@ -30,7 +30,7 @@ The scanner's job is to find future fat moves early.
 
 1. `get-candidates`
 2. inspect `Data/Tickers/candidates.csv`
-3. inspect `Data/Tickers/wishlist.json`
+3. inspect `Data/Tickers/wishlist.csv`
 4. compare yesterday's scan with today's `research_top_gainers.csv`
 
 ## Main split
