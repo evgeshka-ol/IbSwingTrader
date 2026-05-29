@@ -157,6 +157,10 @@ pre-move H4 rows:
 - `WishListOnly`: SHLS-like. Daily/weekly runway is visible, but H4 trigger is
   not ready. Keep it in `wishlist.csv`; it is still a runway watch, not a
   reversal.
+- `Neutral`: neither the higher-frame runway nor the H4 trigger is confirmed
+  well enough by the saved rows. Keep it out of the trade-ready
+  `TodayResearchLikeCandidates` path even if an older live-mover or template
+  branch likes it.
 
 When comparing band curves across tickers, compare shape rather than absolute
 price. Normalize by the starting point or compare deltas from the first point.

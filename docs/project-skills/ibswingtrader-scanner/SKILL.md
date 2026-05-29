@@ -93,6 +93,9 @@ pre-move rows:
 - `WishListOnly`: Daily/weekly runway shape exists, but H4 trigger is not ready
   yet. Keep it in `wishlist.csv` even though it is not a reversal. Do not force
   it into `ReversalCandidates`.
+- `Neutral`: the saved rows do not confirm a trade-ready runway phase. Do not
+  let legacy live-mover/template/bypass branches promote it into
+  `TodayResearchLikeCandidates`.
 
 This split is important for same-pattern candidates: UMAC/ONDS-like rows are
 ready for immediate `TodayResearchLikeCandidates` promotion, while SHLS-like
