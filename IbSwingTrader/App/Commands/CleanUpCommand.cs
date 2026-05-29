@@ -182,16 +182,6 @@ namespace IbSwingTrader.App.Commands
 
             return new CandidateSummarySections
             {
-                ReversalCandidates = candidates
-                    .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                    .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                    .ThenByDescending(x => x.Score.Score)
-                    .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                    .Select(x => new CandidateSummaryItem
-                    {
-                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: false)
-                    })
-                    .ToList(),
                 TodayResearchLikeCandidates = sameDayCandidates
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
@@ -201,6 +191,16 @@ namespace IbSwingTrader.App.Commands
                     .Select(x => new CandidateSummaryItem
                     {
                         Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: true)
+                    })
+                    .ToList(),
+                ReversalCandidates = candidates
+                    .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(x => x.TradePlan.ProfitPercent)
+                    .ThenByDescending(x => x.Score.Score)
+                    .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => new CandidateSummaryItem
+                    {
+                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: false)
                     })
                     .ToList()
             };

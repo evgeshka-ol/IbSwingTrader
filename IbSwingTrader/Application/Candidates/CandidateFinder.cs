@@ -815,21 +815,11 @@ namespace IbSwingTrader.Application.Candidates
 
             if (trade.ProfitPercent < candidateFilterSettings.MinPlannedProfitPct)
             {
-                if (isTodayResearchLikeCandidate)
-                {
-                    _logger.Info(
-                        $"TodayResearchLike low-profit override applied: {ctx.Stock.Ticker}. " +
-                        $"ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
-                        $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
-                }
-                else
-                {
-                    _logger.Info(
-                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
-                        $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
-                    return;
-                }
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
+                    $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
+                return;
             }
 
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
@@ -1950,6 +1940,9 @@ namespace IbSwingTrader.Application.Candidates
                 RecentDailyBbMidBandSeries = recentSeries.DailyBbMidBandSeries,
                 RecentDailyBbLowerBandSeries = recentSeries.DailyBbLowerBandSeries,
                 RecentDailyRsiSeries = recentSeries.DailyRsiSeries,
+                RecentDailyMacdLineSeries = recentSeries.DailyMacdLineSeries,
+                RecentDailyMacdSignalSeries = recentSeries.DailyMacdSignalSeries,
+                RecentDailyMacdHistogramSeries = recentSeries.DailyMacdHistogramSeries,
                 RecentDailyMacdSeries = recentSeries.DailyMacdSeries,
                 RecentWeeklyMaSeries = recentSeries.WeeklyMaSeries,
                 RecentWeeklyBbMidDistanceSeries = recentSeries.WeeklyBbMidDistanceSeries,
@@ -1959,6 +1952,9 @@ namespace IbSwingTrader.Application.Candidates
                 RecentWeeklyBbMidBandSeries = recentSeries.WeeklyBbMidBandSeries,
                 RecentWeeklyBbLowerBandSeries = recentSeries.WeeklyBbLowerBandSeries,
                 RecentWeeklyRsiSeries = recentSeries.WeeklyRsiSeries,
+                RecentWeeklyMacdLineSeries = recentSeries.WeeklyMacdLineSeries,
+                RecentWeeklyMacdSignalSeries = recentSeries.WeeklyMacdSignalSeries,
+                RecentWeeklyMacdHistogramSeries = recentSeries.WeeklyMacdHistogramSeries,
                 RecentWeeklyMacdSeries = recentSeries.WeeklyMacdSeries,
                 RecentH4MaSeries = recentSeries.H4MaSeries,
                 RecentH4BbMidDistanceSeries = recentSeries.H4BbMidDistanceSeries,
@@ -1968,6 +1964,9 @@ namespace IbSwingTrader.Application.Candidates
                 RecentH4BbMidBandSeries = recentSeries.H4BbMidBandSeries,
                 RecentH4BbLowerBandSeries = recentSeries.H4BbLowerBandSeries,
                 RecentH4RsiSeries = recentSeries.H4RsiSeries,
+                RecentH4MacdLineSeries = recentSeries.H4MacdLineSeries,
+                RecentH4MacdSignalSeries = recentSeries.H4MacdSignalSeries,
+                RecentH4MacdHistogramSeries = recentSeries.H4MacdHistogramSeries,
                 RecentH4MacdSeries = recentSeries.H4MacdSeries,
                 WeeklyBbDirection = bbState.Weekly.Direction,
                 WeeklyBbRegime = bbState.Weekly.Regime,
@@ -3111,7 +3110,13 @@ namespace IbSwingTrader.Application.Candidates
                     row.H4BbUpperBandSeries ?? [],
                     row.H4BbLowerBandSeries ?? [],
                     row.H4RsiSeries ?? [],
-                    row.H4MacdSeries ?? []);
+                    row.H4MacdSeries ?? [],
+                    dailyMacdLine: row.DailyMacdLineSeries,
+                    dailyMacdSignal: row.DailyMacdSignalSeries,
+                    weeklyMacdLine: row.WeeklyMacdLineSeries,
+                    weeklyMacdSignal: row.WeeklyMacdSignalSeries,
+                    h4MacdLine: row.H4MacdLineSeries ?? [],
+                    h4MacdSignal: row.H4MacdSignalSeries ?? []);
 
                 if (features.HasUsefulSeries)
                     templates.Add(new SeriesSimilarityTemplate(
@@ -3166,7 +3171,13 @@ namespace IbSwingTrader.Application.Candidates
                         row.RecentH4BbUpperBandSeries,
                         row.RecentH4BbLowerBandSeries,
                         row.RecentH4RsiSeries,
-                        row.RecentH4MacdSeries);
+                        row.RecentH4MacdSeries,
+                        dailyMacdLine: row.RecentDailyMacdLineSeries,
+                        dailyMacdSignal: row.RecentDailyMacdSignalSeries,
+                        weeklyMacdLine: row.RecentWeeklyMacdLineSeries,
+                        weeklyMacdSignal: row.RecentWeeklyMacdSignalSeries,
+                        h4MacdLine: row.RecentH4MacdLineSeries,
+                        h4MacdSignal: row.RecentH4MacdSignalSeries);
 
                     if (lowAmplitudeFeatures.HasUsefulSeries)
                     {
@@ -3209,7 +3220,13 @@ namespace IbSwingTrader.Application.Candidates
                     row.RecentH4BbUpperBandSeries,
                     row.RecentH4BbLowerBandSeries,
                     row.RecentH4RsiSeries,
-                    row.RecentH4MacdSeries);
+                    row.RecentH4MacdSeries,
+                    dailyMacdLine: row.RecentDailyMacdLineSeries,
+                    dailyMacdSignal: row.RecentDailyMacdSignalSeries,
+                    weeklyMacdLine: row.RecentWeeklyMacdLineSeries,
+                    weeklyMacdSignal: row.RecentWeeklyMacdSignalSeries,
+                    h4MacdLine: row.RecentH4MacdLineSeries,
+                    h4MacdSignal: row.RecentH4MacdSignalSeries);
 
                 if (features.HasUsefulSeries)
                     templates.Add(new SeriesSimilarityTemplate(row.Ticker, family, row.AmplitudePct, features));
@@ -3272,7 +3289,13 @@ namespace IbSwingTrader.Application.Candidates
                 candidate.RecentH4BbUpperBandSeries,
                 candidate.RecentH4BbLowerBandSeries,
                 candidate.RecentH4RsiSeries,
-                candidate.RecentH4MacdSeries);
+                candidate.RecentH4MacdSeries,
+                dailyMacdLine: candidate.RecentDailyMacdLineSeries,
+                dailyMacdSignal: candidate.RecentDailyMacdSignalSeries,
+                weeklyMacdLine: candidate.RecentWeeklyMacdLineSeries,
+                weeklyMacdSignal: candidate.RecentWeeklyMacdSignalSeries,
+                h4MacdLine: candidate.RecentH4MacdLineSeries,
+                h4MacdSignal: candidate.RecentH4MacdSignalSeries);
 
             return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
         }
@@ -3301,7 +3324,13 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.H4BbUpperBandSeries,
                 recentSeries.H4BbLowerBandSeries,
                 recentSeries.H4RsiSeries,
-                recentSeries.H4MacdSeries);
+                recentSeries.H4MacdSeries,
+                dailyMacdLine: recentSeries.DailyMacdLineSeries,
+                dailyMacdSignal: recentSeries.DailyMacdSignalSeries,
+                weeklyMacdLine: recentSeries.WeeklyMacdLineSeries,
+                weeklyMacdSignal: recentSeries.WeeklyMacdSignalSeries,
+                h4MacdLine: recentSeries.H4MacdLineSeries,
+                h4MacdSignal: recentSeries.H4MacdSignalSeries);
 
             return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
         }
@@ -3414,32 +3443,41 @@ namespace IbSwingTrader.Application.Candidates
             List<decimal> h4BbUpper,
             List<decimal> h4BbLower,
             List<decimal> h4Rsi,
-            List<decimal> h4Macd)
+            List<decimal> h4Macd,
+            List<decimal>? dailyMacdLine = null,
+            List<decimal>? dailyMacdSignal = null,
+            List<decimal>? weeklyMacdLine = null,
+            List<decimal>? weeklyMacdSignal = null,
+            List<decimal>? h4MacdLine = null,
+            List<decimal>? h4MacdSignal = null)
         {
             return new SeriesFeatureSet(
                 Daily: [
-                    [],
                     dailyBbMid,
                     dailyBbUpper,
                     dailyBbLower,
-                    dailyRsi,
-                    dailyMacd
+                    dailyMacdLine ?? [],
+                    dailyMacdSignal ?? [],
+                    dailyMacd,
+                    dailyRsi
                 ],
                 Weekly: [
-                    [],
                     weeklyBbMid,
                     weeklyBbUpper,
                     weeklyBbLower,
-                    weeklyRsi,
-                    weeklyMacd
+                    weeklyMacdLine ?? [],
+                    weeklyMacdSignal ?? [],
+                    weeklyMacd,
+                    weeklyRsi
                 ],
                 H4: [
-                    [],
                     h4BbMid,
                     h4BbUpper,
                     h4BbLower,
-                    h4Rsi,
-                    h4Macd
+                    h4MacdLine ?? [],
+                    h4MacdSignal ?? [],
+                    h4Macd,
+                    h4Rsi
                 ]);
         }
 
@@ -3484,21 +3522,23 @@ namespace IbSwingTrader.Application.Candidates
         {
             var seriesWeights = new[]
             {
-                settings.MaSeriesWeight,
                 settings.BbMidSeriesWeight,
                 settings.BbUpperSeriesWeight,
                 settings.BbWidthSeriesWeight,
-                settings.RsiSeriesWeight,
-                settings.MacdSeriesWeight
+                settings.MacdSeriesWeight,
+                settings.MacdSeriesWeight,
+                settings.MacdSeriesWeight,
+                settings.RsiSeriesWeight
             };
             var pointTolerances = new[]
             {
-                settings.MaPointTolerance,
                 settings.BbMidPointTolerance,
                 settings.BbUpperPointTolerance,
                 settings.BbWidthPointTolerance,
-                settings.RsiPointTolerance,
-                settings.MacdPointTolerance
+                settings.MacdPointTolerance,
+                settings.MacdPointTolerance,
+                settings.MacdPointTolerance,
+                settings.RsiPointTolerance
             };
             var weightedDistance = 0m;
             var weight = 0m;
@@ -3711,6 +3751,9 @@ namespace IbSwingTrader.Application.Candidates
                 nameof(ResearchTopGainerDatasetRow.DailyBbMidBandSeries) => ["DailyBollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.DailyBbLowerBandSeries) => ["DailyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdLineSeries) => ["DailyMacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdSignalSeries) => ["DailyMacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdHistogramSeries) => ["DailyMacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbMidDistanceSeries) => ["WeeklyBollingerMidDistances"],
@@ -3720,6 +3763,9 @@ namespace IbSwingTrader.Application.Candidates
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbMidBandSeries) => ["WeeklyBollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbLowerBandSeries) => ["WeeklyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdLineSeries) => ["WeeklyMacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdSignalSeries) => ["WeeklyMacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdHistogramSeries) => ["WeeklyMacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
                 nameof(ResearchTopGainerDatasetRow.H4BbMidDistanceSeries) => ["H4BollingerMidDistances"],
@@ -3729,6 +3775,9 @@ namespace IbSwingTrader.Application.Candidates
                 nameof(ResearchTopGainerDatasetRow.H4BbMidBandSeries) => ["H4BollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.H4BbLowerBandSeries) => ["H4BollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdLineSeries) => ["H4MacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdSignalSeries) => ["H4MacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdHistogramSeries) => ["H4MacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
                 _ => []
             };
@@ -3818,7 +3867,10 @@ namespace IbSwingTrader.Application.Candidates
                 DailyBbMidBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand),
                 DailyBbLowerBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand),
                 DailyRsiSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14),
-                DailyMacdSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLineMinusSignal),
+                DailyMacdLineSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLine),
+                DailyMacdSignalSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDSignal),
+                DailyMacdHistogramSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDHistogram),
+                DailyMacdSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDHistogram),
                 WeeklyMaSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMaSignedDistancePct),
                 WeeklyBbMidDistanceSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidDistancePct),
                 WeeklyBbUpperDistanceSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperDistancePct),
@@ -3827,7 +3879,10 @@ namespace IbSwingTrader.Application.Candidates
                 WeeklyBbMidBandSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidBand),
                 WeeklyBbLowerBandSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerLowerBand),
                 WeeklyRsiSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14),
-                WeeklyMacdSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLineMinusSignal),
+                WeeklyMacdLineSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLine),
+                WeeklyMacdSignalSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDSignal),
+                WeeklyMacdHistogramSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDHistogram),
+                WeeklyMacdSeries = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDHistogram),
                 H4MaSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4MaSignedDistancePct),
                 H4BbMidDistanceSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidDistancePct),
                 H4BbUpperDistanceSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperDistancePct),
@@ -3836,7 +3891,10 @@ namespace IbSwingTrader.Application.Candidates
                 H4BbMidBandSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidBand),
                 H4BbLowerBandSeries = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerLowerBand),
                 H4RsiSeries = BuildRecentH4Series(candles, scanIndex, x => x.RSI14),
-                H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDLineMinusSignal)
+                H4MacdLineSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDLine),
+                H4MacdSignalSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDSignal),
+                H4MacdHistogramSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram),
+                H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram)
             };
         }
 
@@ -4032,6 +4090,31 @@ namespace IbSwingTrader.Application.Candidates
             => series.Count >= 2
                 ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero)
                 : 0m;
+
+        private static decimal CalculateRelativeSlopePct(List<decimal> series)
+        {
+            if (series.Count < 2)
+                return 0m;
+
+            var first = series[0];
+            if (first == 0m)
+                return CalculateSlope(series);
+
+            return decimal.Round((series[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static bool IsRealBollingerLaunch(
+            decimal midSlopePct,
+            decimal upperSlopePct,
+            decimal lowerSlopePct)
+        {
+            return midSlopePct > 0m &&
+                   upperSlopePct > midSlopePct &&
+                   lowerSlopePct <= midSlopePct;
+        }
+
+        private static List<decimal> PreferSeries(List<decimal> preferred, List<decimal> fallback)
+            => preferred.Count > 0 ? preferred : fallback;
 
         private static decimal Positive(decimal value)
             => value > 0m ? value : 0m;
@@ -4289,22 +4372,42 @@ namespace IbSwingTrader.Application.Candidates
             SeriesEntryProfileSettings settings,
             decimal? currentEntryDiscountPct)
         {
-            var dailyMidSlope = CalculateSlope(recentSeries.DailyBbMidDistanceSeries);
-            var dailyMaSlope = CalculateSlope(recentSeries.DailyMaSeries);
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
+            var dailyLowerSlope = CalculateRelativeSlopePct(recentSeries.DailyBbLowerBandSeries);
+            var dailyMaSlope = dailyMidSlope;
             var dailyRsiSlope = CalculateSlope(recentSeries.DailyRsiSeries);
-            var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
-            var h4MidSlope = CalculateSlope(recentSeries.H4BbMidDistanceSeries);
-            var h4MaSlope = CalculateSlope(recentSeries.H4MaSeries);
+            var dailyMacdHistogramSeries = PreferSeries(recentSeries.DailyMacdHistogramSeries, recentSeries.DailyMacdSeries);
+            var h4MacdHistogramSeries = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
+            var dailyMacdSlope = CalculateSlope(dailyMacdHistogramSeries);
+            var dailyMacdLineSlope = CalculateSlope(recentSeries.DailyMacdLineSeries);
+            var dailyMacdSignalSlope = CalculateSlope(recentSeries.DailyMacdSignalSeries);
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
+            var h4UpperSlope = CalculateRelativeSlopePct(recentSeries.H4BbUpperBandSeries);
+            var h4LowerSlope = CalculateRelativeSlopePct(recentSeries.H4BbLowerBandSeries);
+            var h4MaSlope = h4MidSlope;
             var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
-            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
-            var dailyMaLast = GetLatestValue(recentSeries.DailyMaSeries);
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdHistogramSeries);
+            var h4MacdLineSlope = CalculateSlope(recentSeries.H4MacdLineSeries);
+            var h4MacdSignalSlope = CalculateSlope(recentSeries.H4MacdSignalSeries);
+            var dailyMaLast = GetLatestSignedPercent(recentSeries.DailyBbMidDistanceSeries);
             var dailyMidLast = GetLatestValue(recentSeries.DailyBbMidDistanceSeries);
-            var h4MaLast = GetLatestValue(recentSeries.H4MaSeries);
+            var h4MaLast = GetLatestSignedPercent(recentSeries.H4BbMidDistanceSeries);
             var h4MidLast = GetLatestValue(recentSeries.H4BbMidDistanceSeries);
             var dailyRsiLast = GetLatestValue(recentSeries.DailyRsiSeries);
             var h4RsiLast = GetLatestValue(recentSeries.H4RsiSeries);
-            var dailyMacdLast = GetLatestValue(recentSeries.DailyMacdSeries);
-            var h4MacdLast = GetLatestValue(recentSeries.H4MacdSeries);
+            var dailyMacdLast = GetLatestValue(dailyMacdHistogramSeries);
+            var h4MacdLast = GetLatestValue(h4MacdHistogramSeries);
+            var realDailyBbLaunch = IsRealBollingerLaunch(dailyMidSlope, dailyUpperSlope, dailyLowerSlope);
+            var realH4BbLaunch = IsRealBollingerLaunch(h4MidSlope, h4UpperSlope, h4LowerSlope);
+            var realDailyMacdConstructive =
+                dailyMacdSlope >= 0m &&
+                dailyMacdLineSlope >= dailyMacdSignalSlope &&
+                dailyMacdLast >= 0m;
+            var realH4MacdConstructive =
+                h4MacdSlope >= 0m &&
+                h4MacdLineSlope >= h4MacdSignalSlope &&
+                h4MacdLast >= -0.05m;
 
             if (!settings.Enabled)
             {
@@ -4320,21 +4423,22 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var dailyStrong =
+                realDailyBbLaunch ||
                 dailyMidSlope >= settings.DailyStrongSlopeThreshold ||
                 dailyRsiSlope >= settings.DailyRsiSlopeThreshold ||
                 snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold;
 
             var h4Weakening =
-                h4MidSlope <= settings.H4WeakSlopeThreshold ||
+                (!realH4BbLaunch && h4MidSlope <= settings.H4WeakSlopeThreshold) ||
                 h4RsiSlope < 0m ||
                 h4MacdSlope <= settings.H4MacdWeakDeltaThreshold ||
                 bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse);
 
             var constructiveH4 =
-                h4MidSlope > 0m &&
+                (realH4BbLaunch || h4MidSlope > 0m) &&
                 h4RsiSlope > 0m &&
-                h4MacdSlope > 0m &&
+                (realH4MacdConstructive || h4MacdSlope > 0m) &&
                 bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
                 bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or
                                      nameof(BollingerFigureRegime.Reacceleration);
@@ -4375,7 +4479,9 @@ namespace IbSwingTrader.Application.Candidates
 
             var fastContinuationShallow =
                 !lateSpike &&
-                (cleanContinuation ||
+                ((realDailyBbLaunch && realH4BbLaunch && realDailyMacdConstructive && realH4MacdConstructive) ||
+                 (realH4BbLaunch && realH4MacdConstructive && dailyStrong) ||
+                 cleanContinuation ||
                  (dailyStrong && constructiveH4) ||
                  (dailyMaLast >= settings.LaunchContinuationMinDailyMaDistancePct &&
                   dailyMaLast < settings.FastContinuationMinDailyMaDistancePct &&
@@ -5617,6 +5723,9 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> DailyBbMidBandSeries { get; init; } = [];
             public List<decimal> DailyBbLowerBandSeries { get; init; } = [];
             public List<decimal> DailyRsiSeries { get; init; } = [];
+            public List<decimal> DailyMacdLineSeries { get; init; } = [];
+            public List<decimal> DailyMacdSignalSeries { get; init; } = [];
+            public List<decimal> DailyMacdHistogramSeries { get; init; } = [];
             public List<decimal> DailyMacdSeries { get; init; } = [];
             public List<decimal> WeeklyMaSeries { get; init; } = [];
             public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
@@ -5626,6 +5735,9 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> WeeklyBbMidBandSeries { get; init; } = [];
             public List<decimal> WeeklyBbLowerBandSeries { get; init; } = [];
             public List<decimal> WeeklyRsiSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdLineSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdSignalSeries { get; init; } = [];
+            public List<decimal> WeeklyMacdHistogramSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSeries { get; init; } = [];
             public List<decimal> H4MaSeries { get; init; } = [];
             public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
@@ -5635,6 +5747,9 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> H4BbMidBandSeries { get; init; } = [];
             public List<decimal> H4BbLowerBandSeries { get; init; } = [];
             public List<decimal> H4RsiSeries { get; init; } = [];
+            public List<decimal> H4MacdLineSeries { get; init; } = [];
+            public List<decimal> H4MacdSignalSeries { get; init; } = [];
+            public List<decimal> H4MacdHistogramSeries { get; init; } = [];
             public List<decimal> H4MacdSeries { get; init; } = [];
         }
 

@@ -34,6 +34,9 @@ namespace IbSwingTrader.Domain.Market
 
         public List<decimal> RecentDailyRsiSeries { get; set; } = [];
 
+        public List<decimal> RecentDailyMacdLineSeries { get; set; } = [];
+        public List<decimal> RecentDailyMacdSignalSeries { get; set; } = [];
+        public List<decimal> RecentDailyMacdHistogramSeries { get; set; } = [];
         public List<decimal> RecentDailyMacdSeries { get; set; } = [];
 
         public List<decimal> RecentWeeklyMaSeries { get; set; } = [];
@@ -46,6 +49,9 @@ namespace IbSwingTrader.Domain.Market
 
         public List<decimal> RecentWeeklyRsiSeries { get; set; } = [];
 
+        public List<decimal> RecentWeeklyMacdLineSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyMacdSignalSeries { get; set; } = [];
+        public List<decimal> RecentWeeklyMacdHistogramSeries { get; set; } = [];
         public List<decimal> RecentWeeklyMacdSeries { get; set; } = [];
 
         public List<decimal> RecentH4MaSeries { get; set; } = [];
@@ -58,6 +64,9 @@ namespace IbSwingTrader.Domain.Market
 
         public List<decimal> RecentH4RsiSeries { get; set; } = [];
 
+        public List<decimal> RecentH4MacdLineSeries { get; set; } = [];
+        public List<decimal> RecentH4MacdSignalSeries { get; set; } = [];
+        public List<decimal> RecentH4MacdHistogramSeries { get; set; } = [];
         public List<decimal> RecentH4MacdSeries { get; set; } = [];
 
         public decimal DailyMaSlope { get; set; }

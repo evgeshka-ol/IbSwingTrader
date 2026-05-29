@@ -336,10 +336,19 @@ namespace IbSwingTrader.App.Commands
             score += row.H4BbUpperDistanceSeries?.Count ?? 0;
             score += row.H4BbWidthSeries?.Count ?? 0;
             score += row.DailyRsiSeries?.Count ?? 0;
+            score += row.DailyMacdLineSeries?.Count ?? 0;
+            score += row.DailyMacdSignalSeries?.Count ?? 0;
+            score += row.DailyMacdHistogramSeries?.Count ?? 0;
             score += row.DailyMacdSeries?.Count ?? 0;
             score += row.WeeklyRsiSeries?.Count ?? 0;
+            score += row.WeeklyMacdLineSeries?.Count ?? 0;
+            score += row.WeeklyMacdSignalSeries?.Count ?? 0;
+            score += row.WeeklyMacdHistogramSeries?.Count ?? 0;
             score += row.WeeklyMacdSeries?.Count ?? 0;
             score += row.H4RsiSeries?.Count ?? 0;
+            score += row.H4MacdLineSeries?.Count ?? 0;
+            score += row.H4MacdSignalSeries?.Count ?? 0;
+            score += row.H4MacdHistogramSeries?.Count ?? 0;
             score += row.H4MacdSeries?.Count ?? 0;
 
             return score;
@@ -459,6 +468,9 @@ namespace IbSwingTrader.App.Commands
                 nameof(ResearchTopGainerDatasetRow.DailyBbMidBandSeries) => ["DailyBollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.DailyBbLowerBandSeries) => ["DailyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdLineSeries) => ["DailyMacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdSignalSeries) => ["DailyMacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.DailyMacdHistogramSeries) => ["DailyMacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.DailyMacdSeries) => ["DailyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMaSeries) => ["WeeklyMaDistances"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbMidDistanceSeries) => ["WeeklyBollingerMidDistances"],
@@ -468,6 +480,9 @@ namespace IbSwingTrader.App.Commands
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbMidBandSeries) => ["WeeklyBollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyBbLowerBandSeries) => ["WeeklyBollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdLineSeries) => ["WeeklyMacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdSignalSeries) => ["WeeklyMacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.WeeklyMacdHistogramSeries) => ["WeeklyMacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.WeeklyMacdSeries) => ["WeeklyMacdValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MaSeries) => ["H4MaDistances"],
                 nameof(ResearchTopGainerDatasetRow.H4BbMidDistanceSeries) => ["H4BollingerMidDistances"],
@@ -477,6 +492,9 @@ namespace IbSwingTrader.App.Commands
                 nameof(ResearchTopGainerDatasetRow.H4BbMidBandSeries) => ["H4BollingerMidBands"],
                 nameof(ResearchTopGainerDatasetRow.H4BbLowerBandSeries) => ["H4BollingerLowerBands"],
                 nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdLineSeries) => ["H4MacdLineValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdSignalSeries) => ["H4MacdSignalValues"],
+                nameof(ResearchTopGainerDatasetRow.H4MacdHistogramSeries) => ["H4MacdHistogramValues"],
                 nameof(ResearchTopGainerDatasetRow.H4MacdSeries) => ["H4MacdValues"],
                 _ => []
             };
@@ -669,6 +687,9 @@ namespace IbSwingTrader.App.Commands
                 DailyBbMidBandSeries = [.. row.DailyBollingerMidBands],
                 DailyBbLowerBandSeries = [.. row.DailyBollingerLowerBands],
                 DailyRsiSeries = [.. row.DailyRsiValues],
+                DailyMacdLineSeries = [.. row.DailyMacdLineValues],
+                DailyMacdSignalSeries = [.. row.DailyMacdSignalValues],
+                DailyMacdHistogramSeries = [.. row.DailyMacdHistogramValues],
                 DailyMacdSeries = [.. row.DailyMacdValues],
                 WeeklyMaSeries = [.. row.WeeklyMaDistances],
                 WeeklyBbMidDistanceSeries = [.. row.WeeklyBollingerMidDistances],
@@ -678,6 +699,9 @@ namespace IbSwingTrader.App.Commands
                 WeeklyBbMidBandSeries = [.. row.WeeklyBollingerMidBands],
                 WeeklyBbLowerBandSeries = [.. row.WeeklyBollingerLowerBands],
                 WeeklyRsiSeries = [.. row.WeeklyRsiValues],
+                WeeklyMacdLineSeries = [.. row.WeeklyMacdLineValues],
+                WeeklyMacdSignalSeries = [.. row.WeeklyMacdSignalValues],
+                WeeklyMacdHistogramSeries = [.. row.WeeklyMacdHistogramValues],
                 WeeklyMacdSeries = [.. row.WeeklyMacdValues],
                 H4MaSeries = row.H4MaDistances == null ? null : [.. row.H4MaDistances],
                 H4BbMidDistanceSeries = row.H4BollingerMidDistances == null ? null : [.. row.H4BollingerMidDistances],
@@ -687,6 +711,9 @@ namespace IbSwingTrader.App.Commands
                 H4BbMidBandSeries = row.H4BollingerMidBands == null ? null : [.. row.H4BollingerMidBands],
                 H4BbLowerBandSeries = row.H4BollingerLowerBands == null ? null : [.. row.H4BollingerLowerBands],
                 H4RsiSeries = row.H4RsiValues == null ? null : [.. row.H4RsiValues],
+                H4MacdLineSeries = row.H4MacdLineValues == null ? null : [.. row.H4MacdLineValues],
+                H4MacdSignalSeries = row.H4MacdSignalValues == null ? null : [.. row.H4MacdSignalValues],
+                H4MacdHistogramSeries = row.H4MacdHistogramValues == null ? null : [.. row.H4MacdHistogramValues],
                 H4MacdSeries = row.H4MacdValues == null ? null : [.. row.H4MacdValues]
             };
         }
@@ -892,7 +919,10 @@ namespace IbSwingTrader.App.Commands
             row.DailyBollingerMidBands = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyBollingerMidBand);
             row.DailyBollingerLowerBands = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyBollingerLowerBand);
             row.DailyRsiValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyRSI14);
-            row.DailyMacdValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDLineMinusSignal);
+            row.DailyMacdLineValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDLine);
+            row.DailyMacdSignalValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDSignal);
+            row.DailyMacdHistogramValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDHistogram);
+            row.DailyMacdValues = BuildRecentDailySeries(candles, scanIndex, featureCache, x => x.DailyMACDHistogram);
 
             row.WeeklyMaDistances = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMaSignedDistancePct);
             row.WeeklyBollingerMidDistances = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerMidDistancePct);
@@ -902,7 +932,10 @@ namespace IbSwingTrader.App.Commands
             row.WeeklyBollingerMidBands = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerMidBand);
             row.WeeklyBollingerLowerBands = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyBollingerLowerBand);
             row.WeeklyRsiValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyRSI14);
-            row.WeeklyMacdValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDLineMinusSignal);
+            row.WeeklyMacdLineValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDLine);
+            row.WeeklyMacdSignalValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDSignal);
+            row.WeeklyMacdHistogramValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDHistogram);
+            row.WeeklyMacdValues = BuildRecentWeeklySeries(candles, scanIndex, featureCache, x => x.WeeklyMACDHistogram);
 
             row.H4MaDistances = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4MaSignedDistancePct);
             row.H4BollingerMidDistances = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerMidDistancePct);
@@ -912,7 +945,10 @@ namespace IbSwingTrader.App.Commands
             row.H4BollingerMidBands = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerMidBand);
             row.H4BollingerLowerBands = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.H4BollingerLowerBand);
             row.H4RsiValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.RSI14);
-            row.H4MacdValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDLineMinusSignal);
+            row.H4MacdLineValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDLine);
+            row.H4MacdSignalValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDSignal);
+            row.H4MacdHistogramValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDHistogram);
+            row.H4MacdValues = BuildRecentH4Series(candles, scanIndex, featureCache, x => x.MACDHistogram);
         }
 
         private List<decimal> BuildRecentDailySeries(

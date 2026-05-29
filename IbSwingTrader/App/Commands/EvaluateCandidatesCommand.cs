@@ -259,18 +259,27 @@ namespace IbSwingTrader.App.Commands
                    (candidate.RecentDailyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyMacdLineSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyMacdSignalSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentDailyMacdHistogramSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentDailyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMaSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyBbMidDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyBbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyBbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyRsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyMacdLineSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyMacdSignalSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentWeeklyMacdHistogramSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentWeeklyMacdSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4MaSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4BbMidDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4BbUpperDistanceSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4BbWidthSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4RsiSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4MacdLineSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4MacdSignalSeries?.Count ?? 0) > 0 ||
+                   (candidate.RecentH4MacdHistogramSeries?.Count ?? 0) > 0 ||
                    (candidate.RecentH4MacdSeries?.Count ?? 0) > 0;
         }
 
@@ -299,18 +308,27 @@ namespace IbSwingTrader.App.Commands
                 RecentDailyBbUpperDistanceSeries = [.. evaluation.RecentDailyBbUpperDistanceSeries],
                 RecentDailyBbWidthSeries = [.. evaluation.RecentDailyBbWidthSeries],
                 RecentDailyRsiSeries = [.. evaluation.RecentDailyRsiSeries],
+                RecentDailyMacdLineSeries = [.. evaluation.RecentDailyMacdLineSeries],
+                RecentDailyMacdSignalSeries = [.. evaluation.RecentDailyMacdSignalSeries],
+                RecentDailyMacdHistogramSeries = [.. evaluation.RecentDailyMacdHistogramSeries],
                 RecentDailyMacdSeries = [.. evaluation.RecentDailyMacdSeries],
                 RecentWeeklyMaSeries = [.. evaluation.RecentWeeklyMaSeries],
                 RecentWeeklyBbMidDistanceSeries = [.. evaluation.RecentWeeklyBbMidDistanceSeries],
                 RecentWeeklyBbUpperDistanceSeries = [.. evaluation.RecentWeeklyBbUpperDistanceSeries],
                 RecentWeeklyBbWidthSeries = [.. evaluation.RecentWeeklyBbWidthSeries],
                 RecentWeeklyRsiSeries = [.. evaluation.RecentWeeklyRsiSeries],
+                RecentWeeklyMacdLineSeries = [.. evaluation.RecentWeeklyMacdLineSeries],
+                RecentWeeklyMacdSignalSeries = [.. evaluation.RecentWeeklyMacdSignalSeries],
+                RecentWeeklyMacdHistogramSeries = [.. evaluation.RecentWeeklyMacdHistogramSeries],
                 RecentWeeklyMacdSeries = [.. evaluation.RecentWeeklyMacdSeries],
                 RecentH4MaSeries = [.. evaluation.RecentH4MaSeries],
                 RecentH4BbMidDistanceSeries = [.. evaluation.RecentH4BbMidDistanceSeries],
                 RecentH4BbUpperDistanceSeries = [.. evaluation.RecentH4BbUpperDistanceSeries],
                 RecentH4BbWidthSeries = [.. evaluation.RecentH4BbWidthSeries],
                 RecentH4RsiSeries = [.. evaluation.RecentH4RsiSeries],
+                RecentH4MacdLineSeries = [.. evaluation.RecentH4MacdLineSeries],
+                RecentH4MacdSignalSeries = [.. evaluation.RecentH4MacdSignalSeries],
+                RecentH4MacdHistogramSeries = [.. evaluation.RecentH4MacdHistogramSeries],
                 RecentH4MacdSeries = [.. evaluation.RecentH4MacdSeries],
                 WeeklyBbDirection = evaluation.WeeklyBbDirection,
                 WeeklyBbRegime = evaluation.WeeklyBbRegime,

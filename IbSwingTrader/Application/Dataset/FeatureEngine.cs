@@ -13,6 +13,9 @@ namespace IbSwingTrader.Application.Dataset
             var h4Bands = CalcBollingerBandsFromSeries(BuildH4Closes(candles, index), 20, 2m);
             var dailyBands = CalcBollingerBandsFromSeries(BuildDailyCloses(candles, index), 20, 2m);
             var weeklyBands = CalcBollingerBandsFromSeries(BuildWeeklyCloses(candles, index), 20, 2m);
+            var h4Macd = CalcMacdPointFromSeries(BuildH4Closes(candles, index));
+            var dailyMacd = CalcMacdPointFromSeries(BuildDailyCloses(candles, index));
+            var weeklyMacd = CalcMacdPointFromSeries(BuildWeeklyCloses(candles, index));
 
             return new FeatureSet
             {
@@ -28,7 +31,10 @@ namespace IbSwingTrader.Application.Dataset
                 H4BollingerMidBand = h4Bands?.Mid ?? 0m,
                 H4BollingerLowerBand = h4Bands?.Lower ?? 0m,
                 RSI14 = CalcRsiFromCandles(candles, index, 14),
-                MACDLineMinusSignal = CalcMacdLineMinusSignalFromCandles(candles, index),
+                MACDLine = h4Macd?.Macd ?? 0m,
+                MACDSignal = h4Macd?.Signal ?? 0m,
+                MACDHistogram = h4Macd?.Histogram ?? 0m,
+                MACDLineMinusSignal = h4Macd?.Histogram ?? 0m,
 
                 // --- Daily ---
                 DailyMaSignedDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
@@ -39,7 +45,10 @@ namespace IbSwingTrader.Application.Dataset
                 DailyBollingerMidBand = dailyBands?.Mid ?? 0m,
                 DailyBollingerLowerBand = dailyBands?.Lower ?? 0m,
                 DailyRSI14 = CalcDailyRsi14(candles, index),
-                DailyMACDLineMinusSignal = CalcDailyMacdLineMinusSignal(candles, index),
+                DailyMACDLine = dailyMacd?.Macd ?? 0m,
+                DailyMACDSignal = dailyMacd?.Signal ?? 0m,
+                DailyMACDHistogram = dailyMacd?.Histogram ?? 0m,
+                DailyMACDLineMinusSignal = dailyMacd?.Histogram ?? 0m,
 
                 // --- Weekly ---
                 WeeklyMaSignedDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
@@ -50,7 +59,10 @@ namespace IbSwingTrader.Application.Dataset
                 WeeklyBollingerMidBand = weeklyBands?.Mid,
                 WeeklyBollingerLowerBand = weeklyBands?.Lower,
                 WeeklyRSI14 = CalcWeeklyRsi14(candles, index),
-                WeeklyMACDLineMinusSignal = CalcWeeklyMacdLineMinusSignal(candles, index)
+                WeeklyMACDLine = weeklyMacd?.Macd,
+                WeeklyMACDSignal = weeklyMacd?.Signal,
+                WeeklyMACDHistogram = weeklyMacd?.Histogram,
+                WeeklyMACDLineMinusSignal = weeklyMacd?.Histogram
             };
         }
 
@@ -361,6 +373,12 @@ namespace IbSwingTrader.Application.Dataset
 
         private static decimal? CalcMacdLineMinusSignalFromSeries(List<decimal> closes)
         {
+            var point = CalcMacdPointFromSeries(closes);
+            return point?.Histogram;
+        }
+
+        private static MacdPoint? CalcMacdPointFromSeries(List<decimal> closes)
+        {
             if (closes.Count == 0)
                 return null;
 
@@ -368,7 +386,7 @@ namespace IbSwingTrader.Application.Dataset
             if (macdSeries.Count == 0)
                 return null;
 
-            return macdSeries[^1].Macd - macdSeries[^1].Signal;
+            return macdSeries[^1];
         }
 
         private static decimal? CalcBollingerUpperDistancePctFromSeries(

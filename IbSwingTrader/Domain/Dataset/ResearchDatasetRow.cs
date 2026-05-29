@@ -76,6 +76,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> DailyBollingerMidBands { get; set; } = [];
         public List<decimal> DailyBollingerLowerBands { get; set; } = [];
         public List<decimal> DailyRsiValues { get; set; } = [];
+        public List<decimal> DailyMacdLineValues { get; set; } = [];
+        public List<decimal> DailyMacdSignalValues { get; set; } = [];
+        public List<decimal> DailyMacdHistogramValues { get; set; } = [];
         public List<decimal> DailyMacdValues { get; set; } = [];
 
         public List<decimal> WeeklyMaDistances { get; set; } = [];
@@ -86,6 +89,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> WeeklyBollingerMidBands { get; set; } = [];
         public List<decimal> WeeklyBollingerLowerBands { get; set; } = [];
         public List<decimal> WeeklyRsiValues { get; set; } = [];
+        public List<decimal> WeeklyMacdLineValues { get; set; } = [];
+        public List<decimal> WeeklyMacdSignalValues { get; set; } = [];
+        public List<decimal> WeeklyMacdHistogramValues { get; set; } = [];
         public List<decimal> WeeklyMacdValues { get; set; } = [];
 
         public List<decimal>? H4MaDistances { get; set; }
@@ -96,6 +102,9 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal>? H4BollingerMidBands { get; set; }
         public List<decimal>? H4BollingerLowerBands { get; set; }
         public List<decimal>? H4RsiValues { get; set; }
+        public List<decimal>? H4MacdLineValues { get; set; }
+        public List<decimal>? H4MacdSignalValues { get; set; }
+        public List<decimal>? H4MacdHistogramValues { get; set; }
         public List<decimal>? H4MacdValues { get; set; }
     }
 }

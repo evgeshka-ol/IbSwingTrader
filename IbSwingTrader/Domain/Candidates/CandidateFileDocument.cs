@@ -39,9 +39,9 @@ namespace IbSwingTrader.Domain.Candidates
 
     public class CandidateSummarySections
     {
-        public List<CandidateSummaryItem> ReversalCandidates { get; set; } = [];
-
         public List<CandidateSummaryItem> TodayResearchLikeCandidates { get; set; } = [];
+
+        public List<CandidateSummaryItem> ReversalCandidates { get; set; } = [];
     }
 
     public class CandidateSummaryItem
