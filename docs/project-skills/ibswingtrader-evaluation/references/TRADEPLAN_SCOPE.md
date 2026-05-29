@@ -114,14 +114,13 @@ The broader trade-plan direction is to use real chart-like indicator rows for
 confidence and ambiguity checks:
 
 - Bollinger real upper/mid/lower lines are the primary pattern shape.
-- RSI real rows add or remove confidence from the launch.
-- MACD should expose chart-like MACD line, signal line, and histogram rows; the
-  current line-minus-signal row is not enough for all pattern judgments.
+- MACD real line, signal line, and histogram rows are the secondary signal.
+- RSI real rows are the last confidence/ambiguity correction.
 - MA is not a priority decision signal. Keep existing MA/distance rows as
   legacy/context, but do not add trade-plan complexity around MA unless a
   specific analysis proves it improves decisions beyond Bollinger/MACD/RSI.
-- Distance/width rows remain useful as confirmation and normalization context,
-  but entry/exit decisions should not depend only on derived distances.
+- Distance/width rows remain useful for diagnostics and compatibility, but new
+  entry/exit decisions should move away from them.
 
 High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
 High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.

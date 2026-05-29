@@ -5,15 +5,9 @@ These are the main series used to understand a ticker before it fully expands.
 ## Primary series
 
 Prefer real chart-like indicator lines for pattern detection and confidence.
-Distance/width rows remain useful as derived context, but they should not be
-the only source for visual pattern logic.
+New prediction, filter, promotion, ranking, and trade-plan logic should be
+built on these rows first:
 
-- `RecentWeeklyBbMidDistanceSeries`
-- `RecentDailyBbMidDistanceSeries`
-- `RecentH4BbMidDistanceSeries`
-- `RecentWeeklyBbWidthSeries`
-- `RecentDailyBbWidthSeries`
-- `RecentH4BbWidthSeries`
 - `RecentWeeklyBbUpperBandSeries`
 - `RecentWeeklyBbMidBandSeries`
 - `RecentWeeklyBbLowerBandSeries`
@@ -23,22 +17,31 @@ the only source for visual pattern logic.
 - `RecentH4BbUpperBandSeries`
 - `RecentH4BbMidBandSeries`
 - `RecentH4BbLowerBandSeries`
-- `RecentWeeklyMacdSeries`
-- `RecentDailyMacdSeries`
-- `RecentH4MacdSeries`
+- `RecentWeeklyMacdLineSeries`
+- `RecentWeeklyMacdSignalSeries`
+- `RecentWeeklyMacdHistogramSeries`
+- `RecentDailyMacdLineSeries`
+- `RecentDailyMacdSignalSeries`
+- `RecentDailyMacdHistogramSeries`
+- `RecentH4MacdLineSeries`
+- `RecentH4MacdSignalSeries`
+- `RecentH4MacdHistogramSeries`
+- `RecentWeeklyRsiSeries`
+- `RecentDailyRsiSeries`
+- `RecentH4RsiSeries`
 
 Migration direction:
 
-- Keep existing distance rows for compatibility while adding real chart rows.
-- Bollinger already has real upper/mid/lower band rows.
-- RSI rows are already real indicator values.
-- MACD should move beyond only `MACDLineMinusSignal` and expose chart-like
-  MACD line, signal line, and histogram rows per timeframe.
+- Bollinger upper/mid/lower rows are the primary pattern signal.
+- MACD line/signal/histogram rows are the second-level confirmation signal.
+- RSI rows are a final confidence/ambiguity correction.
+- The old `Recent*MacdSeries` compatibility rows should be treated as
+  histogram-only aliases, not as complete MACD.
 - MA is not a priority visual signal for this project direction. Keep existing
   MA/distance rows only as legacy/context unless a specific analysis proves
   they add value beyond Bollinger/MACD/RSI.
-- Pattern detectors should primarily read the real chart rows, with distance
-  rows used as confirmation or normalization context.
+- Distance/width rows can remain for compatibility and diagnostics, but should
+  be removed from primary decision logic over time.
 
 ## Main interpretations
 

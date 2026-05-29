@@ -84,11 +84,16 @@ but the trade decision changes with timeframe. Use the real band series
 shape, then use timeframe context to decide ranking strength and trade profile.
 
 Broader series direction: move pattern logic toward the visual indicators the
-user actually relies on: Bollinger, MACD, and RSI. MA is not a priority signal
-for pattern recognition and should be treated as legacy/context unless a
-specific analysis proves it adds value. Existing distance/width rows can remain
-for compatibility and confirmation, but they should not be the only basis for
-visual pattern recognition.
+user actually relies on: Bollinger, MACD, and RSI. The priority order for
+scanner prediction, filters, promotion, and ranking is:
+
+1. real Bollinger upper/mid/lower curves
+2. real MACD line, signal line, and histogram
+3. real RSI as a confidence/ambiguity correction
+
+MA rows and older distance/width rows are legacy/context. Do not base new
+prediction logic on them unless a concrete analysis proves they add value
+beyond the real Bollinger/MACD/RSI rows.
 
 ## Main code
 
