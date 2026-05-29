@@ -135,6 +135,9 @@ namespace IbSwingTrader.Application.WishList
 
         private static object? ParseValue(Type type, string raw)
         {
+            if (type == typeof(List<decimal>))
+                return ParseDecimalList(raw);
+
             if (string.IsNullOrWhiteSpace(raw))
             {
                 if (Nullable.GetUnderlyingType(type) != null)
@@ -169,6 +172,28 @@ namespace IbSwingTrader.Application.WishList
                 return Enum.Parse(targetType, raw, ignoreCase: true);
 
             return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
+        }
+
+        private static List<decimal> ParseDecimalList(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return [];
+
+            var trimmed = raw.Trim();
+            if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
+                trimmed = trimmed[1..^1];
+
+            if (string.IsNullOrWhiteSpace(trimmed))
+                return [];
+
+            return
+            [
+                .. trimmed
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+                        ? value
+                        : 0m)
+            ];
         }
 
         private async Task<List<WishListItem>> ReadLegacyJsonAsync(string jsonPath)

@@ -885,6 +885,22 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var runawayPhase = ClassifyTodayResearchLikeRunawayPhase(recentSeries);
+            if (runawayPhase == TodayResearchLikeRunawayPhase.WishListOnly)
+            {
+                _logger.Info(
+                    $"TodayResearchLike runway pattern kept in wish list: {ctx.Stock.Ticker}. " +
+                    $"Reason=H4 trigger is not ready by real Bollinger/RSI rows, " +
+                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
+                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
+                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
+                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
+                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
+                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
+                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
+                return false;
+            }
+
             var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
                 mergedWishItem,
                 ctx,
@@ -1278,6 +1294,38 @@ namespace IbSwingTrader.Application.Candidates
         private bool IsStrongTodayResearchLikeSeries(RecentFeatureSeries recentSeries)
         {
             return CalculateTodayResearchLikeSeriesScore(recentSeries) >= 10m;
+        }
+
+        private static TodayResearchLikeRunawayPhase ClassifyTodayResearchLikeRunawayPhase(RecentFeatureSeries recentSeries)
+        {
+            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
+            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
+            var dailyLowerTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6);
+            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
+            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
+            var h4LowerTail = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
+            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
+
+            var dailyRunawayPattern =
+                dailyUpperTail >= 1.0m &&
+                dailyMidTail >= 0m &&
+                dailyLowerTail <= dailyMidTail + 1.0m;
+
+            var h4TriggerReady =
+                h4UpperTail >= 1.0m &&
+                h4MidTail >= 0m &&
+                h4LowerTail <= h4MidTail + 1.0m &&
+                h4RsiTail >= 0m &&
+                h4MacdTail >= -0.05m;
+
+            if (h4TriggerReady)
+                return TodayResearchLikeRunawayPhase.ReadyNow;
+
+            return dailyRunawayPattern
+                ? TodayResearchLikeRunawayPhase.WishListOnly
+                : TodayResearchLikeRunawayPhase.Neutral;
         }
 
         private decimal CalculateTodayResearchLikeSeriesScore(RecentFeatureSeries recentSeries)
@@ -1882,6 +1930,27 @@ namespace IbSwingTrader.Application.Candidates
                     DailyRSI14 = snapshot.Current.DailyRSI14,
                     Notes = BuildWishListNotes(snapshot)
                 },
+                RecentDailyBbUpperBandSeries = recentSeries.DailyBbUpperBandSeries,
+                RecentDailyBbMidBandSeries = recentSeries.DailyBbMidBandSeries,
+                RecentDailyBbLowerBandSeries = recentSeries.DailyBbLowerBandSeries,
+                RecentDailyMacdLineSeries = recentSeries.DailyMacdLineSeries,
+                RecentDailyMacdSignalSeries = recentSeries.DailyMacdSignalSeries,
+                RecentDailyMacdHistogramSeries = recentSeries.DailyMacdHistogramSeries,
+                RecentDailyRsiSeries = recentSeries.DailyRsiSeries,
+                RecentWeeklyBbUpperBandSeries = recentSeries.WeeklyBbUpperBandSeries,
+                RecentWeeklyBbMidBandSeries = recentSeries.WeeklyBbMidBandSeries,
+                RecentWeeklyBbLowerBandSeries = recentSeries.WeeklyBbLowerBandSeries,
+                RecentWeeklyMacdLineSeries = recentSeries.WeeklyMacdLineSeries,
+                RecentWeeklyMacdSignalSeries = recentSeries.WeeklyMacdSignalSeries,
+                RecentWeeklyMacdHistogramSeries = recentSeries.WeeklyMacdHistogramSeries,
+                RecentWeeklyRsiSeries = recentSeries.WeeklyRsiSeries,
+                RecentH4BbUpperBandSeries = recentSeries.H4BbUpperBandSeries,
+                RecentH4BbMidBandSeries = recentSeries.H4BbMidBandSeries,
+                RecentH4BbLowerBandSeries = recentSeries.H4BbLowerBandSeries,
+                RecentH4MacdLineSeries = recentSeries.H4MacdLineSeries,
+                RecentH4MacdSignalSeries = recentSeries.H4MacdSignalSeries,
+                RecentH4MacdHistogramSeries = recentSeries.H4MacdHistogramSeries,
+                RecentH4RsiSeries = recentSeries.H4RsiSeries,
                 FirstSeen = scanTimeMarket,
                 LastEvaluatedAt = scanTimeMarket,
                 ExpectedTargetTime = targetForecast.ExpectedTargetMarketTime,
@@ -4103,6 +4172,28 @@ namespace IbSwingTrader.Application.Candidates
             return decimal.Round((series[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
         }
 
+        private static decimal CalculateTailRelativeSlopePct(List<decimal> series, int lookback)
+        {
+            if (series.Count < 2)
+                return 0m;
+
+            var tail = series.TakeLast(Math.Max(2, lookback)).ToList();
+            var first = tail[0];
+            if (first == 0m)
+                return CalculateTailSlope(series, lookback);
+
+            return decimal.Round((tail[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal CalculateTailSlope(List<decimal> series, int lookback)
+        {
+            if (series.Count < 2)
+                return 0m;
+
+            var tail = series.TakeLast(Math.Max(2, lookback)).ToList();
+            return decimal.Round(tail[^1] - tail[0], 2, MidpointRounding.AwayFromZero);
+        }
+
         private static bool IsRealBollingerLaunch(
             decimal midSlopePct,
             decimal upperSlopePct,
@@ -5784,6 +5875,13 @@ namespace IbSwingTrader.Application.Candidates
             TodayResearchLike,
             Reversal,
             LowAmplitudeSameDay
+        }
+
+        private enum TodayResearchLikeRunawayPhase
+        {
+            Neutral,
+            ReadyNow,
+            WishListOnly
         }
 
         private sealed record SeriesSimilarityTemplate(
