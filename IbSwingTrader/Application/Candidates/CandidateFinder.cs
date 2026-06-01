@@ -2970,6 +2970,17 @@ namespace IbSwingTrader.Application.Candidates
                 candidate,
                 diagnostics,
                 settings);
+            var lateSpikePullbackPenalty = CalculateLateSpikePullbackPenalty(
+                candidate,
+                diagnostics,
+                settings,
+                seriesSimilarityBonus);
+            var realBollingerEnvelopeExpansionAdjustment = CalculateRealBollingerEnvelopeExpansionAdjustment(
+                candidate,
+                diagnostics,
+                settings,
+                seriesSimilarityBonus,
+                lateSpikePullbackPenalty);
 
             return
                 dailySeriesScore * settings.SecondPassDailySeriesWeight +
@@ -2982,8 +2993,129 @@ namespace IbSwingTrader.Application.Candidates
                 CalculateLiveWinnerContinuationAdjustment(candidate, diagnostics) +
                 freshExpansionWinnerAdjustment +
                 dailyBollingerSqueezeLaunchAdjustment +
+                realBollingerEnvelopeExpansionAdjustment +
                 seriesSimilarityBonus -
+                lateSpikePullbackPenalty -
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+        }
+
+        private static decimal CalculateRealBollingerEnvelopeExpansionAdjustment(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            decimal seriesSimilarityBonus,
+            decimal lateSpikePullbackPenalty)
+        {
+            diagnostics.RealBollingerEnvelopeExpansionScore = null;
+
+            if (seriesSimilarityBonus <= 0m || lateSpikePullbackPenalty > 0m)
+                return 0m;
+
+            if (!TryCalculateRealBollingerEnvelope(
+                    candidate.RecentDailyBbUpperBandSeries,
+                    candidate.RecentDailyBbMidBandSeries,
+                    candidate.RecentDailyBbLowerBandSeries,
+                    out var daily) ||
+                !TryCalculateRealBollingerEnvelope(
+                    candidate.RecentH4BbUpperBandSeries,
+                    candidate.RecentH4BbMidBandSeries,
+                    candidate.RecentH4BbLowerBandSeries,
+                    out var h4) ||
+                !TryCalculateRealBollingerEnvelope(
+                    candidate.RecentWeeklyBbUpperBandSeries,
+                    candidate.RecentWeeklyBbMidBandSeries,
+                    candidate.RecentWeeklyBbLowerBandSeries,
+                    out var weekly))
+            {
+                return 0m;
+            }
+
+            var dailyOpens =
+                daily.OpenPct >= settings.RealBollingerEnvelopeMinDailyOpenPct &&
+                daily.UpperMovePct >= settings.RealBollingerEnvelopeMinDailyUpperMovePct &&
+                daily.LowerMovePct <= daily.MidMovePct * settings.RealBollingerEnvelopeMaxLowerVsMidMovePct;
+            var h4Confirms =
+                h4.OpenPct >= settings.RealBollingerEnvelopeMinH4OpenPct &&
+                h4.UpperMovePct >= settings.RealBollingerEnvelopeMinH4UpperMovePct &&
+                h4.LowerMovePct <= h4.MidMovePct * settings.RealBollingerEnvelopeMaxLowerVsMidMovePct;
+            var weeklySupports = weekly.OpenPct >= settings.RealBollingerEnvelopeMinWeeklyOpenPct;
+
+            if (!dailyOpens || !h4Confirms || !weeklySupports)
+                return 0m;
+
+            var score = settings.RealBollingerEnvelopeExpansionBonus;
+
+            if (daily.OpenPct >= settings.RealBollingerEnvelopeMinDailyOpenPct * 2m &&
+                h4.OpenPct >= settings.RealBollingerEnvelopeMinH4OpenPct * 4m &&
+                seriesSimilarityBonus >= settings.SeriesSimilarity.FullMatchBonus)
+            {
+                score += settings.RealBollingerEnvelopeExpansionHighConvictionBonus;
+            }
+
+            diagnostics.RealBollingerEnvelopeExpansionScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+            return score;
+        }
+
+        private static bool TryCalculateRealBollingerEnvelope(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower,
+            out RealBollingerEnvelope envelope)
+        {
+            envelope = default;
+
+            if (upper.Count < 4 || mid.Count < 4 || lower.Count < 4)
+                return false;
+
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            var upperTail = upper.TakeLast(count).ToArray();
+            var midTail = mid.TakeLast(count).ToArray();
+            var lowerTail = lower.TakeLast(count).ToArray();
+            var baseMid = midTail[0];
+
+            if (baseMid <= 0m)
+                return false;
+
+            var upperMovePct = (upperTail[^1] - upperTail[0]) / baseMid * 100m;
+            var midMovePct = (midTail[^1] - midTail[0]) / baseMid * 100m;
+            var lowerMovePct = (lowerTail[^1] - lowerTail[0]) / baseMid * 100m;
+
+            envelope = new RealBollingerEnvelope(
+                upperMovePct,
+                midMovePct,
+                lowerMovePct,
+                upperMovePct - lowerMovePct);
+            return true;
+        }
+
+        private static decimal CalculateLateSpikePullbackPenalty(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            decimal seriesSimilarityBonus)
+        {
+            diagnostics.LateSpikePullbackPenalty = null;
+
+            if (seriesSimilarityBonus > 0m)
+                return 0m;
+
+            var overheatedContext =
+                candidate.Context.DailyRSI14 >= settings.LateSpikePullbackMinDailyRsi &&
+                diagnostics.BBMidSignedDistancePct >= settings.LateSpikePullbackMinBbMid;
+
+            var fallingAwayFromUpperBand =
+                candidate.DailyBbUpperDistanceSlope <= settings.LateSpikePullbackMaxDailyUpperDistanceSlope &&
+                candidate.H4BbUpperDistanceSlope <= settings.LateSpikePullbackMaxH4UpperDistanceSlope;
+
+            var envelopeStillExpanding =
+                candidate.DailyBbWidthSlope >= settings.LateSpikePullbackMinDailyWidthSlope &&
+                candidate.H4BbWidthSlope >= settings.LateSpikePullbackMinH4WidthSlope;
+
+            if (!overheatedContext || !fallingAwayFromUpperBand || !envelopeStillExpanding)
+                return 0m;
+
+            diagnostics.LateSpikePullbackPenalty = settings.LateSpikePullbackPenalty;
+            return settings.LateSpikePullbackPenalty;
         }
 
         private static decimal CalculateDailyBollingerSqueezeLaunchAdjustment(
@@ -5904,6 +6036,12 @@ namespace IbSwingTrader.Application.Candidates
             SeriesTemplateFamily Family,
             decimal AmplitudePct,
             SeriesFeatureSet Features);
+
+        private readonly record struct RealBollingerEnvelope(
+            decimal UpperMovePct,
+            decimal MidMovePct,
+            decimal LowerMovePct,
+            decimal OpenPct);
 
         private sealed record SeriesSimilarityMatch(
             string? TemplateTicker,

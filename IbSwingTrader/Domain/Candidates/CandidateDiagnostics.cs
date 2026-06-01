@@ -45,5 +45,9 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? FreshExpansionWinnerScore { get; set; }
 
         public decimal? DailyBollingerSqueezeLaunchScore { get; set; }
+
+        public decimal? LateSpikePullbackPenalty { get; set; }
+
+        public decimal? RealBollingerEnvelopeExpansionScore { get; set; }
     }
 }
