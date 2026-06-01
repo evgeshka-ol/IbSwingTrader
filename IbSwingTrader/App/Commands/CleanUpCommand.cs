@@ -36,12 +36,12 @@ namespace IbSwingTrader.App.Commands
 
             var candidatesRemoved = await CleanCandidatesAsync(settings);
             var evaluationsRemoved = await CleanEvaluationsAsync(settings);
-            await SyncEvaluationDatasetAsync(settings, evaluationsRemoved > 0);
+            var evaluationDatasetRemoved = await CleanEvaluationDatasetAsync(settings, evaluationsRemoved > 0);
             var wishListRemoved = await CleanWishListAsync(settings, marketNow);
             var deletedFiles = CleanOldFiles(settings, marketNow);
 
             _logger.Info(
-                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} EvaluationsRemoved={evaluationsRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles}");
+                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} EvaluationsRemoved={evaluationsRemoved} EvaluationDatasetRemoved={evaluationDatasetRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles}");
         }
 
         private async Task<int> CleanCandidatesAsync(CleanUpSettings settings)
@@ -54,7 +54,7 @@ namespace IbSwingTrader.App.Commands
 
             var candidateDocument = await _candidateFileService.ReadAsync(candidatesPath);
             var candidates = candidateDocument.Candidates;
-            if (candidates.Count == 0 || !File.Exists(evaluationsPath))
+            if (candidates.Count == 0)
                 return 0;
 
             var removableOutcomes = settings.CandidateOutcomesToRemove
@@ -64,7 +64,9 @@ namespace IbSwingTrader.App.Commands
             if (removableOutcomes.Count == 0)
                 return 0;
 
-            var evaluatedKeys = await LoadCandidateKeysByOutcomeAsync(evaluationsPath, removableOutcomes);
+            var evaluatedKeys = File.Exists(evaluationsPath)
+                ? await LoadCandidateKeysByOutcomeAsync(evaluationsPath, removableOutcomes)
+                : await LoadCandidateKeysByOutcomeFromDatasetAsync(removableOutcomes);
             if (evaluatedKeys.Count == 0)
                 return 0;
 
@@ -89,52 +91,77 @@ namespace IbSwingTrader.App.Commands
             return removed;
         }
 
-        private async Task SyncEvaluationDatasetAsync(
+        private async Task<int> CleanEvaluationDatasetAsync(
             CleanUpSettings settings,
             bool evaluationsChanged)
         {
-            if (!evaluationsChanged)
-                return;
-
-            var evaluationsPath = _pathService.GetEvaluationsFile();
             var datasetPath = Path.GetFullPath(
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
 
-            var evaluations = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
-            if (evaluations.Count == 0)
-            {
-                if (!File.Exists(datasetPath))
-                    return;
+            if (!File.Exists(datasetPath))
+                return 0;
 
-                File.Delete(datasetPath);
-                _logger.Info($"Evaluation dataset deleted: {datasetPath}");
-                return;
+            List<EvaluationDatasetRow>? datasetRows = null;
+            var removedTotal = 0;
+
+            if (evaluationsChanged)
+            {
+                var evaluationsPath = _pathService.GetEvaluationsFile();
+                var evaluations = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
+                if (evaluations.Count == 0)
+                {
+                    File.Delete(datasetPath);
+                    _logger.Info($"Evaluation dataset deleted: {datasetPath}");
+                    return 0;
+                }
+
+                var removableOutcomes = settings.EvaluationOutcomesToRemove
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                if (removableOutcomes.Count > 0)
+                {
+                    datasetRows = await _evaluationDatasetCsvService.ReadAsync(datasetPath);
+                    var filteredRows = datasetRows
+                        .Where(x => !removableOutcomes.Contains(x.Outcome ?? string.Empty))
+                        .ToList();
+
+                    var removed = datasetRows.Count - filteredRows.Count;
+                    if (removed > 0)
+                    {
+                        datasetRows = filteredRows;
+                        removedTotal += removed;
+
+                        _logger.Info(
+                            $"Evaluation dataset cleaned by outcome: removed={removed}, kept={filteredRows.Count}, " +
+                            $"outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
+                    }
+                }
             }
 
-            if (!File.Exists(datasetPath))
-                return;
+            if (settings.RemoveEvaluationDatasetRowsWithoutCandidateGroup)
+            {
+                datasetRows ??= await _evaluationDatasetCsvService.ReadAsync(datasetPath);
+                var filteredRows = datasetRows
+                    .Where(x => !string.IsNullOrWhiteSpace(x.CandidateGroup))
+                    .ToList();
 
-            var removableOutcomes = settings.EvaluationOutcomesToRemove
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var removed = datasetRows.Count - filteredRows.Count;
+                if (removed > 0)
+                {
+                    datasetRows = filteredRows;
+                    removedTotal += removed;
 
-            if (removableOutcomes.Count == 0)
-                return;
+                    _logger.Info(
+                        $"Evaluation dataset cleaned by candidate group: removed={removed}, kept={filteredRows.Count}");
+                }
+            }
 
-            var datasetRows = await _evaluationDatasetCsvService.ReadAsync(datasetPath);
-            var filteredRows = datasetRows
-                .Where(x => !removableOutcomes.Contains(x.Outcome ?? string.Empty))
-                .ToList();
+            if (removedTotal <= 0 || datasetRows is null)
+                return 0;
 
-            var removed = datasetRows.Count - filteredRows.Count;
-            if (removed <= 0)
-                return;
-
-            await _evaluationDatasetCsvService.WriteAsync(datasetPath, filteredRows);
-
-            _logger.Info(
-                $"Evaluation dataset cleaned: removed={removed}, kept={filteredRows.Count}, " +
-                $"outcomes=[{string.Join(", ", removableOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
+            await _evaluationDatasetCsvService.WriteAsync(datasetPath, datasetRows);
+            return removedTotal;
         }
 
         private async Task<int> CleanEvaluationsAsync(CleanUpSettings settings)
@@ -610,6 +637,26 @@ namespace IbSwingTrader.App.Commands
             return latestByCandidate
                 .Where(x => outcomes.Contains(x.Value.Outcome))
                 .Select(x => x.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async Task<HashSet<string>> LoadCandidateKeysByOutcomeFromDatasetAsync(
+            HashSet<string> outcomes)
+        {
+            var datasetPath = Path.GetFullPath(
+                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+
+            if (!File.Exists(datasetPath))
+                return [];
+
+            var rows = await _evaluationDatasetCsvService.ReadAsync(datasetPath);
+            return rows
+                .GroupBy(x => BuildCandidateKey(x.Ticker, x.PresetScanCode, x.ScanTime), StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(r => r.EvaluatedAt)
+                    .First())
+                .Where(x => outcomes.Contains(x.Outcome ?? string.Empty))
+                .Select(x => BuildCandidateKey(x.Ticker, x.PresetScanCode, x.ScanTime))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 

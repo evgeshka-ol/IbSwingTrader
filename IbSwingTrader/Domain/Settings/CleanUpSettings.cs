@@ -18,6 +18,8 @@ namespace IbSwingTrader.Domain.Settings
 
         public bool RemoveEvaluationReportRows { get; set; } = true;
 
+        public bool RemoveEvaluationDatasetRowsWithoutCandidateGroup { get; set; }
+
         public List<string> EvaluationOutcomesToRemove { get; set; } =
         [
             "NoData",

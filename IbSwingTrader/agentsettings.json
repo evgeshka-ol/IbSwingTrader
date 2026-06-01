@@ -702,12 +702,13 @@
     },
 
     "CleanUp": {
-        "RemoveEvaluatedCandidates": false,
+        "RemoveEvaluatedCandidates": true,
         "CandidateOutcomesToRemove": [
             "Loss"
         ],
         "RemoveStaleWishListItems": true,
         "RemoveEvaluationReportRows": true,
+        "RemoveEvaluationDatasetRowsWithoutCandidateGroup": true,
         "EvaluationOutcomesToRemove": [
             "NoData",
             "NoDataAfterScan",
