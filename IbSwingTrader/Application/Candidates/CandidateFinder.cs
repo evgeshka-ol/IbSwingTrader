@@ -2981,6 +2981,12 @@ namespace IbSwingTrader.Application.Candidates
                 settings,
                 seriesSimilarityBonus,
                 lateSpikePullbackPenalty);
+            var lowAmplitudeFreshLaunchRepairAdjustment = CalculateLowAmplitudeFreshLaunchRepairAdjustment(
+                candidate,
+                diagnostics,
+                settings,
+                lowAmplitudeSimilarityPenalty,
+                lateSpikePullbackPenalty);
 
             return
                 dailySeriesScore * settings.SecondPassDailySeriesWeight +
@@ -2994,9 +3000,70 @@ namespace IbSwingTrader.Application.Candidates
                 freshExpansionWinnerAdjustment +
                 dailyBollingerSqueezeLaunchAdjustment +
                 realBollingerEnvelopeExpansionAdjustment +
+                lowAmplitudeFreshLaunchRepairAdjustment +
                 seriesSimilarityBonus -
                 lateSpikePullbackPenalty -
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+        }
+
+        private static decimal CalculateLowAmplitudeFreshLaunchRepairAdjustment(
+            CandidateDetails candidate,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            decimal lowAmplitudeSimilarityPenalty,
+            decimal lateSpikePullbackPenalty)
+        {
+            diagnostics.LowAmplitudeFreshLaunchRepairScore = null;
+
+            if (lowAmplitudeSimilarityPenalty <= 0m || lateSpikePullbackPenalty > 0m)
+                return 0m;
+
+            if (candidate.TradePlan.ProfitPercent < settings.LowAmplitudeFreshLaunchRepairMinProfitPct ||
+                diagnostics.ATRRatio < settings.LowAmplitudeFreshLaunchRepairMinAtrRatio)
+            {
+                return 0m;
+            }
+
+            if (!TryCalculateRealBollingerEnvelope(
+                    candidate.RecentDailyBbUpperBandSeries,
+                    candidate.RecentDailyBbMidBandSeries,
+                    candidate.RecentDailyBbLowerBandSeries,
+                    out var daily) ||
+                !TryCalculateRealBollingerEnvelope(
+                    candidate.RecentH4BbUpperBandSeries,
+                    candidate.RecentH4BbMidBandSeries,
+                    candidate.RecentH4BbLowerBandSeries,
+                    out var h4))
+            {
+                return 0m;
+            }
+
+            var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
+            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
+            var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
+            var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+
+            var realLaunch =
+                daily.OpenPct >= settings.LowAmplitudeFreshLaunchRepairMinDailyOpenPct &&
+                h4.OpenPct >= settings.LowAmplitudeFreshLaunchRepairMinH4OpenPct &&
+                daily.MidMovePct >= settings.LowAmplitudeFreshLaunchRepairMinDailyMidMovePct &&
+                h4.MidMovePct >= settings.LowAmplitudeFreshLaunchRepairMinH4MidMovePct &&
+                daily.UpperMovePct > daily.MidMovePct &&
+                h4.UpperMovePct > h4.MidMovePct;
+
+            var momentumConfirms =
+                dailyRsiSlope >= settings.LowAmplitudeFreshLaunchRepairMinDailyRsiSlope &&
+                h4RsiSlope >= settings.LowAmplitudeFreshLaunchRepairMinH4RsiSlope &&
+                dailyMacdSlope >= settings.LowAmplitudeFreshLaunchRepairMinDailyMacdSlope &&
+                h4MacdSlope >= settings.LowAmplitudeFreshLaunchRepairMinH4MacdSlope;
+
+            if (!realLaunch || !momentumConfirms)
+                return 0m;
+
+            var weightedPenalty = lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+            var score = Math.Min(weightedPenalty, settings.LowAmplitudeFreshLaunchRepairMaxBonus);
+            diagnostics.LowAmplitudeFreshLaunchRepairScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+            return score;
         }
 
         private static decimal CalculateRealBollingerEnvelopeExpansionAdjustment(
