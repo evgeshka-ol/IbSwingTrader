@@ -1,12 +1,16 @@
+using System.Text.Json;
 
 namespace IbSwingTrader.Application.Candidates
 {
     public class StockPreFilter(
         ITextLogger logger,
-        IGetCandidatesSettingsProvider settingsProvider) : IStockPreFilter
+        IGetCandidatesSettingsProvider settingsProvider,
+        IAgentPathService pathService) : IStockPreFilter
     {
         private readonly ITextLogger _logger = logger;
         private readonly IGetCandidatesSettingsProvider _settingsProvider = settingsProvider;
+        private readonly IAgentPathService _pathService = pathService;
+        private IReadOnlySet<string>? _tickerSuffixExceptions;
 
         public bool Pass(StockInfo stock)
         {
@@ -61,6 +65,13 @@ namespace IbSwingTrader.Application.Candidates
             {
                 if (stock.Ticker.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 {
+                    if (GetTickerSuffixExceptions(settings).Contains(stock.Ticker))
+                    {
+                        _logger.Info(
+                            $"Stock {stock.Ticker} ends with '{suffix}', but is allowed by ticker suffix exception list.");
+                        continue;
+                    }
+
                     _logger.Info(
                         $"Stock {stock.Ticker} ends with '{suffix}', which is not supported.");
                     return false;
@@ -68,6 +79,52 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return true;
+        }
+
+        private IReadOnlySet<string> GetTickerSuffixExceptions(PreFilterSettings settings)
+        {
+            if (_tickerSuffixExceptions != null)
+                return _tickerSuffixExceptions;
+
+            var tickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(settings.TickerSuffixExceptionFile))
+                return _tickerSuffixExceptions = tickers;
+
+            try
+            {
+                var path = Path.IsPathRooted(settings.TickerSuffixExceptionFile)
+                    ? settings.TickerSuffixExceptionFile
+                    : Path.Combine(_pathService.GetDataRoot(), settings.TickerSuffixExceptionFile);
+
+                if (!File.Exists(path))
+                {
+                    _logger.Info($"Ticker suffix exception file not found: {path}");
+                    return _tickerSuffixExceptions = tickers;
+                }
+
+                var json = File.ReadAllText(path);
+                var exceptions = JsonSerializer.Deserialize<TickerSuffixExceptionList>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (exceptions?.Tickers == null)
+                    return _tickerSuffixExceptions = tickers;
+
+                foreach (var ticker in exceptions.Tickers)
+                {
+                    if (!string.IsNullOrWhiteSpace(ticker))
+                        tickers.Add(ticker.Trim());
+                }
+
+                _logger.Info($"Ticker suffix exceptions loaded: Count={tickers.Count}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to load ticker suffix exception file: {ex.Message}");
+            }
+
+            return _tickerSuffixExceptions = tickers;
         }
     }
 }

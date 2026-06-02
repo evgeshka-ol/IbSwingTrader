@@ -279,6 +279,7 @@
             "DenyList": [ "UVIX", "AGQ", "SCO", "MSTZ" ],
             "AllowedStockTypeMarkers": [ "STK", "CORP", "ADR" ],
             "RejectTickersEndingWith": [ "U", "W" ],
+            "TickerSuffixExceptionFile": "Tickers/ticker-suffix-exceptions.json",
             "RecentDailyPriceFloorDays": 12,
             "MinRecentDailyClosePrice": 5.0,
             "MinRecentDailyLowPrice": 4.0,
