@@ -886,50 +886,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var runawayPhase = ClassifyTodayResearchLikeRunawayPhase(recentSeries);
-            if (runawayPhase == TodayResearchLikeRunawayPhase.WishListOnly)
-            {
-                _logger.Info(
-                    $"TodayResearchLike runway pattern kept in wish list: {ctx.Stock.Ticker}. " +
-                    $"Reason=H4 trigger is not ready by real Bollinger/RSI rows, " +
-                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
-                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
-                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
-                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
-                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
-                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
-                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
-                return false;
-            }
-
-            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral)
-            {
-                _logger.Info(
-                    $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
-                    $"Reason=real Bollinger/H4 trigger phase is neutral, " +
-                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
-                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
-                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
-                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
-                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
-                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
-                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
-                return false;
-            }
-
-            var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
-                mergedWishItem,
-                ctx,
-                diagnostics,
-                bbState,
-                recentSeries);
-            var shortHistoryLiveMover = IsShortHistoryLiveMoverCandidate(
-                ctx,
-                diagnostics,
-                recentSeries);
-            var mixedMeanLiveWinner = IsMixedMeanLiveWinnerCandidate(
-                ctx,
-                diagnostics,
-                entryScore);
             var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
             var currentSessionLikeMove =
                 string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
@@ -948,6 +904,66 @@ namespace IbSwingTrader.Application.Candidates
                 seriesTemplateMatch.Bonus > 0m &&
                 !selfSeriesTemplateMatch &&
                 (entryScore >= 15m || diagnostics.ATRRatio >= 3m || ctx.Stock.Rank <= 20);
+
+            if (runawayPhase == TodayResearchLikeRunawayPhase.WishListOnly)
+            {
+                _logger.Info(
+                    $"TodayResearchLike runway pattern kept in wish list: {ctx.Stock.Ticker}. " +
+                    $"Reason=H4 trigger is not ready by real Bollinger/RSI rows, " +
+                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
+                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
+                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
+                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
+                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
+                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
+                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
+                return false;
+            }
+
+            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral && !seriesTemplatePromotion)
+            {
+                _logger.Info(
+                    $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
+                    $"Reason=real Bollinger/H4 trigger phase is neutral, " +
+                    $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
+                    $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
+                    $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
+                    $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
+                    $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
+                    $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
+                    $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
+                return false;
+            }
+
+            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral)
+            {
+                _logger.Info(
+                    $"TodayResearchLike neutral-H4 template promotion allowed: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"Template={seriesTemplateMatch.TemplateTicker}, " +
+                    $"Distance={_fmt.Generic(seriesTemplateMatch.TotalDistance ?? 0m)}, " +
+                    $"Daily={_fmt.Generic(seriesTemplateMatch.DailyDistance ?? 0m)}, " +
+                    $"Weekly={_fmt.Generic(seriesTemplateMatch.WeeklyDistance ?? 0m)}, " +
+                    $"H4={_fmt.Generic(seriesTemplateMatch.H4Distance ?? 0m)}, " +
+                    $"Bonus={_fmt.Generic(seriesTemplateMatch.Bonus)}, " +
+                    $"EntryScore={_fmt.Generic(entryScore)}, " +
+                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
+            }
+
+            var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
+                mergedWishItem,
+                ctx,
+                diagnostics,
+                bbState,
+                recentSeries);
+            var shortHistoryLiveMover = IsShortHistoryLiveMoverCandidate(
+                ctx,
+                diagnostics,
+                recentSeries);
+            var mixedMeanLiveWinner = IsMixedMeanLiveWinnerCandidate(
+                ctx,
+                diagnostics,
+                entryScore);
 
             if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
                 !preLaunchResearchLike &&
@@ -4827,8 +4843,32 @@ namespace IbSwingTrader.Application.Candidates
                  h4MacdSlope <= 0m ||
                  IsRollingOver(recentSeries.H4RsiSeries));
 
+            var immediateContinuation =
+                !lateSpike &&
+                dailyStrong &&
+                constructiveH4 &&
+                diagnostics.ATRRatio >= settings.ImmediateContinuationMinAtrRatio &&
+                dailyMaLast >= settings.ImmediateContinuationMinDailyMaDistancePct &&
+                h4MaLast >= settings.ImmediateContinuationMinH4MaDistancePct &&
+                h4RsiLast >= settings.ImmediateContinuationMinH4Rsi &&
+                dailyMacdLast >= 0m &&
+                h4MacdLast >= 0m;
+
+            var deepAdverseContinuation =
+                !lateSpike &&
+                dailyStrong &&
+                diagnostics.ATRRatio >= settings.DeepAdverseContinuationMinAtrRatio &&
+                (dailyMaLast >= settings.DeepAdverseContinuationMinDailyMaDistancePct ||
+                 snapshot.Current.DailyRSI14 >= settings.DailyOverheatedRsiThreshold) &&
+                (bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
+                 bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral) ||
+                 bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse) ||
+                 h4RsiSlope < 0m ||
+                 h4MacdSlope <= settings.H4MacdWeakDeltaThreshold);
+
             var fastContinuationShallow =
                 !lateSpike &&
+                !deepAdverseContinuation &&
                 ((realDailyBbLaunch && realH4BbLaunch && realDailyMacdConstructive && realH4MacdConstructive) ||
                  (realH4BbLaunch && realH4MacdConstructive && dailyStrong) ||
                  cleanContinuation ||
@@ -4850,6 +4890,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var moderatePullback =
                 !lateSpike &&
+                !deepAdverseContinuation &&
                 !fastContinuationShallow &&
                 dailyMaLast >= settings.ModeratePullbackMinDailyMaDistancePct &&
                 h4MaLast >= settings.ModeratePullbackMinH4MaDistancePct &&
@@ -4859,6 +4900,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var deepPullback =
                 !lateSpike &&
+                !deepAdverseContinuation &&
                 !fastContinuationShallow &&
                 !moderatePullback &&
                 (dailyMaLast <= settings.DeepPullbackMaxMaDistancePct ||
@@ -4874,6 +4916,20 @@ namespace IbSwingTrader.Application.Candidates
                     currentEntryDiscountPct,
                     Math.Min(settings.LateSpikeAvoidDiscountPct, settings.MaxDiscountPct));
                 profile = "AvoidLateSpike";
+            }
+            else if (deepAdverseContinuation)
+            {
+                targetDiscountPct = MaxDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.DeepAdverseContinuationDiscountPct, settings.MaxDiscountPct));
+                profile = "DeepAdverseContinuation";
+            }
+            else if (immediateContinuation)
+            {
+                targetDiscountPct = CapDiscount(
+                    currentEntryDiscountPct,
+                    Math.Min(settings.ImmediateContinuationMaxDiscountPct, settings.MaxDiscountPct));
+                profile = "ImmediateContinuation";
             }
             else if (fastContinuationShallow)
             {
