@@ -1416,6 +1416,28 @@ namespace IbSwingTrader.Application.Candidates
                    (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) < 0m;
         }
 
+        private static bool IsReversalRecoveryTradeProfile(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState,
+            ReversalRecoveryExitSettings settings)
+        {
+            if (!settings.Enabled || !IsReversalCandidateContext(snapshot))
+                return false;
+
+            var h4MacdSeries = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
+            var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
+            var h4MacdSlope = CalculateSlope(h4MacdSeries);
+
+            return diagnostics.ATRRatio >= settings.MinAtrRatio &&
+                   diagnostics.DailyTrendPosition <= settings.MaxDailyTrendPosition &&
+                   diagnostics.TrendPosition <= settings.MaxTrendPosition &&
+                   h4RsiSlope >= settings.MinH4RsiSlope &&
+                   h4MacdSlope >= settings.MinH4MacdSlope &&
+                   bbState.H4.Direction != nameof(BollingerFigureDirection.Down);
+        }
+
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
             WishListItem item,
             DateTime marketNow,
@@ -1602,6 +1624,12 @@ namespace IbSwingTrader.Application.Candidates
                 diagnostics,
                 recentSeries,
                 tradeSettings.FreshExpansionExit);
+            var isReversalRecovery = IsReversalRecoveryTradeProfile(
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                bbState,
+                tradeSettings.ReversalRecoveryExit);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -1641,6 +1669,23 @@ namespace IbSwingTrader.Application.Candidates
                     $"MinProfitPct={_fmt.Percent(deepParabolicSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(deepParabolicSettings.MaxProfitPct)}, " +
                     $"MaxLossPct={_fmt.Percent(deepParabolicSettings.MaxLossPct)}");
+            }
+            else if (isReversalRecovery)
+            {
+                var reversalRecoverySettings = tradeSettings.ReversalRecoveryExit;
+                defaultProfitPctOverride = reversalRecoverySettings.DefaultProfitPct;
+                minProfitPctOverride = reversalRecoverySettings.MinProfitPct;
+                maxProfitPctOverride = reversalRecoverySettings.MaxProfitPct;
+                maxLossPctOverride = reversalRecoverySettings.MaxLossPct;
+                entryDiscountOverridePct = reversalRecoverySettings.EntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan reversal-recovery profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(reversalRecoverySettings.EntryDiscountPct)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(reversalRecoverySettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(reversalRecoverySettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(reversalRecoverySettings.MaxProfitPct)}, " +
+                    $"MaxLossPct={_fmt.Percent(reversalRecoverySettings.MaxLossPct)}");
             }
             else if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
             {

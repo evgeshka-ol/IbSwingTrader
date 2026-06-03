@@ -1,4 +1,3 @@
-
 namespace IbSwingTrader.Application.Candidates
 {
     public class TradeBuilder(
@@ -125,7 +124,7 @@ namespace IbSwingTrader.Application.Candidates
             TradePlanSettings settings,
             decimal? entryDiscountOverridePct)
         {
-            if (entryCandles == null || entryCandles.Count < settings.MinimumEntryCandles)
+            if (entryCandles == null || entryCandles.Count == 0)
             {
                 if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
                 {
@@ -147,6 +146,38 @@ namespace IbSwingTrader.Application.Candidates
                 .ToList();
 
             var current = ordered[^1].Close;
+
+            if (ordered.Count < settings.MinimumEntryCandles)
+            {
+                if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
+                {
+                    var discountedCurrent = current * (1m - entryDiscountOverridePct.Value);
+                    _logger.Info(
+                        $"Trade entry set to latest M15 close with profile discount. " +
+                        $"M15 candles={ordered.Count} is below forecast minimum {settings.MinimumEntryCandles}. " +
+                        $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedCurrent)}");
+                    return discountedCurrent > 0m ? discountedCurrent : fallbackEntry;
+                }
+
+                if (settings.UseCurrentPriceAsEntry)
+                {
+                    var baselineDiscountPct = Math.Max(settings.BaselineEntryDiscountPct, 0m);
+                    var discountedCurrent = baselineDiscountPct > 0m
+                        ? current * (1m - baselineDiscountPct)
+                        : current;
+
+                    _logger.Info(
+                        $"Trade entry set to latest M15 close with baseline discount. " +
+                        $"M15 candles={ordered.Count} is below forecast minimum {settings.MinimumEntryCandles}. " +
+                        $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(baselineDiscountPct)}, Entry={_fmt.Price(discountedCurrent)}");
+                    return discountedCurrent > 0m ? discountedCurrent : fallbackEntry;
+                }
+
+                _logger.Info(
+                    $"Trade entry fallback to last H4 close. " +
+                    $"M15 candles={ordered.Count} is below required {settings.MinimumEntryCandles} and no current-price entry profile is active.");
+                return fallbackEntry;
+            }
 
             if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
             {

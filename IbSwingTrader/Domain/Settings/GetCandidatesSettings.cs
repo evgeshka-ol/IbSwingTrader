@@ -132,6 +132,7 @@ namespace IbSwingTrader.Domain.Settings
         public ExplosiveMinFirstExitSettings ExplosiveMinFirstExit { get; set; } = new();
         public ConstructiveDeepMinFirstSettings ConstructiveDeepMinFirst { get; set; } = new();
         public WeakDeepPullbackExitSettings WeakDeepPullbackExit { get; set; } = new();
+        public ReversalRecoveryExitSettings ReversalRecoveryExit { get; set; } = new();
         public ExplosiveMaxFirstExitSettings ExplosiveMaxFirstExit { get; set; } = new();
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
@@ -308,6 +309,21 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DefaultProfitPct { get; set; } = 0.04m;
         public decimal MinProfitPct { get; set; } = 0.03m;
         public decimal MaxProfitPct { get; set; } = 0.05m;
+        public decimal MaxLossPct { get; set; } = 0.05m;
+    }
+
+    public class ReversalRecoveryExitSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal MinAtrRatio { get; set; } = 3.0m;
+        public decimal MinH4RsiSlope { get; set; } = 25.0m;
+        public decimal MinH4MacdSlope { get; set; } = 0.15m;
+        public decimal MaxDailyTrendPosition { get; set; } = 1.0m;
+        public decimal MaxTrendPosition { get; set; } = 2.0m;
+        public decimal EntryDiscountPct { get; set; } = 0.03m;
+        public decimal DefaultProfitPct { get; set; } = 0.08m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.12m;
         public decimal MaxLossPct { get; set; } = 0.05m;
     }
 

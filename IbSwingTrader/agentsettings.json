@@ -378,6 +378,19 @@
                 "MaxProfitPct": 0.05,
                 "MaxLossPct": 0.05
             },
+            "ReversalRecoveryExit": {
+                "Enabled": true,
+                "MinAtrRatio": 3.0,
+                "MinH4RsiSlope": 25.0,
+                "MinH4MacdSlope": 0.15,
+                "MaxDailyTrendPosition": 1.0,
+                "MaxTrendPosition": 2.0,
+                "EntryDiscountPct": 0.03,
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.12,
+                "MaxLossPct": 0.05
+            },
             "ExplosiveMaxFirstExit": {
                 "Enabled": true,
                 "MinDailyRsi14": 60.0,
