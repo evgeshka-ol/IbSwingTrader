@@ -899,6 +899,9 @@ namespace IbSwingTrader.Application.Candidates
                 string.Equals(ctx.Preset.ScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(ctx.Preset.ScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
                 strongLiveMove;
+            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
             var seriesTemplateMatch = CalculateSeriesSimilarityMatch(
                 recentSeries,
                 seriesSimilarityTemplates,
@@ -909,6 +912,7 @@ namespace IbSwingTrader.Application.Candidates
                 currentSessionLikeMove &&
                 seriesTemplateMatch.Bonus > 0m &&
                 !selfSeriesTemplateMatch &&
+                (dailyMidSlope >= 1.5m || h4MidSlope >= 2.5m) &&
                 (entryScore >= 15m || diagnostics.ATRRatio >= 3m || ctx.Stock.Rank <= 20);
 
             if (runawayPhase == TodayResearchLikeRunawayPhase.WishListOnly)
@@ -969,12 +973,19 @@ namespace IbSwingTrader.Application.Candidates
             var mixedMeanLiveWinner = IsMixedMeanLiveWinnerCandidate(
                 ctx,
                 diagnostics,
+                recentSeries,
                 entryScore);
+            var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                bbState);
 
             if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
                 !preLaunchResearchLike &&
                 !shortHistoryLiveMover &&
                 !mixedMeanLiveWinner &&
+                !aiReferenceLiveRecovery &&
                 !seriesTemplatePromotion)
             {
                 return false;
@@ -985,13 +996,10 @@ namespace IbSwingTrader.Application.Candidates
             var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
             var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
             var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
-            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
             var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
             var weeklyLowerSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries);
-            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
             var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
             var dailyLowerSlope = CalculateRelativeSlopePct(recentSeries.DailyBbLowerBandSeries);
-            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
             var h4UpperSlope = CalculateRelativeSlopePct(recentSeries.H4BbUpperBandSeries);
             var h4LowerSlope = CalculateRelativeSlopePct(recentSeries.H4BbLowerBandSeries);
             var realWeeklyLaunch = IsRealBollingerLaunch(weeklyMidSlope, weeklyUpperSlope, weeklyLowerSlope);
@@ -1065,6 +1073,20 @@ namespace IbSwingTrader.Application.Candidates
                     $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
                     $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
                     $"EntryScore={_fmt.Generic(entryScore)}");
+                return true;
+            }
+
+            if (aiReferenceLiveRecovery)
+            {
+                _logger.Info(
+                    $"TodayResearchLike AI-reference live-recovery promotion applied: {ctx.Stock.Ticker}. " +
+                    $"Preset={ctx.Preset.ScanCode}, " +
+                    $"DistanceTo20dHigh={_fmt.Generic(ctx.Snapshot.Current.DistanceTo20dHigh)}%, " +
+                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
+                    $"WeeklyMidSlope={_fmt.Generic(weeklyMidSlope)}%, " +
+                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
+                    $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
+                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
                 return true;
             }
 
@@ -1173,6 +1195,7 @@ namespace IbSwingTrader.Application.Candidates
         private static bool IsMixedMeanLiveWinnerCandidate(
             WishListContext ctx,
             CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
             decimal entryScore)
         {
             if (!IsLiveMoverPreset(ctx.Preset.ScanCode))
@@ -1184,16 +1207,68 @@ namespace IbSwingTrader.Application.Candidates
 
             var current = ctx.Snapshot.Current;
             var weeklyDistance = current.WeeklyMaSignedDistancePct ?? 0m;
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
 
             return weeklyDistance > 0m &&
                    current.DailyMaSignedDistancePct >= -8m &&
                    current.H4MaSignedDistancePct >= -12m &&
+                   (dailyMidSlope >= 1.5m || h4MidSlope >= 2.5m) &&
                    (ctx.Snapshot.DailyMaDelta3 > 0m ||
                     ctx.Snapshot.H4MaDelta3 > 0m ||
                     entryScore >= 20m) &&
                    (diagnostics.ATRRatio >= 3m ||
                     current.DailyRSI14 >= 50m ||
                     entryScore >= 20m);
+        }
+
+        private static bool IsAiReferenceLiveRecoveryCandidate(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState)
+        {
+            if (snapshot.Current.DistanceTo20dHigh > -8m)
+                return false;
+
+            if (snapshot.Current.DailyRSI14 < 38m || snapshot.Current.DailyRSI14 > 58m)
+                return false;
+
+            if (diagnostics.ATRRatio < 2.4m)
+                return false;
+
+            if (diagnostics.TrendPosition > 2m || diagnostics.DailyTrendPosition > 2m)
+                return false;
+
+            var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
+            var dailyRsiSlope = CalculateSlope(recentSeries.DailyRsiSeries);
+            var h4RsiSlope = CalculateSlope(recentSeries.H4RsiSeries);
+            var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
+            var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
+
+            var weeklyConstructive =
+                bbState.Weekly.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.Weekly.Regime is nameof(BollingerFigureRegime.Collapse) or
+                                     nameof(BollingerFigureRegime.Neutral) or
+                                     nameof(BollingerFigureRegime.Pullback);
+
+            var dailyConstructive =
+                bbState.Daily.Direction is nameof(BollingerFigureDirection.Down) or
+                                        nameof(BollingerFigureDirection.Flat);
+
+            var h4Constructive =
+                bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or
+                                   nameof(BollingerFigureRegime.Reacceleration);
+
+            return weeklyConstructive &&
+                   dailyConstructive &&
+                   h4Constructive &&
+                   weeklyMacdHistDelta >= 0m &&
+                   h4RsiSlope >= 0m &&
+                   h4MacdSlope >= -0.20m &&
+                   dailyMacdSlope >= -0.20m &&
+                   dailyRsiSlope <= 5m;
         }
 
         private static bool IsShortHistoryLiveMoverCandidate(
@@ -1638,6 +1713,11 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries,
                 bbState,
                 tradeSettings.ReversalRecoveryExit);
+            var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                bbState);
 
             decimal? defaultProfitPctOverride = momentumExit?.DefaultProfitPct;
             decimal? minProfitPctOverride = momentumExit?.MinProfitPct;
@@ -1806,6 +1886,22 @@ namespace IbSwingTrader.Application.Candidates
                         $"DefaultProfitPct={_fmt.Percent(researchLikeSettings.DefaultProfitPct)}, " +
                         $"MinProfitPct={_fmt.Percent(researchLikeSettings.MinProfitPct)}, " +
                         $"MaxProfitPct={_fmt.Percent(researchLikeSettings.MaxProfitPct)}");
+
+                    if (aiReferenceLiveRecovery && tradeSettings.AiReferenceTradePlan.Enabled)
+                    {
+                        var aiSettings = tradeSettings.AiReferenceTradePlan;
+                        defaultProfitPctOverride = aiSettings.DefaultProfitPct;
+                        minProfitPctOverride = aiSettings.MinProfitPct;
+                        maxProfitPctOverride = aiSettings.MaxProfitPct;
+                        entryDiscountOverridePct ??= aiSettings.EntryDiscountPct;
+
+                        _logger.Info(
+                            $"Trade plan AI-reference profile applied for {ctx.Stock.Ticker}. " +
+                            $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
+                            $"DefaultProfitPct={_fmt.Percent(aiSettings.DefaultProfitPct)}, " +
+                            $"MinProfitPct={_fmt.Percent(aiSettings.MinProfitPct)}, " +
+                            $"MaxProfitPct={_fmt.Percent(aiSettings.MaxProfitPct)}");
+                    }
                 }
                 else
                 {
@@ -1815,6 +1911,21 @@ namespace IbSwingTrader.Application.Candidates
                         $"Trade plan research-like early-entry profile applied for {ctx.Stock.Ticker}. " +
                         $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
                 }
+            }
+            else if (aiReferenceLiveRecovery && tradeSettings.AiReferenceTradePlan.Enabled)
+            {
+                var aiSettings = tradeSettings.AiReferenceTradePlan;
+                defaultProfitPctOverride = aiSettings.DefaultProfitPct;
+                minProfitPctOverride = aiSettings.MinProfitPct;
+                maxProfitPctOverride = aiSettings.MaxProfitPct;
+                entryDiscountOverridePct ??= aiSettings.EntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan AI-reference profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(aiSettings.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(aiSettings.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(aiSettings.MaxProfitPct)}");
             }
             else if (needsMomentumExit)
             {
@@ -2828,47 +2939,81 @@ namespace IbSwingTrader.Application.Candidates
             if (diagnostics == null)
                 return 0m;
 
-            if (!candidate.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase))
-                return 0m;
-
             var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
             var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
             var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
             var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
             var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+            var score = 0m;
 
-            var score =
-                Closeness(candidate.Context.DistanceTo20dHigh, settings.AiReferenceDistanceTo20dHighTarget, settings.AiReferenceDistanceTo20dHighTolerance) +
-                Closeness(candidate.Context.DailyRSI14, settings.AiReferenceDailyRsiTarget, settings.AiReferenceDailyRsiTolerance) +
-                Closeness(diagnostics.TrendPosition, settings.AiReferenceTrendPositionTarget, settings.AiReferenceTrendPositionTolerance) +
-                Closeness(diagnostics.DailyTrendPosition, settings.AiReferenceDailyTrendPositionTarget, settings.AiReferenceDailyTrendPositionTolerance) +
-                Closeness(diagnostics.BBMidSignedDistancePct, settings.AiReferenceBbMidSignedDistanceTarget, settings.AiReferenceBbMidSignedDistanceTolerance) +
-                Closeness(weeklyMacdHistDelta, settings.AiReferenceWeeklyMacdHistDeltaTarget, settings.AiReferenceWeeklyMacdHistDeltaTolerance) +
-                Closeness(dailyRsiSlope, settings.AiReferenceDailyRsiSlopeTarget, settings.AiReferenceDailyRsiSlopeTolerance) +
-                Closeness(h4RsiSlope, settings.AiReferenceH4RsiSlopeTarget, settings.AiReferenceH4RsiSlopeTolerance) +
-                Closeness(dailyMacdSlope, settings.AiReferenceDailyMacdSlopeTarget, settings.AiReferenceDailyMacdSlopeTolerance) +
-                Closeness(h4MacdSlope, settings.AiReferenceH4MacdSlopeTarget, settings.AiReferenceH4MacdSlopeTolerance);
+            if (candidate.Context.DistanceTo20dHigh <= -8m)
+                score += 1.0m;
 
-            if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up))
-                score += 0.10m;
+            if (candidate.Context.DailyRSI14 >= 38m && candidate.Context.DailyRSI14 <= 58m)
+                score += 1.0m;
 
-            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or nameof(BollingerFigureDirection.Flat))
-                score += 0.12m;
+            if (diagnostics.ATRRatio >= 2.4m)
+                score += 0.5m;
 
-            if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up))
-                score += 0.16m;
+            if (diagnostics.TrendPosition <= 2m)
+                score += 0.75m;
 
-            if (candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Collapse) or nameof(BollingerFigureRegime.Neutral))
-                score += 0.08m;
+            if (diagnostics.DailyTrendPosition <= 2m)
+                score += 0.75m;
 
-            if (candidate.DailyBbRegime is nameof(BollingerFigureRegime.Neutral) or nameof(BollingerFigureRegime.Collapse))
-                score += 0.08m;
+            if (weeklyMacdHistDelta >= 0m)
+                score += 0.5m;
 
-            if (candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or nameof(BollingerFigureRegime.Reacceleration))
-                score += 0.18m;
+            if (dailyRsiSlope <= 0m)
+                score += 0.25m;
 
-            if (candidate.TradePlan.ProfitPercent >= 4.5m && candidate.TradePlan.ProfitPercent <= 6.5m)
-                score += 0.12m;
+            if (h4RsiSlope >= 0m)
+                score += 0.75m;
+
+            if (dailyMacdSlope >= -0.20m)
+                score += 0.25m;
+
+            if (h4MacdSlope >= -0.20m)
+                score += 0.5m;
+
+            if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up) &&
+                candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Collapse) or
+                                         nameof(BollingerFigureRegime.Neutral) or
+                                         nameof(BollingerFigureRegime.Pullback))
+            {
+                score += 0.5m;
+            }
+
+            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or
+                                              nameof(BollingerFigureDirection.Flat))
+            {
+                score += 0.75m;
+            }
+
+            if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up) &&
+                candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or
+                                       nameof(BollingerFigureRegime.Reacceleration))
+            {
+                score += 0.75m;
+            }
+
+            if (candidate.DailyBbRegime is nameof(BollingerFigureRegime.Neutral) or
+                                            nameof(BollingerFigureRegime.Collapse))
+            {
+                score += 0.25m;
+            }
+
+            if (candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or
+                                         nameof(BollingerFigureRegime.Reacceleration))
+            {
+                score += 0.25m;
+            }
+
+            if (candidate.TradePlan.ProfitPercent >= 4.5m && candidate.TradePlan.ProfitPercent <= 7.5m)
+                score += 0.75m;
+
+            if (score < 5m)
+                return 0m;
 
             return decimal.Round(score * settings.AiReferenceBonus, 4, MidpointRounding.AwayFromZero);
         }

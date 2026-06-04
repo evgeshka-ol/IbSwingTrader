@@ -138,6 +138,7 @@ namespace IbSwingTrader.Domain.Settings
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
         public FreshExpansionExitSettings FreshExpansionExit { get; set; } = new();
         public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
+        public AiReferenceTradePlanSettings AiReferenceTradePlan { get; set; } = new();
         public SeriesEntryProfileSettings SeriesEntryProfile { get; set; } = new();
         public H4BollingerEntrySettings H4BollingerEntry { get; set; } = new();
     }
@@ -396,6 +397,15 @@ namespace IbSwingTrader.Domain.Settings
         public int MinH4RsiUpMoves { get; set; } = 8;
     }
 
+    public class AiReferenceTradePlanSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public decimal EntryDiscountPct { get; set; } = 0.02m;
+        public decimal DefaultProfitPct { get; set; } = 0.075m;
+        public decimal MinProfitPct { get; set; } = 0.055m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
+    }
+
     public class NextDayRankingSettings
     {
         public decimal EntryScoreWeight { get; set; } = 0.35m;
@@ -556,7 +566,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ResearchSeriesDailyRsiUpMovesTolerance { get; set; } = 2m;
         public decimal ResearchSeriesH4RsiUpMovesTarget { get; set; } = 13m;
         public decimal ResearchSeriesH4RsiUpMovesTolerance { get; set; } = 4m;
-        public decimal AiReferenceBonus { get; set; } = 1.10m;
+        public decimal AiReferenceBonus { get; set; } = 1.80m;
         public decimal AiReferenceDistanceTo20dHighTarget { get; set; } = -15.5m;
         public decimal AiReferenceDistanceTo20dHighTolerance { get; set; } = 6.0m;
         public decimal AiReferenceDailyRsiTarget { get; set; } = 45.0m;

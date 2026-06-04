@@ -690,7 +690,7 @@
             "ResearchSeriesDailyRsiUpMovesTolerance": 2.0,
             "ResearchSeriesH4RsiUpMovesTarget": 13.0,
             "ResearchSeriesH4RsiUpMovesTolerance": 4.0,
-            "AiReferenceBonus": 1.10,
+            "AiReferenceBonus": 1.80,
             "AiReferenceDistanceTo20dHighTarget": -15.5,
             "AiReferenceDistanceTo20dHighTolerance": 6.0,
             "AiReferenceDailyRsiTarget": 45.0,
@@ -711,6 +711,13 @@
             "AiReferenceDailyMacdSlopeTolerance": 0.18,
             "AiReferenceH4MacdSlopeTarget": 0.10,
             "AiReferenceH4MacdSlopeTolerance": 0.18,
+            "AiReferenceTradePlan": {
+                "Enabled": true,
+                "EntryDiscountPct": 0.02,
+                "DefaultProfitPct": 0.075,
+                "MinProfitPct": 0.055,
+                "MaxProfitPct": 0.14
+            },
             "SeriesSimilarity": {
                 "Enabled": true,
                 "MinTemplateAmplitudePct": 10.0,
