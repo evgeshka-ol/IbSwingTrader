@@ -874,6 +874,16 @@ namespace IbSwingTrader.Application.Candidates
             if (IsLossPreset(ctx.Preset.ScanCode))
                 return false;
 
+            if (IsReversalCandidateContext(ctx.Snapshot))
+            {
+                _logger.Info(
+                    $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
+                    $"Reason=price is below daily and weekly average, " +
+                    $"DailyMaSignedDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyMaSignedDistancePct)}%, " +
+                    $"WeeklyMaSignedDistancePct={_fmt.Generic(ctx.Snapshot.Current.WeeklyMaSignedDistancePct ?? 0m)}%");
+                return false;
+            }
+
             if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly) &&
                 !ShouldBypassWeeklyBbVetoForLiveMover(
                     ctx.Stock,
@@ -891,35 +901,12 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
-            var runawayPhase = ClassifyTodayResearchLikeRunawayPhase(recentSeries);
-            var strongLiveMove = ShouldBypassWishListFilterForLiveScan(ctx.Snapshot, diagnostics, entryScore);
-            var currentSessionLikeMove =
-                string.Equals(ctx.Preset.ScanCode, "HOT_BY_VOLUME", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(ctx.Preset.ScanCode, "MOST_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(ctx.Preset.ScanCode, "TOP_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(ctx.Preset.ScanCode, "TOP_OPEN_PERC_GAIN", StringComparison.OrdinalIgnoreCase) ||
-                strongLiveMove;
-            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
-            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
-            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
-            var seriesTemplateMatch = CalculateSeriesSimilarityMatch(
-                recentSeries,
-                seriesSimilarityTemplates,
-                SeriesTemplateFamily.TodayResearchLike,
-                _nextDayRankingSettings.SeriesSimilarity);
-            var selfSeriesTemplateMatch = IsSelfSeriesTemplateMatch(ctx.Stock.Ticker, seriesTemplateMatch);
-            var seriesTemplatePromotion =
-                currentSessionLikeMove &&
-                seriesTemplateMatch.Bonus > 0m &&
-                !selfSeriesTemplateMatch &&
-                (dailyMidSlope >= 1.5m || h4MidSlope >= 2.5m) &&
-                (entryScore >= 15m || diagnostics.ATRRatio >= 3m || ctx.Stock.Rank <= 20);
+            var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
 
-            if (runawayPhase == TodayResearchLikeRunawayPhase.WishListOnly)
+            if (patternKind == TodayResearchLikePatternKind.None)
             {
                 _logger.Info(
-                    $"TodayResearchLike runway pattern kept in wish list: {ctx.Stock.Ticker}. " +
-                    $"Reason=H4 trigger is not ready by real Bollinger/RSI rows, " +
+                    $"TodayResearchLike pattern not confirmed: {ctx.Stock.Ticker}. " +
                     $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
                     $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
                     $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
@@ -930,11 +917,12 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral && !seriesTemplatePromotion)
+            if (!IsTodayResearchLikePatternReadyNow(patternKind, bbState, recentSeries))
             {
                 _logger.Info(
                     $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
-                    $"Reason=real Bollinger/H4 trigger phase is neutral, " +
+                    $"Pattern={patternKind}, " +
+                    $"Reason=pattern is not ready now, " +
                     $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
                     $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
                     $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
@@ -944,184 +932,44 @@ namespace IbSwingTrader.Application.Candidates
                     $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}");
                 return false;
             }
-
-            if (runawayPhase == TodayResearchLikeRunawayPhase.Neutral)
-            {
-                _logger.Info(
-                    $"TodayResearchLike neutral-H4 template promotion allowed: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"Template={seriesTemplateMatch.TemplateTicker}, " +
-                    $"Distance={_fmt.Generic(seriesTemplateMatch.TotalDistance ?? 0m)}, " +
-                    $"Daily={_fmt.Generic(seriesTemplateMatch.DailyDistance ?? 0m)}, " +
-                    $"Weekly={_fmt.Generic(seriesTemplateMatch.WeeklyDistance ?? 0m)}, " +
-                    $"H4={_fmt.Generic(seriesTemplateMatch.H4Distance ?? 0m)}, " +
-                    $"Bonus={_fmt.Generic(seriesTemplateMatch.Bonus)}, " +
-                    $"EntryScore={_fmt.Generic(entryScore)}, " +
-                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
-            }
-
-            var preLaunchResearchLike = IsTodayResearchLikePreLaunchCandidate(
-                mergedWishItem,
-                ctx,
-                diagnostics,
-                bbState,
-                recentSeries);
-            var shortHistoryLiveMover = IsShortHistoryLiveMoverCandidate(
-                ctx,
-                diagnostics,
-                recentSeries);
-            var mixedMeanLiveWinner = IsMixedMeanLiveWinnerCandidate(
-                ctx,
-                diagnostics,
-                recentSeries,
-                entryScore);
-            var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
-                ctx.Snapshot,
-                diagnostics,
-                recentSeries,
-                bbState);
-
-            if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m &&
-                !preLaunchResearchLike &&
-                !shortHistoryLiveMover &&
-                !mixedMeanLiveWinner &&
-                !aiReferenceLiveRecovery &&
-                !seriesTemplatePromotion)
-            {
-                return false;
-            }
-
-            var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
-            var dailyRsiDelta3 = ctx.Snapshot.DailyRsiDelta3;
-            var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
-            var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
-            var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
-            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
-            var weeklyLowerSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries);
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
             var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
             var dailyLowerSlope = CalculateRelativeSlopePct(recentSeries.DailyBbLowerBandSeries);
+            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
+            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
+            var weeklyLowerSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries);
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
             var h4UpperSlope = CalculateRelativeSlopePct(recentSeries.H4BbUpperBandSeries);
             var h4LowerSlope = CalculateRelativeSlopePct(recentSeries.H4BbLowerBandSeries);
-            var realWeeklyLaunch = IsRealBollingerLaunch(weeklyMidSlope, weeklyUpperSlope, weeklyLowerSlope);
-            var realDailyLaunch = IsRealBollingerLaunch(dailyMidSlope, dailyUpperSlope, dailyLowerSlope);
-            var realH4Launch = IsRealBollingerLaunch(h4MidSlope, h4UpperSlope, h4LowerSlope);
+            var runawaySeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
 
-            var weeklySeriesConstructive =
-                (realWeeklyLaunch || weeklyMidSlope >= 0m || weeklyUpperSlope >= 0m) &&
-                weeklyMacdLast > -0.35m &&
-                weeklyLowerSlope <= weeklyMidSlope + 5m;
+            _logger.Info(
+                $"TodayResearchLike promotion applied: {ctx.Stock.Ticker}. " +
+                $"Pattern={patternKind}, " +
+                $"Preset={ctx.Preset.ScanCode}, " +
+                $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
+                $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
+                $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
+                $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
+                $"H4UpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4))}, " +
+                $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
+                $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
+                $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
+                $"DailyUpperSlope={_fmt.Generic(dailyUpperSlope)}%, " +
+                $"DailyLowerSlope={_fmt.Generic(dailyLowerSlope)}%, " +
+                $"WeeklyMidSlope={_fmt.Generic(weeklyMidSlope)}%, " +
+                $"WeeklyUpperSlope={_fmt.Generic(weeklyUpperSlope)}%, " +
+                $"WeeklyLowerSlope={_fmt.Generic(weeklyLowerSlope)}%, " +
+                $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
+                $"H4UpperSlope={_fmt.Generic(h4UpperSlope)}%, " +
+                $"H4LowerSlope={_fmt.Generic(h4LowerSlope)}%, " +
+                $"RunawaySeriesScore={_fmt.Generic(runawaySeriesScore)}, " +
+                $"EntryScore={_fmt.Generic(entryScore)}, " +
+                $"ATRRatio={_fmt.Generic(diagnostics.ATRRatio)}");
 
-            var dailySeriesConstructive =
-                (realDailyLaunch || dailyMidSlope >= 2m || dailyUpperSlope >= 2m) &&
-                dailyMacdLast > -0.20m &&
-                dailyLowerSlope <= dailyMidSlope + 5m;
-
-            var h4SeriesSupportive =
-                (realH4Launch || h4MidSlope >= 0m || h4UpperSlope >= 0m) &&
-                h4MacdLast > -0.25m &&
-                h4LowerSlope <= h4MidSlope + 8m;
-
-            var seriesDrivenTodayResearchLike =
-                weeklySeriesConstructive &&
-                dailySeriesConstructive &&
-                h4SeriesSupportive &&
-                runawaySeriesScore >= 10m;
-
-            var staleLiveRunaway =
-                currentSessionLikeMove &&
-                dailyMidSlope < -8m &&
-                h4MidSlope < -8m &&
-                dailyRsiDelta3 < -4m;
-
-            if (staleLiveRunaway)
-                return false;
-
-            if (preLaunchResearchLike)
-            {
-                _logger.Info(
-                    $"TodayResearchLike pre-launch promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
-                    $"DistanceTo20dHigh={_fmt.Generic(ctx.Snapshot.Current.DistanceTo20dHigh)}%, " +
-                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
-                    $"Score={_fmt.Generic(mergedWishItem.Score.Score)}");
-                return true;
-            }
-
-            if (shortHistoryLiveMover)
-            {
-                _logger.Info(
-                    $"TodayResearchLike short-history live-mover promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
-                    $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
-                    $"DistanceTo20dHigh={_fmt.Generic(ctx.Snapshot.Current.DistanceTo20dHigh)}%, " +
-                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
-                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
-                return true;
-            }
-
-            if (mixedMeanLiveWinner)
-            {
-                _logger.Info(
-                    $"TodayResearchLike mixed-mean live-winner promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"Rank={ctx.Stock.Rank}, " +
-                    $"WeeklyMidSlope={_fmt.Generic(weeklyMidSlope)}%, " +
-                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
-                    $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
-                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
-                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
-                    $"EntryScore={_fmt.Generic(entryScore)}");
-                return true;
-            }
-
-            if (aiReferenceLiveRecovery)
-            {
-                _logger.Info(
-                    $"TodayResearchLike AI-reference live-recovery promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"DistanceTo20dHigh={_fmt.Generic(ctx.Snapshot.Current.DistanceTo20dHigh)}%, " +
-                    $"DailyRsi14={_fmt.Generic(ctx.Snapshot.Current.DailyRSI14)}, " +
-                    $"WeeklyMidSlope={_fmt.Generic(weeklyMidSlope)}%, " +
-                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}%, " +
-                    $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
-                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
-                return true;
-            }
-
-            if (seriesTemplatePromotion)
-            {
-                _logger.Info(
-                    $"TodayResearchLike series-template promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"Template={seriesTemplateMatch.TemplateTicker}, " +
-                    $"Distance={_fmt.Generic(seriesTemplateMatch.TotalDistance ?? 0m)}, " +
-                    $"Daily={_fmt.Generic(seriesTemplateMatch.DailyDistance ?? 0m)}, " +
-                    $"Weekly={_fmt.Generic(seriesTemplateMatch.WeeklyDistance ?? 0m)}, " +
-                    $"H4={_fmt.Generic(seriesTemplateMatch.H4Distance ?? 0m)}, " +
-                    $"Bonus={_fmt.Generic(seriesTemplateMatch.Bonus)}, " +
-                    $"EntryScore={_fmt.Generic(entryScore)}, " +
-                    $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}");
-                return true;
-            }
-
-            if (seriesDrivenTodayResearchLike)
-            {
-                _logger.Info(
-                    $"TodayResearchLike series-driven promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"RunawaySeriesScore={_fmt.Generic(runawaySeriesScore)}, " +
-                    $"WeeklyMidSlope={_fmt.Generic(weeklyMidSlope)}, " +
-                    $"DailyMidSlope={_fmt.Generic(dailyMidSlope)}, " +
-                    $"H4MidSlope={_fmt.Generic(h4MidSlope)}, " +
-                    $"WeeklyMacdLast={_fmt.Generic(weeklyMacdLast)}, " +
-                    $"DailyMacdLast={_fmt.Generic(dailyMacdLast)}, " +
-                    $"H4MacdLast={_fmt.Generic(h4MacdLast)}");
-                return true;
-            }
-
-            return false;
+            return true;
         }
 
         private static bool IsTodayResearchLikePreLaunchCandidate(
@@ -1228,6 +1076,12 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState)
         {
+            if (snapshot.Current.DailyMaSignedDistancePct < 0m ||
+                (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) < 0m)
+            {
+                return false;
+            }
+
             if (snapshot.Current.DistanceTo20dHigh > -8m)
                 return false;
 
@@ -1238,6 +1092,9 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
 
             if (diagnostics.TrendPosition > 2m || diagnostics.DailyTrendPosition > 2m)
+                return false;
+
+            if (!IsStrictTodayResearchLikeRunawayPattern(bbState, recentSeries))
                 return false;
 
             var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
@@ -1398,12 +1255,22 @@ namespace IbSwingTrader.Application.Candidates
                    score >= 7;
         }
 
-        private bool IsStrongTodayResearchLikeSeries(RecentFeatureSeries recentSeries)
+        private bool IsTodayResearchLikePatternReadyNow(
+            TodayResearchLikePatternKind patternKind,
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
         {
-            return CalculateTodayResearchLikeSeriesScore(recentSeries) >= 10m;
+            return patternKind switch
+            {
+                TodayResearchLikePatternKind.Runaway => IsStrictTodayResearchLikeRunawayPatternReadyNow(bbState, recentSeries),
+                TodayResearchLikePatternKind.PullbackContinuation => IsPullbackContinuationTodayResearchLikePatternReadyNow(bbState, recentSeries),
+                _ => false
+            };
         }
 
-        private static TodayResearchLikeRunawayPhase ClassifyTodayResearchLikeRunawayPhase(RecentFeatureSeries recentSeries)
+        private static bool IsStrictTodayResearchLikeRunawayPatternReadyNow(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
         {
             var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
             var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
@@ -1415,40 +1282,145 @@ namespace IbSwingTrader.Application.Candidates
             var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
             var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
 
-            var dailyRunawayPattern =
-                dailyUpperTail >= 1.0m &&
-                dailyMidTail >= 0m &&
-                dailyLowerTail <= dailyMidTail + 1.0m;
-
-            var h4TriggerReady =
-                h4UpperTail >= 1.0m &&
-                h4MidTail >= 0m &&
-                h4LowerTail <= h4MidTail + 1.0m &&
-                h4RsiTail >= 0m &&
-                h4MacdTail >= -0.05m;
-
-            if (h4TriggerReady)
-                return TodayResearchLikeRunawayPhase.ReadyNow;
-
-            return dailyRunawayPattern
-                ? TodayResearchLikeRunawayPhase.WishListOnly
-                : TodayResearchLikeRunawayPhase.Neutral;
+            return h4UpperTail >= 0.75m &&
+                   h4MidTail >= 0m &&
+                   h4LowerTail <= h4MidTail + 1.0m &&
+                   h4RsiTail >= 0m &&
+                   h4MacdTail >= -0.05m &&
+                   bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                   (bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) ||
+                    bbState.Daily.Direction == nameof(BollingerFigureDirection.Flat)) &&
+                   dailyUpperTail >= -0.20m &&
+                   dailyMidTail >= -0.20m &&
+                   dailyLowerTail <= dailyMidTail + 2.0m;
         }
 
-        private decimal CalculateTodayResearchLikeSeriesScore(RecentFeatureSeries recentSeries)
+        private static bool IsPullbackContinuationTodayResearchLikePatternReadyNow(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
         {
+            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
+            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
+            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
+            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
+            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
+            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
+            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
+            var dailyRegimeConstructive =
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Runaway) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Reacceleration);
+            var h4RegimeConstructive =
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral);
+
+            var weeklyFlexible =
+                bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
+                weeklyUpperSlope >= -0.75m &&
+                weeklyMidSlope >= -0.75m;
+
+            var dailyConstructive =
+                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                dailyRegimeConstructive &&
+                dailyUpperTail >= -0.25m &&
+                dailyMidTail >= -0.35m;
+
+            var h4Resuming =
+                bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
+                h4RegimeConstructive &&
+                h4UpperTail >= -0.50m &&
+                h4MidTail >= -5.0m &&
+                h4RsiTail >= -0.25m &&
+                h4MacdTail >= -0.20m;
+
+            return weeklyFlexible && dailyConstructive && h4Resuming;
+        }
+
+        private static TodayResearchLikePatternKind ClassifyTodayResearchLikePatternKind(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
+        {
+            if (IsStrictTodayResearchLikeRunawayPattern(bbState, recentSeries))
+                return TodayResearchLikePatternKind.Runaway;
+
+            if (IsPullbackContinuationTodayResearchLikePattern(bbState, recentSeries))
+                return TodayResearchLikePatternKind.PullbackContinuation;
+
+            return TodayResearchLikePatternKind.None;
+        }
+
+        private static bool IsPullbackContinuationTodayResearchLikePattern(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
+        {
+            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
+            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
+            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
+            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
+            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
+            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
+            var dailyRegimeConstructive =
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Runaway) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Reacceleration);
+            var h4RegimeConstructive =
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral);
+
+            var dailyConstructive =
+                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
+                dailyRegimeConstructive &&
+                dailyUpperTail >= -0.25m &&
+                dailyMidTail >= -0.35m;
+
+            var h4PullbackResumption =
+                bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
+                h4RegimeConstructive &&
+                h4UpperTail >= -0.50m &&
+                h4RsiTail >= -0.25m &&
+                h4MacdTail >= -0.20m;
+
+            var weeklyNotBroken =
+                bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
+                weeklyUpperSlope >= -0.75m &&
+                weeklyMidSlope >= -0.75m;
+
+            return dailyConstructive && h4PullbackResumption && weeklyNotBroken;
+        }
+
+        private decimal CalculateTodayResearchLikeSeriesScore(BollingerStateSet bbState, RecentFeatureSeries recentSeries)
+        {
+            var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
+            if (patternKind == TodayResearchLikePatternKind.None)
+                return 0m;
+
+            var dailyUpperRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 3);
+            var dailyUpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 3, 3);
+            var dailyMidRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 3);
+            var dailyMidPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 3, 3);
+            var dailyLowerRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 3);
+            var dailyLowerPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 3, 3);
+            var weeklyUpperRecent = CalculateTailRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries, 4);
+            var weeklyUpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries, 4, 4);
+            var weeklyMidRecent = CalculateTailRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries, 4);
+            var weeklyMidPrior = CalculateSegmentRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries, 4, 4);
+            var weeklyLowerRecent = CalculateTailRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries, 4);
+            var weeklyLowerPrior = CalculateSegmentRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries, 4, 4);
+            var h4UpperRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 3);
+            var h4UpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 3, 3);
+            var h4MidRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 3);
+            var h4MidPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbMidBandSeries, 3, 3);
+            var h4LowerRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 3);
+            var h4LowerPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 3, 3);
             var dailyMacdLast = recentSeries.DailyMacdSeries.LastOrDefault();
             var weeklyMacdLast = recentSeries.WeeklyMacdSeries.LastOrDefault();
             var h4MacdLast = recentSeries.H4MacdSeries.LastOrDefault();
-            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
-            var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
-            var dailyLowerSlope = CalculateRelativeSlopePct(recentSeries.DailyBbLowerBandSeries);
-            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
-            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
-            var weeklyLowerSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries);
-            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
-            var h4UpperSlope = CalculateRelativeSlopePct(recentSeries.H4BbUpperBandSeries);
-            var h4LowerSlope = CalculateRelativeSlopePct(recentSeries.H4BbLowerBandSeries);
             var dailyMacdSlope = CalculateSlope(recentSeries.DailyMacdSeries);
             var weeklyMacdSlope = CalculateSlope(recentSeries.WeeklyMacdSeries);
             var h4MacdSlope = CalculateSlope(recentSeries.H4MacdSeries);
@@ -1457,18 +1429,46 @@ namespace IbSwingTrader.Application.Candidates
 
             decimal score = 0m;
 
-            if (IsRealBollingerLaunch(dailyMidSlope, dailyUpperSlope, dailyLowerSlope))
-                score += 3m;
-            if (IsRealBollingerLaunch(h4MidSlope, h4UpperSlope, h4LowerSlope))
-                score += 3m;
-            if (IsRealBollingerLaunch(weeklyMidSlope, weeklyUpperSlope, weeklyLowerSlope))
-                score += 2m;
+            if (patternKind == TodayResearchLikePatternKind.Runaway)
+            {
+                if (IsBullishBandKink(dailyUpperPrior, dailyUpperRecent, 0.75m, 0.40m, 0.60m))
+                    score += 3m;
+                if (IsBullishBandKink(dailyMidPrior, dailyMidRecent, 0.15m, 0.20m, 0.35m))
+                    score += 2m;
+                if (IsBullishBandKink(dailyLowerPrior, dailyLowerRecent, -0.20m, 0.20m, 0.25m))
+                    score += 1m;
 
-            if (dailyMidSlope > 0m && dailyUpperSlope > 0m)
+                if (IsBullishBandKink(h4UpperPrior, h4UpperRecent, 0.50m, 0.25m, 0.45m))
+                    score += 2m;
+                if (IsBullishBandKink(h4MidPrior, h4MidRecent, 0.10m, 0.15m, 0.25m))
+                    score += 1m;
+                if (IsBullishBandKink(h4LowerPrior, h4LowerRecent, -0.20m, 0.15m, 0.20m))
+                    score += 0.5m;
+            }
+            else
+            {
+                if (dailyUpperRecent >= 0m && dailyUpperPrior > -0.50m)
+                    score += 2m;
+                if (dailyMidRecent >= -0.25m && dailyMidPrior > -0.75m)
+                    score += 1.5m;
+                if (weeklyUpperRecent >= -0.25m && weeklyMidRecent >= -0.25m)
+                    score += 1m;
+                if (h4UpperRecent >= -0.50m)
+                    score += 2m;
+                if (h4RsiSlope >= -0.10m)
+                    score += 1m;
+                if (h4MacdSlope >= -0.10m)
+                    score += 1m;
+            }
+
+            if (weeklyUpperRecent > 0m && weeklyMidRecent >= 0m)
                 score += 1m;
-            if (weeklyMidSlope > 0m && weeklyUpperSlope > 0m)
+
+            if (dailyUpperRecent > 0m && dailyMidRecent >= 0m)
                 score += 1m;
-            if (h4MidSlope > 0m && h4UpperSlope > 0m)
+            if (weeklyUpperRecent > 0m && weeklyMidRecent >= 0m)
+                score += 1m;
+            if (h4UpperRecent > 0m && h4MidRecent >= 0m)
                 score += 1m;
 
             if (dailyMacdLast > 0m)
@@ -2260,7 +2260,8 @@ namespace IbSwingTrader.Application.Candidates
             if (trade.ProfitPercent >= minPlannedProfitPct)
                 return 0m;
 
-            var seriesScore = CalculateTodayResearchLikeSeriesScore(recentSeries);
+            var bbState = BuildBollingerStateSet(recentSeries);
+            var seriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
             if (seriesScore < 9m)
                 return 0m;
 
@@ -2929,8 +2930,7 @@ namespace IbSwingTrader.Application.Candidates
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
         }
 
-        // AI reference favors early recovery continuations: daily weakness, constructive H4,
-        // and a weekly context that is not already fully extended.
+        // AI reference now tracks the strict runaway Bollinger kink pattern.
         private static decimal CalculateAiReferenceAdjustment(
             CandidateDetails candidate,
             NextDayRankingSettings settings)
@@ -2939,80 +2939,109 @@ namespace IbSwingTrader.Application.Candidates
             if (diagnostics == null)
                 return 0m;
 
-            var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
-            var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
-            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
-            var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
-            var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+            var strictRunawayPattern = IsStrictTodayResearchLikeRunawayPattern(
+                new BollingerStateSet
+                {
+                    Weekly = new BollingerStateOutput
+                    {
+                        Direction = candidate.WeeklyBbDirection,
+                        Regime = candidate.WeeklyBbRegime,
+                        MidSlope = candidate.WeeklyBbMidSlope,
+                        WidthSlope = candidate.WeeklyBbWidthSlope,
+                        UpperDistanceSlope = candidate.WeeklyBbUpperDistanceSlope
+                    },
+                    Daily = new BollingerStateOutput
+                    {
+                        Direction = candidate.DailyBbDirection,
+                        Regime = candidate.DailyBbRegime,
+                        MidSlope = candidate.DailyBbMidSlope,
+                        WidthSlope = candidate.DailyBbWidthSlope,
+                        UpperDistanceSlope = candidate.DailyBbUpperDistanceSlope
+                    },
+                    H4 = new BollingerStateOutput
+                    {
+                        Direction = candidate.H4BbDirection,
+                        Regime = candidate.H4BbRegime,
+                        MidSlope = candidate.H4BbMidSlope,
+                        WidthSlope = candidate.H4BbWidthSlope,
+                        UpperDistanceSlope = candidate.H4BbUpperDistanceSlope
+                    }
+                },
+                new RecentFeatureSeries
+                {
+                    DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries,
+                    DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries,
+                    DailyBbLowerBandSeries = candidate.RecentDailyBbLowerBandSeries,
+                    WeeklyBbUpperBandSeries = candidate.RecentWeeklyBbUpperBandSeries,
+                    WeeklyBbMidBandSeries = candidate.RecentWeeklyBbMidBandSeries,
+                    WeeklyBbLowerBandSeries = candidate.RecentWeeklyBbLowerBandSeries,
+                    H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries,
+                    H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries,
+                    H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries
+                });
+
+            if (!strictRunawayPattern)
+                return 0m;
+
             var score = 0m;
 
-            if (candidate.Context.DistanceTo20dHigh <= -8m)
+            if (candidate.Context.DistanceTo20dHigh <= -10m)
                 score += 1.0m;
 
-            if (candidate.Context.DailyRSI14 >= 38m && candidate.Context.DailyRSI14 <= 58m)
+            if (candidate.Context.DailyRSI14 >= 40m && candidate.Context.DailyRSI14 <= 58m)
                 score += 1.0m;
 
-            if (diagnostics.ATRRatio >= 2.4m)
-                score += 0.5m;
-
-            if (diagnostics.TrendPosition <= 2m)
+            if (diagnostics.ATRRatio >= 2.6m)
                 score += 0.75m;
 
-            if (diagnostics.DailyTrendPosition <= 2m)
+            if (diagnostics.TrendPosition <= 1m)
                 score += 0.75m;
 
-            if (weeklyMacdHistDelta >= 0m)
-                score += 0.5m;
-
-            if (dailyRsiSlope <= 0m)
-                score += 0.25m;
-
-            if (h4RsiSlope >= 0m)
+            if (diagnostics.DailyTrendPosition <= 1m)
                 score += 0.75m;
 
-            if (dailyMacdSlope >= -0.20m)
-                score += 0.25m;
+            if ((diagnostics.WeeklyMACDHistDelta ?? 0m) >= 0m)
+                score += 0.75m;
 
-            if (h4MacdSlope >= -0.20m)
+            if (CalculateSlope(candidate.RecentDailyRsiSeries) <= 0m)
                 score += 0.5m;
+
+            if (CalculateSlope(candidate.RecentH4RsiSeries) >= 0m)
+                score += 0.75m;
+
+            if (CalculateSlope(candidate.RecentDailyMacdSeries) >= -0.10m)
+                score += 0.5m;
+
+            if (CalculateSlope(candidate.RecentH4MacdSeries) >= -0.10m)
+                score += 0.75m;
 
             if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up) &&
-                candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Collapse) or
-                                         nameof(BollingerFigureRegime.Neutral) or
-                                         nameof(BollingerFigureRegime.Pullback))
-            {
-                score += 0.5m;
-            }
-
-            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or
-                                              nameof(BollingerFigureDirection.Flat))
+                candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Runaway) or
+                                         nameof(BollingerFigureRegime.Pullback) or
+                                         nameof(BollingerFigureRegime.Reacceleration))
             {
                 score += 0.75m;
+            }
+
+            if (candidate.DailyBbDirection == nameof(BollingerFigureDirection.Up) &&
+                candidate.DailyBbRegime is nameof(BollingerFigureRegime.Runaway) or
+                                        nameof(BollingerFigureRegime.Pullback) or
+                                        nameof(BollingerFigureRegime.Reacceleration))
+            {
+                score += 1.0m;
             }
 
             if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up) &&
                 candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or
                                        nameof(BollingerFigureRegime.Reacceleration))
             {
-                score += 0.75m;
-            }
-
-            if (candidate.DailyBbRegime is nameof(BollingerFigureRegime.Neutral) or
-                                            nameof(BollingerFigureRegime.Collapse))
-            {
-                score += 0.25m;
-            }
-
-            if (candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or
-                                         nameof(BollingerFigureRegime.Reacceleration))
-            {
-                score += 0.25m;
+                score += 1.0m;
             }
 
             if (candidate.TradePlan.ProfitPercent >= 4.5m && candidate.TradePlan.ProfitPercent <= 7.5m)
                 score += 0.75m;
 
-            if (score < 5m)
+            if (score < 6m)
                 return 0m;
 
             return decimal.Round(score * settings.AiReferenceBonus, 4, MidpointRounding.AwayFromZero);
@@ -4447,6 +4476,103 @@ namespace IbSwingTrader.Application.Candidates
 
             var tail = series.TakeLast(Math.Max(2, lookback)).ToList();
             return decimal.Round(tail[^1] - tail[0], 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal CalculateSegmentRelativeSlopePct(
+            List<decimal> series,
+            int lookback,
+            int offsetFromEnd)
+        {
+            var segmentLength = Math.Max(2, lookback);
+            if (series.Count < segmentLength + offsetFromEnd)
+                return 0m;
+
+            var segment = series
+                .Skip(series.Count - offsetFromEnd - segmentLength)
+                .Take(segmentLength)
+                .ToList();
+
+            if (segment.Count < 2)
+                return 0m;
+
+            var first = segment[0];
+            if (first == 0m)
+                return CalculateTailSlope(segment, segmentLength);
+
+            return decimal.Round((segment[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static bool IsBullishBandKink(
+            decimal priorSlopePct,
+            decimal recentSlopePct,
+            decimal minRecentSlopePct,
+            decimal maxPriorSlopePct,
+            decimal minAccelerationPct)
+        {
+            return recentSlopePct >= minRecentSlopePct &&
+                   priorSlopePct <= maxPriorSlopePct &&
+                   recentSlopePct - priorSlopePct >= minAccelerationPct;
+        }
+
+        private static bool IsStrictTodayResearchLikeRunawayPattern(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
+        {
+            var dailyUpperRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
+            var dailyUpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6, 6);
+            var dailyMidRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
+            var dailyMidPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6, 6);
+            var dailyLowerRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6);
+            var dailyLowerPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6, 6);
+
+            var h4UpperRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
+            var h4UpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4, 4);
+            var h4MidRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
+            var h4MidPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4, 4);
+            var h4LowerRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4);
+            var h4LowerPrior = CalculateSegmentRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4, 4);
+
+            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
+            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
+            var weeklyLowerSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbLowerBandSeries);
+            var weeklyDirectionUp = bbState.Weekly.Direction == nameof(BollingerFigureDirection.Up);
+            var weeklyRegimeConstructive =
+                bbState.Weekly.Regime == nameof(BollingerFigureRegime.Runaway) ||
+                bbState.Weekly.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.Weekly.Regime == nameof(BollingerFigureRegime.Reacceleration);
+            var dailyDirectionUp = bbState.Daily.Direction == nameof(BollingerFigureDirection.Up);
+            var dailyRegimeConstructive =
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Runaway) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) ||
+                bbState.Daily.Regime == nameof(BollingerFigureRegime.Reacceleration);
+            var h4DirectionUp = bbState.H4.Direction == nameof(BollingerFigureDirection.Up);
+            var h4RegimeConstructive =
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Runaway) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback);
+
+            var weeklyConstructive =
+                weeklyDirectionUp &&
+                weeklyRegimeConstructive &&
+                weeklyUpperSlope >= 0m &&
+                weeklyMidSlope >= 0m &&
+                weeklyLowerSlope <= weeklyMidSlope + 1.5m;
+
+            var dailyRunawayKink =
+                dailyDirectionUp &&
+                dailyRegimeConstructive &&
+                IsBullishBandKink(dailyUpperPrior, dailyUpperRecent, 0.75m, 0.25m, 0.75m) &&
+                IsBullishBandKink(dailyMidPrior, dailyMidRecent, 0.10m, 0.20m, 0.35m) &&
+                IsBullishBandKink(dailyLowerPrior, dailyLowerRecent, -0.20m, 0.35m, 0.25m);
+
+            var h4RunawayKink =
+                h4DirectionUp &&
+                h4RegimeConstructive &&
+                IsBullishBandKink(h4UpperPrior, h4UpperRecent, 0.50m, 0.20m, 0.40m) &&
+                IsBullishBandKink(h4MidPrior, h4MidRecent, 0.05m, 0.15m, 0.25m) &&
+                IsBullishBandKink(h4LowerPrior, h4LowerRecent, -0.20m, 0.20m, 0.20m);
+
+            return weeklyConstructive && dailyRunawayKink && h4RunawayKink;
         }
 
         private static bool IsRealBollingerLaunch(
@@ -6160,11 +6286,11 @@ namespace IbSwingTrader.Application.Candidates
             LowAmplitudeSameDay
         }
 
-        private enum TodayResearchLikeRunawayPhase
+        private enum TodayResearchLikePatternKind
         {
-            Neutral,
-            ReadyNow,
-            WishListOnly
+            None,
+            Runaway,
+            PullbackContinuation
         }
 
         private sealed record SeriesSimilarityTemplate(
