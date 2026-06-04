@@ -556,6 +556,27 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ResearchSeriesDailyRsiUpMovesTolerance { get; set; } = 2m;
         public decimal ResearchSeriesH4RsiUpMovesTarget { get; set; } = 13m;
         public decimal ResearchSeriesH4RsiUpMovesTolerance { get; set; } = 4m;
+        public decimal AiReferenceBonus { get; set; } = 1.10m;
+        public decimal AiReferenceDistanceTo20dHighTarget { get; set; } = -15.5m;
+        public decimal AiReferenceDistanceTo20dHighTolerance { get; set; } = 6.0m;
+        public decimal AiReferenceDailyRsiTarget { get; set; } = 45.0m;
+        public decimal AiReferenceDailyRsiTolerance { get; set; } = 8.0m;
+        public decimal AiReferenceTrendPositionTarget { get; set; } = -6.0m;
+        public decimal AiReferenceTrendPositionTolerance { get; set; } = 6.0m;
+        public decimal AiReferenceDailyTrendPositionTarget { get; set; } = -5.0m;
+        public decimal AiReferenceDailyTrendPositionTolerance { get; set; } = 6.0m;
+        public decimal AiReferenceBbMidSignedDistanceTarget { get; set; } = -3.0m;
+        public decimal AiReferenceBbMidSignedDistanceTolerance { get; set; } = 4.0m;
+        public decimal AiReferenceWeeklyMacdHistDeltaTarget { get; set; } = 0.02m;
+        public decimal AiReferenceWeeklyMacdHistDeltaTolerance { get; set; } = 0.12m;
+        public decimal AiReferenceDailyRsiSlopeTarget { get; set; } = -4.0m;
+        public decimal AiReferenceDailyRsiSlopeTolerance { get; set; } = 6.0m;
+        public decimal AiReferenceH4RsiSlopeTarget { get; set; } = 12.0m;
+        public decimal AiReferenceH4RsiSlopeTolerance { get; set; } = 10.0m;
+        public decimal AiReferenceDailyMacdSlopeTarget { get; set; } = -0.05m;
+        public decimal AiReferenceDailyMacdSlopeTolerance { get; set; } = 0.18m;
+        public decimal AiReferenceH4MacdSlopeTarget { get; set; } = 0.10m;
+        public decimal AiReferenceH4MacdSlopeTolerance { get; set; } = 0.18m;
         public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;

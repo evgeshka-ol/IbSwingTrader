@@ -2778,6 +2778,7 @@ namespace IbSwingTrader.Application.Candidates
                 diagnostics,
                 settings,
                 seriesSimilarityBonus);
+            var aiReferenceAdjustment = CalculateAiReferenceAdjustment(candidate, settings);
             var realBollingerEnvelopeExpansionAdjustment = CalculateRealBollingerEnvelopeExpansionAdjustment(
                 candidate,
                 diagnostics,
@@ -2810,10 +2811,66 @@ namespace IbSwingTrader.Application.Candidates
                 dailyBollingerSqueezeLaunchAdjustment +
                 realBollingerEnvelopeExpansionAdjustment +
                 lowAmplitudeFreshLaunchRepairAdjustment +
-                seriesSimilarityBonus -
+                seriesSimilarityBonus +
+                aiReferenceAdjustment +
                 lateSpikePullbackPenalty -
                 narrowRangePenalty -
                 lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+        }
+
+        // AI reference favors early recovery continuations: daily weakness, constructive H4,
+        // and a weekly context that is not already fully extended.
+        private static decimal CalculateAiReferenceAdjustment(
+            CandidateDetails candidate,
+            NextDayRankingSettings settings)
+        {
+            var diagnostics = candidate.Diagnostics;
+            if (diagnostics == null)
+                return 0m;
+
+            if (!candidate.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase))
+                return 0m;
+
+            var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
+            var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
+            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
+            var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdSeries);
+            var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdSeries);
+
+            var score =
+                Closeness(candidate.Context.DistanceTo20dHigh, settings.AiReferenceDistanceTo20dHighTarget, settings.AiReferenceDistanceTo20dHighTolerance) +
+                Closeness(candidate.Context.DailyRSI14, settings.AiReferenceDailyRsiTarget, settings.AiReferenceDailyRsiTolerance) +
+                Closeness(diagnostics.TrendPosition, settings.AiReferenceTrendPositionTarget, settings.AiReferenceTrendPositionTolerance) +
+                Closeness(diagnostics.DailyTrendPosition, settings.AiReferenceDailyTrendPositionTarget, settings.AiReferenceDailyTrendPositionTolerance) +
+                Closeness(diagnostics.BBMidSignedDistancePct, settings.AiReferenceBbMidSignedDistanceTarget, settings.AiReferenceBbMidSignedDistanceTolerance) +
+                Closeness(weeklyMacdHistDelta, settings.AiReferenceWeeklyMacdHistDeltaTarget, settings.AiReferenceWeeklyMacdHistDeltaTolerance) +
+                Closeness(dailyRsiSlope, settings.AiReferenceDailyRsiSlopeTarget, settings.AiReferenceDailyRsiSlopeTolerance) +
+                Closeness(h4RsiSlope, settings.AiReferenceH4RsiSlopeTarget, settings.AiReferenceH4RsiSlopeTolerance) +
+                Closeness(dailyMacdSlope, settings.AiReferenceDailyMacdSlopeTarget, settings.AiReferenceDailyMacdSlopeTolerance) +
+                Closeness(h4MacdSlope, settings.AiReferenceH4MacdSlopeTarget, settings.AiReferenceH4MacdSlopeTolerance);
+
+            if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up))
+                score += 0.10m;
+
+            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or nameof(BollingerFigureDirection.Neutral))
+                score += 0.12m;
+
+            if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up))
+                score += 0.16m;
+
+            if (candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Collapse) or nameof(BollingerFigureRegime.Neutral))
+                score += 0.08m;
+
+            if (candidate.DailyBbRegime is nameof(BollingerFigureRegime.Neutral) or nameof(BollingerFigureRegime.Collapse))
+                score += 0.08m;
+
+            if (candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or nameof(BollingerFigureRegime.Reacceleration))
+                score += 0.18m;
+
+            if (candidate.TradePlan.ProfitPercent >= 4.5m && candidate.TradePlan.ProfitPercent <= 6.5m)
+                score += 0.12m;
+
+            return decimal.Round(score * settings.AiReferenceBonus, 4, MidpointRounding.AwayFromZero);
         }
 
         private static decimal CalculateNarrowRangePenalty(
