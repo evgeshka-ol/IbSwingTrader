@@ -2852,7 +2852,7 @@ namespace IbSwingTrader.Application.Candidates
             if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up))
                 score += 0.10m;
 
-            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or nameof(BollingerFigureDirection.Neutral))
+            if (candidate.DailyBbDirection is nameof(BollingerFigureDirection.Down) or nameof(BollingerFigureDirection.Flat))
                 score += 0.12m;
 
             if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up))
