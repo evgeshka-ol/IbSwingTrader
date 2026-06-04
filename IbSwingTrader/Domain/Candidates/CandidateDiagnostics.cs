@@ -51,5 +51,7 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? LateSpikePullbackPenalty { get; set; }
 
         public decimal? RealBollingerEnvelopeExpansionScore { get; set; }
+
+        public decimal? NarrowRangePenalty { get; set; }
     }
 }

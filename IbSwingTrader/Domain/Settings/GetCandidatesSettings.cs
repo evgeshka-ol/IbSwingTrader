@@ -182,6 +182,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal DeepAdverseContinuationDiscountPct { get; set; } = 0.08m;
         public decimal DeepAdverseContinuationMinAtrRatio { get; set; } = 3.0m;
         public decimal DeepAdverseContinuationMinDailyMaDistancePct { get; set; } = 5.0m;
+        public decimal DeepAdverseContinuationMaxH4MidSlopePct { get; set; } = -8.0m;
+        public decimal DeepAdverseContinuationMaxH4RsiSlope { get; set; } = -4.0m;
+        public decimal DeepAdverseContinuationMaxH4MacdSlope { get; set; } = -0.50m;
         public decimal LateSpikeAvoidDiscountPct { get; set; } = 0.09m;
         public decimal DailyStrongSlopeThreshold { get; set; } = 10.0m;
         public decimal DailyRsiSlopeThreshold { get; set; } = 8.0m;
@@ -213,7 +216,7 @@ namespace IbSwingTrader.Domain.Settings
 
     public class H4BollingerEntrySettings
     {
-        public bool Enabled { get; set; } = true;
+        public bool Enabled { get; set; } = false;
         public decimal FlatMidSlopeThresholdPct { get; set; } = 1.0m;
         public decimal UpwardMidSlopeThresholdPct { get; set; } = 1.0m;
         public decimal MidpointWeightWhenMidUp { get; set; } = 0.50m;
@@ -504,6 +507,14 @@ namespace IbSwingTrader.Domain.Settings
         public decimal LowAmplitudeFreshLaunchRepairMinH4RsiSlope { get; set; } = 18.0m;
         public decimal LowAmplitudeFreshLaunchRepairMinDailyMacdSlope { get; set; } = 0.0m;
         public decimal LowAmplitudeFreshLaunchRepairMinH4MacdSlope { get; set; } = 0.0m;
+        public decimal NarrowRangePenaltyWeight { get; set; } = 1.25m;
+        public decimal NarrowRangeMaxPenalty { get; set; } = 2.40m;
+        public decimal NarrowRangeMinUsefulProfitPct { get; set; } = 8.0m;
+        public decimal NarrowRangeHardMinProfitPct { get; set; } = 5.5m;
+        public decimal NarrowRangeMinAtrRatio { get; set; } = 2.60m;
+        public decimal NarrowRangeHardMinAtrRatio { get; set; } = 2.20m;
+        public decimal NarrowRangeWeakH4Penalty { get; set; } = 0.35m;
+        public decimal NarrowRangeWeakH4RsiSlopeThreshold { get; set; } = -5.0m;
         public decimal FreshExpansionWinnerBonus { get; set; } = 4.60m;
         public decimal FreshExpansionExactTemplateBonus { get; set; } = 1.00m;
         public decimal FreshExpansionHighConvictionBonus { get; set; } = 0.60m;

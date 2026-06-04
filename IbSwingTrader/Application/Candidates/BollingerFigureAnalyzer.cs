@@ -45,13 +45,18 @@ namespace IbSwingTrader.Application.Candidates
     {
         public BollingerFigureState Analyze(BollingerFeatureSeries series)
         {
-            var midSlope = CalculateSlope(series.MidSeries);
-            var widthSlope = CalculateSlope(series.WidthSeries);
-            var upperDistanceSlope = CalculateSlope(series.UpperDistanceSeries);
-            var latestUpperDistance = series.UpperDistanceSeries.Count > 0 ? series.UpperDistanceSeries[^1] : 0m;
-            var priceRidingUpperBand = latestUpperDistance >= -1.0m;
-            var pricePullingBackToMid = upperDistanceSlope < 0m && latestUpperDistance < -1.0m;
-            var figureCollapsing = widthSlope < 0m && upperDistanceSlope < 0m;
+            var midSlope = CalculateRelativeSlopePct(series.MidSeries);
+            var upperSlope = CalculateRelativeSlopePct(series.UpperDistanceSeries);
+            var lowerSlope = CalculateRelativeSlopePct(series.WidthSeries);
+            var upperOpening = upperSlope > 0m;
+            var midRising = midSlope > 0m;
+            var lowerNotOutrunningMid = lowerSlope <= midSlope + 1.0m;
+            var lowerOpeningDown = lowerSlope < 0m;
+            var bandOpening = upperOpening && midRising && (lowerNotOutrunningMid || lowerOpeningDown);
+            var bandClosing = upperSlope < 0m && lowerSlope > midSlope;
+            var priceRidingUpperBand = bandOpening;
+            var pricePullingBackToMid = midRising && upperSlope < 0m;
+            var figureCollapsing = bandClosing || (!midRising && upperSlope < 0m);
 
             var direction = midSlope switch
             {
@@ -61,13 +66,13 @@ namespace IbSwingTrader.Application.Candidates
             };
 
             var regime =
-                priceRidingUpperBand && widthSlope > 0m
+                bandOpening
                     ? BollingerFigureRegime.Runaway
                 : pricePullingBackToMid && direction != BollingerFigureDirection.Flat
                     ? BollingerFigureRegime.Pullback
                 : figureCollapsing
                     ? BollingerFigureRegime.Collapse
-                : upperDistanceSlope > 0m && widthSlope >= 0m
+                : upperSlope > 0m && midSlope >= 0m
                     ? BollingerFigureRegime.Reacceleration
                 : BollingerFigureRegime.Neutral;
 
@@ -76,9 +81,9 @@ namespace IbSwingTrader.Application.Candidates
                 Direction = direction,
                 Regime = regime,
                 MidSlope = midSlope,
-                WidthSlope = widthSlope,
-                UpperDistanceSlope = upperDistanceSlope,
-                PriceToMidCompression = -upperDistanceSlope,
+                WidthSlope = lowerSlope,
+                UpperDistanceSlope = upperSlope,
+                PriceToMidCompression = midSlope - upperSlope,
                 PriceRidingUpperBand = priceRidingUpperBand,
                 PricePullingBackToMid = pricePullingBackToMid,
                 FigureCollapsing = figureCollapsing
@@ -89,5 +94,17 @@ namespace IbSwingTrader.Application.Candidates
             => series.Count >= 2
                 ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero)
                 : 0m;
+
+        private static decimal CalculateRelativeSlopePct(List<decimal> series)
+        {
+            if (series.Count < 2)
+                return 0m;
+
+            var first = series[0];
+            if (first == 0m)
+                return CalculateSlope(series);
+
+            return decimal.Round((series[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
+        }
     }
 }
