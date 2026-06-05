@@ -888,11 +888,8 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
-                    $"Reason=price has broken daily Bollinger mid in the recent daily window, " +
-                    $"DailyBollingerMidDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyBollingerMidDistancePct)}%, " +
-                    $"Prev1={_fmt.Generic(ctx.Snapshot.Prev1.DailyBollingerMidDistancePct)}%, " +
-                    $"Prev2={_fmt.Generic(ctx.Snapshot.Prev2.DailyBollingerMidDistancePct)}%, " +
-                    $"Prev3={_fmt.Generic(ctx.Snapshot.Prev3.DailyBollingerMidDistancePct)}%");
+                    $"Reason=price is below daily Bollinger mid, " +
+                    $"DailyBollingerMidDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyBollingerMidDistancePct)}%");
                 return false;
             }
 
@@ -1491,17 +1488,10 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
-        {
-            return HasRecentDailyBollingerMidBreakdown(snapshot);
-        }
+            => snapshot.Current.DailyBollingerMidDistancePct < 0m;
 
         private static bool HasRecentDailyBollingerMidBreakdown(CandidateSignalSnapshot snapshot)
-        {
-            return snapshot.Current.DailyBollingerMidDistancePct < 0m ||
-                   snapshot.Prev1.DailyBollingerMidDistancePct < 0m ||
-                   snapshot.Prev2.DailyBollingerMidDistancePct < 0m ||
-                   snapshot.Prev3.DailyBollingerMidDistancePct < 0m;
-        }
+            => snapshot.Current.DailyBollingerMidDistancePct < 0m;
 
         private static bool IsReversalRecoveryTradeProfile(
             CandidateSignalSnapshot snapshot,
