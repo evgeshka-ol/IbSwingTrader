@@ -430,7 +430,7 @@ namespace IbSwingTrader.Application.Candidates
                 if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
                     continue;
 
-                if (ctx.Snapshot.Current.DailyMaSignedDistancePct < 0m)
+                if (HasRecentDailyBollingerMidBreakdown(ctx.Snapshot))
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -888,9 +888,11 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
-                    $"Reason=price is below daily and weekly average, " +
-                    $"DailyMaSignedDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyMaSignedDistancePct)}%, " +
-                    $"WeeklyMaSignedDistancePct={_fmt.Generic(ctx.Snapshot.Current.WeeklyMaSignedDistancePct ?? 0m)}%");
+                    $"Reason=price has broken daily Bollinger mid in the recent daily window, " +
+                    $"DailyBollingerMidDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyBollingerMidDistancePct)}%, " +
+                    $"Prev1={_fmt.Generic(ctx.Snapshot.Prev1.DailyBollingerMidDistancePct)}%, " +
+                    $"Prev2={_fmt.Generic(ctx.Snapshot.Prev2.DailyBollingerMidDistancePct)}%, " +
+                    $"Prev3={_fmt.Generic(ctx.Snapshot.Prev3.DailyBollingerMidDistancePct)}%");
                 return false;
             }
 
@@ -1086,8 +1088,7 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState)
         {
-            if (snapshot.Current.DailyMaSignedDistancePct < 0m ||
-                (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) < 0m)
+            if (HasRecentDailyBollingerMidBreakdown(snapshot))
             {
                 return false;
             }
@@ -1491,8 +1492,15 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
         {
-            return snapshot.Current.DailyMaSignedDistancePct < 0m &&
-                   (snapshot.Current.WeeklyMaSignedDistancePct ?? 0m) < 0m;
+            return HasRecentDailyBollingerMidBreakdown(snapshot);
+        }
+
+        private static bool HasRecentDailyBollingerMidBreakdown(CandidateSignalSnapshot snapshot)
+        {
+            return snapshot.Current.DailyBollingerMidDistancePct < 0m ||
+                   snapshot.Prev1.DailyBollingerMidDistancePct < 0m ||
+                   snapshot.Prev2.DailyBollingerMidDistancePct < 0m ||
+                   snapshot.Prev3.DailyBollingerMidDistancePct < 0m;
         }
 
         private static bool IsReversalRecoveryTradeProfile(
@@ -2285,7 +2293,7 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             TradePlanInfo trade)
         {
-            if (snapshot.Current.DailyMaSignedDistancePct < 0m)
+            if (HasRecentDailyBollingerMidBreakdown(snapshot))
                 return 0m;
 
             var minPlannedProfitPct = _getCandidatesSettingsProvider.Get().CandidateFilter.MinPlannedProfitPct;
@@ -6339,8 +6347,8 @@ namespace IbSwingTrader.Application.Candidates
         {
             var parts = new List<string>();
 
-            if (snapshot.Current.DailyMaSignedDistancePct < 0m)
-                parts.Add("below daily MA");
+            if (snapshot.Current.DailyBollingerMidDistancePct < 0m)
+                parts.Add("below daily Bollinger mid");
 
             if (snapshot.Current.DailyMACDLineMinusSignal <= 0m)
                 parts.Add("daily MACD weak/negative");
