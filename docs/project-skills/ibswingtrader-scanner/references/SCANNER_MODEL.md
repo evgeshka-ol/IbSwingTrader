@@ -30,17 +30,16 @@ scanner recall, promotion, and ranking before tuning entries/exits.
 
 ### ReversalCandidates
 
-Use reversal logic only when the ticker is below the relevant daily and weekly
-mean context.
+Use reversal logic only when the ticker is below the daily Bollinger mid.
 
 Hard rule:
 
-- If the ticker is above mean on any relevant mean context, it is not a
+- If the ticker is below the daily Bollinger mid, it is a `ReversalCandidates`
+  candidate.
+- If the ticker is at or above the daily Bollinger mid, it is not a
   `ReversalCandidates` candidate.
-- A `ReversalCandidates` candidate must be below mean on both daily and weekly
-  context.
-- Above-mean tickers may only be considered through `TodayResearchLikeCandidates`
-  continuation/promotion logic.
+- Weekly and H4 context may refine the reversal subtype or trade plan, but they
+  do not change the family assignment.
 
 Typical traits:
 
@@ -55,7 +54,8 @@ Expected quality:
 
 ### TodayResearchLikeCandidates
 
-Use continuation logic when the ticker is above the mean and acting like a live winner.
+Use continuation logic when the ticker is at or above the daily Bollinger mid
+and acting like a live winner.
 
 Typical traits:
 
@@ -72,6 +72,14 @@ Expected quality:
 
 - should be the closest proxy for next-day `research_top_gainers.csv`
 - misses here are the first thing to fix
+
+Important:
+
+- Treat the family boundary as fixed once the daily mid split is correct.
+- Further scanner work should change only whether a candidate reaches the final
+  list, how it is ranked, and how the trade plan is shaped.
+- Do not reopen the family split when the problem is really profit capture or
+  top-of-list quality.
 
 ## Evaluation principle
 
