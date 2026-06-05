@@ -614,6 +614,9 @@ namespace IbSwingTrader.Application.Candidates
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
+                var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+                var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
+                var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
 
                 var candidateItem = BuildCandidateItem(
                     ctx.Stock,
@@ -630,7 +633,9 @@ namespace IbSwingTrader.Application.Candidates
                     dailyScore,
                     weeklyScore,
                     entryScore,
-                    finalScore);
+                    finalScore,
+                    todayResearchLikePatternKind,
+                    todayResearchLikeSeriesScore);
 
                 candidateItem.CandidateSource = "SameDayContinuation";
                 results.Add(candidateItem);
@@ -831,6 +836,9 @@ namespace IbSwingTrader.Application.Candidates
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
             var finalScore = dailyScore + weeklyScore + entryScore;
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
+            var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
 
             var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
 
@@ -849,7 +857,9 @@ namespace IbSwingTrader.Application.Candidates
                 dailyScore,
                 weeklyScore,
                 entryScore,
-                finalScore);
+                finalScore,
+                todayResearchLikePatternKind,
+                todayResearchLikeSeriesScore);
 
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
@@ -1299,8 +1309,6 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
-            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
             var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
             var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
             var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
@@ -1317,11 +1325,6 @@ namespace IbSwingTrader.Application.Candidates
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral);
 
-            var weeklyFlexible =
-                bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
-                weeklyUpperSlope >= -0.75m &&
-                weeklyMidSlope >= -0.75m;
-
             var dailyConstructive =
                 bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
                 dailyRegimeConstructive &&
@@ -1336,7 +1339,7 @@ namespace IbSwingTrader.Application.Candidates
                 h4RsiTail >= -0.25m &&
                 h4MacdTail >= -0.20m;
 
-            return weeklyFlexible && dailyConstructive && h4Resuming;
+            return dailyConstructive && h4Resuming;
         }
 
         private static TodayResearchLikePatternKind ClassifyTodayResearchLikePatternKind(
@@ -1356,8 +1359,6 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var weeklyUpperSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbUpperBandSeries);
-            var weeklyMidSlope = CalculateRelativeSlopePct(recentSeries.WeeklyBbMidBandSeries);
             var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
             var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
             var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
@@ -1386,12 +1387,7 @@ namespace IbSwingTrader.Application.Candidates
                 h4RsiTail >= -0.25m &&
                 h4MacdTail >= -0.20m;
 
-            var weeklyNotBroken =
-                bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
-                weeklyUpperSlope >= -0.75m &&
-                weeklyMidSlope >= -0.75m;
-
-            return dailyConstructive && h4PullbackResumption && weeklyNotBroken;
+            return dailyConstructive && h4PullbackResumption;
         }
 
         private decimal CalculateTodayResearchLikeSeriesScore(BollingerStateSet bbState, RecentFeatureSeries recentSeries)
@@ -1697,6 +1693,8 @@ namespace IbSwingTrader.Application.Candidates
             var isExplosiveMaxFirst = IsExplosiveMaxFirstProxy(ctx.Snapshot, diagnostics);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
+            var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
+            var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
             var isResearchLikeLaunch = IsResearchLikeLaunch(
                 ctx.Snapshot,
                 diagnostics,
@@ -1873,34 +1871,54 @@ namespace IbSwingTrader.Application.Candidates
             else if (isResearchLikeLaunch && tradeSettings.ResearchLikeExit.Enabled)
             {
                 var researchLikeSettings = tradeSettings.ResearchLikeExit;
+                var researchLikeProfitProfile = ResolveAmplitudeAwareResearchLikeProfitProfile(
+                    todayResearchLikePatternKind,
+                    todayResearchLikeSeriesScore,
+                    diagnostics.ATRRatio,
+                    researchLikeSettings.DefaultProfitPct,
+                    researchLikeSettings.MinProfitPct,
+                    researchLikeSettings.MaxProfitPct);
+
                 if (isResearchLikeReadyNow)
                 {
-                    defaultProfitPctOverride = researchLikeSettings.DefaultProfitPct;
-                    minProfitPctOverride = researchLikeSettings.MinProfitPct;
-                    maxProfitPctOverride = researchLikeSettings.MaxProfitPct;
+                    defaultProfitPctOverride = researchLikeProfitProfile.DefaultProfitPct;
+                    minProfitPctOverride = researchLikeProfitProfile.MinProfitPct;
+                    maxProfitPctOverride = researchLikeProfitProfile.MaxProfitPct;
                     entryDiscountOverridePct ??= researchLikeSettings.EntryDiscountPct;
 
                     _logger.Info(
                         $"Trade plan research-like ready-now profile applied for {ctx.Stock.Ticker}. " +
                         $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
-                        $"DefaultProfitPct={_fmt.Percent(researchLikeSettings.DefaultProfitPct)}, " +
-                        $"MinProfitPct={_fmt.Percent(researchLikeSettings.MinProfitPct)}, " +
-                        $"MaxProfitPct={_fmt.Percent(researchLikeSettings.MaxProfitPct)}");
+                        $"Pattern={todayResearchLikePatternKind}, " +
+                        $"SeriesScore={_fmt.Generic(todayResearchLikeSeriesScore)}, " +
+                        $"DefaultProfitPct={_fmt.Percent(researchLikeProfitProfile.DefaultProfitPct)}, " +
+                        $"MinProfitPct={_fmt.Percent(researchLikeProfitProfile.MinProfitPct)}, " +
+                        $"MaxProfitPct={_fmt.Percent(researchLikeProfitProfile.MaxProfitPct)}");
 
                     if (aiReferenceLiveRecovery && tradeSettings.AiReferenceTradePlan.Enabled)
                     {
                         var aiSettings = tradeSettings.AiReferenceTradePlan;
-                        defaultProfitPctOverride = aiSettings.DefaultProfitPct;
-                        minProfitPctOverride = aiSettings.MinProfitPct;
-                        maxProfitPctOverride = aiSettings.MaxProfitPct;
+                        var aiProfitProfile = ResolveAmplitudeAwareResearchLikeProfitProfile(
+                            todayResearchLikePatternKind,
+                            todayResearchLikeSeriesScore,
+                            diagnostics.ATRRatio,
+                            aiSettings.DefaultProfitPct,
+                            aiSettings.MinProfitPct,
+                            aiSettings.MaxProfitPct);
+
+                        defaultProfitPctOverride = aiProfitProfile.DefaultProfitPct;
+                        minProfitPctOverride = aiProfitProfile.MinProfitPct;
+                        maxProfitPctOverride = aiProfitProfile.MaxProfitPct;
                         entryDiscountOverridePct ??= aiSettings.EntryDiscountPct;
 
                         _logger.Info(
                             $"Trade plan AI-reference profile applied for {ctx.Stock.Ticker}. " +
                             $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
-                            $"DefaultProfitPct={_fmt.Percent(aiSettings.DefaultProfitPct)}, " +
-                            $"MinProfitPct={_fmt.Percent(aiSettings.MinProfitPct)}, " +
-                            $"MaxProfitPct={_fmt.Percent(aiSettings.MaxProfitPct)}");
+                            $"Pattern={todayResearchLikePatternKind}, " +
+                            $"SeriesScore={_fmt.Generic(todayResearchLikeSeriesScore)}, " +
+                            $"DefaultProfitPct={_fmt.Percent(aiProfitProfile.DefaultProfitPct)}, " +
+                            $"MinProfitPct={_fmt.Percent(aiProfitProfile.MinProfitPct)}, " +
+                            $"MaxProfitPct={_fmt.Percent(aiProfitProfile.MaxProfitPct)}");
                     }
                 }
                 else
@@ -1915,17 +1933,27 @@ namespace IbSwingTrader.Application.Candidates
             else if (aiReferenceLiveRecovery && tradeSettings.AiReferenceTradePlan.Enabled)
             {
                 var aiSettings = tradeSettings.AiReferenceTradePlan;
-                defaultProfitPctOverride = aiSettings.DefaultProfitPct;
-                minProfitPctOverride = aiSettings.MinProfitPct;
-                maxProfitPctOverride = aiSettings.MaxProfitPct;
+                var aiProfitProfile = ResolveAmplitudeAwareResearchLikeProfitProfile(
+                    todayResearchLikePatternKind,
+                    todayResearchLikeSeriesScore,
+                    diagnostics.ATRRatio,
+                    aiSettings.DefaultProfitPct,
+                    aiSettings.MinProfitPct,
+                    aiSettings.MaxProfitPct);
+
+                defaultProfitPctOverride = aiProfitProfile.DefaultProfitPct;
+                minProfitPctOverride = aiProfitProfile.MinProfitPct;
+                maxProfitPctOverride = aiProfitProfile.MaxProfitPct;
                 entryDiscountOverridePct ??= aiSettings.EntryDiscountPct;
 
                 _logger.Info(
                     $"Trade plan AI-reference profile applied for {ctx.Stock.Ticker}. " +
                     $"EntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}, " +
-                    $"DefaultProfitPct={_fmt.Percent(aiSettings.DefaultProfitPct)}, " +
-                    $"MinProfitPct={_fmt.Percent(aiSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(aiSettings.MaxProfitPct)}");
+                    $"Pattern={todayResearchLikePatternKind}, " +
+                    $"SeriesScore={_fmt.Generic(todayResearchLikeSeriesScore)}, " +
+                    $"DefaultProfitPct={_fmt.Percent(aiProfitProfile.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(aiProfitProfile.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(aiProfitProfile.MaxProfitPct)}");
             }
             else if (needsMomentumExit)
             {
@@ -2151,7 +2179,9 @@ namespace IbSwingTrader.Application.Candidates
             decimal dailyScore,
             decimal weeklyScore,
             decimal entryScore,
-            decimal finalScore)
+            decimal finalScore,
+            TodayResearchLikePatternKind todayResearchLikePatternKind,
+            decimal todayResearchLikeSeriesScore)
         {
             var recentSeries = BuildRecentFeatureSeries(candles);
             var bbState = BuildBollingerStateSet(recentSeries);
@@ -2167,7 +2197,9 @@ namespace IbSwingTrader.Application.Candidates
                 snapshot,
                 candles,
                 recentSeries,
-                bbState);
+                bbState,
+                todayResearchLikePatternKind,
+                todayResearchLikeSeriesScore);
 
             nextDayRank += CalculateTodayResearchLikeLowProfitRankCompensation(
                 preset.ScanCode,
@@ -2299,6 +2331,146 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
+        private static (decimal DefaultProfitPct, decimal MinProfitPct, decimal MaxProfitPct) ResolveAmplitudeAwareResearchLikeProfitProfile(
+            TodayResearchLikePatternKind patternKind,
+            decimal seriesScore,
+            decimal atrRatio,
+            decimal defaultProfitPct,
+            decimal minProfitPct,
+            decimal maxProfitPct)
+        {
+            var score = Math.Max(seriesScore, 0m);
+            decimal defaultBoost = 0m;
+            decimal minBoost = 0m;
+            decimal maxBoost = 0m;
+
+            if (patternKind == TodayResearchLikePatternKind.Runaway)
+            {
+                if (score >= 10m)
+                {
+                    defaultBoost += 0.005m;
+                    minBoost += 0.005m;
+                    maxBoost += 0.010m;
+                }
+
+                if (score >= 12m)
+                {
+                    defaultBoost += 0.010m;
+                    minBoost += 0.010m;
+                    maxBoost += 0.020m;
+                }
+
+                if (score >= 15m)
+                {
+                    defaultBoost += 0.010m;
+                    minBoost += 0.010m;
+                    maxBoost += 0.030m;
+                }
+
+                if (atrRatio >= 3.0m)
+                {
+                    defaultBoost += 0.005m;
+                    maxBoost += 0.010m;
+                }
+
+                if (atrRatio >= 4.5m)
+                    maxBoost += 0.020m;
+            }
+            else if (patternKind == TodayResearchLikePatternKind.PullbackContinuation)
+            {
+                if (score >= 8m)
+                {
+                    defaultBoost += 0.004m;
+                    minBoost += 0.003m;
+                    maxBoost += 0.010m;
+                }
+
+                if (score >= 10m)
+                {
+                    defaultBoost += 0.006m;
+                    minBoost += 0.005m;
+                    maxBoost += 0.015m;
+                }
+
+                if (score >= 12m)
+                {
+                    defaultBoost += 0.007m;
+                    minBoost += 0.005m;
+                    maxBoost += 0.020m;
+                }
+
+                if (atrRatio >= 3.5m)
+                {
+                    defaultBoost += 0.004m;
+                    maxBoost += 0.010m;
+                }
+
+                if (atrRatio >= 5.0m)
+                    maxBoost += 0.020m;
+            }
+            else if (score >= 10m)
+            {
+                maxBoost += 0.010m;
+            }
+
+            var adjustedMax = Math.Min(maxProfitPct + maxBoost, 0.18m);
+            var adjustedDefault = Math.Min(defaultProfitPct + defaultBoost, adjustedMax);
+            var adjustedMin = Math.Min(minProfitPct + minBoost, adjustedDefault);
+
+            return (
+                decimal.Round(adjustedDefault, 4, MidpointRounding.AwayFromZero),
+                decimal.Round(adjustedMin, 4, MidpointRounding.AwayFromZero),
+                decimal.Round(adjustedMax, 4, MidpointRounding.AwayFromZero));
+        }
+
+        private static decimal CalculateTodayResearchLikePatternRankBonus(
+            string presetScanCode,
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            TodayResearchLikePatternKind patternKind,
+            decimal seriesScore)
+        {
+            if (patternKind == TodayResearchLikePatternKind.None)
+                return 0m;
+
+            if (!IsLiveMoverPreset(presetScanCode) && !IsGainPreset(presetScanCode))
+                return 0m;
+
+            var score = 0m;
+
+            score += patternKind == TodayResearchLikePatternKind.Runaway ? 0.42m : 0.30m;
+
+            if (seriesScore >= 10m)
+                score += 0.10m;
+
+            if (seriesScore >= 12m)
+                score += 0.10m;
+
+            if (seriesScore >= 15m)
+                score += 0.12m;
+
+            if (diagnostics.ATRRatio >= 3.0m)
+                score += 0.08m;
+
+            if (diagnostics.ATRRatio >= 4.5m)
+                score += 0.08m;
+
+            if (snapshot.Current.DailyRSI14 >= 40m && snapshot.Current.DailyRSI14 <= 62m)
+                score += patternKind == TodayResearchLikePatternKind.Runaway ? 0.08m : 0.06m;
+
+            if (snapshot.Current.DistanceTo20dHigh <= -8m)
+                score += 0.05m;
+
+            if (snapshot.Current.DailyMaSignedDistancePct > 0m)
+                score += 0.05m;
+
+            var weeklyMacdHistDelta = diagnostics.WeeklyMACDHistDelta ?? 0m;
+            if (weeklyMacdHistDelta >= 0m)
+                score += 0.05m;
+
+            return decimal.Round(Math.Min(score, 0.90m), 4, MidpointRounding.AwayFromZero);
+        }
+
         private decimal CalculateNextDayRank(
             string presetScanCode,
             decimal candidateScore,
@@ -2310,7 +2482,9 @@ namespace IbSwingTrader.Application.Candidates
             CandidateSignalSnapshot snapshot,
             List<Candle> candles,
             RecentFeatureSeries recentSeries,
-            BollingerStateSet bbState)
+            BollingerStateSet bbState,
+            TodayResearchLikePatternKind todayResearchLikePatternKind,
+            decimal todayResearchLikeSeriesScore)
         {
             var s = _nextDayRankingSettings;
             var diagnostics = BuildDiagnostics(snapshot, candles);
@@ -2456,6 +2630,13 @@ namespace IbSwingTrader.Application.Candidates
                 if (diagnostics.ATRRatio >= 4.0m)
                     score += 0.20m;
             }
+
+            score += CalculateTodayResearchLikePatternRankBonus(
+                presetScanCode,
+                snapshot,
+                diagnostics,
+                todayResearchLikePatternKind,
+                todayResearchLikeSeriesScore);
 
             score += CalculateTodayResearchLikeFreshnessAdjustment(
                 presetScanCode,
