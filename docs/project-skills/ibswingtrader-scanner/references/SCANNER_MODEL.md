@@ -68,6 +68,12 @@ Typical traits:
   - `TOP_PERC_GAIN`
   - `TOP_OPEN_PERC_GAIN`
 
+Internal subtypes inside this family:
+
+- `Runaway`
+- `LaunchContinuation`
+- `PullbackContinuation`
+
 Expected quality:
 
 - should be the closest proxy for next-day `research_top_gainers.csv`

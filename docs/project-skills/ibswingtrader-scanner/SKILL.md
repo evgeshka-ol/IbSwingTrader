@@ -38,6 +38,12 @@ The scanner's job is to find future fat moves early.
 - `ReversalCandidates`: below-mid / pullback / return-to-mean style ideas.
 - `TodayResearchLikeCandidates`: above-mid / runaway / continuation style ideas.
 
+Internal `TodayResearchLike` subtypes:
+
+- `Runaway`: strict kink/acceleration launch
+- `LaunchContinuation`: real Bollinger launch with strong daily/H4 expansion
+- `PullbackContinuation`: constructive continuation after a pullback
+
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
 Hard classification rule:
@@ -63,6 +69,7 @@ similarity signal before adding more derived heuristics.
 - Normalize comparable series from their first point so shape matters more than absolute level.
 - Use `research_top_gainers.csv` as the main `TodayResearchLikeCandidates` template source.
 - Use high-amplitude `evaluation-dataset.csv` rows as an additional template source.
+- Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
 - For `ReversalCandidates`, use only high-amplitude reversal rows from the evaluation dataset.
 - A candidate close to historical winner templates should get promotion/ranking support.
 - A candidate close to low-amplitude or failed templates can later be penalized, but do not add that before the positive winner-template signal is stable.
