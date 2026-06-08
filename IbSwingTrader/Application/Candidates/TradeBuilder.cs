@@ -12,6 +12,7 @@ namespace IbSwingTrader.Application.Candidates
         public TradePlan Build(
             List<Candle> candles,
             List<Candle>? entryCandles = null,
+            decimal? scanPriceOverride = null,
             decimal? entryDiscountOverridePct = null,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
@@ -29,7 +30,7 @@ namespace IbSwingTrader.Application.Candidates
                 .Skip(Math.Max(0, candles.Count - settings.StopLookbackBars))
                 .Min(x => x.Low);
 
-            var entry = BuildEntryPrice(last.Close, entryCandles, settings, entryDiscountOverridePct);
+            var entry = BuildEntryPrice(last.Close, entryCandles, settings, scanPriceOverride, entryDiscountOverridePct);
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -122,23 +123,28 @@ namespace IbSwingTrader.Application.Candidates
             decimal fallbackEntry,
             List<Candle>? entryCandles,
             TradePlanSettings settings,
+            decimal? scanPriceOverride,
             decimal? entryDiscountOverridePct)
         {
+            var scanPrice = scanPriceOverride.GetValueOrDefault();
+            var hasScanPrice = scanPrice > 0m;
+
             if (entryCandles == null || entryCandles.Count == 0)
             {
+                var fallbackPrice = hasScanPrice ? scanPrice : fallbackEntry;
                 if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
                 {
-                    var discountedFallback = fallbackEntry * (1m - entryDiscountOverridePct.Value);
+                    var discountedFallback = fallbackPrice * (1m - entryDiscountOverridePct.Value);
                     _logger.Info(
-                        $"Trade entry fallback to H4 close with profile discount. " +
-                        $"Fallback={_fmt.Price(fallbackEntry)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedFallback)}");
-                    return discountedFallback > 0m ? discountedFallback : fallbackEntry;
+                        $"Trade entry fallback to scan price with profile discount. " +
+                        $"Fallback={_fmt.Price(fallbackPrice)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedFallback)}");
+                    return discountedFallback > 0m ? discountedFallback : fallbackPrice;
                 }
 
                 _logger.Info(
-                    $"Trade entry fallback to last H4 close. " +
+                    $"Trade entry fallback to scan price. " +
                     $"M15 candles={(entryCandles?.Count ?? 0)} is below required {settings.MinimumEntryCandles}.");
-                return fallbackEntry;
+                return fallbackPrice;
             }
 
             var ordered = entryCandles
@@ -146,37 +152,38 @@ namespace IbSwingTrader.Application.Candidates
                 .ToList();
 
             var current = ordered[^1].Close;
+            var referencePrice = hasScanPrice ? scanPrice : fallbackEntry;
 
             if (ordered.Count < settings.MinimumEntryCandles)
             {
                 if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
                 {
-                    var discountedCurrent = current * (1m - entryDiscountOverridePct.Value);
+                    var discountedCurrent = referencePrice * (1m - entryDiscountOverridePct.Value);
                     _logger.Info(
-                        $"Trade entry set to latest M15 close with profile discount. " +
+                        $"Trade entry set to scan price with profile discount. " +
                         $"M15 candles={ordered.Count} is below forecast minimum {settings.MinimumEntryCandles}. " +
-                        $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedCurrent)}");
-                    return discountedCurrent > 0m ? discountedCurrent : fallbackEntry;
+                        $"Reference={_fmt.Price(referencePrice)}, DiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, Entry={_fmt.Price(discountedCurrent)}");
+                    return discountedCurrent > 0m ? discountedCurrent : referencePrice;
                 }
 
                 if (settings.UseCurrentPriceAsEntry)
                 {
                     var baselineDiscountPct = Math.Max(settings.BaselineEntryDiscountPct, 0m);
                     var discountedCurrent = baselineDiscountPct > 0m
-                        ? current * (1m - baselineDiscountPct)
-                        : current;
+                        ? referencePrice * (1m - baselineDiscountPct)
+                        : referencePrice;
 
                     _logger.Info(
-                        $"Trade entry set to latest M15 close with baseline discount. " +
+                        $"Trade entry set to scan price with baseline discount. " +
                         $"M15 candles={ordered.Count} is below forecast minimum {settings.MinimumEntryCandles}. " +
-                        $"Current={_fmt.Price(current)}, DiscountPct={_fmt.Percent(baselineDiscountPct)}, Entry={_fmt.Price(discountedCurrent)}");
-                    return discountedCurrent > 0m ? discountedCurrent : fallbackEntry;
+                        $"Reference={_fmt.Price(referencePrice)}, DiscountPct={_fmt.Percent(baselineDiscountPct)}, Entry={_fmt.Price(discountedCurrent)}");
+                    return discountedCurrent > 0m ? discountedCurrent : referencePrice;
                 }
 
                 _logger.Info(
-                    $"Trade entry fallback to last H4 close. " +
+                    $"Trade entry fallback to scan price. " +
                     $"M15 candles={ordered.Count} is below required {settings.MinimumEntryCandles} and no current-price entry profile is active.");
-                return fallbackEntry;
+                return referencePrice;
             }
 
             if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
