@@ -1772,7 +1772,7 @@ namespace IbSwingTrader.Application.Candidates
                 try
                 {
                     var end = MarketTime.Now();
-                    var start = end.AddHours(-tradeSettings.EntryLookbackHours);
+                    var start = ResolveEntryHistoryStart(end, tradeSettings.EntryLookbackHours);
 
                     entryCandles = await _historicalData.GetCandlesRange(
                         ctx.Stock.Ticker,
@@ -2209,6 +2209,18 @@ namespace IbSwingTrader.Application.Candidates
             return 0m;
         }
 
+        private static DateTime ResolveEntryHistoryStart(DateTime end, int lookbackHours)
+        {
+            var start = end.AddHours(-Math.Max(1, lookbackHours));
+
+            while (start.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                start = start.AddDays(-1);
+            }
+
+            return start;
+        }
+
         private static decimal? ResolveSeriesBasedScanPriceFloor(
             decimal scanPrice,
             RecentFeatureSeries recentSeries,
@@ -2231,7 +2243,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (dailyUpper > 0m && scanPrice >= dailyUpper)
             {
-                var retraceFactor = Clamp(
+                var retraceFactor = Math.Clamp(
                     (Math.Abs(dailyMidSlope) + Math.Abs(h4MidSlope)) / 20m,
                     0.35m,
                     0.70m);
@@ -2239,7 +2251,7 @@ namespace IbSwingTrader.Application.Candidates
             }
             else if (dailyMid > 0m && scanPrice >= dailyMid)
             {
-                var retraceFactor = Clamp(
+                var retraceFactor = Math.Clamp(
                     (Math.Abs(dailyMidSlope) + Math.Abs(h4MidSlope)) / 24m,
                     0.30m,
                     0.60m);
@@ -2247,7 +2259,7 @@ namespace IbSwingTrader.Application.Candidates
             }
             else if (h4Upper > 0m && scanPrice >= h4Upper)
             {
-                var retraceFactor = Clamp(
+                var retraceFactor = Math.Clamp(
                     (Math.Abs(h4MidSlope) + Math.Abs(h4UpperSlope)) / 20m,
                     0.25m,
                     0.55m);
