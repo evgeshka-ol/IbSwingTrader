@@ -1802,6 +1802,12 @@ namespace IbSwingTrader.Application.Candidates
             var bbState = BuildBollingerStateSet(recentSeries);
             var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
+            var scanPrice = ResolveScanPrice(ctx.Snapshot);
+            var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
+                scanPrice,
+                recentSeries,
+                bbState,
+                todayResearchLikePatternKind);
             var isResearchLikeLaunch = IsResearchLikeLaunch(
                 ctx.Snapshot,
                 diagnostics,
@@ -2170,7 +2176,8 @@ namespace IbSwingTrader.Application.Candidates
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
                 entryCandles,
-                ResolveScanPrice(ctx.Snapshot),
+                scanPrice,
+                scanPriceFloorOverride,
                 entryDiscountOverridePct,
                 defaultProfitPctOverride,
                 minProfitPctOverride,
@@ -2200,6 +2207,64 @@ namespace IbSwingTrader.Application.Candidates
                 return current.H4BollingerMidBand * (1m + current.H4BollingerMidDistancePct / 100m);
 
             return 0m;
+        }
+
+        private static decimal? ResolveSeriesBasedScanPriceFloor(
+            decimal scanPrice,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState,
+            TodayResearchLikePatternKind patternKind)
+        {
+            if (scanPrice <= 0m)
+                return null;
+
+            var dailyUpper = GetLatestValue(recentSeries.DailyBbUpperBandSeries);
+            var dailyMid = GetLatestValue(recentSeries.DailyBbMidBandSeries);
+            var h4Upper = GetLatestValue(recentSeries.H4BbUpperBandSeries);
+            var h4Mid = GetLatestValue(recentSeries.H4BbMidBandSeries);
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
+            var h4UpperSlope = CalculateRelativeSlopePct(recentSeries.H4BbUpperBandSeries);
+
+            decimal? floor = null;
+
+            if (dailyUpper > 0m && scanPrice >= dailyUpper)
+            {
+                var retraceFactor = Clamp(
+                    (Math.Abs(dailyMidSlope) + Math.Abs(h4MidSlope)) / 20m,
+                    0.35m,
+                    0.70m);
+                floor = dailyUpper + (scanPrice - dailyUpper) * retraceFactor;
+            }
+            else if (dailyMid > 0m && scanPrice >= dailyMid)
+            {
+                var retraceFactor = Clamp(
+                    (Math.Abs(dailyMidSlope) + Math.Abs(h4MidSlope)) / 24m,
+                    0.30m,
+                    0.60m);
+                floor = dailyMid + (scanPrice - dailyMid) * retraceFactor;
+            }
+            else if (h4Upper > 0m && scanPrice >= h4Upper)
+            {
+                var retraceFactor = Clamp(
+                    (Math.Abs(h4MidSlope) + Math.Abs(h4UpperSlope)) / 20m,
+                    0.25m,
+                    0.55m);
+                floor = h4Upper + (scanPrice - h4Upper) * retraceFactor;
+            }
+
+            if (!floor.HasValue)
+                return null;
+
+            if (patternKind == TodayResearchLikePatternKind.Runaway)
+                floor = Math.Max(floor.Value, scanPrice * 0.92m);
+            else if (patternKind == TodayResearchLikePatternKind.LaunchContinuation)
+                floor = Math.Max(floor.Value, scanPrice * 0.90m);
+            else if (patternKind == TodayResearchLikePatternKind.PullbackContinuation)
+                floor = Math.Max(floor.Value, scanPrice * 0.88m);
+
+            return decimal.Round(floor.Value, 2, MidpointRounding.AwayFromZero);
         }
 
         private WishListItem BuildWishListItem(

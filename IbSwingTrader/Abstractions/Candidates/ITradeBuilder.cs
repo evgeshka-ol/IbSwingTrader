@@ -6,6 +6,7 @@ namespace IbSwingTrader.Abstractions.Candidates
             List<Candle> candles,
             List<Candle>? entryCandles = null,
             decimal? scanPriceOverride = null,
+            decimal? scanPriceFloorOverride = null,
             decimal? entryDiscountOverridePct = null,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,

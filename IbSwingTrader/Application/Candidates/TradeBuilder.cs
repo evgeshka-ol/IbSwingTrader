@@ -13,6 +13,7 @@ namespace IbSwingTrader.Application.Candidates
             List<Candle> candles,
             List<Candle>? entryCandles = null,
             decimal? scanPriceOverride = null,
+            decimal? scanPriceFloorOverride = null,
             decimal? entryDiscountOverridePct = null,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
@@ -30,7 +31,13 @@ namespace IbSwingTrader.Application.Candidates
                 .Skip(Math.Max(0, candles.Count - settings.StopLookbackBars))
                 .Min(x => x.Low);
 
-            var entry = BuildEntryPrice(last.Close, entryCandles, settings, scanPriceOverride, entryDiscountOverridePct);
+            var entry = BuildEntryPrice(
+                last.Close,
+                entryCandles,
+                settings,
+                scanPriceOverride,
+                scanPriceFloorOverride,
+                entryDiscountOverridePct);
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -124,6 +131,7 @@ namespace IbSwingTrader.Application.Candidates
             List<Candle>? entryCandles,
             TradePlanSettings settings,
             decimal? scanPriceOverride,
+            decimal? scanPriceFloorOverride,
             decimal? entryDiscountOverridePct)
         {
             var scanPrice = scanPriceOverride.GetValueOrDefault();
@@ -272,6 +280,16 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var entry = Clamp(projectedEntry, minEntry, maxEntry);
+
+            if (scanPriceFloorOverride.HasValue &&
+                scanPriceFloorOverride.Value > 0m &&
+                entry < scanPriceFloorOverride.Value)
+            {
+                _logger.Info(
+                    $"Trade entry raised toward scan-price floor from series structure. " +
+                    $"Floor={_fmt.Price(scanPriceFloorOverride.Value)}, PreviousEntry={_fmt.Price(entry)}");
+                entry = scanPriceFloorOverride.Value;
+            }
 
             _logger.Info(
                 $"Trade entry from M15 forecast. " +
