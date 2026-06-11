@@ -320,9 +320,10 @@ namespace IbSwingTrader.Application.Candidates
                 if (ctx == null)
                     continue;
 
+                var agedRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var agedDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var agedEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var agedBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var agedBbState = BuildBollingerStateSet(agedRecentSeries);
                 var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
@@ -346,7 +347,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (!IsReversalCandidateContext(ctx.Snapshot))
+                if (!IsBelowPreviousClosedDailyMid(agedRecentSeries))
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -379,9 +380,10 @@ namespace IbSwingTrader.Application.Candidates
                 if (!scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var ctx))
                     continue;
 
+                var sameDayRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var sameDayDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var sameDayEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var sameDayBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var sameDayBbState = BuildBollingerStateSet(sameDayRecentSeries);
                 var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
@@ -402,7 +404,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (IsReversalCandidateContext(ctx.Snapshot))
+                else if (IsBelowPreviousClosedDailyMid(sameDayRecentSeries))
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -430,12 +432,13 @@ namespace IbSwingTrader.Application.Candidates
                 if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
                     continue;
 
-                if (HasRecentDailyBollingerMidBreakdown(ctx.Snapshot))
+                var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
+                if (IsBelowPreviousClosedDailyMid(liveRecentSeries))
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var liveEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var liveBbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var liveBbState = BuildBollingerStateSet(liveRecentSeries);
                 var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
@@ -884,12 +887,13 @@ namespace IbSwingTrader.Application.Candidates
             if (IsLossPreset(ctx.Preset.ScanCode))
                 return false;
 
-            if (IsReversalCandidateContext(ctx.Snapshot))
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+
+            if (IsBelowPreviousClosedDailyMid(recentSeries))
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
-                    $"Reason=price is below daily Bollinger mid, " +
-                    $"DailyBollingerMidDistancePct={_fmt.Generic(ctx.Snapshot.Current.DailyBollingerMidDistancePct)}%");
+                    $"Reason=previous closed daily bar is below daily Bollinger mid.");
                 return false;
             }
 
@@ -909,7 +913,6 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
 
@@ -1092,7 +1095,7 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState)
         {
-            if (HasRecentDailyBollingerMidBreakdown(snapshot))
+            if (IsBelowPreviousClosedDailyMid(recentSeries))
             {
                 return false;
             }
@@ -1403,18 +1406,40 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsBellUpEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
-            return recent.MidMovePct > 0m &&
+            var midAccelerationThreshold = Math.Max(0.20m, Math.Abs(prior.MidMovePct) * 0.10m);
+            var openExpansionThreshold = Math.Max(0.25m, Math.Abs(prior.OpenPct) * 0.10m);
+
+            var midAccelerating =
+                recent.MidMovePct > 0m &&
+                recent.MidMovePct >= prior.MidMovePct + midAccelerationThreshold;
+
+            var openExpanding =
+                recent.OpenPct > 0m &&
+                recent.OpenPct >= prior.OpenPct + openExpansionThreshold;
+
+            return midAccelerating &&
+                   openExpanding &&
                    recent.UpperMovePct > recent.MidMovePct &&
-                   recent.LowerMovePct <= recent.MidMovePct &&
-                   recent.OpenPct >= prior.OpenPct;
+                   recent.LowerMovePct <= recent.MidMovePct;
         }
 
         private static bool IsBellDownEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
-            return recent.MidMovePct < 0m &&
+            var midDecelerationThreshold = Math.Max(0.20m, Math.Abs(prior.MidMovePct) * 0.10m);
+            var openExpansionThreshold = Math.Max(0.25m, Math.Abs(prior.OpenPct) * 0.10m);
+
+            var midDecelerating =
+                recent.MidMovePct < 0m &&
+                recent.MidMovePct <= prior.MidMovePct - midDecelerationThreshold;
+
+            var openExpanding =
+                recent.OpenPct > 0m &&
+                recent.OpenPct >= prior.OpenPct + openExpansionThreshold;
+
+            return midDecelerating &&
+                   openExpanding &&
                    recent.LowerMovePct < recent.MidMovePct &&
-                   recent.UpperMovePct >= recent.MidMovePct &&
-                   recent.OpenPct >= prior.OpenPct;
+                   recent.UpperMovePct >= recent.MidMovePct;
         }
 
         private static bool IsBellUpPatternReadyNow(
@@ -1785,11 +1810,13 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
-        private static bool IsReversalCandidateContext(CandidateSignalSnapshot snapshot)
-            => snapshot.Current.DailyBollingerMidDistancePct < 0m;
+        private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
+        {
+            if (recentSeries.DailyCloseSeries.Count < 2 || recentSeries.DailyBbMidBandSeries.Count < 2)
+                return false;
 
-        private static bool HasRecentDailyBollingerMidBreakdown(CandidateSignalSnapshot snapshot)
-            => snapshot.Current.DailyBollingerMidDistancePct < 0m;
+            return recentSeries.DailyCloseSeries[^2] < recentSeries.DailyBbMidBandSeries[^2];
+        }
 
         private static bool IsReversalRecoveryTradeProfile(
             CandidateSignalSnapshot snapshot,
@@ -1798,7 +1825,7 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             ReversalRecoveryExitSettings settings)
         {
-            if (!settings.Enabled || !IsReversalCandidateContext(snapshot))
+            if (!settings.Enabled || !IsBelowPreviousClosedDailyMid(recentSeries))
                 return false;
 
             var h4MacdSeries = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
@@ -2674,7 +2701,7 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             TradePlanInfo trade)
         {
-            if (HasRecentDailyBollingerMidBreakdown(snapshot))
+            if (IsBelowPreviousClosedDailyMid(recentSeries))
                 return 0m;
 
             var minPlannedProfitPct = _getCandidatesSettingsProvider.Get().CandidateFilter.MinPlannedProfitPct;
@@ -4886,6 +4913,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return new RecentFeatureSeries
             {
+                DailyCloseSeries = BuildRecentDailyCloseSeries(candles, scanIndex),
                 DailyBbUpperBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperBand),
                 DailyBbMidBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand),
                 DailyBbLowerBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand),
@@ -4911,6 +4939,26 @@ namespace IbSwingTrader.Application.Candidates
                 H4MacdHistogramSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram),
                 H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram)
             };
+        }
+
+        private List<decimal> BuildRecentDailyCloseSeries(List<Candle> candles, int scanIndex)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(candles[i].Close, 2, MidpointRounding.AwayFromZero))];
         }
 
         private BollingerStateSet BuildBollingerStateSet(RecentFeatureSeries recentSeries)
@@ -5708,7 +5756,7 @@ namespace IbSwingTrader.Application.Candidates
                     Math.Min(settings.ImmediateContinuationMaxDiscountPct, settings.MaxDiscountPct));
                 profile = "ImmediateContinuation";
             }
-            else if (bellPatternKind == BellPatternKind.BellDown && IsReversalCandidateContext(snapshot))
+            else if (bellPatternKind == BellPatternKind.BellDown && IsBelowPreviousClosedDailyMid(recentSeries))
             {
                 targetDiscountPct = MaxDiscount(
                     currentEntryDiscountPct,
@@ -6853,9 +6901,6 @@ namespace IbSwingTrader.Application.Candidates
         {
             var parts = new List<string>();
 
-            if (snapshot.Current.DailyBollingerMidDistancePct < 0m)
-                parts.Add("below daily Bollinger mid");
-
             if (snapshot.Current.DailyMACDLineMinusSignal <= 0m)
                 parts.Add("daily MACD weak/negative");
 
@@ -6910,6 +6955,7 @@ namespace IbSwingTrader.Application.Candidates
 
         private sealed class RecentFeatureSeries
         {
+            public List<decimal> DailyCloseSeries { get; init; } = [];
             public List<decimal> DailyMaSeries { get; init; } = [];
             public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
             public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
