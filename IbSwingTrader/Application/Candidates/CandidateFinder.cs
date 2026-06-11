@@ -1406,16 +1406,11 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsBellUpEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
-            var midAccelerationThreshold = Math.Max(0.20m, Math.Abs(prior.MidMovePct) * 0.10m);
-            var openExpansionThreshold = Math.Max(0.25m, Math.Abs(prior.OpenPct) * 0.10m);
-
             var midAccelerating =
-                recent.MidMovePct > 0m &&
-                recent.MidMovePct >= prior.MidMovePct + midAccelerationThreshold;
+                recent.MidMovePct > prior.MidMovePct;
 
             var openExpanding =
-                recent.OpenPct > 0m &&
-                recent.OpenPct >= prior.OpenPct + openExpansionThreshold;
+                recent.OpenPct > prior.OpenPct;
 
             return midAccelerating &&
                    openExpanding &&
@@ -1425,16 +1420,11 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsBellDownEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
-            var midDecelerationThreshold = Math.Max(0.20m, Math.Abs(prior.MidMovePct) * 0.10m);
-            var openExpansionThreshold = Math.Max(0.25m, Math.Abs(prior.OpenPct) * 0.10m);
-
             var midDecelerating =
-                recent.MidMovePct < 0m &&
-                recent.MidMovePct <= prior.MidMovePct - midDecelerationThreshold;
+                recent.MidMovePct < prior.MidMovePct;
 
             var openExpanding =
-                recent.OpenPct > 0m &&
-                recent.OpenPct >= prior.OpenPct + openExpansionThreshold;
+                recent.OpenPct > prior.OpenPct;
 
             return midDecelerating &&
                    openExpanding &&
@@ -1450,28 +1440,14 @@ namespace IbSwingTrader.Application.Candidates
             if (bellPatternSignal.Kind != BellPatternKind.BellUp)
                 return false;
 
-            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 4);
-            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 4);
-            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
-            var dailyRsiTail = CalculateTailSlope(recentSeries.DailyRsiSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-            var dailyMacdTail = CalculateTailSlope(recentSeries.DailyMacdSeries, 4);
-            var h4MacdTail = CalculateTailSlope(PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries), 4);
-
             return bellPatternSignal.Timeframe switch
             {
                 BellPatternTimeframe.H4 => bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
-                                           h4MidTail >= -0.10m &&
-                                           h4UpperTail >= h4MidTail - 0.10m &&
-                                           h4RsiTail >= -0.10m &&
-                                           h4MacdTail >= -0.10m,
+                                           bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse),
                 BellPatternTimeframe.Daily => bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
-                                              dailyMidTail >= -0.10m &&
-                                              dailyUpperTail >= dailyMidTail - 0.10m &&
-                                              dailyRsiTail >= -0.10m &&
-                                              dailyMacdTail >= -0.10m,
-                BellPatternTimeframe.Weekly => false,
+                                              bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse),
+                BellPatternTimeframe.Weekly => bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
+                                               bbState.Weekly.Regime != nameof(BollingerFigureRegime.Collapse),
                 _ => false
             };
         }
@@ -1480,95 +1456,34 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
-            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
-            var dailyLowerTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6);
-            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
-            var h4LowerTail = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
-            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
-
-            return h4UpperTail >= 0.75m &&
-                   h4MidTail >= 0m &&
-                   h4LowerTail <= h4MidTail + 1.0m &&
-                   h4RsiTail >= 0m &&
-                   h4MacdTail >= -0.05m &&
-                   bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
-                   (bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) ||
-                    bbState.Daily.Direction == nameof(BollingerFigureDirection.Flat)) &&
-                   dailyUpperTail >= -0.20m &&
-                   dailyMidTail >= -0.20m &&
-                   dailyLowerTail <= dailyMidTail + 2.0m;
+            return bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
+                   bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
+                   bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
+                   bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.Weekly.Regime != nameof(BollingerFigureRegime.Collapse);
         }
 
         private static bool IsLaunchContinuationTodayResearchLikePatternReadyNow(
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
-            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
-            var dailyLowerTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6);
-            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
-            var h4LowerTail = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4);
-            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
-            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
-            var dailyMacdTail = CalculateTailSlope(recentSeries.DailyMacdSeries, 4);
-            var dailyRsiTail = CalculateTailSlope(recentSeries.DailyRsiSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-
-            var realDailyLaunch = IsRealBollingerLaunch(dailyMidTail, dailyUpperTail, dailyLowerTail);
-            var realH4Launch = IsRealBollingerLaunch(h4MidTail, h4UpperTail, h4LowerTail);
-
-            return realDailyLaunch &&
-                   realH4Launch &&
+            return bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
+                   bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
                    bbState.Weekly.Direction != nameof(BollingerFigureDirection.Down) &&
                    bbState.Weekly.Regime != nameof(BollingerFigureRegime.Collapse) &&
-                   bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
-                   bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
-                   dailyMacdTail >= -0.05m &&
-                   h4MacdTail >= -0.10m &&
-                   dailyRsiTail >= -0.10m &&
-                   h4RsiTail >= -0.10m;
+                   bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse);
         }
 
         private static bool IsPullbackContinuationTodayResearchLikePatternReadyNow(
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
-            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
-            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4MidTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
-            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
-            var dailyRegimeConstructive =
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Runaway) ||
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) ||
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Reacceleration);
-            var h4RegimeConstructive =
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback) ||
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral);
-
-            var dailyConstructive =
-                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
-                dailyRegimeConstructive &&
-                dailyUpperTail >= -0.25m &&
-                dailyMidTail >= -0.35m;
-
-            var h4Resuming =
-                bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
-                h4RegimeConstructive &&
-                h4UpperTail >= -0.50m &&
-                h4MidTail >= -5.0m &&
-                h4RsiTail >= -0.25m &&
-                h4MacdTail >= -0.20m;
-
-            return dailyConstructive && h4Resuming;
+            return bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
+                   bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
+                   bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse);
         }
 
         private static TodayResearchLikePatternKind ClassifyTodayResearchLikePatternKind(
@@ -1595,30 +1510,7 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyUpperRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
-            var dailyMidRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
-            var dailyLowerRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6);
-            var h4UpperRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4MidRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4);
-            var h4LowerRecent = CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4);
-            var dailyMacdTail = CalculateTailSlope(recentSeries.DailyMacdSeries, 4);
-            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
-            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
-            var dailyRsiTail = CalculateTailSlope(recentSeries.DailyRsiSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-
-            var realDailyLaunch = IsRealBollingerLaunch(
-                CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6),
-                dailyUpperRecent,
-                dailyLowerRecent);
-            var realH4Launch = IsRealBollingerLaunch(
-                CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4),
-                h4UpperRecent,
-                h4LowerRecent);
-
-            return realDailyLaunch &&
-                   realH4Launch &&
-                   (bbState.Weekly.Direction == nameof(BollingerFigureDirection.Up) ||
+            return (bbState.Weekly.Direction == nameof(BollingerFigureDirection.Up) ||
                     bbState.Weekly.Direction == nameof(BollingerFigureDirection.Flat) ||
                     bbState.Weekly.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
                     bbState.Weekly.Regime == nameof(BollingerFigureRegime.Pullback)) &&
@@ -1626,45 +1518,19 @@ namespace IbSwingTrader.Application.Candidates
                     bbState.Daily.Direction == nameof(BollingerFigureDirection.Flat)) &&
                    (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) ||
                     bbState.H4.Direction == nameof(BollingerFigureDirection.Flat)) &&
-                   dailyMacdTail >= -0.05m &&
-                   h4MacdTail >= -0.10m &&
-                   dailyRsiTail >= -0.10m &&
-                   h4RsiTail >= -0.10m;
+                   bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse);
         }
 
         private static bool IsPullbackContinuationTodayResearchLikePattern(
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6);
-            var dailyMidTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6);
-            var h4UpperTail = CalculateTailRelativeSlopePct(recentSeries.H4BbUpperBandSeries, 4);
-            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
-            var h4MacdHistogram = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
-            var h4MacdTail = CalculateTailSlope(h4MacdHistogram, 4);
-            var dailyRegimeConstructive =
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Runaway) ||
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Pullback) ||
-                bbState.Daily.Regime == nameof(BollingerFigureRegime.Reacceleration);
-            var h4RegimeConstructive =
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback) ||
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Reacceleration) ||
-                bbState.H4.Regime == nameof(BollingerFigureRegime.Neutral);
-
-            var dailyConstructive =
-                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
-                dailyRegimeConstructive &&
-                dailyUpperTail >= -0.25m &&
-                dailyMidTail >= -0.35m;
-
-            var h4PullbackResumption =
-                bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
-                h4RegimeConstructive &&
-                h4UpperTail >= -0.50m &&
-                h4RsiTail >= -0.25m &&
-                h4MacdTail >= -0.20m;
-
-            return dailyConstructive && h4PullbackResumption;
+            return (bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) ||
+                    bbState.Daily.Direction == nameof(BollingerFigureDirection.Flat)) &&
+                   (bbState.H4.Direction != nameof(BollingerFigureDirection.Down)) &&
+                   bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                   bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse);
         }
 
         private decimal CalculateTodayResearchLikeSeriesScore(BollingerStateSet bbState, RecentFeatureSeries recentSeries)
@@ -1706,18 +1572,18 @@ namespace IbSwingTrader.Application.Candidates
 
             if (patternKind == TodayResearchLikePatternKind.Runaway)
             {
-                if (IsBullishBandKink(dailyUpperPrior, dailyUpperRecent, 0.75m, 0.40m, 0.60m))
+                if (IsBullishBandKink(dailyUpperPrior, dailyUpperRecent))
                     score += 3m;
-                if (IsBullishBandKink(dailyMidPrior, dailyMidRecent, 0.15m, 0.20m, 0.35m))
+                if (IsBullishBandKink(dailyMidPrior, dailyMidRecent))
                     score += 2m;
-                if (IsBullishBandKink(dailyLowerPrior, dailyLowerRecent, -0.20m, 0.20m, 0.25m))
+                if (IsBullishBandKink(dailyLowerPrior, dailyLowerRecent))
                     score += 1m;
 
-                if (IsBullishBandKink(h4UpperPrior, h4UpperRecent, 0.50m, 0.25m, 0.45m))
+                if (IsBullishBandKink(h4UpperPrior, h4UpperRecent))
                     score += 2m;
-                if (IsBullishBandKink(h4MidPrior, h4MidRecent, 0.10m, 0.15m, 0.25m))
+                if (IsBullishBandKink(h4MidPrior, h4MidRecent))
                     score += 1m;
-                if (IsBullishBandKink(h4LowerPrior, h4LowerRecent, -0.20m, 0.15m, 0.20m))
+                if (IsBullishBandKink(h4LowerPrior, h4LowerRecent))
                     score += 0.5m;
             }
             else if (patternKind == TodayResearchLikePatternKind.LaunchContinuation)
@@ -1727,25 +1593,25 @@ namespace IbSwingTrader.Application.Candidates
                 if (IsRealBollingerLaunch(h4MidRecent, h4UpperRecent, h4LowerRecent))
                     score += 2m;
 
-                if (weeklyUpperRecent >= 0m && weeklyMidRecent >= -0.25m)
+                if (weeklyUpperRecent >= weeklyMidRecent && weeklyMidRecent >= weeklyLowerRecent)
                     score += 1m;
-                if (dailyUpperRecent >= 0m && dailyMidRecent >= -0.10m)
+                if (dailyUpperRecent >= dailyMidRecent && dailyMidRecent >= dailyLowerRecent)
                     score += 1m;
-                if (h4UpperRecent >= 0m && h4MidRecent >= -0.10m)
+                if (h4UpperRecent >= h4MidRecent && h4MidRecent >= h4LowerRecent)
                     score += 1m;
 
-                if (dailyMacdLast > 0m)
+                if (dailyMacdLast >= dailyMacdSlope)
                     score += 1.25m;
-                if (weeklyMacdLast > -0.05m)
+                if (weeklyMacdLast >= weeklyMacdSlope)
                     score += 0.75m;
-                if (h4MacdLast >= 0m)
+                if (h4MacdLast >= h4MacdSlope)
                     score += 1m;
 
-                if (dailyMacdSlope > -0.10m)
+                if (dailyMacdSlope > 0m)
                     score += 0.75m;
-                if (weeklyMacdSlope > -0.10m)
+                if (weeklyMacdSlope > 0m)
                     score += 0.5m;
-                if (h4MacdSlope > -0.10m)
+                if (h4MacdSlope > 0m)
                     score += 0.75m;
 
                 if (dailyRsiSlope > 0m)
@@ -5215,15 +5081,8 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsBullishBandKink(
             decimal priorSlopePct,
-            decimal recentSlopePct,
-            decimal minRecentSlopePct,
-            decimal maxPriorSlopePct,
-            decimal minAccelerationPct)
-        {
-            return recentSlopePct >= minRecentSlopePct &&
-                   priorSlopePct <= maxPriorSlopePct &&
-                   recentSlopePct - priorSlopePct >= minAccelerationPct;
-        }
+            decimal recentSlopePct)
+            => recentSlopePct > priorSlopePct;
 
         private static bool IsStrictTodayResearchLikeRunawayPattern(
             BollingerStateSet bbState,
@@ -5265,23 +5124,22 @@ namespace IbSwingTrader.Application.Candidates
             var weeklyConstructive =
                 weeklyDirectionUp &&
                 weeklyRegimeConstructive &&
-                weeklyUpperSlope >= 0m &&
-                weeklyMidSlope >= 0m &&
-                weeklyLowerSlope <= weeklyMidSlope + 1.5m;
+                weeklyUpperSlope >= weeklyMidSlope &&
+                weeklyMidSlope >= weeklyLowerSlope;
 
             var dailyRunawayKink =
                 dailyDirectionUp &&
                 dailyRegimeConstructive &&
-                IsBullishBandKink(dailyUpperPrior, dailyUpperRecent, 0.75m, 0.25m, 0.75m) &&
-                IsBullishBandKink(dailyMidPrior, dailyMidRecent, 0.10m, 0.20m, 0.35m) &&
-                IsBullishBandKink(dailyLowerPrior, dailyLowerRecent, -0.20m, 0.35m, 0.25m);
+                IsBullishBandKink(dailyUpperPrior, dailyUpperRecent) &&
+                IsBullishBandKink(dailyMidPrior, dailyMidRecent) &&
+                IsBullishBandKink(dailyLowerPrior, dailyLowerRecent);
 
             var h4RunawayKink =
                 h4DirectionUp &&
                 h4RegimeConstructive &&
-                IsBullishBandKink(h4UpperPrior, h4UpperRecent, 0.50m, 0.20m, 0.40m) &&
-                IsBullishBandKink(h4MidPrior, h4MidRecent, 0.05m, 0.15m, 0.25m) &&
-                IsBullishBandKink(h4LowerPrior, h4LowerRecent, -0.20m, 0.20m, 0.20m);
+                IsBullishBandKink(h4UpperPrior, h4UpperRecent) &&
+                IsBullishBandKink(h4MidPrior, h4MidRecent) &&
+                IsBullishBandKink(h4LowerPrior, h4LowerRecent);
 
             return weeklyConstructive && dailyRunawayKink && h4RunawayKink;
         }
