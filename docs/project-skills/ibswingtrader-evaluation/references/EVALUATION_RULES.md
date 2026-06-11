@@ -21,9 +21,9 @@ For both scanner families:
 - `TodayResearchLikeCandidates` should be judged by whether it becomes the next research dataset.
 - `ReversalCandidates` should still produce meaningful amplitude, normally `> 10%`.
 - If amplitude is below 10%, treat that as scanner failure, even when the trade plan correctly avoids entry.
-- Family membership is fixed by the daily Bollinger mid split:
-  - below daily mid -> `ReversalCandidates`
-  - at or above daily mid -> `TodayResearchLikeCandidates`
+- Family membership is fixed by the last closed daily Bollinger mid split:
+  - below daily mid on the last closed daily bar -> `ReversalCandidates`
+  - at or above daily mid on the last closed daily bar -> `TodayResearchLikeCandidates`
 - Do not change the family boundary during amplitude or trade-plan tuning; only
   list promotion, ranking, and exit shaping should move after the split is correct.
 

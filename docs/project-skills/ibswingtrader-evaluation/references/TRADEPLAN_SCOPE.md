@@ -90,11 +90,13 @@ The active direction for entry prediction is four series-driven profiles:
 
 Bell pair:
 
-- `BellUp` should behave like the shallow continuation side: squeeze-phase rows
-  should keep the entry close to the scan price and should not fall back to a
-  generic deep discount.
-- `BellDown` is the mirrored reversal-side shape: use the same rows to shape a
-  reversal entry/exit profile, but keep it separate from above-mid continuation.
+- `BellUp` should behave like the shallow continuation side: the row shape must
+  show a prior squeeze / flat phase followed by clear expansion, and the entry
+  should stay close to the scan price instead of collapsing into a generic deep
+  discount.
+- `BellDown` is the mirrored reversal-side shape: use the same
+  prior-compression / recent-expansion rows to shape a reversal entry/exit
+  profile, but keep it separate from above-mid continuation.
 - One clean Bell timeframe is enough. The source timeframe changes the
   expected holding horizon:
   - `H4` => today-style execution

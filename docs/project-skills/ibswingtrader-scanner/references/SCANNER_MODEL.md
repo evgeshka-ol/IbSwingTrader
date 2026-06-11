@@ -34,9 +34,12 @@ Use reversal logic only when the ticker is below the daily Bollinger mid.
 
 Hard rule:
 
-- If the ticker is below the daily Bollinger mid, it is a `ReversalCandidates`
-  candidate.
-- If the ticker is at or above the daily Bollinger mid, it is not a
+- Use the last closed daily bar for this check, not the current intraday
+  partial bar.
+- If the ticker was below the daily Bollinger mid on the last closed daily bar,
+  it is a `ReversalCandidates` candidate.
+- If the ticker was at or above the daily Bollinger mid on the last closed
+  daily bar, it is not a
   `ReversalCandidates` candidate.
 - Weekly and H4 context may refine the reversal subtype or trade plan, but they
   do not change the family assignment.
@@ -183,10 +186,11 @@ Comparison principle:
 
 Bell pattern pair:
 
-- `BellUp` is the direct squeeze-to-launch form. It belongs on the
-  above-mid / continuation side.
-- `BellDown` is the vertical mirror. It belongs on the below-mid /
-  reversal side.
+- `BellUp` is the direct squeeze-to-launch form. It requires a prior
+  compressed/flat phase and a recent phase with clear expansion; it belongs on
+  the above-mid / continuation side.
+- `BellDown` is the vertical mirror with the same prior-compression /
+  recent-expansion requirement. It belongs on the below-mid / reversal side.
 - Use the same real Bollinger upper/mid/lower rows to recognize both forms;
   only the direction changes.
 - The scanner does not require Bell confirmation on all three timeframes.

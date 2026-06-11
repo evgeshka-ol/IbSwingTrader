@@ -150,10 +150,14 @@ for a faster, more defensive trade plan than a Daily/Weekly launch.
 
 Bell pair:
 
-- `BellUp` is the direct squeeze-to-launch form. Entry belongs in the squeeze
-  phase near the end of the session, before the expansion is obvious.
-- `BellDown` is the vertical mirror. It marks the mirrored squeeze-to-breakdown
-  form and is the reversal-side analogue.
+- `BellUp` is the direct squeeze-to-launch form. The prior phase should be
+  compressed or flat, and the recent phase should show clear expansion in the
+  upper/mid envelope before the setup is treated as Bell.
+- Entry belongs in the squeeze phase near the end of the session, before the
+  expansion is obvious.
+- `BellDown` is the vertical mirror. The same prior-compression / recent-
+  expansion logic applies, but the recent phase breaks down instead of
+  launching up.
 - In both cases, the decisive cue is the band geometry: the middle band must
   stop compressing in the direction that invalidates the move, and then the
   price should mean-revert toward the mid as the flatting begins.

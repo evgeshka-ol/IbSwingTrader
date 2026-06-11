@@ -49,9 +49,9 @@ Do not mix the two mentally or in code. They are opposite regimes and need diffe
 
 Hard classification rule:
 
-- Daily Bollinger mid is the primary hard split.
-- If the ticker is below the daily Bollinger mid, it belongs to `ReversalCandidates`.
-- If the ticker is at or above the daily Bollinger mid, it belongs to `TodayResearchLikeCandidates`.
+- The latest completed daily Bollinger mid bar is the primary hard split.
+- If the ticker was below the daily Bollinger mid on the last closed daily bar, it belongs to `ReversalCandidates`.
+- If the ticker was at or above the daily Bollinger mid on the last closed daily bar, it belongs to `TodayResearchLikeCandidates`.
 - Weekly and H4 context only refine subtyping, promotion, and ranking inside the family.
 - Do not retune this family split when trying to improve list quality; keep the category boundary fixed and work only on promotion, ranking, and trade-plan behavior after the split.
 
