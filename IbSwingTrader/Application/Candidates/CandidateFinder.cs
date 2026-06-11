@@ -911,7 +911,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
-            var bellPatternKind = ClassifyBellPatternKind(bbState, recentSeries);
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
 
             if (patternKind == TodayResearchLikePatternKind.None)
             {
@@ -924,7 +924,8 @@ namespace IbSwingTrader.Application.Candidates
                     $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
                     $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
                     $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}, " +
-                    $"BellPattern={bellPatternKind}");
+                    $"BellPattern={bellPatternSignal.Kind}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}");
                 return false;
             }
 
@@ -941,7 +942,8 @@ namespace IbSwingTrader.Application.Candidates
                     $"H4MidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 4))}, " +
                     $"H4LowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.H4BbLowerBandSeries, 4))}, " +
                     $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}, " +
-                    $"BellPattern={bellPatternKind}");
+                    $"BellPattern={bellPatternSignal.Kind}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}");
                 return false;
             }
             var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
@@ -977,7 +979,8 @@ namespace IbSwingTrader.Application.Candidates
                 $"H4MidSlope={_fmt.Generic(h4MidSlope)}%, " +
                 $"H4UpperSlope={_fmt.Generic(h4UpperSlope)}%, " +
                 $"H4LowerSlope={_fmt.Generic(h4LowerSlope)}%, " +
-                $"BellPattern={bellPatternKind}, " +
+                $"BellPattern={bellPatternSignal.Kind}, " +
+                $"BellTimeframe={bellPatternSignal.Timeframe}, " +
                 $"RunawaySeriesScore={_fmt.Generic(runawaySeriesScore)}, " +
                 $"EntryScore={_fmt.Generic(entryScore)}, " +
                 $"ATRRatio={_fmt.Generic(diagnostics.ATRRatio)}");
@@ -1272,13 +1275,13 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var bellPatternKind = ClassifyBellPatternKind(bbState, recentSeries);
-            if (bellPatternKind == BellPatternKind.BellUp)
-                return IsBellUpPatternReadyNow(bbState, recentSeries);
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            if (bellPatternSignal.Kind == BellPatternKind.BellUp)
+                return IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries);
 
             return patternKind switch
             {
-                TodayResearchLikePatternKind.BellUp => IsBellUpPatternReadyNow(bbState, recentSeries),
+                TodayResearchLikePatternKind.BellUp => IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries),
                 TodayResearchLikePatternKind.Runaway => IsStrictTodayResearchLikeRunawayPatternReadyNow(bbState, recentSeries),
                 TodayResearchLikePatternKind.LaunchContinuation => IsLaunchContinuationTodayResearchLikePatternReadyNow(bbState, recentSeries),
                 TodayResearchLikePatternKind.PullbackContinuation => IsPullbackContinuationTodayResearchLikePatternReadyNow(bbState, recentSeries),
@@ -1286,7 +1289,7 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private static BellPatternKind ClassifyBellPatternKind(
+        private static BellPatternSignal ClassifyBellPatternSignal(
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
@@ -1306,24 +1309,43 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.WeeklyBbLowerBandSeries,
                 bbState.Weekly.Direction);
 
-            var kinds = new List<BellPatternKind>(3);
-            if (dailyKind != BellPatternKind.None)
-                kinds.Add(dailyKind);
-            if (h4Kind != BellPatternKind.None)
-                kinds.Add(h4Kind);
-            if (weeklyKind != BellPatternKind.None)
-                kinds.Add(weeklyKind);
+            var bellUpSignal = SelectBellPatternSignal(
+                dailyKind,
+                h4Kind,
+                weeklyKind,
+                BellPatternKind.BellUp);
+            if (bellUpSignal.Kind != BellPatternKind.None)
+                return bellUpSignal;
 
-            if (kinds.Count == 0)
-                return BellPatternKind.None;
+            var bellDownSignal = SelectBellPatternSignal(
+                dailyKind,
+                h4Kind,
+                weeklyKind,
+                BellPatternKind.BellDown);
+            return bellDownSignal;
+        }
 
-            var hasBellUp = kinds.Contains(BellPatternKind.BellUp);
-            var hasBellDown = kinds.Contains(BellPatternKind.BellDown);
+        private static BellPatternKind ClassifyBellPatternKind(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
+            => ClassifyBellPatternSignal(bbState, recentSeries).Kind;
 
-            if (hasBellUp && hasBellDown)
-                return BellPatternKind.None;
+        private static BellPatternSignal SelectBellPatternSignal(
+            BellPatternKind dailyKind,
+            BellPatternKind h4Kind,
+            BellPatternKind weeklyKind,
+            BellPatternKind targetKind)
+        {
+            if (h4Kind == targetKind)
+                return new BellPatternSignal(targetKind, BellPatternTimeframe.H4);
 
-            return hasBellUp ? BellPatternKind.BellUp : BellPatternKind.BellDown;
+            if (dailyKind == targetKind)
+                return new BellPatternSignal(targetKind, BellPatternTimeframe.Daily);
+
+            if (weeklyKind == targetKind)
+                return new BellPatternSignal(targetKind, BellPatternTimeframe.Weekly);
+
+            return new BellPatternSignal(BellPatternKind.None, BellPatternTimeframe.None);
         }
 
         private static BellPatternKind ClassifyBellPatternKindForTimeframe(
@@ -1396,10 +1418,11 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private static bool IsBellUpPatternReadyNow(
+            BellPatternSignal bellPatternSignal,
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            if (ClassifyBellPatternKind(bbState, recentSeries) != BellPatternKind.BellUp)
+            if (bellPatternSignal.Kind != BellPatternKind.BellUp)
                 return false;
 
             var dailyUpperTail = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 4);
@@ -1411,16 +1434,21 @@ namespace IbSwingTrader.Application.Candidates
             var dailyMacdTail = CalculateTailSlope(recentSeries.DailyMacdSeries, 4);
             var h4MacdTail = CalculateTailSlope(PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries), 4);
 
-            return bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
-                   bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
-                   dailyMidTail >= -0.10m &&
-                   h4MidTail >= -0.10m &&
-                   dailyUpperTail >= dailyMidTail - 0.10m &&
-                   h4UpperTail >= h4MidTail - 0.10m &&
-                   dailyRsiTail >= -0.10m &&
-                   h4RsiTail >= -0.10m &&
-                   dailyMacdTail >= -0.10m &&
-                   h4MacdTail >= -0.10m;
+            return bellPatternSignal.Timeframe switch
+            {
+                BellPatternTimeframe.H4 => bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
+                                           h4MidTail >= -0.10m &&
+                                           h4UpperTail >= h4MidTail - 0.10m &&
+                                           h4RsiTail >= -0.10m &&
+                                           h4MacdTail >= -0.10m,
+                BellPatternTimeframe.Daily => bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
+                                              dailyMidTail >= -0.10m &&
+                                              dailyUpperTail >= dailyMidTail - 0.10m &&
+                                              dailyRsiTail >= -0.10m &&
+                                              dailyMacdTail >= -0.10m,
+                BellPatternTimeframe.Weekly => false,
+                _ => false
+            };
         }
 
         private static bool IsStrictTodayResearchLikeRunawayPatternReadyNow(
@@ -1620,6 +1648,8 @@ namespace IbSwingTrader.Application.Candidates
             if (patternKind == TodayResearchLikePatternKind.None)
                 return 0m;
 
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+
             var dailyUpperRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 3);
             var dailyUpperPrior = CalculateSegmentRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 3, 3);
             var dailyMidRecent = CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 3);
@@ -1700,19 +1730,12 @@ namespace IbSwingTrader.Application.Candidates
             }
             else if (patternKind == TodayResearchLikePatternKind.BellUp)
             {
-                if (ClassifyBellPatternKindForTimeframe(
-                        recentSeries.DailyBbUpperBandSeries,
-                        recentSeries.DailyBbMidBandSeries,
-                        recentSeries.DailyBbLowerBandSeries,
-                        bbState.Daily.Direction) == BellPatternKind.BellUp)
-                    score += 1.75m;
-
-                if (ClassifyBellPatternKindForTimeframe(
-                        recentSeries.H4BbUpperBandSeries,
-                        recentSeries.H4BbMidBandSeries,
-                        recentSeries.H4BbLowerBandSeries,
-                        bbState.H4.Direction) == BellPatternKind.BellUp)
-                    score += 1.25m;
+                if (bellPatternSignal.Timeframe == BellPatternTimeframe.H4)
+                    score += 2.0m;
+                else if (bellPatternSignal.Timeframe == BellPatternTimeframe.Daily)
+                    score += 1.5m;
+                else if (bellPatternSignal.Timeframe == BellPatternTimeframe.Weekly)
+                    score += 0.75m;
             }
             else
             {
@@ -5509,7 +5532,8 @@ namespace IbSwingTrader.Application.Candidates
             var dailyMacdLast = GetLatestValue(dailyMacdHistogramSeries);
             var h4MacdLast = GetLatestValue(h4MacdHistogramSeries);
             var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
-            var bellPatternKind = ClassifyBellPatternKind(bbState, recentSeries);
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            var bellPatternKind = bellPatternSignal.Kind;
             var realDailyBbLaunch = IsRealBollingerLaunch(dailyMidSlope, dailyUpperSlope, dailyLowerSlope);
             var realH4BbLaunch = IsRealBollingerLaunch(h4MidSlope, h4UpperSlope, h4LowerSlope);
             var realDailyMacdConstructive =
@@ -5664,10 +5688,18 @@ namespace IbSwingTrader.Application.Candidates
             }
             else if (todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp)
             {
+                var bellCap = bellPatternSignal.Timeframe switch
+                {
+                    BellPatternTimeframe.H4 => settings.ImmediateContinuationMaxDiscountPct,
+                    BellPatternTimeframe.Daily => settings.ShallowContinuationMaxDiscountPct,
+                    BellPatternTimeframe.Weekly => settings.ModeratePullbackMaxDiscountPct,
+                    _ => settings.ImmediateContinuationMaxDiscountPct
+                };
+
                 targetDiscountPct = CapDiscount(
                     currentEntryDiscountPct,
-                    Math.Min(settings.ImmediateContinuationMaxDiscountPct, settings.MaxDiscountPct));
-                profile = "BellUp";
+                    Math.Min(bellCap, settings.MaxDiscountPct));
+                profile = $"BellUp-{bellPatternSignal.Timeframe}";
             }
             else if (immediateContinuation)
             {
@@ -6955,6 +6987,18 @@ namespace IbSwingTrader.Application.Candidates
             BellUp,
             BellDown
         }
+
+        private enum BellPatternTimeframe
+        {
+            None,
+            H4,
+            Daily,
+            Weekly
+        }
+
+        private readonly record struct BellPatternSignal(
+            BellPatternKind Kind,
+            BellPatternTimeframe Timeframe);
 
         private enum TodayResearchLikePatternKind
         {
