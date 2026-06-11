@@ -157,6 +157,11 @@ Bell pair:
 - In both cases, the decisive cue is the band geometry: the middle band must
   stop compressing in the direction that invalidates the move, and then the
   price should mean-revert toward the mid as the flatting begins.
+- One clean timeframe is enough to recognize Bell. The source timeframe sets
+  the expected horizon:
+  - `H4` means today
+  - `Daily` means tomorrow
+  - `Weekly` means wishlist / next week
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:

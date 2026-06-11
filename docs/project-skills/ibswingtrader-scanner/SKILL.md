@@ -103,6 +103,15 @@ Canonical Bell pattern pair:
 the rows show a squeeze-to-expansion launch. `BellDown` is the mirrored form
 used on the below-mid reversal side.
 
+The scanner does not require all three timeframes to confirm Bell.
+One clean timeframe is enough:
+
+- `H4`: play it today
+- `Daily`: play it for tomorrow
+- `Weekly`: keep it as wishlist / next-week context
+
+The source timeframe changes urgency and trade-plan depth, not the family split.
+
 When the same runway pattern appears, split it by phase using only the saved
 pre-move rows:
 

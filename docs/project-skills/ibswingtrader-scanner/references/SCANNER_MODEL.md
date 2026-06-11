@@ -189,3 +189,8 @@ Bell pattern pair:
   reversal side.
 - Use the same real Bollinger upper/mid/lower rows to recognize both forms;
   only the direction changes.
+- The scanner does not require Bell confirmation on all three timeframes.
+  One clean timeframe is enough. The source timeframe controls timing:
+  - `H4` means the setup can be played today
+  - `Daily` means the setup is for tomorrow
+  - `Weekly` means the setup belongs in wishlist / next-week context

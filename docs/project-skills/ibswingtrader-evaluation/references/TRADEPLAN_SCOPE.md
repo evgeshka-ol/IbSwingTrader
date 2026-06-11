@@ -95,6 +95,11 @@ Bell pair:
   generic deep discount.
 - `BellDown` is the mirrored reversal-side shape: use the same rows to shape a
   reversal entry/exit profile, but keep it separate from above-mid continuation.
+- One clean Bell timeframe is enough. The source timeframe changes the
+  expected holding horizon:
+  - `H4` => today-style execution
+  - `Daily` => tomorrow-style execution
+  - `Weekly` => wishlist / next-week execution
 
 Daily below mean is not automatically a deep-pullback entry. If the row shows a
 fresh launch from below daily mean with strong H4 acceleration, treat it as
