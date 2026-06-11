@@ -88,6 +88,14 @@ The active direction for entry prediction is four series-driven profiles:
 - `DeepPullback`: deep entry is valid only when Daily/H4 rows show a real below-mean/deep-pullback shape.
 - `AvoidLateSpike`: overheated late spikes near highs should require a very deep entry or be skipped by practical non-fill.
 
+Bell pair:
+
+- `BellUp` should behave like the shallow continuation side: squeeze-phase rows
+  should keep the entry close to the scan price and should not fall back to a
+  generic deep discount.
+- `BellDown` is the mirrored reversal-side shape: use the same rows to shape a
+  reversal entry/exit profile, but keep it separate from above-mid continuation.
+
 Daily below mean is not automatically a deep-pullback entry. If the row shows a
 fresh launch from below daily mean with strong H4 acceleration, treat it as
 `FastContinuationShallow`; otherwise winners like `AKAN` can become high-amplitude

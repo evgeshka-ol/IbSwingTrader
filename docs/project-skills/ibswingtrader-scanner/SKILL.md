@@ -40,6 +40,7 @@ The scanner's job is to find future fat moves early.
 
 Internal `TodayResearchLike` subtypes:
 
+- `BellUp`: squeeze-to-launch continuation, the canonical direct form
 - `Runaway`: strict kink/acceleration launch
 - `LaunchContinuation`: real Bollinger launch with strong daily/H4 expansion
 - `PullbackContinuation`: constructive continuation after a pullback
@@ -92,6 +93,15 @@ The same upper/mid/lower band pattern can be useful on any available timeframe,
 but the trade decision changes with timeframe. Use the real band series
 (`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
 shape, then use timeframe context to decide ranking strength and trade profile.
+
+Canonical Bell pattern pair:
+
+- `BellUp`: squeeze, launch, then late flattening/mean-reversion warning on the direct bullish form
+- `BellDown`: mirrored squeeze, launch down, then late flattening/mean-reversion warning on the bearish form
+
+`BellUp` belongs to the above-mid continuation side and should be promoted when
+the rows show a squeeze-to-expansion launch. `BellDown` is the mirrored form
+used on the below-mid reversal side.
 
 When the same runway pattern appears, split it by phase using only the saved
 pre-move rows:

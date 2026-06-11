@@ -70,6 +70,7 @@ Typical traits:
 
 Internal subtypes inside this family:
 
+- `BellUp`
 - `Runaway`
 - `LaunchContinuation`
 - `PullbackContinuation`
@@ -179,3 +180,12 @@ Comparison principle:
 - avoid replacing this with only slope/aggregate statistics
 - split templates by outcome role: high-amplitude rows are positive scanner
   templates; low-amplitude rows are rejection templates
+
+Bell pattern pair:
+
+- `BellUp` is the direct squeeze-to-launch form. It belongs on the
+  above-mid / continuation side.
+- `BellDown` is the vertical mirror. It belongs on the below-mid /
+  reversal side.
+- Use the same real Bollinger upper/mid/lower rows to recognize both forms;
+  only the direction changes.

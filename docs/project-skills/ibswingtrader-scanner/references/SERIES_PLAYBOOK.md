@@ -148,6 +148,16 @@ Do not require the pattern to exist on Daily before using it. A clean H4
 Bollinger launch without Daily launch can still be playable, but usually calls
 for a faster, more defensive trade plan than a Daily/Weekly launch.
 
+Bell pair:
+
+- `BellUp` is the direct squeeze-to-launch form. Entry belongs in the squeeze
+  phase near the end of the session, before the expansion is obvious.
+- `BellDown` is the vertical mirror. It marks the mirrored squeeze-to-breakdown
+  form and is the reversal-side analogue.
+- In both cases, the decisive cue is the band geometry: the middle band must
+  stop compressing in the direction that invalidates the move, and then the
+  price should mean-revert toward the mid as the flatting begins.
+
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:
 
