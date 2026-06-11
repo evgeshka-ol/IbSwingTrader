@@ -4913,7 +4913,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return new RecentFeatureSeries
             {
-                DailyCloseSeries = BuildRecentDailyCloseSeries(candles, scanIndex),
+                DailyCloseSeries = BuildRecentDailyCloseSeries(candles),
                 DailyBbUpperBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperBand),
                 DailyBbMidBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand),
                 DailyBbLowerBandSeries = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand),
@@ -4941,24 +4941,22 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private List<decimal> BuildRecentDailyCloseSeries(List<Candle> candles, int scanIndex)
+        private List<decimal> BuildRecentDailyCloseSeries(List<Candle> candles)
         {
-            var indexes = new List<int>();
-            var usedDays = new HashSet<DateTime>();
+            var dailyBars = BuildDailyBars(candles);
+            if (dailyBars.Count == 0)
+                return [];
 
-            for (var i = scanIndex; i >= 0; i--)
-            {
-                var day = candles[i].Time.Date;
-                if (!usedDays.Add(day))
-                    continue;
+            var completedDailyBars = dailyBars.Count > 1
+                ? dailyBars.Take(dailyBars.Count - 1).ToList()
+                : dailyBars;
 
-                indexes.Add(i);
-                if (indexes.Count >= RecentDailySeriesLength)
-                    break;
-            }
+            if (completedDailyBars.Count == 0)
+                completedDailyBars = dailyBars;
 
-            indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(candles[i].Close, 2, MidpointRounding.AwayFromZero))];
+            return [.. completedDailyBars
+                .TakeLast(RecentDailySeriesLength)
+                .Select(x => decimal.Round(x.Close, 2, MidpointRounding.AwayFromZero))];
         }
 
         private BollingerStateSet BuildBollingerStateSet(RecentFeatureSeries recentSeries)
