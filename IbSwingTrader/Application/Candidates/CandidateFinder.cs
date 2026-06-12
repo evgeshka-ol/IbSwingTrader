@@ -1711,6 +1711,18 @@ namespace IbSwingTrader.Application.Candidates
             return latestClosedDailyClose < previousClosedDailyMid;
         }
 
+        private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
+        {
+            if (recentSeries.DailyCloseSeries.Count == 0 ||
+                recentSeries.DailyBbMidBandSeries.Count == 0 ||
+                recentSeries.DailyCloseSeries.Count != recentSeries.DailyBbMidBandSeries.Count)
+            {
+                return false;
+            }
+
+            return recentSeries.DailyCloseSeries[^1] < recentSeries.DailyBbMidBandSeries[^1];
+        }
+
         private bool IsReversalRecoveryTradeProfile(
             CandidateSignalSnapshot snapshot,
             CandidateDiagnostics diagnostics,
@@ -5690,7 +5702,7 @@ namespace IbSwingTrader.Application.Candidates
                     Math.Min(settings.ImmediateContinuationMaxDiscountPct, settings.MaxDiscountPct));
                 profile = "ImmediateContinuation";
             }
-            else if (bellPatternKind == BellPatternKind.BellDown && IsBelowPreviousClosedDailyMid(candles))
+            else if (bellPatternKind == BellPatternKind.BellDown && IsBelowPreviousClosedDailyMid(recentSeries))
             {
                 targetDiscountPct = MaxDiscount(
                     currentEntryDiscountPct,
