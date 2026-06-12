@@ -27,6 +27,16 @@ namespace IbSwingTrader.Application.Market
 
             if (!IsIntraday(timeframe))
             {
+                if (timeframe == Timeframe.D1)
+                {
+                    var timeZone = await GetTimeZoneAsync(contract, previousBarUtc, cancellationToken);
+                    var previousLocal = TimeZoneInfo.ConvertTimeFromUtc(previousBarUtc, timeZone);
+                    var currentLocal = TimeZoneInfo.ConvertTimeFromUtc(currentBarUtc, timeZone);
+
+                    if (IsExpectedWeekendTransition(previousLocal, currentLocal))
+                        return true;
+                }
+
                 var nextExpectedNonIntraday = previousBarUtc + timeframe.ToTimeSpan();
                 return currentBarUtc <= nextExpectedNonIntraday.Add(GetSlotTolerance(timeframe));
             }
