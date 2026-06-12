@@ -101,6 +101,9 @@ For scanner quality:
 - if roughly two thirds of candidates clear `AmplitudePct >= 10%`, preserve
   that high-amplitude pool and focus scanner work on rejecting the remaining
   low-amplitude third by row similarity
+- if live scanning still needs a late guard, use a row-based envelope-expansion
+  proxy as the last gate before the final list; do not use the realized
+  `AmplitudePct` itself because it is unknown at scan time
 
 For trade-plan quality:
 

@@ -78,6 +78,9 @@ similarity signal before adding more derived heuristics.
   the playable pool and learn low-amplitude rejection from rows below 10%.
   The goal is to remove the low-amplitude third by similarity to today's
   low-amplitude report rows, not by broad one-size-fits-all thresholds.
+- If you need to reject weak candidates before evaluation knows the true
+  `AmplitudePct`, do it late and only through row-based envelope expansion
+  proxies. Do not hard-cut the family split or Bell classification.
 
 ## Bollinger pattern direction
 
