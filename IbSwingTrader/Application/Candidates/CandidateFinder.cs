@@ -276,7 +276,7 @@ namespace IbSwingTrader.Application.Candidates
                             Preset = preset,
                             Snapshot = snapshot,
                             Candles = candles,
-                            DailyCandles = dailyCandles ?? dailyBars,
+                            DailyCandles = dailyCandles,
                             ScanTimeMarket = marketNow,
                             AvgDollarVolumeDaily = avgDollarVolume,
                             WishListItem = wishListItem
@@ -370,7 +370,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (!IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
+                if (!IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -427,7 +427,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
+                else if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -456,7 +456,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
 
                 var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
+                if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -927,9 +927,31 @@ namespace IbSwingTrader.Application.Candidates
             if (IsLossPreset(ctx.Preset.ScanCode))
                 return false;
 
-            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            if (ctx.DailyCandles == null || ctx.DailyCandles.Count < 2)
+            {
+                _logger.Info(
+                    $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
+                    $"Reason=real daily candles unavailable.");
+                return false;
+            }
 
-            if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var dailySplitDiagnostic = BuildDailySplitDiagnostic(
+                ctx.DailyCandles,
+                "D1");
+            _logger.Info(
+                $"Daily split diagnostic: {ctx.Stock.Ticker}. " +
+                $"Source={dailySplitDiagnostic.Source}, " +
+                $"DailyBars={dailySplitDiagnostic.DailyBarsCount}, " +
+                $"CompletedDailyBars={dailySplitDiagnostic.CompletedDailyBarsCount}, " +
+                $"LatestRawDailyBarDate={dailySplitDiagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
+                $"MarketToday={dailySplitDiagnostic.MarketToday:yyyy-MM-dd}, " +
+                $"TrimmedCurrentDay={dailySplitDiagnostic.TrimmedCurrentDay}, " +
+                $"Close={_fmt.Price(dailySplitDiagnostic.LatestClosedDailyClose)}, " +
+                $"Mid={_fmt.Price(dailySplitDiagnostic.PreviousClosedDailyMid)}, " +
+                $"BelowMid={dailySplitDiagnostic.IsBelowMid}");
+
+            if (dailySplitDiagnostic.IsBelowMid)
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
@@ -1717,25 +1739,65 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
-        private bool IsBelowPreviousClosedDailyMid(List<Candle> candles)
+        private bool IsBelowPreviousClosedDailyMid(List<Candle>? candles)
+        {
+            if (candles == null || candles.Count < 2)
+                return true;
+
+            return BuildDailySplitDiagnostic(candles, "row-based").IsBelowMid;
+        }
+
+        private DailySplitDiagnostic BuildDailySplitDiagnostic(List<Candle> candles, string source)
         {
             var dailyBars = BuildDailyBars(candles);
             if (dailyBars.Count < 2)
-                return false;
+            {
+                return new DailySplitDiagnostic(
+                    Source: source,
+                    DailyBarsCount: dailyBars.Count,
+                    CompletedDailyBarsCount: 0,
+                    LatestRawDailyBarDate: dailyBars.Count > 0 ? dailyBars[^1].Time.Date : DateTime.MinValue,
+                    MarketToday: MarketTime.Now().Date,
+                    TrimmedCurrentDay: false,
+                    LatestClosedDailyClose: 0m,
+                    PreviousClosedDailyMid: 0m,
+                    IsBelowMid: false);
+            }
 
             var marketToday = MarketTime.Now().Date;
-            var completedDailyBars = dailyBars[^1].Time.Date == marketToday
+            var trimmedCurrentDay = dailyBars[^1].Time.Date == marketToday;
+            var completedDailyBars = trimmedCurrentDay
                 ? dailyBars.Take(dailyBars.Count - 1).ToList()
                 : dailyBars;
 
             if (completedDailyBars.Count < 2)
-                return false;
+            {
+                return new DailySplitDiagnostic(
+                    Source: source,
+                    DailyBarsCount: dailyBars.Count,
+                    CompletedDailyBarsCount: completedDailyBars.Count,
+                    LatestRawDailyBarDate: dailyBars[^1].Time.Date,
+                    MarketToday: marketToday,
+                    TrimmedCurrentDay: trimmedCurrentDay,
+                    LatestClosedDailyClose: completedDailyBars.Count > 0 ? completedDailyBars[^1].Close : 0m,
+                    PreviousClosedDailyMid: 0m,
+                    IsBelowMid: false);
+            }
 
             var completedDailyFeatures = _featureEngine.Calculate(completedDailyBars, completedDailyBars.Count);
             var latestClosedDailyClose = completedDailyBars[^1].Close;
             var previousClosedDailyMid = completedDailyFeatures.DailyBollingerMidBand;
 
-            return latestClosedDailyClose < previousClosedDailyMid;
+            return new DailySplitDiagnostic(
+                Source: source,
+                DailyBarsCount: dailyBars.Count,
+                CompletedDailyBarsCount: completedDailyBars.Count,
+                LatestRawDailyBarDate: dailyBars[^1].Time.Date,
+                MarketToday: marketToday,
+                TrimmedCurrentDay: trimmedCurrentDay,
+                LatestClosedDailyClose: latestClosedDailyClose,
+                PreviousClosedDailyMid: previousClosedDailyMid,
+                IsBelowMid: latestClosedDailyClose < previousClosedDailyMid);
         }
 
         private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
@@ -1925,7 +1987,7 @@ namespace IbSwingTrader.Application.Candidates
                     item.Scan.PresetDescription),
                 Snapshot = snapshot,
                 Candles = candles,
-                DailyCandles = dailyCandles ?? dailyBars,
+                DailyCandles = dailyCandles,
                 ScanTimeMarket = marketNow,
                 AvgDollarVolumeDaily = avgDollarVolume,
                 WishListItem = item
@@ -7076,6 +7138,17 @@ namespace IbSwingTrader.Application.Candidates
             decimal MidMovePct,
             decimal LowerMovePct,
             decimal OpenPct);
+
+        private readonly record struct DailySplitDiagnostic(
+            string Source,
+            int DailyBarsCount,
+            int CompletedDailyBarsCount,
+            DateTime LatestRawDailyBarDate,
+            DateTime MarketToday,
+            bool TrimmedCurrentDay,
+            decimal LatestClosedDailyClose,
+            decimal PreviousClosedDailyMid,
+            bool IsBelowMid);
 
         private sealed record SeriesSimilarityMatch(
             string? TemplateTicker,
