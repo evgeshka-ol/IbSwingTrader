@@ -612,6 +612,14 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
+                if (!PassFinalAmplitudeProxyGate(ctx, out var amplitudeRejectReason))
+                {
+                    _logger.Info(
+                        $"Premarket summary candidate rejected: {ctx.Stock.Ticker}. " +
+                        amplitudeRejectReason);
+                    continue;
+                }
+
                 var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
                 var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
@@ -833,6 +841,15 @@ namespace IbSwingTrader.Application.Candidates
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
                     $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
+                return;
+            }
+
+            if (isTodayResearchLikeCandidate &&
+                !PassFinalAmplitudeProxyGate(ctx, out var amplitudeRejectReason))
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    amplitudeRejectReason);
                 return;
             }
 
@@ -3977,6 +3994,52 @@ namespace IbSwingTrader.Application.Candidates
                 score += 0.15m;
 
             return score;
+        }
+
+        private bool PassFinalAmplitudeProxyGate(
+            WishListContext ctx,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            if (!TryCalculateRealBollingerEnvelope(
+                    recentSeries.DailyBbUpperBandSeries,
+                    recentSeries.DailyBbMidBandSeries,
+                    recentSeries.DailyBbLowerBandSeries,
+                    out var daily) ||
+                !TryCalculateRealBollingerEnvelope(
+                    recentSeries.WeeklyBbUpperBandSeries,
+                    recentSeries.WeeklyBbMidBandSeries,
+                    recentSeries.WeeklyBbLowerBandSeries,
+                    out var weekly) ||
+                !TryCalculateRealBollingerEnvelope(
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries,
+                    out var h4))
+            {
+                return true;
+            }
+
+            var dailyProxy =
+                daily.UpperMovePct > daily.MidMovePct &&
+                daily.MidMovePct >= 0m &&
+                daily.OpenPct > 0m;
+            var weeklyProxy =
+                weekly.UpperMovePct > weekly.MidMovePct &&
+                weekly.MidMovePct >= 0m &&
+                weekly.OpenPct > 0m;
+            var h4Proxy =
+                h4.UpperMovePct > h4.MidMovePct &&
+                h4.MidMovePct >= 0m &&
+                h4.OpenPct > 0m;
+
+            if (dailyProxy || weeklyProxy || h4Proxy)
+                return true;
+
+            reason = "Final amplitude proxy rejected: no row-based envelope expansion on daily/weekly/H4.";
+            return false;
         }
 
         private async Task<IReadOnlyList<SeriesSimilarityTemplate>> LoadSeriesSimilarityTemplatesAsync(
