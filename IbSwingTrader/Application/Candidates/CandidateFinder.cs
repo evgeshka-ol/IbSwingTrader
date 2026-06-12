@@ -910,7 +910,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
-                    $"Reason=previous closed daily bar is below daily Bollinger mid.");
+                    $"Reason=previous closed daily close is below previous closed daily Bollinger mid.");
                 return false;
             }
 
@@ -1695,10 +1695,13 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
         {
-            if (recentSeries.DailyCloseSeries.Count < 2 || recentSeries.DailyBbMidBandSeries.Count < 2)
+            if (recentSeries.DailyCloseSeries.Count == 0 || recentSeries.DailyBbMidBandSeries.Count < 2)
                 return false;
 
-            return recentSeries.DailyCloseSeries[^2] < recentSeries.DailyBbMidBandSeries[^2];
+            var latestClosedDailyClose = recentSeries.DailyCloseSeries[^1];
+            var previousClosedDailyMid = recentSeries.DailyBbMidBandSeries[^2];
+
+            return latestClosedDailyClose < previousClosedDailyMid;
         }
 
         private static bool IsReversalRecoveryTradeProfile(
