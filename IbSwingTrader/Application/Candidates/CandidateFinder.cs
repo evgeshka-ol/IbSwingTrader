@@ -347,7 +347,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (!IsBelowPreviousClosedDailyMid(agedRecentSeries))
+                if (!IsBelowPreviousClosedDailyMid(ctx.Candles))
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -404,7 +404,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (IsBelowPreviousClosedDailyMid(sameDayRecentSeries))
+                else if (IsBelowPreviousClosedDailyMid(ctx.Candles))
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -433,7 +433,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
 
                 var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                if (IsBelowPreviousClosedDailyMid(liveRecentSeries))
+                if (IsBelowPreviousClosedDailyMid(ctx.Candles))
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -906,7 +906,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
 
-            if (IsBelowPreviousClosedDailyMid(recentSeries))
+            if (IsBelowPreviousClosedDailyMid(ctx.Candles))
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
@@ -1106,13 +1106,14 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore >= 20m);
         }
 
-        private static bool IsAiReferenceLiveRecoveryCandidate(
+        private bool IsAiReferenceLiveRecoveryCandidate(
             CandidateSignalSnapshot snapshot,
             CandidateDiagnostics diagnostics,
+            List<Candle> candles,
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState)
         {
-            if (IsBelowPreviousClosedDailyMid(recentSeries))
+            if (IsBelowPreviousClosedDailyMid(candles))
             {
                 return false;
             }
@@ -1693,25 +1694,32 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
-        private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
+        private bool IsBelowPreviousClosedDailyMid(List<Candle> candles)
         {
-            if (recentSeries.DailyCloseSeries.Count == 0 || recentSeries.DailyBbMidBandSeries.Count < 2)
+            var dailyBars = BuildDailyBars(candles);
+            if (dailyBars.Count < 2)
                 return false;
 
-            var latestClosedDailyClose = recentSeries.DailyCloseSeries[^1];
-            var previousClosedDailyMid = recentSeries.DailyBbMidBandSeries[^2];
+            var completedDailyBars = dailyBars.Take(dailyBars.Count - 1).ToList();
+            if (completedDailyBars.Count < 2)
+                return false;
+
+            var completedDailyFeatures = _featureEngine.Calculate(completedDailyBars, completedDailyBars.Count);
+            var latestClosedDailyClose = completedDailyBars[^1].Close;
+            var previousClosedDailyMid = completedDailyFeatures.DailyBollingerMidBand;
 
             return latestClosedDailyClose < previousClosedDailyMid;
         }
 
-        private static bool IsReversalRecoveryTradeProfile(
+        private bool IsReversalRecoveryTradeProfile(
             CandidateSignalSnapshot snapshot,
             CandidateDiagnostics diagnostics,
+            List<Candle> candles,
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
             ReversalRecoveryExitSettings settings)
         {
-            if (!settings.Enabled || !IsBelowPreviousClosedDailyMid(recentSeries))
+            if (!settings.Enabled || !IsBelowPreviousClosedDailyMid(candles))
                 return false;
 
             var h4MacdSeries = PreferSeries(recentSeries.H4MacdHistogramSeries, recentSeries.H4MacdSeries);
@@ -1923,12 +1931,14 @@ namespace IbSwingTrader.Application.Candidates
             var isReversalRecovery = IsReversalRecoveryTradeProfile(
                 ctx.Snapshot,
                 diagnostics,
+                ctx.Candles,
                 recentSeries,
                 bbState,
                 tradeSettings.ReversalRecoveryExit);
             var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
                 ctx.Snapshot,
                 diagnostics,
+                ctx.Candles,
                 recentSeries,
                 bbState);
 
@@ -2506,6 +2516,7 @@ namespace IbSwingTrader.Application.Candidates
             nextDayRank += CalculateTodayResearchLikeLowProfitRankCompensation(
                 preset.ScanCode,
                 snapshot,
+                candles,
                 recentSeries,
                 trade);
 
@@ -2584,10 +2595,11 @@ namespace IbSwingTrader.Application.Candidates
         private decimal CalculateTodayResearchLikeLowProfitRankCompensation(
             string presetScanCode,
             CandidateSignalSnapshot snapshot,
+            List<Candle> candles,
             RecentFeatureSeries recentSeries,
             TradePlanInfo trade)
         {
-            if (IsBelowPreviousClosedDailyMid(recentSeries))
+            if (IsBelowPreviousClosedDailyMid(candles))
                 return 0m;
 
             var minPlannedProfitPct = _getCandidatesSettingsProvider.Get().CandidateFilter.MinPlannedProfitPct;
@@ -5678,7 +5690,7 @@ namespace IbSwingTrader.Application.Candidates
                     Math.Min(settings.ImmediateContinuationMaxDiscountPct, settings.MaxDiscountPct));
                 profile = "ImmediateContinuation";
             }
-            else if (bellPatternKind == BellPatternKind.BellDown && IsBelowPreviousClosedDailyMid(recentSeries))
+            else if (bellPatternKind == BellPatternKind.BellDown && IsBelowPreviousClosedDailyMid(candles))
             {
                 targetDiscountPct = MaxDiscount(
                     currentEntryDiscountPct,
