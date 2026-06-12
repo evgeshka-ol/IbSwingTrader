@@ -136,7 +136,29 @@ namespace IbSwingTrader.Application.Candidates
                         continue;
                     }
 
-                    var dailyBars = BuildDailyBars(candles);
+                    List<Candle>? dailyCandles = null;
+
+                    if (contract != null)
+                    {
+                        try
+                        {
+                            var end = MarketTime.Now();
+                            var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+
+                            dailyCandles = await _historicalData.GetCandlesRange(
+                                stock.Ticker,
+                                contract,
+                                Timeframe.D1,
+                                start,
+                                end);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Info($"Daily candles load skipped for {stock.Ticker}. {ex.Message}");
+                        }
+                    }
+
+                    var dailyBars = dailyCandles ?? BuildDailyBars(candles);
                     var weeklyBars = BuildWeeklyBars(candles);
 
                     _logger.Info(
@@ -254,6 +276,7 @@ namespace IbSwingTrader.Application.Candidates
                             Preset = preset,
                             Snapshot = snapshot,
                             Candles = candles,
+                            DailyCandles = dailyCandles ?? dailyBars,
                             ScanTimeMarket = marketNow,
                             AvgDollarVolumeDaily = avgDollarVolume,
                             WishListItem = wishListItem
@@ -347,7 +370,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (!IsBelowPreviousClosedDailyMid(ctx.Candles))
+                if (!IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -404,7 +427,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (IsBelowPreviousClosedDailyMid(ctx.Candles))
+                else if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -433,7 +456,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
 
                 var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                if (IsBelowPreviousClosedDailyMid(ctx.Candles))
+                if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -906,7 +929,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
 
-            if (IsBelowPreviousClosedDailyMid(ctx.Candles))
+            if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles ?? ctx.Candles))
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
@@ -1700,7 +1723,11 @@ namespace IbSwingTrader.Application.Candidates
             if (dailyBars.Count < 2)
                 return false;
 
-            var completedDailyBars = dailyBars.Take(dailyBars.Count - 1).ToList();
+            var marketToday = MarketTime.Now().Date;
+            var completedDailyBars = dailyBars[^1].Time.Date == marketToday
+                ? dailyBars.Take(dailyBars.Count - 1).ToList()
+                : dailyBars;
+
             if (completedDailyBars.Count < 2)
                 return false;
 
@@ -1793,7 +1820,43 @@ namespace IbSwingTrader.Application.Candidates
                 return null;
             }
 
-            var dailyBars = BuildDailyBars(candles);
+            if (contract == null)
+            {
+                try
+                {
+                    contract = await _contractResolver.ResolveStockAsync(
+                        item.Ticker,
+                        TimeSpan.FromSeconds(Math.Max(15, finderSettings.ContractResolveTimeoutSeconds)),
+                        Math.Max(1, finderSettings.ContractResolveMaxAttempts));
+                }
+                catch (Exception ex)
+                {
+                    _logger.Info($"Daily candles contract resolve skipped for {item.Ticker}. {ex.Message}");
+                }
+            }
+
+            List<Candle>? dailyCandles = null;
+            if (contract != null)
+            {
+                try
+                {
+                    var end = marketNow;
+                    var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+
+                    dailyCandles = await _historicalData.GetCandlesRange(
+                        item.Ticker,
+                        contract,
+                        Timeframe.D1,
+                        start,
+                        end);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Info($"Daily candles load skipped for {item.Ticker}. {ex.Message}");
+                }
+            }
+
+            var dailyBars = dailyCandles ?? BuildDailyBars(candles);
             if (TryRejectByRecentDailyPriceFloor(item.Ticker, dailyBars, out var recentPriceFloorReason))
             {
                 _logger.Info($"Skipping {item.Ticker}: {recentPriceFloorReason}");
@@ -1862,6 +1925,7 @@ namespace IbSwingTrader.Application.Candidates
                     item.Scan.PresetDescription),
                 Snapshot = snapshot,
                 Candles = candles,
+                DailyCandles = dailyCandles ?? dailyBars,
                 ScanTimeMarket = marketNow,
                 AvgDollarVolumeDaily = avgDollarVolume,
                 WishListItem = item
@@ -7051,6 +7115,7 @@ namespace IbSwingTrader.Application.Candidates
             public required PresetScanCode Preset { get; init; }
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
+            public List<Candle>? DailyCandles { get; init; }
             public required DateTime ScanTimeMarket { get; init; }
             public required decimal AvgDollarVolumeDaily { get; init; }
             public required WishListItem WishListItem { get; init; }
