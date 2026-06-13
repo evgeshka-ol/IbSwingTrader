@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net.Sockets;
 using IBApi;
 using IBApi.protobuf;
 
@@ -458,6 +459,13 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void error(Exception e)
         {
+            if (e is SocketException socketException &&
+                socketException.SocketErrorCode == SocketError.ConnectionRefused)
+            {
+                _logger.Error($"IB connection refused: TWS/Gateway is not accepting API connections at {_host}:{_port}. Start TWS/Gateway and verify API port/settings.");
+                return;
+            }
+
             _logger.Error($"IB EXCEPTION: {e}");
         }
 
