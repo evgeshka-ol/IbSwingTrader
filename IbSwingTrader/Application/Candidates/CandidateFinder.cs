@@ -370,7 +370,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (!IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
+                if (ClassifyDailyFamily(ctx, log: false) != DailyFamilySplit.Reversal)
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -427,7 +427,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
+                else if (ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal)
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -456,7 +456,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
 
                 var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                if (IsBelowPreviousClosedDailyMid(ctx.DailyCandles))
+                if (ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal)
                     continue;
 
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -924,34 +924,18 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
-            if (IsLossPreset(ctx.Preset.ScanCode))
-                return false;
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
 
-            if (ctx.DailyCandles == null || ctx.DailyCandles.Count < 2)
+            if (dailyFamilySplit == DailyFamilySplit.Unknown)
             {
                 _logger.Info(
-                    $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
-                    $"Reason=real daily candles unavailable.");
+                    $"TodayResearchLike rejected: {ctx.Stock.Ticker}. " +
+                    $"Reason=reliable daily close/mid rows unavailable.");
                 return false;
             }
 
-            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
-            var dailySplitDiagnostic = BuildDailySplitDiagnostic(
-                ctx.DailyCandles,
-                "D1");
-            _logger.Info(
-                $"Daily split diagnostic: {ctx.Stock.Ticker}. " +
-                $"Source={dailySplitDiagnostic.Source}, " +
-                $"DailyBars={dailySplitDiagnostic.DailyBarsCount}, " +
-                $"CompletedDailyBars={dailySplitDiagnostic.CompletedDailyBarsCount}, " +
-                $"LatestRawDailyBarDate={dailySplitDiagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
-                $"MarketToday={dailySplitDiagnostic.MarketToday:yyyy-MM-dd}, " +
-                $"TrimmedCurrentDay={dailySplitDiagnostic.TrimmedCurrentDay}, " +
-                $"Close={_fmt.Price(dailySplitDiagnostic.LatestClosedDailyClose)}, " +
-                $"Mid={_fmt.Price(dailySplitDiagnostic.PreviousClosedDailyMid)}, " +
-                $"BelowMid={dailySplitDiagnostic.IsBelowMid}");
-
-            if (dailySplitDiagnostic.IsBelowMid)
+            if (dailyFamilySplit == DailyFamilySplit.Reversal)
             {
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
@@ -1742,9 +1726,109 @@ namespace IbSwingTrader.Application.Candidates
         private bool IsBelowPreviousClosedDailyMid(List<Candle>? candles)
         {
             if (candles == null || candles.Count < 2)
-                return true;
+                return false;
 
             return BuildDailySplitDiagnostic(candles, "row-based").IsBelowMid;
+        }
+
+        private DailyFamilySplit ClassifyDailyFamily(
+            WishListContext ctx,
+            bool log)
+        {
+            if (ctx.DailyCandles != null && ctx.DailyCandles.Count >= 2)
+            {
+                var d1Diagnostic = BuildDailySplitDiagnostic(ctx.DailyCandles, "D1");
+                if (IsFreshDailySplitDiagnostic(d1Diagnostic))
+                {
+                    LogDailySplitDiagnostic(ctx.Stock.Ticker, d1Diagnostic, log);
+                    return d1Diagnostic.IsBelowMid
+                        ? DailyFamilySplit.Reversal
+                        : DailyFamilySplit.TodayResearchLike;
+                }
+
+                if (log)
+                {
+                    _logger.Info(
+                        $"Daily split D1 rows are stale for {ctx.Stock.Ticker}. " +
+                        $"LatestRawDailyBarDate={d1Diagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
+                        $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(d1Diagnostic.MarketToday):yyyy-MM-dd}. " +
+                        "Falling back to built daily rows.");
+                }
+            }
+
+            if (TryBuildBuiltDailyRowsSplitDiagnostic(ctx.Candles, out var rowDiagnostic))
+            {
+                if (IsFreshDailySplitDiagnostic(rowDiagnostic))
+                {
+                    LogDailySplitDiagnostic(ctx.Stock.Ticker, rowDiagnostic, log);
+                    return rowDiagnostic.IsBelowMid
+                        ? DailyFamilySplit.Reversal
+                        : DailyFamilySplit.TodayResearchLike;
+                }
+
+                if (log)
+                {
+                    _logger.Info(
+                        $"Daily split built rows are stale for {ctx.Stock.Ticker}. " +
+                        $"LatestRawDailyBarDate={rowDiagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
+                        $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(rowDiagnostic.MarketToday):yyyy-MM-dd}. " +
+                        "Daily family split is unknown.");
+                }
+            }
+
+            return DailyFamilySplit.Unknown;
+        }
+
+        private void LogDailySplitDiagnostic(
+            string ticker,
+            DailySplitDiagnostic diagnostic,
+            bool log)
+        {
+            if (!log)
+                return;
+
+            _logger.Info(
+                $"Daily split diagnostic: {ticker}. " +
+                $"Source={diagnostic.Source}, " +
+                $"DailyBars={diagnostic.DailyBarsCount}, " +
+                $"CompletedDailyBars={diagnostic.CompletedDailyBarsCount}, " +
+                $"LatestRawDailyBarDate={diagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
+                $"MarketToday={diagnostic.MarketToday:yyyy-MM-dd}, " +
+                $"TrimmedCurrentDay={diagnostic.TrimmedCurrentDay}, " +
+                $"Close={_fmt.Price(diagnostic.LatestClosedDailyClose)}, " +
+                $"Mid={_fmt.Price(diagnostic.PreviousClosedDailyMid)}, " +
+                $"BelowMid={diagnostic.IsBelowMid}");
+        }
+
+        private bool TryBuildBuiltDailyRowsSplitDiagnostic(
+            List<Candle> candles,
+            out DailySplitDiagnostic diagnostic)
+        {
+            diagnostic = default;
+
+            if (candles.Count < 2)
+                return false;
+
+            diagnostic = BuildDailySplitDiagnostic(candles, "BuiltDailyRows");
+            return true;
+        }
+
+        private static bool IsFreshDailySplitDiagnostic(DailySplitDiagnostic diagnostic)
+        {
+            if (diagnostic.LatestRawDailyBarDate == DateTime.MinValue)
+                return false;
+
+            return diagnostic.LatestRawDailyBarDate.Date >=
+                   GetExpectedLatestClosedDailyDate(diagnostic.MarketToday);
+        }
+
+        private static DateTime GetExpectedLatestClosedDailyDate(DateTime marketToday)
+        {
+            var expected = marketToday.Date.AddDays(-1);
+            while (expected.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                expected = expected.AddDays(-1);
+
+            return expected;
         }
 
         private DailySplitDiagnostic BuildDailySplitDiagnostic(List<Candle> candles, string source)
@@ -5169,6 +5253,22 @@ namespace IbSwingTrader.Application.Candidates
             if (candles == null || candles.Count < finderSettings.MinimumCandles)
                 return false;
 
+            var dailyBars = BuildDailyBars(candles);
+            var expectedLatestClosedDailyDate = GetExpectedLatestClosedDailyDate(MarketTime.Now().Date);
+            var latestDailyDate = dailyBars.Count > 0
+                ? dailyBars[^1].Time.Date
+                : DateTime.MinValue;
+
+            if (latestDailyDate < expectedLatestClosedDailyDate)
+            {
+                _logger.Info(
+                    $"Historical cache stale for scanner: {ticker}. " +
+                    $"LatestDailyDate={latestDailyDate:yyyy-MM-dd}, " +
+                    $"ExpectedLatestClosedDailyDate={expectedLatestClosedDailyDate:yyyy-MM-dd}. " +
+                    "Reloading history.");
+                return false;
+            }
+
             _logger.Info(
                 $"Historical cache used for scanner: {ticker}. " +
                 $"H4={candles.Count}, LookbackDays={finderSettings.LookbackCalendarDays}");
@@ -7112,6 +7212,13 @@ namespace IbSwingTrader.Application.Candidates
             H4,
             Daily,
             Weekly
+        }
+
+        private enum DailyFamilySplit
+        {
+            Unknown,
+            TodayResearchLike,
+            Reversal
         }
 
         private readonly record struct BellPatternSignal(
