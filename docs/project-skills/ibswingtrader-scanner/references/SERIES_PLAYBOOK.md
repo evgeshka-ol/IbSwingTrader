@@ -178,7 +178,7 @@ pre-move H4 rows:
   reversal.
 - `Neutral`: neither the higher-frame runway nor the H4 trigger is confirmed
   well enough by the saved rows. Keep it out of the trade-ready
-  `TodayResearchLikeCandidates` path even if an older live-mover or template
+  `RunawayCandidates` path even if an older live-mover or template
   branch likes it.
 
 When comparing band curves across tickers, compare shape rather than absolute
@@ -207,8 +207,8 @@ The question is:
 
 Use two positive template families:
 
-- `research_top_gainers.csv`: primary templates for `TodayResearchLikeCandidates`
-- `evaluation-dataset.csv`: high-amplitude templates for both `TodayResearchLikeCandidates` and `ReversalCandidates`
+- `research_top_gainers.csv`: primary templates for `RunawayCandidates`
+- `evaluation-dataset.csv`: high-amplitude templates for both `RunawayCandidates` and `ReversalCandidates`
 
 For `ReversalCandidates`, keep templates below-mean and high-amplitude. The goal is
 not just being a pullback, but being a pullback shape that historically produced
@@ -248,4 +248,4 @@ For summary ranking, compare rows in both directions:
   the 10% amplitude line
 
 Do not use the negative templates as a hard scanner filter. They are a ranking
-tool for keeping weak lookalikes out of the current top-ranked `TodayResearchLikeCandidates` rows.
+tool for keeping weak lookalikes out of the current top-ranked `RunawayCandidates` rows.

@@ -18,7 +18,7 @@ Suggested mental buckets:
 
 For both scanner families:
 
-- `TodayResearchLikeCandidates` should be judged by whether it becomes the next research dataset.
+- `RunawayCandidates` should be judged by whether it becomes the next research dataset.
 - `ReversalCandidates` should still produce meaningful amplitude, normally `> 10%`.
 - If amplitude is below 10%, treat that as scanner failure, even when the trade plan correctly avoids entry.
 - In live scan tuning, a row-based amplitude proxy can be used only as a late
@@ -26,7 +26,7 @@ For both scanner families:
   let that proxy change the family split.
 - Family membership is fixed by the last closed daily Bollinger mid split:
   - below daily mid on the last closed daily bar -> `ReversalCandidates`
-  - at or above daily mid on the last closed daily bar -> `TodayResearchLikeCandidates`
+  - at or above daily mid on the last closed daily bar -> `RunawayCandidates`
 - Do not change the family boundary during amplitude or trade-plan tuning; only
   list promotion, ranking, and exit shaping should move after the split is correct.
 

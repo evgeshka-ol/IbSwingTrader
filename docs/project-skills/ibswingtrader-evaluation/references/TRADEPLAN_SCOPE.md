@@ -6,7 +6,7 @@
 
 The project is currently optimizing for a simple playable loop:
 
-- the #1 current `TodayResearchLikeCandidates` row should win consistently
+- the #1 current `RunawayCandidates` row should win consistently
 - the trade plan should capture more than 10% when that row has enough amplitude
 
 Analyze top-1 failures before broad aggregate metrics. If top-1 has strong
@@ -20,7 +20,7 @@ ranking selected the wrong leader.
 - many top candidates have low amplitude
 - research winners are seen but not promoted
 - summary contains stale or weak names
-- `TodayResearchLikeCandidates` summary names do not become next-day research winners
+- `RunawayCandidates` summary names do not become next-day research winners
 - `ReversalCandidates` repeatedly produce amplitude below 10%
 
 ## Fix TradePlan first when:
@@ -31,7 +31,7 @@ ranking selected the wrong leader.
 - many strong rows end up `NoEntry`
 - many strong-amplitude rows are `Loss` or remain `Open`
 
-Large counts of `Loss` on strong-amplitude `TodayResearchLikeCandidates` usually
+Large counts of `Loss` on strong-amplitude `RunawayCandidates` usually
 mean the entry was too early for the local structure. Do not treat this as a
 simple "lower the entry" problem. The trade plan needs to predict entry and exit
 from the same kind of series evidence used by the scanner.
@@ -160,7 +160,7 @@ remaining high-amplitude row families.
 The project should first produce:
 
 - a good `ReversalCandidates` list
-- a good `TodayResearchLikeCandidates` list
+- a good `RunawayCandidates` list
 
 Only after that should entry/exit tuning become the main focus.
 

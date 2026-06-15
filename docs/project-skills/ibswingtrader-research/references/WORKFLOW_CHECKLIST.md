@@ -9,7 +9,7 @@ Daily loop:
    - yesterday's scanner
    - today's research
 5. Decide what kind of problem you have:
-   - `TodayResearchLikeCandidates -> next-day research` miss
+   - `RunawayCandidates -> next-day research` miss
    - recall
    - `WishList -> TodayResearchLike` promotion
    - ranking
@@ -29,7 +29,7 @@ Fix promotion and gating.
 
 Fix ranking.
 
-### If `TodayResearchLikeCandidates` summary names do not become research winners
+### If `RunawayCandidates` summary names do not become research winners
 
 Fix scanner selection/ranking first.
 

@@ -10,7 +10,7 @@ The scanner should not be judged primarily by entry precision. That is `TradePla
 
 The nearest minimal target is top-1 quality:
 
-- the #1 current `TodayResearchLikeCandidates` row should be stable enough to
+- the #1 current `RunawayCandidates` row should be stable enough to
   play
 - it should convert into a practical winner
 - the plan should capture more than 10%
@@ -20,7 +20,7 @@ list quality.
 
 The highest-priority scanner goal is:
 
-- tickers in today's current top-ranked `TodayResearchLikeCandidates`
+- tickers in today's current top-ranked `RunawayCandidates`
 - should appear in tomorrow's `research_top_gainers.csv`
 
 This is the main next-day feedback loop. If this relationship is weak, tune
@@ -55,7 +55,7 @@ Expected quality:
 - should still produce `AmplitudePct > 10%` often enough to matter
 - lower amplitude is scanner failure, even if the trade plan avoided entry
 
-### TodayResearchLikeCandidates
+### RunawayCandidates
 
 Use continuation logic when the ticker is at or above the daily Bollinger mid
 and acting like a live winner.
@@ -140,7 +140,7 @@ This is stale/weak ranking and should be penalized.
 The current direction is:
 
 1. use series as the primary signal
-2. make `TodayResearchLikeCandidates` predict tomorrow's research dataset
+2. make `RunawayCandidates` predict tomorrow's research dataset
 3. keep `ReversalCandidates` separate
 4. require `ReversalCandidates` to produce meaningful amplitude too
 5. only then tune `TradePlan`
@@ -149,7 +149,7 @@ The current direction is:
 
 The scanner should move toward literal row-shape matching.
 
-For `TodayResearchLikeCandidates`:
+For `RunawayCandidates`:
 
 - compare the current candidate series against rows in `research_top_gainers.csv`
 - also compare against high-amplitude rows in `evaluation-dataset.csv`
