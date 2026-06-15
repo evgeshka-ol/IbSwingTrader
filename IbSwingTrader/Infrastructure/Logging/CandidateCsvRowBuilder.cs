@@ -24,7 +24,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var headers = new List<string>();
             var rows = new List<Dictionary<string, string>>();
 
-            AddGroupRows("TodayResearchLikeCandidates", sameDayCandidates, currentOperationKeys, headers, rows);
+            AddGroupRows("RunawayCandidates", sameDayCandidates, currentOperationKeys, headers, rows);
             AddGroupRows("ReversalCandidates", candidates, currentOperationKeys, headers, rows);
 
             return new CandidateCsvTable

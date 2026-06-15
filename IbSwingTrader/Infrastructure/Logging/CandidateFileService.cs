@@ -147,7 +147,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                     bool.TryParse(currentRaw, out var current) &&
                     current;
 
-                if (group.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
+                if (group.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                    group.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
                     document.SameDayCandidates.Add(candidate);
                 else
                     document.Candidates.Add(candidate);
@@ -318,6 +319,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                     root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     [],
                 SameDayCandidates =
+                    root["RunawayCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     []

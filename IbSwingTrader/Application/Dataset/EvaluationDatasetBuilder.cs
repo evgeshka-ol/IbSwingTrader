@@ -284,7 +284,7 @@ namespace IbSwingTrader.Application.Dataset
                     return x;
                 });
 
-            var snapshots = BuildRankedCandidateSnapshots("TodayResearchLikeCandidates", sameDayCandidates)
+            var snapshots = BuildRankedCandidateSnapshots("RunawayCandidates", sameDayCandidates)
                 .Concat(BuildRankedCandidateSnapshots("ReversalCandidates", primaryCandidates));
 
             return snapshots
@@ -987,7 +987,8 @@ namespace IbSwingTrader.Application.Dataset
                     .Select((candidate, index) => new RankedCandidateSnapshot(
                         candidate,
                         groupName,
-                        groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase) ? 0 : 1,
+                        (groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                         groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase)) ? 0 : 1,
                         index + 1)))];
         }
 

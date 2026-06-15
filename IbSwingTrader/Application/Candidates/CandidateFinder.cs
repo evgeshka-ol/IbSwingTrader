@@ -363,8 +363,8 @@ namespace IbSwingTrader.Application.Candidates
                         ctx,
                         isFromWishlist: false,
                         marketTimezone,
-                        bucketName: "today-research-like promoted candidates",
-                        rejectionLogPrefix: "Entry rejected after today-research-like promotion",
+                        bucketName: "runaway promoted candidates",
+                        rejectionLogPrefix: "Entry rejected after runaway promotion",
                         seriesSimilarityTemplates);
 
                     continue;
@@ -484,8 +484,8 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     isFromWishlist: false,
                     marketTimezone,
-                    bucketName: "live today-research-like candidates",
-                    rejectionLogPrefix: "Entry rejected after live today-research-like promotion",
+                    bucketName: "live runaway candidates",
+                    rejectionLogPrefix: "Entry rejected after live runaway promotion",
                     seriesSimilarityTemplates);
             }
 

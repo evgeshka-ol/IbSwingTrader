@@ -9,8 +9,20 @@ namespace IbSwingTrader.Domain.Candidates
         [JsonPropertyName("ReversalCandidatesData")]
         public List<CandidateDetails> Candidates { get; set; } = [];
 
-        [JsonPropertyName("TodayResearchLikeCandidatesData")]
+        [JsonPropertyName("RunawayCandidatesData")]
         public List<CandidateDetails> SameDayCandidates { get; set; } = [];
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("TodayResearchLikeCandidatesData")]
+        public List<CandidateDetails>? LegacyTodayResearchLikeCandidates
+        {
+            get => null;
+            set
+            {
+                if (value is { Count: > 0 })
+                    SameDayCandidates = value;
+            }
+        }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("Candidates")]
@@ -39,7 +51,18 @@ namespace IbSwingTrader.Domain.Candidates
 
     public class CandidateSummarySections
     {
-        public List<CandidateSummaryItem> TodayResearchLikeCandidates { get; set; } = [];
+        public List<CandidateSummaryItem> RunawayCandidates { get; set; } = [];
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<CandidateSummaryItem>? TodayResearchLikeCandidates
+        {
+            get => null;
+            set
+            {
+                if (value is { Count: > 0 })
+                    RunawayCandidates = value;
+            }
+        }
 
         public List<CandidateSummaryItem> ReversalCandidates { get; set; } = [];
     }

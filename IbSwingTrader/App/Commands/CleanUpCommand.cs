@@ -211,7 +211,7 @@ namespace IbSwingTrader.App.Commands
 
             return new CandidateSummarySections
             {
-                TodayResearchLikeCandidates = sameDayCandidates
+                RunawayCandidates = sameDayCandidates
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
@@ -219,7 +219,7 @@ namespace IbSwingTrader.App.Commands
                     .Take(premarketSummarySettings.MaxItems)
                     .Select(x => new CandidateSummaryItem
                     {
-                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: true)
+                        Ticker = BuildSummaryTickerText(x, includeRunawayMarker: true)
                     })
                     .ToList(),
                 ReversalCandidates = candidates
@@ -229,7 +229,7 @@ namespace IbSwingTrader.App.Commands
                     .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                     .Select(x => new CandidateSummaryItem
                     {
-                        Ticker = BuildSummaryTickerText(x, includeTodayResearchLikeMarker: false)
+                        Ticker = BuildSummaryTickerText(x, includeRunawayMarker: false)
                     })
                     .ToList()
             };
@@ -237,7 +237,7 @@ namespace IbSwingTrader.App.Commands
 
         private string BuildSummaryTickerText(
             CandidateDetails candidate,
-            bool includeTodayResearchLikeMarker)
+            bool includeRunawayMarker)
         {
             return
                 $"{candidate.Ticker} " +
@@ -247,17 +247,17 @@ namespace IbSwingTrader.App.Commands
                 $"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%/" +
                 $"{_fmt.Percent(candidate.TradePlan.LossPercent)}%" +
                 $" rank={_fmt.Generic(candidate.Score.NextDayRank ?? 0m)}" +
-                $"{BuildSummaryMarkers(candidate, includeTodayResearchLikeMarker)}";
+                $"{BuildSummaryMarkers(candidate, includeRunawayMarker)}";
         }
 
         private string BuildSummaryMarkers(
             CandidateDetails candidate,
-            bool includeTodayResearchLikeMarker)
+            bool includeRunawayMarker)
         {
             var markers = new List<string>();
 
-            if (includeTodayResearchLikeMarker)
-                markers.Add("today-research-like");
+            if (includeRunawayMarker)
+                markers.Add("runaway");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");
@@ -428,7 +428,7 @@ namespace IbSwingTrader.App.Commands
             right ??= new CandidateSummarySections();
 
             return AreSummaryListsEqual(left.ReversalCandidates, right.ReversalCandidates) &&
-                   AreSummaryListsEqual(left.TodayResearchLikeCandidates, right.TodayResearchLikeCandidates);
+                   AreSummaryListsEqual(left.RunawayCandidates, right.RunawayCandidates);
         }
 
         private static bool AreSummaryListsEqual(

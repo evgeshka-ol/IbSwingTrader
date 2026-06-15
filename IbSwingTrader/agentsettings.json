@@ -99,7 +99,7 @@
                 "Column": "CandidateGroup",
                 "OrderedValues": [
                     "ReversalCandidates",
-                    "TodayResearchLikeCandidates"
+                    "RunawayCandidates"
                 ]
             },
             {

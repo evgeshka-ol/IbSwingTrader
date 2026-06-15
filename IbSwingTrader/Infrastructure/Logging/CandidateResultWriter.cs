@@ -34,7 +34,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var scanTime = GetMarketNow(marketSettings.Timezone);
 
             if (sameDayCandidates.Count > 0)
-                WriteConsoleSectionHeader("TodayResearchLikeCandidates");
+                WriteConsoleSectionHeader("RunawayCandidates");
 
             foreach (var candidate in sameDayCandidates)
             {
@@ -137,7 +137,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .ToList();
             return new CandidateSummarySections
             {
-                TodayResearchLikeCandidates = orderedSameDayCandidates
+                RunawayCandidates = orderedSameDayCandidates
                     .Select(x => BuildSummaryItem(x, includeSameDayMarker: true))
                     .ToList(),
                 ReversalCandidates = orderedCandidates
@@ -191,7 +191,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             var markers = new List<string>();
 
             if (includeSameDayMarker)
-                markers.Add("today-research-like");
+                markers.Add("runaway");
 
             if (candidate.NeedsDeeperEntry)
                 markers.Add("deep-entry");
