@@ -1436,13 +1436,13 @@ namespace IbSwingTrader.Application.Candidates
             if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
                 return BellPatternKind.None;
 
-            if (IsBellUpEnvelope(prior, recent) &&
+            if ((IsBellUpEnvelope(prior, recent) || IsBellUpCurveTurn(upper, mid, lower)) &&
                 direction != nameof(BollingerFigureDirection.Down))
             {
                 return BellPatternKind.BellUp;
             }
 
-            if (IsBellDownEnvelope(prior, recent) &&
+            if ((IsBellDownEnvelope(prior, recent) || IsBellDownCurveTurn(upper, mid, lower)) &&
                 direction != nameof(BollingerFigureDirection.Up))
             {
                 return BellPatternKind.BellDown;
@@ -1494,6 +1494,34 @@ namespace IbSwingTrader.Application.Candidates
                    recent.LowerMovePct <= recent.MidMovePct;
         }
 
+        private static bool IsBellUpCurveTurn(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 4)
+                return false;
+
+            var upperTail = upper.TakeLast(4).ToArray();
+            var midTail = mid.TakeLast(4).ToArray();
+            var lowerTail = lower.TakeLast(4).ToArray();
+
+            var upperPrevDelta = upperTail[2] - upperTail[1];
+            var upperLastDelta = upperTail[3] - upperTail[2];
+            var midPrevDelta = midTail[2] - midTail[1];
+            var midLastDelta = midTail[3] - midTail[2];
+            var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
+            var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
+
+            return upperLastDelta > 0m &&
+                   upperLastDelta >= upperPrevDelta &&
+                   midLastDelta >= 0m &&
+                   midLastDelta >= midPrevDelta &&
+                   widthLastDelta > 0m &&
+                   widthLastDelta >= widthPrevDelta;
+        }
+
         private static bool IsBellDownEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
             var midDecelerating =
@@ -1506,6 +1534,34 @@ namespace IbSwingTrader.Application.Candidates
                    openExpanding &&
                    recent.LowerMovePct < recent.MidMovePct &&
                    recent.UpperMovePct >= recent.MidMovePct;
+        }
+
+        private static bool IsBellDownCurveTurn(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 4)
+                return false;
+
+            var upperTail = upper.TakeLast(4).ToArray();
+            var midTail = mid.TakeLast(4).ToArray();
+            var lowerTail = lower.TakeLast(4).ToArray();
+
+            var upperPrevDelta = upperTail[2] - upperTail[1];
+            var upperLastDelta = upperTail[3] - upperTail[2];
+            var midPrevDelta = midTail[2] - midTail[1];
+            var midLastDelta = midTail[3] - midTail[2];
+            var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
+            var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
+
+            return upperLastDelta < 0m &&
+                   upperLastDelta <= upperPrevDelta &&
+                   midLastDelta <= 0m &&
+                   midLastDelta <= midPrevDelta &&
+                   widthLastDelta > 0m &&
+                   widthLastDelta >= widthPrevDelta;
         }
 
         private static bool IsBellUpPatternReadyNow(
