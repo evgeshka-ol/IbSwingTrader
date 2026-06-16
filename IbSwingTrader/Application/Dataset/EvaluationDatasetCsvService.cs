@@ -67,10 +67,33 @@ namespace IbSwingTrader.Application.Dataset
                     continue;
                 }
 
+                row.CandidateGroup = NormalizeCandidateGroup(row.CandidateGroup);
+
                 rows.Add(row);
             }
 
             return rows;
+        }
+
+        private static string NormalizeCandidateGroup(string? groupName)
+        {
+            if (string.IsNullOrWhiteSpace(groupName))
+                return string.Empty;
+
+            if (groupName.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Runaway";
+            }
+
+            if (groupName.Equals("Reversal", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("ReversalCandidates", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Reversal";
+            }
+
+            return groupName;
         }
 
         public async Task WriteAsync(string path, List<EvaluationDatasetRow> rows)

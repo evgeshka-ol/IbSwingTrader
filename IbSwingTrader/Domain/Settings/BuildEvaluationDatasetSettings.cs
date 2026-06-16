@@ -17,7 +17,7 @@ namespace IbSwingTrader.Domain.Settings
         public List<BuildEvaluationDatasetSortColumnSettings> SortColumns { get; set; } =
         [
             new() { Column = "ScanTime", Descending = true },
-            new() { Column = "CandidateGroup", OrderedValues = ["ReversalCandidates", "RunawayCandidates"] },
+            new() { Column = "CandidateGroup", OrderedValues = ["Runaway", "Reversal"] },
             new() { Column = "CandidateDisplayRank" },
             new() { Column = "Ticker" }
         ];

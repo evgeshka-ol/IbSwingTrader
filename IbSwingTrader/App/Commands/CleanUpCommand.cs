@@ -211,7 +211,7 @@ namespace IbSwingTrader.App.Commands
 
             return new CandidateSummarySections
             {
-                RunawayCandidates = sameDayCandidates
+                Runaway = sameDayCandidates
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
@@ -222,7 +222,7 @@ namespace IbSwingTrader.App.Commands
                         Ticker = BuildSummaryTickerText(x, includeRunawayMarker: true)
                     })
                     .ToList(),
-                ReversalCandidates = candidates
+                Reversal = candidates
                     .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                     .ThenByDescending(x => x.TradePlan.ProfitPercent)
                     .ThenByDescending(x => x.Score.Score)
@@ -427,8 +427,8 @@ namespace IbSwingTrader.App.Commands
             left ??= new CandidateSummarySections();
             right ??= new CandidateSummarySections();
 
-            return AreSummaryListsEqual(left.ReversalCandidates, right.ReversalCandidates) &&
-                   AreSummaryListsEqual(left.RunawayCandidates, right.RunawayCandidates);
+            return AreSummaryListsEqual(left.Reversal, right.Reversal) &&
+                   AreSummaryListsEqual(left.Runaway, right.Runaway);
         }
 
         private static bool AreSummaryListsEqual(

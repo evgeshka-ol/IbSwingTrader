@@ -284,8 +284,8 @@ namespace IbSwingTrader.Application.Dataset
                     return x;
                 });
 
-            var snapshots = BuildRankedCandidateSnapshots("RunawayCandidates", sameDayCandidates)
-                .Concat(BuildRankedCandidateSnapshots("ReversalCandidates", primaryCandidates));
+            var snapshots = BuildRankedCandidateSnapshots("Runaway", sameDayCandidates)
+                .Concat(BuildRankedCandidateSnapshots("Reversal", primaryCandidates));
 
             return snapshots
                 .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)
@@ -410,7 +410,7 @@ namespace IbSwingTrader.Application.Dataset
                 MaxDownBeforeMaxUp = CompareTimes(minTime, maxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 CandidateSource = candidateSource,
-                CandidateGroup = candidateSnapshot?.GroupName ?? string.Empty,
+                CandidateGroup = NormalizeCandidateGroup(candidateSnapshot?.GroupName),
                 CandidateDisplayRank = candidateSnapshot?.DisplayRank,
                 HasActiveCandidateSnapshot = candidate != null,
                 CandidateScore = candidate?.Score.Score,
@@ -933,6 +933,27 @@ namespace IbSwingTrader.Application.Dataset
                 : "Wishlist";
         }
 
+        private static string NormalizeCandidateGroup(string? groupName)
+        {
+            if (string.IsNullOrWhiteSpace(groupName))
+                return string.Empty;
+
+            if (groupName.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Runaway";
+            }
+
+            if (groupName.Equals("Reversal", StringComparison.OrdinalIgnoreCase) ||
+                groupName.Equals("ReversalCandidates", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Reversal";
+            }
+
+            return groupName;
+        }
+
         private static int CompareRows(
             EvaluationDatasetRow left,
             EvaluationDatasetRow right,
@@ -987,7 +1008,8 @@ namespace IbSwingTrader.Application.Dataset
                     .Select((candidate, index) => new RankedCandidateSnapshot(
                         candidate,
                         groupName,
-                        (groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                        (groupName.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
+                         groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
                          groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase)) ? 0 : 1,
                         index + 1)))];
         }

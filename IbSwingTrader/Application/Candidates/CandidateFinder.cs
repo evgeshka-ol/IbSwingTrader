@@ -838,6 +838,14 @@ namespace IbSwingTrader.Application.Candidates
                     bbState,
                     seriesSimilarityTemplates);
 
+            if (!isFromWishlist && !isTodayResearchLikeCandidate)
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    "Runaway candidate rejected because BellUp pattern was not confirmed on H4/Daily.");
+                return;
+            }
+
             if (!_candidateFilter.Pass(ctx.Snapshot, 0m, ctx.AvgDollarVolumeDaily))
             {
                 if (isTodayResearchLikeCandidate)
@@ -938,7 +946,7 @@ namespace IbSwingTrader.Application.Candidates
             if (dailyFamilySplit == DailyFamilySplit.Reversal)
             {
                 _logger.Info(
-                    $"TodayResearchLike rejected and rerouted to ReversalCandidates: {ctx.Stock.Ticker}. " +
+                    $"TodayResearchLike rejected and rerouted to Reversal: {ctx.Stock.Ticker}. " +
                     $"Reason=previous closed daily close is below previous closed daily Bollinger mid.");
                 return false;
             }
@@ -962,10 +970,15 @@ namespace IbSwingTrader.Application.Candidates
             var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
 
-            if (patternKind == TodayResearchLikePatternKind.None)
+            if (!IsRunawayBellUpPattern(bellPatternSignal))
             {
                 _logger.Info(
                     $"TodayResearchLike pattern not confirmed: {ctx.Stock.Ticker}. " +
+                    $"RequiredPattern=BellUp, " +
+                    $"AllowedTimeframes=H4/Daily, " +
+                    $"DetectedPattern={bellPatternSignal.Kind}, " +
+                    $"DetectedTimeframe={bellPatternSignal.Timeframe}, " +
+                    $"CandidatePattern={patternKind}, " +
                     $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
                     $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
                     $"DailyLowerTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbLowerBandSeries, 6))}, " +
@@ -978,11 +991,12 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            if (!IsTodayResearchLikePatternReadyNow(patternKind, bbState, recentSeries))
+            if (!IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries))
             {
                 _logger.Info(
                     $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
                     $"Pattern={patternKind}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}, " +
                     $"Reason=pattern is not ready now, " +
                     $"DailyUpperTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbUpperBandSeries, 6))}, " +
                     $"DailyMidTail={_fmt.Generic(CalculateTailRelativeSlopePct(recentSeries.DailyBbMidBandSeries, 6))}, " +
@@ -1337,6 +1351,12 @@ namespace IbSwingTrader.Application.Candidates
                 TodayResearchLikePatternKind.PullbackContinuation => IsPullbackContinuationTodayResearchLikePatternReadyNow(bbState, recentSeries),
                 _ => false
             };
+        }
+
+        private static bool IsRunawayBellUpPattern(BellPatternSignal bellPatternSignal)
+        {
+            return bellPatternSignal.Kind == BellPatternKind.BellUp &&
+                   bellPatternSignal.Timeframe is BellPatternTimeframe.H4 or BellPatternTimeframe.Daily;
         }
 
         private static BellPatternSignal ClassifyBellPatternSignal(

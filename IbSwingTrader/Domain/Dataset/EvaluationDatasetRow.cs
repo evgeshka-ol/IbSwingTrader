@@ -8,6 +8,8 @@ namespace IbSwingTrader.Domain.Dataset
 
         public DateTime? ExitTime { get; set; }
 
+        public string CandidateGroup { get; set; } = string.Empty;
+
         public string Outcome { get; set; } = string.Empty;
 
         public decimal AmplitudePct { get; set; }
@@ -52,8 +54,6 @@ namespace IbSwingTrader.Domain.Dataset
         public required string GroupLabel { get; set; }
 
         public string CandidateSource { get; set; } = string.Empty;
-
-        public string CandidateGroup { get; set; } = string.Empty;
 
         public int? CandidateDisplayRank { get; set; }
 

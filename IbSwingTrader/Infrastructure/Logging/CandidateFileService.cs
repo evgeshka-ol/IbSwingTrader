@@ -147,11 +147,16 @@ namespace IbSwingTrader.Infrastructure.Logging
                     bool.TryParse(currentRaw, out var current) &&
                     current;
 
-                if (group.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
+                if (group.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
+                    group.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
                     group.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
+                {
                     document.SameDayCandidates.Add(candidate);
+                }
                 else
+                {
                     document.Candidates.Add(candidate);
+                }
 
                 if (isCurrentScanOutput)
                     currentOperationKeys.Add(CandidateCsvRowBuilder.BuildCandidateOperationKey(candidate));
@@ -315,10 +320,12 @@ namespace IbSwingTrader.Infrastructure.Logging
             return new CandidateFileDocument
             {
                 Candidates =
+                    root["ReversalData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["ReversalCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["Candidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     [],
                 SameDayCandidates =
+                    root["RunawayData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["RunawayCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["TodayResearchLikeCandidatesData"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
                     root["SameDayCandidates"]?.Deserialize<List<CandidateDetails>>(ReadOptions) ??
