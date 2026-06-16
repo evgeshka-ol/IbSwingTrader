@@ -827,7 +827,8 @@ namespace IbSwingTrader.Application.Candidates
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var candidateFilterSettings = _getCandidatesSettingsProvider.Get().CandidateFilter;
-            var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+            var bbState = BuildBollingerStateSet(recentSeries);
             var isTodayResearchLikeCandidate =
                 !isFromWishlist &&
                 IsTodayResearchLikeCandidate(
@@ -843,6 +844,15 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info(
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     "Runaway candidate rejected because BellUp pattern was not confirmed on H4/Daily.");
+                return;
+            }
+
+            if (isFromWishlist &&
+                !IsReversalHookPattern(recentSeries, out var reversalHookDiagnostics))
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    $"ReversalHook not confirmed. {reversalHookDiagnostics}");
                 return;
             }
 
@@ -887,7 +897,6 @@ namespace IbSwingTrader.Application.Candidates
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
             var finalScore = dailyScore + weeklyScore + entryScore;
-            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
 
@@ -5480,6 +5489,116 @@ namespace IbSwingTrader.Application.Candidates
             return weeklyConstructive && dailyRunawayKink && h4RunawayKink;
         }
 
+        private static bool IsReversalHookPattern(
+            RecentFeatureSeries recentSeries,
+            out string diagnostics)
+        {
+            diagnostics = string.Empty;
+
+            if (!IsBelowPreviousClosedDailyMid(recentSeries))
+            {
+                diagnostics = "Reason=not-below-daily-mid";
+                return false;
+            }
+
+            var upper = recentSeries.DailyBbUpperBandSeries;
+            var mid = recentSeries.DailyBbMidBandSeries;
+            var lower = recentSeries.DailyBbLowerBandSeries;
+            var rsi = recentSeries.DailyRsiSeries;
+            var macdLine = recentSeries.DailyMacdLineSeries;
+            var macdSignal = recentSeries.DailyMacdSignalSeries;
+            var macdHistogram = PreferSeries(
+                recentSeries.DailyMacdHistogramSeries,
+                recentSeries.DailyMacdSeries);
+
+            if (upper.Count < 6 ||
+                mid.Count < 6 ||
+                lower.Count < 6 ||
+                macdHistogram.Count < 4)
+            {
+                diagnostics =
+                    $"Reason=not-enough-daily-rows, " +
+                    $"UpperCount={upper.Count}, MidCount={mid.Count}, LowerCount={lower.Count}, " +
+                    $"MacdHistogramCount={macdHistogram.Count}";
+                return false;
+            }
+
+            var lowerDeltas = CalculateDeltas(lower);
+            var midDeltas = CalculateDeltas(mid);
+            var histogramDeltas = CalculateDeltas(macdHistogram);
+
+            var lowerRecent = lowerDeltas.TakeLast(3).ToList();
+            var lowerPrior = lowerDeltas.Take(Math.Max(0, lowerDeltas.Count - 2)).TakeLast(5).ToList();
+            var lowerBrokeDown = lowerPrior.Any(x => x < 0m) || lowerDeltas.TakeLast(5).Any(x => x < 0m);
+            var lowerHooked =
+                lowerRecent.Count >= 2 &&
+                lowerRecent.Count(x => x >= 0m) >= 2 &&
+                lowerRecent[^1] >= 0m;
+
+            var midRecent = midDeltas.TakeLast(3).ToList();
+            var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
+            var midWorstPrior = midPrior.Count > 0 ? midPrior.Min() : 0m;
+            var midHooked =
+                midRecent.Count >= 2 &&
+                (midRecent[^1] >= 0m ||
+                 midRecent[^1] > midWorstPrior ||
+                 midRecent[^1] >= midRecent[^2]);
+
+            var currentWidth = upper[^1] - lower[^1];
+            var previousWidth = upper[^4] - lower[^4];
+            var bandCompression = currentWidth < previousWidth;
+
+            var histogramRecent = histogramDeltas.TakeLast(3).ToList();
+            var histogramTurnsUp =
+                histogramRecent.Count >= 2 &&
+                histogramRecent.Count(x => x > 0m) >= 2 &&
+                macdHistogram[^1] > macdHistogram[^3];
+
+            var macdConverges = false;
+            if (macdLine.Count >= 4 && macdSignal.Count >= 4)
+            {
+                var pairCount = Math.Min(macdLine.Count, macdSignal.Count);
+                var macdGap = macdLine
+                    .TakeLast(pairCount)
+                    .Zip(macdSignal.TakeLast(pairCount), (line, signal) => line - signal)
+                    .ToList();
+
+                macdConverges =
+                    macdGap.Count >= 3 &&
+                    macdGap[^1] > macdGap[^2] &&
+                    macdGap[^2] >= macdGap[^3];
+            }
+            else
+            {
+                macdConverges = histogramTurnsUp;
+            }
+
+            var rsiTurnsUp =
+                rsi.Count < 4 ||
+                (rsi[^1] > rsi[^2] &&
+                 rsi[^1] > rsi.TakeLast(4).Min());
+
+            diagnostics =
+                $"LowerBrokeDown={lowerBrokeDown}, " +
+                $"LowerHooked={lowerHooked}, " +
+                $"MidHooked={midHooked}, " +
+                $"BandCompression={bandCompression}, " +
+                $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
+                $"MacdConverges={macdConverges}, " +
+                $"RsiTurnsUp={rsiTurnsUp}, " +
+                $"LowerDeltasTail={FormatTail(lowerDeltas, 4)}, " +
+                $"MidDeltasTail={FormatTail(midDeltas, 4)}, " +
+                $"MacdHistogramTail={FormatTail(macdHistogram, 4)}";
+
+            return lowerBrokeDown &&
+                   lowerHooked &&
+                   midHooked &&
+                   bandCompression &&
+                   histogramTurnsUp &&
+                   macdConverges &&
+                   rsiTurnsUp;
+        }
+
         private static bool IsRealBollingerLaunch(
             decimal midSlopePct,
             decimal upperSlopePct,
@@ -5492,6 +5611,26 @@ namespace IbSwingTrader.Application.Candidates
 
         private static List<decimal> PreferSeries(List<decimal> preferred, List<decimal> fallback)
             => preferred.Count > 0 ? preferred : fallback;
+
+        private static List<decimal> CalculateDeltas(List<decimal> series)
+        {
+            if (series.Count < 2)
+                return [];
+
+            var deltas = new List<decimal>(series.Count - 1);
+            for (var i = 1; i < series.Count; i++)
+                deltas.Add(series[i] - series[i - 1]);
+
+            return deltas;
+        }
+
+        private static string FormatTail(List<decimal> series, int count)
+        {
+            if (series.Count == 0)
+                return "[]";
+
+            return "[" + string.Join(" ", series.TakeLast(count).Select(x => x.ToString("G29", CultureInfo.InvariantCulture))) + "]";
+        }
 
         private static decimal Positive(decimal value)
             => value > 0m ? value : 0m;
