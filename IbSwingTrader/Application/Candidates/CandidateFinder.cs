@@ -1785,7 +1785,7 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
-            if (TryBuildBuiltDailyRowsSplitDiagnostic(ctx.Candles, out var rowDiagnostic))
+            if (TryBuildBuiltDailyRowsSplitDiagnostic(ctx.Candles, out var rowDiagnostic, out var rowRejectionReason))
             {
                 if (IsFreshDailySplitDiagnostic(rowDiagnostic))
                 {
@@ -1803,6 +1803,13 @@ namespace IbSwingTrader.Application.Candidates
                         $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(rowDiagnostic.MarketToday):yyyy-MM-dd}. " +
                         "Daily family split is unknown.");
                 }
+            }
+            else if (log && !string.IsNullOrWhiteSpace(rowRejectionReason))
+            {
+                _logger.Info(
+                    $"Daily split built rows are incomplete for {ctx.Stock.Ticker}. " +
+                    $"{rowRejectionReason} " +
+                    "Daily family split is unknown.");
             }
 
             return DailyFamilySplit.Unknown;
@@ -1831,12 +1838,35 @@ namespace IbSwingTrader.Application.Candidates
 
         private bool TryBuildBuiltDailyRowsSplitDiagnostic(
             List<Candle> candles,
-            out DailySplitDiagnostic diagnostic)
+            out DailySplitDiagnostic diagnostic,
+            out string rejectionReason)
         {
             diagnostic = default;
+            rejectionReason = string.Empty;
 
             if (candles.Count < 2)
+            {
+                rejectionReason = "Not enough candles to build daily rows.";
                 return false;
+            }
+
+            var latestDailyDate = candles
+                .MaxBy(x => x.Time)
+                ?.Time.Date;
+
+            if (latestDailyDate == null)
+            {
+                rejectionReason = "Unable to determine the latest daily date.";
+                return false;
+            }
+
+            var latestDailyDateBars = candles.Count(x => x.Time.Date == latestDailyDate.Value);
+            if (latestDailyDateBars < 2)
+            {
+                rejectionReason =
+                    $"Latest daily aggregation has only {latestDailyDateBars} bar(s) on {latestDailyDate:yyyy-MM-dd}.";
+                return false;
+            }
 
             diagnostic = BuildDailySplitDiagnostic(candles, "BuiltDailyRows");
             return true;
