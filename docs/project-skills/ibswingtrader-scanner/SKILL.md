@@ -67,6 +67,22 @@ Both families should produce meaningful future amplitude:
 - `Reversal` should still usually produce `AmplitudePct > 10%`.
 - If `Reversal` amplitude is below 10%, treat that as scanner failure, not a trade-plan issue.
 
+Current final `Reversal` promotion uses the working `ReversalHook` pattern
+after the hard split. The split only decides that the ticker is below the daily
+Bollinger mid; `ReversalHook` decides whether it is a trade-ready return setup.
+The hook is detected on real daily rows:
+
+- lower Bollinger band broke down and then hooks upward
+- daily mid is still weak but the downward move is decelerating or turning
+- band width is compressing after the breakdown
+- MACD histogram is still weak/negative but turns upward toward zero
+- MACD line and signal are converging
+- RSI is recovering from the recent low
+
+Good `ReversalHook` examples include POET, ASM, SSRM, CDE, and SVM from the
+2026-06-15 evaluation set. The ideal entry is usually the first or second daily
+bar after the lower-band hook; later scans may still work but are less clean.
+
 ## Series-template direction
 
 When improving scanner recall, promotion, or ranking, prefer a literal series

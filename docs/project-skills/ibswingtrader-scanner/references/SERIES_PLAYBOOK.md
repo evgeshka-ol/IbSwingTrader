@@ -105,6 +105,26 @@ For `TradePlan`, min-first is not just a label. It means entry should be
 predicted from the expected local pullback path. A strong-amplitude loss often
 means the entry was too early and the stop was hit before the real move.
 
+### ReversalHook
+
+`ReversalHook` is the current working daily return-to-mid pattern for the final
+`Reversal` path. It is evaluated only after the ticker has already been split
+into `Reversal` by the last closed daily close being below the daily Bollinger
+mid.
+
+The row shape:
+
+- daily lower Bollinger band was falling and then hooks upward
+- daily mid band is weak but decelerates or begins to turn
+- upper/lower envelope compresses after the breakdown
+- daily MACD histogram turns upward toward zero
+- daily MACD line and signal converge
+- daily RSI recovers from its recent low
+
+The best timing is the first or second daily bar after the lower-band hook.
+POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set are the first
+accepted working examples.
+
 ### Triangle Growth
 
 Typical signs on H4:

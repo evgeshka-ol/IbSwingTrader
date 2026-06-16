@@ -55,6 +55,20 @@ Expected quality:
 - should still produce `AmplitudePct > 10%` often enough to matter
 - lower amplitude is scanner failure, even if the trade plan avoided entry
 
+Final `Reversal` promotion currently requires `ReversalHook` after the hard
+below-mid split. The pattern is daily-row based:
+
+- lower Bollinger band breaks down, then hooks upward
+- daily mid weakens but decelerates or starts turning
+- the channel compresses after the breakdown
+- MACD histogram turns upward toward zero
+- MACD line and signal converge
+- RSI recovers from the recent low
+
+Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
+initial working examples. The cleanest entry is normally one to two daily bars
+after the lower-band hook.
+
 ### Runaway
 
 Use continuation logic when the ticker is at or above the daily Bollinger mid
