@@ -20,15 +20,15 @@ This measures whether the scanner surfaced fat movement early enough.
 
 The most important benchmark is:
 
-- today's current top-ranked `RunawayCandidates` rows in `candidates.csv`
+- today's current top-ranked `Runaway` rows in `candidates.csv`
 - should become tomorrow's `research_top_gainers.csv` names
 
 This is the primary direction for scanner tuning.
 
-`RunawayCandidates` is not just a live-watch section. It is the
+`Runaway` is not just a live-watch section. It is the
 project's best attempt to predict the next research dataset.
 
-When a current top-ranked `RunawayCandidates` name does not show up in the next
+When a current top-ranked `Runaway` name does not show up in the next
 research dataset with strong amplitude, treat that as scanner selection/ranking
 feedback before touching `TradePlan`.
 
@@ -40,11 +40,11 @@ The ticker was already in yesterday's current top-ranked candidate rows.
 
 This is the desired outcome.
 
-For `RunawayCandidates`, this is the highest-value success case.
+For `Runaway`, this is the highest-value success case.
 
 ### Current top row failed next-day research
 
-The ticker was in yesterday's current top-ranked `RunawayCandidates` rows, but did
+The ticker was in yesterday's current top-ranked `Runaway` rows, but did
 not become a strong mover in today's research dataset.
 
 This is scanner selection/ranking failure unless the amplitude was still strong

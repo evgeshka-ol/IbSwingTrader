@@ -163,9 +163,14 @@ Bell pair:
   price should mean-revert toward the mid as the flatting begins.
 - One clean timeframe is enough to recognize Bell. The source timeframe sets
   the expected horizon:
-  - `H4` means today
-  - `Daily` means tomorrow
+  - `H4` means today and may enter final `Runaway`
+  - `Daily` means tomorrow and may enter final `Runaway`
   - `Weekly` means wishlist / next week
+
+The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
+real Bollinger rows from `H4` or `Daily`. Weekly-only Bell and non-Bell
+continuation shapes are watchlist/diagnostic context, not final `Runaway`
+promotion.
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:
@@ -178,7 +183,7 @@ pre-move H4 rows:
   reversal.
 - `Neutral`: neither the higher-frame runway nor the H4 trigger is confirmed
   well enough by the saved rows. Keep it out of the trade-ready
-  `RunawayCandidates` path even if an older live-mover or template
+  `Runaway` path even if an older live-mover or template
   branch likes it.
 
 When comparing band curves across tickers, compare shape rather than absolute
@@ -207,10 +212,10 @@ The question is:
 
 Use two positive template families:
 
-- `research_top_gainers.csv`: primary templates for `RunawayCandidates`
-- `evaluation-dataset.csv`: high-amplitude templates for both `RunawayCandidates` and `ReversalCandidates`
+- `research_top_gainers.csv`: primary templates for `Runaway`
+- `evaluation-dataset.csv`: high-amplitude templates for both `Runaway` and `Reversal`
 
-For `ReversalCandidates`, keep templates below-mean and high-amplitude. The goal is
+For `Reversal`, keep templates below-mean and high-amplitude. The goal is
 not just being a pullback, but being a pullback shape that historically produced
 `AmplitudePct > 10%`.
 
@@ -248,4 +253,4 @@ For summary ranking, compare rows in both directions:
   the 10% amplitude line
 
 Do not use the negative templates as a hard scanner filter. They are a ranking
-tool for keeping weak lookalikes out of the current top-ranked `RunawayCandidates` rows.
+tool for keeping weak lookalikes out of the current top-ranked `Runaway` rows.

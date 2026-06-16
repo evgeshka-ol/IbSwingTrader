@@ -10,7 +10,7 @@ The scanner should not be judged primarily by entry precision. That is `TradePla
 
 The nearest minimal target is top-1 quality:
 
-- the #1 current `RunawayCandidates` row should be stable enough to
+- the #1 current `Runaway` row should be stable enough to
   play
 - it should convert into a practical winner
 - the plan should capture more than 10%
@@ -20,7 +20,7 @@ list quality.
 
 The highest-priority scanner goal is:
 
-- tickers in today's current top-ranked `RunawayCandidates`
+- tickers in today's current top-ranked `Runaway`
 - should appear in tomorrow's `research_top_gainers.csv`
 
 This is the main next-day feedback loop. If this relationship is weak, tune
@@ -28,7 +28,7 @@ scanner recall, promotion, and ranking before tuning entries/exits.
 
 ## Two candidate families
 
-### ReversalCandidates
+### Reversal
 
 Use reversal logic only when the ticker is below the daily Bollinger mid.
 
@@ -37,10 +37,10 @@ Hard rule:
 - Use the last closed daily bar for this check, not the current intraday
   partial bar.
 - If the ticker was below the daily Bollinger mid on the last closed daily bar,
-  it is a `ReversalCandidates` candidate.
+  it is a `Reversal` candidate.
 - If the ticker was at or above the daily Bollinger mid on the last closed
   daily bar, it is not a
-  `ReversalCandidates` candidate.
+  `Reversal` candidate.
 - Weekly and H4 context may refine the reversal subtype or trade plan, but they
   do not change the family assignment.
 
@@ -55,7 +55,7 @@ Expected quality:
 - should still produce `AmplitudePct > 10%` often enough to matter
 - lower amplitude is scanner failure, even if the trade plan avoided entry
 
-### RunawayCandidates
+### Runaway
 
 Use continuation logic when the ticker is at or above the daily Bollinger mid
 and acting like a live winner.
@@ -140,16 +140,16 @@ This is stale/weak ranking and should be penalized.
 The current direction is:
 
 1. use series as the primary signal
-2. make `RunawayCandidates` predict tomorrow's research dataset
-3. keep `ReversalCandidates` separate
-4. require `ReversalCandidates` to produce meaningful amplitude too
+2. make `Runaway` predict tomorrow's research dataset
+3. keep `Reversal` separate
+4. require `Reversal` to produce meaningful amplitude too
 5. only then tune `TradePlan`
 
 ## Series-template matching
 
 The scanner should move toward literal row-shape matching.
 
-For `RunawayCandidates`:
+For `Runaway`:
 
 - compare the current candidate series against rows in `research_top_gainers.csv`
 - also compare against high-amplitude rows in `evaluation-dataset.csv`
@@ -173,7 +173,7 @@ For `RunawayCandidates`:
   - do not discard a candidate only because the pattern appears on H4 rather
     than Daily; adjust ranking/trade profile by timeframe instead
 
-For `ReversalCandidates`:
+For `Reversal`:
 
 - compare only against high-amplitude reversal rows from `evaluation-dataset.csv`
 - do not let above-mean continuation templates promote reversal candidates
@@ -198,6 +198,10 @@ Bell pattern pair:
   only the direction changes.
 - The scanner does not require Bell confirmation on all three timeframes.
   One clean timeframe is enough. The source timeframe controls timing:
-  - `H4` means the setup can be played today
-  - `Daily` means the setup is for tomorrow
+  - `H4` means the setup can be played today and may enter final `Runaway`
+  - `Daily` means the setup is for tomorrow and may enter final `Runaway`
   - `Weekly` means the setup belongs in wishlist / next-week context
+
+For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
+real Bollinger rows in `H4` or `Daily`. Weekly-only Bell and other continuation
+subtypes are context until research explicitly enables them.
