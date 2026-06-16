@@ -125,8 +125,10 @@ Canonical Bell pattern pair:
 - `BellDown`: mirrored squeeze, launch down, then late flattening/mean-reversion warning on the bearish form
 
 `BellUp` belongs to the above-mid continuation side and should be promoted when
-the rows show a squeeze-to-expansion launch. `BellDown` is the mirrored form
-used on the below-mid reversal side.
+the rows show a squeeze-to-expansion launch. In code, that can be recognized
+either by a broader phase comparison or by a short local turn where the upper
+and mid Bollinger rows bend up together and band width starts opening again.
+`BellDown` is the mirrored form used on the below-mid reversal side.
 
 The scanner does not require all three timeframes to confirm Bell.
 One clean timeframe is enough:

@@ -173,6 +173,9 @@ Bell pair:
 - `BellUp` is the direct squeeze-to-launch form. The prior phase should be
   compressed or flat, and the recent phase should show clear expansion in the
   upper/mid envelope before the setup is treated as Bell.
+- A shorter local turn also qualifies when the latest upper and mid Bollinger
+  rows bend upward together and band width starts opening again. This is the
+  phase that should catch TE-style green-arrow entries earlier.
 - Entry belongs in the squeeze phase near the end of the session, before the
   expansion is obvious.
 - `BellDown` is the vertical mirror. The same prior-compression / recent-
