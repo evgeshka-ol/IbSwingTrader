@@ -192,13 +192,15 @@ namespace IbSwingTrader.Application.Evaluation
             if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
                 return BellPatternKind.None;
 
-            if ((IsBellUpEnvelope(prior, recent) || IsBellUpCurveTurn(upper, mid, lower)) &&
+            if (IsBellUpEnvelope(prior, recent) &&
+                IsBellUpCurveTurn(upper, mid, lower) &&
                 direction != BollingerFigureDirection.Down)
             {
                 return BellPatternKind.BellUp;
             }
 
-            if ((IsBellDownEnvelope(prior, recent) || IsBellDownCurveTurn(upper, mid, lower)) &&
+            if (IsBellDownEnvelope(prior, recent) &&
+                IsBellDownCurveTurn(upper, mid, lower) &&
                 direction != BollingerFigureDirection.Up)
             {
                 return BellPatternKind.BellDown;
@@ -299,6 +301,8 @@ namespace IbSwingTrader.Application.Evaluation
             var upperLastDelta = upperTail[3] - upperTail[2];
             var midPrevDelta = midTail[2] - midTail[1];
             var midLastDelta = midTail[3] - midTail[2];
+            var lowerPrevDelta = lowerTail[2] - lowerTail[1];
+            var lowerLastDelta = lowerTail[3] - lowerTail[2];
             var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
             var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
 
@@ -306,6 +310,7 @@ namespace IbSwingTrader.Application.Evaluation
                    upperLastDelta >= upperPrevDelta &&
                    midLastDelta >= 0m &&
                    midLastDelta >= midPrevDelta &&
+                   lowerLastDelta <= lowerPrevDelta &&
                    widthLastDelta > 0m &&
                    widthLastDelta >= widthPrevDelta;
         }
@@ -327,13 +332,16 @@ namespace IbSwingTrader.Application.Evaluation
             var upperLastDelta = upperTail[3] - upperTail[2];
             var midPrevDelta = midTail[2] - midTail[1];
             var midLastDelta = midTail[3] - midTail[2];
+            var lowerPrevDelta = lowerTail[2] - lowerTail[1];
+            var lowerLastDelta = lowerTail[3] - lowerTail[2];
             var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
             var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
 
-            return upperLastDelta < 0m &&
-                   upperLastDelta <= upperPrevDelta &&
+            return lowerLastDelta < 0m &&
+                   lowerLastDelta <= lowerPrevDelta &&
                    midLastDelta <= 0m &&
                    midLastDelta <= midPrevDelta &&
+                   upperLastDelta >= upperPrevDelta &&
                    widthLastDelta > 0m &&
                    widthLastDelta >= widthPrevDelta;
         }
