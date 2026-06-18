@@ -59,6 +59,14 @@ namespace IbSwingTrader.Infrastructure.Historical
                     return false;
                 }
 
+                if (timeframe == Timeframe.D1 &&
+                    storedCandles.Any(x => x.Time.TimeOfDay != TimeSpan.Zero))
+                {
+                    _logger.Info(
+                        $"Historical D1 cache invalidated because it contains shifted date-only timestamps: {path}");
+                    return false;
+                }
+
                 candles = storedCandles
                     .Select(NormalizeCandleTime)
                     .OrderBy(x => x.Time)

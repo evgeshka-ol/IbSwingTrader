@@ -12,13 +12,11 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
             // DAILY BAR
             if (parts.Length == 1)
             {
-                var date = DateTime.ParseExact(
+                return DateTime.ParseExact(
                     parts[0],
                     "yyyyMMdd",
                     CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal);
-
-                return date.Date;
+                    DateTimeStyles.None);
             }
 
             // INTRADAY BAR

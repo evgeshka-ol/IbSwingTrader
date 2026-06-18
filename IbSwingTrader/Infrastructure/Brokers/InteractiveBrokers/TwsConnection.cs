@@ -51,10 +51,17 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
             _port = port;
             _clientId = clientId;
 
-            Client.eConnect(host, port, clientId);
+            try
+            {
+                Client.eConnect(host, port, clientId);
+            }
+            catch (SocketException ex)
+            {
+                throw new TwsConnectionException(host, port, ex);
+            }
 
             if (!Client.IsConnected())
-                throw new Exception("Failed to connect to TWS");
+                throw new TwsConnectionException(host, port);
 
             _reader = new EReader(Client, _signal);
             _reader.Start();
@@ -366,7 +373,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
                     duration,
                     barSize,
                     "TRADES",
-                    0,
+                    timeframe == Timeframe.D1 ? 1 : 0,
                     1,
                     false,
                     null);

@@ -87,6 +87,28 @@
             break;
     }
 }
+catch (TwsConnectionException ex)
+{
+    var message =
+        $"ERROR | Не удалось подключиться к TWS/IB Gateway по адресу {ex.Host}:{ex.Port}. " +
+        "Запустите TWS или IB Gateway и проверьте, что API-подключения разрешены и порт указан верно.";
+
+    Console.Error.WriteLine(message);
+
+    try
+    {
+        var fallbackPath = Path.Combine(AppContext.BaseDirectory, "startup-fatal.log");
+        File.AppendAllText(
+            fallbackPath,
+            $"{DateTime.UtcNow:O} {message}{Environment.NewLine}");
+    }
+    catch
+    {
+        // Ignore fallback logging failures; the console output is the primary diagnostic path.
+    }
+
+    Environment.ExitCode = 1;
+}
 catch (Exception ex)
 {
     var message = $"FATAL STARTUP ERROR{Environment.NewLine}{ex}";

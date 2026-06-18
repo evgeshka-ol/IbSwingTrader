@@ -576,13 +576,52 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
-                !IsReversalHookPattern(recentSeries, out var reversalHookDiagnostics))
+            if (dailyFamilySplit == DailyFamilySplit.Reversal)
             {
+                var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
+                if (reversalPatternSeries == null)
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        $"ReversalHook not confirmed on real D1 rows. " +
+                        "Reason=reliable daily pattern rows unavailable");
+                    return;
+                }
+
+                if (!IsReversalHookPattern(reversalPatternSeries, out var reversalHookDiagnostics))
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        $"ReversalHook not confirmed on real D1 rows. " +
+                        $"{reversalHookDiagnostics}");
+                    return;
+                }
+
+                var reversalSimilaritySeries = BuildReversalSimilaritySeries(
+                    recentSeries,
+                    reversalPatternSeries);
+                var hasReversalTemplates = seriesSimilarityTemplates.Any(
+                    x => x.Family == SeriesTemplateFamily.Reversal);
+                var reversalTemplateMatch = CalculateSeriesSimilarityMatch(
+                    reversalSimilaritySeries,
+                    seriesSimilarityTemplates,
+                    SeriesTemplateFamily.Reversal,
+                    _nextDayRankingSettings.SeriesSimilarity);
+
+                if (hasReversalTemplates && reversalTemplateMatch.TotalDistance == null)
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        "ReversalHook matched, but no high-amplitude Reversal series template matched. " +
+                        $"MaxDistance={_fmt.Generic(_nextDayRankingSettings.SeriesSimilarity.WeakMatchDistance)}");
+                    return;
+                }
+
                 _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    $"ReversalHook not confirmed. {reversalHookDiagnostics}");
-                return;
+                    $"Reversal series template confirmed for {ctx.Stock.Ticker}. " +
+                    $"Template={reversalTemplateMatch.TemplateTicker ?? "none"}, " +
+                    $"AmplitudePct={_fmt.Generic(reversalTemplateMatch.TemplateAmplitudePct ?? 0m)}, " +
+                    $"Distance={_fmt.Generic(reversalTemplateMatch.TotalDistance ?? 0m)}");
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
@@ -624,6 +663,39 @@ namespace IbSwingTrader.Application.Candidates
                 $"(mid={_fmt.Generic(candidateItem.H4BbMidSlope)}, width={_fmt.Generic(candidateItem.H4BbWidthSlope)}, upper={_fmt.Generic(candidateItem.H4BbUpperDistanceSlope)})");
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+        }
+
+        private static RecentFeatureSeries BuildReversalSimilaritySeries(
+            RecentFeatureSeries scannerSeries,
+            RecentFeatureSeries realDailySeries)
+        {
+            return new RecentFeatureSeries
+            {
+                DailyBbUpperBandSeries = [.. realDailySeries.DailyBbUpperBandSeries],
+                DailyBbMidBandSeries = [.. realDailySeries.DailyBbMidBandSeries],
+                DailyBbLowerBandSeries = [.. realDailySeries.DailyBbLowerBandSeries],
+                DailyRsiSeries = [.. realDailySeries.DailyRsiSeries],
+                DailyMacdLineSeries = [.. realDailySeries.DailyMacdLineSeries],
+                DailyMacdSignalSeries = [.. realDailySeries.DailyMacdSignalSeries],
+                DailyMacdHistogramSeries = [.. realDailySeries.DailyMacdHistogramSeries],
+                DailyMacdSeries = [.. realDailySeries.DailyMacdSeries],
+                WeeklyBbUpperBandSeries = [.. scannerSeries.WeeklyBbUpperBandSeries],
+                WeeklyBbMidBandSeries = [.. scannerSeries.WeeklyBbMidBandSeries],
+                WeeklyBbLowerBandSeries = [.. scannerSeries.WeeklyBbLowerBandSeries],
+                WeeklyRsiSeries = [.. scannerSeries.WeeklyRsiSeries],
+                WeeklyMacdLineSeries = [.. scannerSeries.WeeklyMacdLineSeries],
+                WeeklyMacdSignalSeries = [.. scannerSeries.WeeklyMacdSignalSeries],
+                WeeklyMacdHistogramSeries = [.. scannerSeries.WeeklyMacdHistogramSeries],
+                WeeklyMacdSeries = [.. scannerSeries.WeeklyMacdSeries],
+                H4BbUpperBandSeries = [.. scannerSeries.H4BbUpperBandSeries],
+                H4BbMidBandSeries = [.. scannerSeries.H4BbMidBandSeries],
+                H4BbLowerBandSeries = [.. scannerSeries.H4BbLowerBandSeries],
+                H4RsiSeries = [.. scannerSeries.H4RsiSeries],
+                H4MacdLineSeries = [.. scannerSeries.H4MacdLineSeries],
+                H4MacdSignalSeries = [.. scannerSeries.H4MacdSignalSeries],
+                H4MacdHistogramSeries = [.. scannerSeries.H4MacdHistogramSeries],
+                H4MacdSeries = [.. scannerSeries.H4MacdSeries]
+            };
         }
 
         private bool IsTodayResearchLikeCandidate(
@@ -1593,24 +1665,21 @@ namespace IbSwingTrader.Application.Candidates
                         $"Daily split D1 rows are stale for {ctx.Stock.Ticker}. " +
                         $"LatestRawDailyBarDate={d1Diagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
                         $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(d1Diagnostic.MarketToday):yyyy-MM-dd}. " +
-                        "Falling back to built daily rows.");
+                        "Daily family split is unknown; H4 aggregation is not used for the D1 family boundary.");
                 }
+
+                return DailyFamilySplit.Unknown;
             }
 
+            // H4 rows include extended-hours bars and cannot reliably reproduce the
+            // official regular-session daily close used by the family boundary.
             if (TryBuildBuiltDailyRowsSplitDiagnostic(ctx.Candles, out var rowDiagnostic, out var rowRejectionReason))
             {
-                if (IsFreshDailySplitDiagnostic(rowDiagnostic))
-                {
-                    LogDailySplitDiagnostic(ctx.Stock.Ticker, rowDiagnostic, log);
-                    return rowDiagnostic.IsBelowMid
-                        ? DailyFamilySplit.Reversal
-                        : DailyFamilySplit.TodayResearchLike;
-                }
-
                 if (log)
                 {
                     _logger.Info(
-                        $"Daily split built rows are stale for {ctx.Stock.Ticker}. " +
+                        $"Daily split D1 rows are unavailable for {ctx.Stock.Ticker}. " +
+                        $"Built H4 daily rows were not used. " +
                         $"LatestRawDailyBarDate={rowDiagnostic.LatestRawDailyBarDate:yyyy-MM-dd}, " +
                         $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(rowDiagnostic.MarketToday):yyyy-MM-dd}. " +
                         "Daily family split is unknown.");
@@ -4975,6 +5044,63 @@ namespace IbSwingTrader.Application.Candidates
                 H4MacdSignalSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDSignal),
                 H4MacdHistogramSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram),
                 H4MacdSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram)
+            };
+        }
+
+        private RecentFeatureSeries? BuildReversalPatternSeries(List<Candle>? dailyCandles)
+        {
+            if (dailyCandles == null || dailyCandles.Count < 2)
+                return null;
+
+            var ordered = dailyCandles
+                .OrderBy(x => x.Time)
+                .ToList();
+            var marketToday = MarketTime.Now().Date;
+            var completed = ordered[^1].Time.Date == marketToday
+                ? ordered.Take(ordered.Count - 1).ToList()
+                : ordered;
+
+            if (completed.Count < 2)
+                return null;
+
+            var scanIndex = completed.Count - 1;
+            return new RecentFeatureSeries
+            {
+                DailyCloseSeries = [.. completed
+                    .TakeLast(RecentDailySeriesLength)
+                    .Select(x => decimal.Round(x.Close, 2, MidpointRounding.AwayFromZero))],
+                DailyBbUpperBandSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyBollingerUpperBand),
+                DailyBbMidBandSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyBollingerMidBand),
+                DailyBbLowerBandSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyBollingerLowerBand),
+                DailyRsiSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyRSI14),
+                DailyMacdLineSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyMACDLine),
+                DailyMacdSignalSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyMACDSignal),
+                DailyMacdHistogramSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyMACDHistogram),
+                DailyMacdSeries = BuildRecentDailySeries(
+                    completed,
+                    scanIndex,
+                    x => x.DailyMACDHistogram)
             };
         }
 

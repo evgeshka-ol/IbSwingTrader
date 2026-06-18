@@ -32,11 +32,18 @@ namespace IbSwingTrader.Infrastructure.Logging
                 Headers = headers,
                 Rows = rows
                     .OrderByDescending(x => ParseDateTime(x.GetValueOrDefault("ScanTime")))
-                    .ThenBy(x => x.GetValueOrDefault("CandidateGroup"), StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => GetCandidateGroupOrder(x.GetValueOrDefault("CandidateGroup")))
                     .ThenBy(x => ParseInt(x.GetValueOrDefault("DisplayRank")) ?? int.MaxValue)
                     .ThenBy(x => x.GetValueOrDefault("Ticker"), StringComparer.OrdinalIgnoreCase)
                     .ToList()
             };
+        }
+
+        private static int GetCandidateGroupOrder(string? candidateGroup)
+        {
+            return candidateGroup?.Equals("Runaway", StringComparison.OrdinalIgnoreCase) == true
+                ? 0
+                : 1;
         }
 
         private void AddGroupRows(
