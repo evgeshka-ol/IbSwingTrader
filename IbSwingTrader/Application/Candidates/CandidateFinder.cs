@@ -126,24 +126,26 @@ namespace IbSwingTrader.Application.Candidates
 
                     List<Candle>? dailyCandles = null;
 
-                    if (contract != null)
+                    try
                     {
-                        try
-                        {
-                            var end = MarketTime.Now();
-                            var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+                        contract ??= await _contractResolver.ResolveStockAsync(
+                            stock.Ticker,
+                            contractResolveTimeout,
+                            contractResolveMaxAttempts);
 
-                            dailyCandles = await _historicalData.GetCandlesRange(
-                                stock.Ticker,
-                                contract,
-                                Timeframe.D1,
-                                start,
-                                end);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Info($"Daily candles load skipped for {stock.Ticker}. {ex.Message}");
-                        }
+                        var end = MarketTime.Now();
+                        var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+
+                        dailyCandles = await _historicalData.GetCandlesRange(
+                            stock.Ticker,
+                            contract,
+                            Timeframe.D1,
+                            start,
+                            end);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Info($"Daily candles load skipped for {stock.Ticker}. {ex.Message}");
                     }
 
                     var dailyBars = dailyCandles ?? BuildDailyBars(candles);
@@ -417,12 +419,16 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var existingPriority = CalculateWishListContextPriority(existing);
                 var itemPriority = CalculateWishListContextPriority(item);
+                var existingHasDailyRows = existing.DailyCandles is { Count: >= 2 };
+                var itemHasDailyRows = item.DailyCandles is { Count: >= 2 };
                 var preserveExistingLossScan =
                     IsLossPreset(existing.Preset.ScanCode) &&
                     IsNonDirectionalLivePreset(item.Preset.ScanCode) &&
                     !IsGainPreset(item.Preset.ScanCode);
+                var preserveExistingDailyRows = existingHasDailyRows && !itemHasDailyRows;
 
                 if (!preserveExistingLossScan &&
+                    !preserveExistingDailyRows &&
                     (itemPriority > existingPriority ||
                     (itemPriority == existingPriority &&
                      item.WishListItem.Score.Score > existing.WishListItem.Score.Score)))
@@ -442,6 +448,8 @@ namespace IbSwingTrader.Application.Candidates
                         $"ExistingPriority={existingPriority}, NewPriority={itemPriority}" +
                         (preserveExistingLossScan
                             ? ", Reason=loss preset is not replaced by non-directional live preset"
+                            : preserveExistingDailyRows
+                                ? ", Reason=existing context has reliable D1 rows"
                             : string.Empty));
                 }
             }
@@ -1248,6 +1256,9 @@ namespace IbSwingTrader.Application.Candidates
             if (bellPatternSignal.Kind != BellPatternKind.BellUp)
                 return false;
 
+            if (IsVerticalSpikeExpansion(recentSeries, bellPatternSignal.Timeframe))
+                return false;
+
             return bellPatternSignal.Timeframe switch
             {
                 BellPatternTimeframe.H4 => bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
@@ -1258,6 +1269,75 @@ namespace IbSwingTrader.Application.Candidates
                                                bbState.Weekly.Regime != nameof(BollingerFigureRegime.Collapse),
                 _ => false
             };
+        }
+
+        private static bool IsVerticalSpikeExpansion(
+            RecentFeatureSeries recentSeries,
+            BellPatternTimeframe timeframe)
+        {
+            IReadOnlyList<decimal> upper = timeframe switch
+            {
+                BellPatternTimeframe.H4 => recentSeries.H4BbUpperBandSeries,
+                BellPatternTimeframe.Daily => recentSeries.DailyBbUpperBandSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> lower = timeframe switch
+            {
+                BellPatternTimeframe.H4 => recentSeries.H4BbLowerBandSeries,
+                BellPatternTimeframe.Daily => recentSeries.DailyBbLowerBandSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> rsi = timeframe switch
+            {
+                BellPatternTimeframe.H4 => recentSeries.H4RsiSeries,
+                BellPatternTimeframe.Daily => recentSeries.DailyRsiSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> macdHistogram = timeframe switch
+            {
+                BellPatternTimeframe.H4 => recentSeries.H4MacdHistogramSeries,
+                BellPatternTimeframe.Daily => recentSeries.DailyMacdHistogramSeries,
+                _ => []
+            };
+
+            var count = Math.Min(upper.Count, lower.Count);
+            if (count < 6 || rsi.Count < count || macdHistogram.Count < count)
+                return false;
+
+            var upperDeltas = CalculateDeltas(upper.TakeLast(count).ToList());
+            var width = upper
+                .TakeLast(count)
+                .Zip(lower.TakeLast(count), (u, l) => u - l)
+                .ToList();
+            var widthDeltas = CalculateDeltas(width);
+            var rsiDeltas = CalculateDeltas(rsi.TakeLast(count).ToList());
+            var histogramDeltas = CalculateDeltas(macdHistogram.TakeLast(count).ToList());
+
+            for (var i = 1; i < upperDeltas.Count; i++)
+            {
+                var priorUpperMoveSum = upperDeltas
+                    .Take(i)
+                    .Select(Math.Abs)
+                    .Sum();
+                var priorWidthMoveSum = widthDeltas
+                    .Take(i)
+                    .Select(Math.Abs)
+                    .Sum();
+                var upperJumpDominates =
+                    upperDeltas[i] > 0m &&
+                    upperDeltas[i] > priorUpperMoveSum;
+                var widthJumpDominates =
+                    widthDeltas[i] > 0m &&
+                    widthDeltas[i] > priorWidthMoveSum;
+                var momentumJump =
+                    rsiDeltas[i] > 0m &&
+                    histogramDeltas[i] > 0m;
+
+                if (upperJumpDominates && widthJumpDominates && momentumJump)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool IsStrictTodayResearchLikeRunawayPatternReadyNow(
