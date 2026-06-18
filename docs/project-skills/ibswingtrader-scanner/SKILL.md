@@ -71,6 +71,8 @@ Both families should produce meaningful future amplitude:
 Current final `Reversal` promotion uses the working `ReversalHook` pattern
 after the hard split. The split only decides that the ticker is below the daily
 Bollinger mid; `ReversalHook` decides whether it is a trade-ready return setup.
+The hook is necessary but not sufficient: the combined real-D1 and Weekly/H4
+rows must also match a high-amplitude (`AmplitudePct >= 10%`) reversal template.
 The hook is detected on real daily rows:
 
 - lower Bollinger band broke down and then hooks upward

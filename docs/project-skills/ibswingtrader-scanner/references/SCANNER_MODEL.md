@@ -65,6 +65,10 @@ below-mid split. The pattern is daily-row based:
 - MACD line and signal converge
 - RSI recovers from the recent low
 
+After the hook passes, final admission also requires literal series similarity
+to a high-amplitude reversal template. Use real closed D1 rows for the daily
+part and the saved Weekly/H4 rows for context.
+
 Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
 initial working examples. The cleanest entry is normally one to two daily bars
 after the lower-band hook.
