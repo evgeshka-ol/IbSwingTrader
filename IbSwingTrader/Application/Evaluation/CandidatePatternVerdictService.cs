@@ -69,9 +69,9 @@ namespace IbSwingTrader.Application.Evaluation
                     {
                         return new CandidatePatternVerdict(
                             detectedPipeline,
-                            "BellUp",
+                            "None",
                             "Mismatch",
-                            $"Reason=BellUp shape detected on {bellSignal.Timeframe}, but entry phase expired: MACD momentum is rolling over");
+                            $"Reason=BellUp not confirmed on {bellSignal.Timeframe}: expansion ended in momentum rollover");
                     }
 
                     return new CandidatePatternVerdict(
@@ -189,15 +189,14 @@ namespace IbSwingTrader.Application.Evaluation
             IReadOnlyList<decimal> lower,
             BollingerFigureDirection direction)
         {
-            if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
-                return BellPatternKind.None;
-
-            if (IsBellUpEnvelope(prior, recent) &&
-                IsBellUpCurveTurn(upper, mid, lower) &&
+            if (IsBellUpPhase(upper, mid, lower) &&
                 direction != BollingerFigureDirection.Down)
             {
                 return BellPatternKind.BellUp;
             }
+
+            if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
+                return BellPatternKind.None;
 
             if (IsBellDownEnvelope(prior, recent) &&
                 IsBellDownCurveTurn(upper, mid, lower) &&
@@ -207,6 +206,64 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             return BellPatternKind.None;
+        }
+
+        private static bool IsBellUpPhase(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 7)
+                return false;
+
+            var width = Enumerable.Range(0, count)
+                .Select(i => upper[i] - lower[i])
+                .ToArray();
+
+            for (var pivot = 2; pivot <= count - 4; pivot++)
+            {
+                if (width[pivot] > width[pivot - 1] ||
+                    width[pivot] > width[pivot + 1])
+                {
+                    continue;
+                }
+
+                var compressionStart = Math.Max(1, pivot - 3);
+                var compressionSteps = 0;
+                for (var i = compressionStart; i <= pivot; i++)
+                {
+                    if (width[i] <= width[i - 1])
+                        compressionSteps++;
+                }
+
+                if (compressionSteps < 2)
+                    continue;
+
+                var expansionSteps = 0;
+                for (var i = pivot + 1; i < count; i++)
+                {
+                    if (width[i] > width[i - 1])
+                        expansionSteps++;
+                }
+
+                var postPivotSteps = count - pivot - 1;
+                if (expansionSteps < Math.Max(2, postPivotSteps - 1))
+                    continue;
+
+                var upperRise = upper[^1] - upper[pivot];
+                var midRise = mid[^1] - mid[pivot];
+                if (upperRise <= 0m ||
+                    midRise <= 0m ||
+                    upperRise <= midRise)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryCalculateBellPhaseEnvelopes(
