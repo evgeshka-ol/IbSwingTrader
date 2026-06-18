@@ -8,6 +8,10 @@ namespace IbSwingTrader.Domain.Candidates
 
         public required string PresetScanCode { get; set; }
         public string CandidateSource { get; set; } = string.Empty;
+        public string DetectedPipeline { get; set; } = string.Empty;
+        public string DetectedPattern { get; set; } = string.Empty;
+        public string PatternVerdict { get; set; } = string.Empty;
+        public string PatternVerdictReason { get; set; } = string.Empty;
         public List<decimal> RecentDailyMaSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidDistanceSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperDistanceSeries { get; set; } = [];

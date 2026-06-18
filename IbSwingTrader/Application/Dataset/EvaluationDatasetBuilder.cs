@@ -1,3 +1,4 @@
+using IbSwingTrader.Abstractions.Evaluation;
 using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Dataset
@@ -10,6 +11,7 @@ namespace IbSwingTrader.Application.Dataset
         IFeatureEngine featureEngine,
         IAgentPathService pathService,
         IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
+        ICandidatePatternVerdictService patternVerdictService,
         ITextLogger logger) : IEvaluationDatasetBuilder
     {
         private const decimal MinInterestingAmplitudePct = 5m;
@@ -26,6 +28,7 @@ namespace IbSwingTrader.Application.Dataset
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly IAgentPathService _pathService = pathService;
         private readonly IBuildEvaluationDatasetSettingsProvider _buildEvaluationDatasetSettingsProvider = buildEvaluationDatasetSettingsProvider;
+        private readonly ICandidatePatternVerdictService _patternVerdictService = patternVerdictService;
         private readonly ITextLogger _logger = logger;
 
         public async Task<List<EvaluationDatasetRow>> ReadCurrentAsync()
@@ -352,12 +355,15 @@ namespace IbSwingTrader.Application.Dataset
             var daysToMaxDownFromScan = DiffDays(evaluation.ScanTime, minTime);
             var daysToMaxDownFromEntry = DiffDays(evaluation.EntryTime, minTime);
 
-            return new EvaluationDatasetRow
+            var row = new EvaluationDatasetRow
             {
                 Ticker = evaluation.Ticker,
                 ScanTime = evaluation.ScanTime,
                 EntryTime = evaluation.EntryTime,
-                ExitTime = evaluation.ExitTime,
+                ExitTime = evaluation.ExitTime ??
+                    (string.Equals(evaluation.Outcome, "Loss", StringComparison.OrdinalIgnoreCase)
+                        ? evaluation.StopTime
+                        : null),
                 PresetScanCode = evaluation.PresetScanCode,
                 IsFromWishlist = isFromWishlist,
                 Outcome = evaluation.Outcome ?? string.Empty,
@@ -410,6 +416,10 @@ namespace IbSwingTrader.Application.Dataset
                 MaxDownBeforeMaxUp = CompareTimes(minTime, maxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 CandidateSource = candidateSource,
+                DetectedPipeline = evaluation.DetectedPipeline,
+                DetectedPattern = evaluation.DetectedPattern,
+                PatternVerdict = evaluation.PatternVerdict,
+                PatternVerdictReason = evaluation.PatternVerdictReason,
                 CandidateGroup = NormalizeCandidateGroup(candidateSnapshot?.GroupName),
                 CandidateDisplayRank = candidateSnapshot?.DisplayRank,
                 HasActiveCandidateSnapshot = candidate != null,
@@ -480,6 +490,31 @@ namespace IbSwingTrader.Application.Dataset
                 H4BbWidthSlope = candidate?.H4BbWidthSlope ?? evaluation.H4BbWidthSlope,
                 H4BbUpperDistanceSlope = candidate?.H4BbUpperDistanceSlope ?? evaluation.H4BbUpperDistanceSlope
             };
+
+            var verdict = ResolvePatternVerdict(row);
+            row.DetectedPipeline = verdict.DetectedPipeline;
+            row.DetectedPattern = verdict.DetectedPattern;
+            row.PatternVerdict = verdict.PatternVerdict;
+            row.PatternVerdictReason = verdict.PatternVerdictReason;
+
+            return row;
+        }
+
+        private CandidatePatternVerdict ResolvePatternVerdict(EvaluationDatasetRow row)
+        {
+            if (!string.IsNullOrWhiteSpace(row.PatternVerdict) &&
+                !string.IsNullOrWhiteSpace(row.DetectedPipeline) &&
+                !string.IsNullOrWhiteSpace(row.DetectedPattern) &&
+                row.PatternVerdict != "Unknown")
+            {
+                return new CandidatePatternVerdict(
+                    row.DetectedPipeline,
+                    row.DetectedPattern,
+                    row.PatternVerdict,
+                    row.PatternVerdictReason);
+            }
+
+            return _patternVerdictService.Analyze(row);
         }
 
         private CacheMetrics? TryBuildCacheMetrics(

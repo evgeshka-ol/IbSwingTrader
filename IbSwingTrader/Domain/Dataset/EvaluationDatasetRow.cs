@@ -9,6 +9,9 @@ namespace IbSwingTrader.Domain.Dataset
         public DateTime? ExitTime { get; set; }
 
         public string CandidateGroup { get; set; } = string.Empty;
+        public string PatternVerdict { get; set; } = string.Empty;
+        public string DetectedPattern { get; set; } = string.Empty;
+        public string PatternVerdictReason { get; set; } = string.Empty;
 
         public string Outcome { get; set; } = string.Empty;
 
@@ -44,6 +47,7 @@ namespace IbSwingTrader.Domain.Dataset
 
         public required string PresetScanCode { get; set; }
         public string ExtremumOrder { get; set; } = string.Empty;
+        public string DetectedPipeline { get; set; } = string.Empty;
 
         public string MinDepthGroup { get; set; } = string.Empty;
 

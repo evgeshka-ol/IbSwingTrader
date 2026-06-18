@@ -1,3 +1,4 @@
+using IbSwingTrader.Abstractions.Evaluation;
 using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Evaluation
@@ -7,12 +8,14 @@ namespace IbSwingTrader.Application.Evaluation
         IHistoricalDataService historicalDataService,
         IAmbiguousBarResolver ambiguousBarResolver,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
+        ICandidatePatternVerdictService patternVerdictService,
         ITextLogger logger) : ICandidateEvaluator
     {
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
         private readonly IAmbiguousBarResolver _ambiguousBarResolver = ambiguousBarResolver;
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
+        private readonly ICandidatePatternVerdictService _patternVerdictService = patternVerdictService;
         private readonly ITextLogger _logger = logger;
 
         public async Task<List<CandidateEvaluationResult>> EvaluateAsync(
@@ -56,6 +59,7 @@ namespace IbSwingTrader.Application.Evaluation
             var freshDataSafetyLag = TimeSpan.FromMinutes(Math.Max(0, settings.FreshDataSafetyLagMinutes));
 
             var result = CreateBaseResult(candidate);
+            ApplyPatternVerdict(result, candidate);
             result.EvaluatedAt = MarketTime.Now();
 
             _logger.Info($"Evaluation step: resolving contract for {candidate.Ticker}");
@@ -319,6 +323,10 @@ namespace IbSwingTrader.Application.Evaluation
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 CandidateSource = candidate.CandidateSource,
+                PatternVerdict = "Unknown",
+                DetectedPattern = "Unknown",
+                DetectedPipeline = "Unknown",
+                PatternVerdictReason = "Reason=error",
                 RecentDailyMaSeries = [.. candidate.RecentDailyMaSeries],
                 RecentDailyBbMidDistanceSeries = [.. candidate.RecentDailyBbMidDistanceSeries],
                 RecentDailyBbUpperDistanceSeries = [.. candidate.RecentDailyBbUpperDistanceSeries],
@@ -390,6 +398,10 @@ namespace IbSwingTrader.Application.Evaluation
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
                 CandidateSource = candidate.CandidateSource,
+                PatternVerdict = "Unknown",
+                DetectedPattern = "Unknown",
+                DetectedPipeline = "Unknown",
+                PatternVerdictReason = $"Reason=Evaluation error: {error}",
                 RecentDailyMaSeries = [.. candidate.RecentDailyMaSeries],
                 RecentDailyBbMidDistanceSeries = [.. candidate.RecentDailyBbMidDistanceSeries],
                 RecentDailyBbUpperDistanceSeries = [.. candidate.RecentDailyBbUpperDistanceSeries],
@@ -449,6 +461,17 @@ namespace IbSwingTrader.Application.Evaluation
                 StopLoss = candidate.TradePlan.StopLoss,
                 Outcome = $"Error: {error}"
             };
+        }
+
+        private void ApplyPatternVerdict(
+            CandidateEvaluationResult result,
+            CandidateDetails candidate)
+        {
+            var verdict = _patternVerdictService.Analyze(result);
+            result.DetectedPipeline = verdict.DetectedPipeline;
+            result.DetectedPattern = verdict.DetectedPattern;
+            result.PatternVerdict = verdict.PatternVerdict;
+            result.PatternVerdictReason = verdict.PatternVerdictReason;
         }
 
         private static bool TouchesPrice(Candle candle, decimal price)

@@ -343,6 +343,10 @@ namespace IbSwingTrader.Application.Candidates
                 if (ctx == null)
                     continue;
 
+                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
+                if (dailyFamilySplit == DailyFamilySplit.Unknown)
+                    continue;
+
                 var agedRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var agedDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var agedEntryScore = _candidateScore.Calculate(ctx.Snapshot);
@@ -352,8 +356,10 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     agedDiagnostics,
                     agedEntryScore,
+                    agedRecentSeries,
                     agedBbState,
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit);
 
                 if (promoteAsTodayResearchLike)
                 {
@@ -370,7 +376,7 @@ namespace IbSwingTrader.Application.Candidates
                     continue;
                 }
 
-                if (ClassifyDailyFamily(ctx, log: false) != DailyFamilySplit.Reversal)
+                if (dailyFamilySplit != DailyFamilySplit.Reversal)
                 {
                     _logger.Info(
                         $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
@@ -403,6 +409,10 @@ namespace IbSwingTrader.Application.Candidates
                 if (!scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var ctx))
                     continue;
 
+                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
+                if (dailyFamilySplit == DailyFamilySplit.Unknown)
+                    continue;
+
                 var sameDayRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var sameDayDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var sameDayEntryScore = _candidateScore.Calculate(ctx.Snapshot);
@@ -412,8 +422,10 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     sameDayDiagnostics,
                     sameDayEntryScore,
+                    sameDayRecentSeries,
                     sameDayBbState,
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit);
 
                 if (promoteAsTodayResearchLike)
                 {
@@ -427,7 +439,7 @@ namespace IbSwingTrader.Application.Candidates
                         rejectionLogPrefix: "Entry rejected after same-day promotion",
                         seriesSimilarityTemplates);
                 }
-                else if (ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal)
+                else if (dailyFamilySplit == DailyFamilySplit.Reversal)
                 {
                     await TryAddCandidate(
                         candidateResults,
@@ -455,10 +467,14 @@ namespace IbSwingTrader.Application.Candidates
                 if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
                     continue;
 
-                var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                if (ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal)
+                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
+                if (dailyFamilySplit == DailyFamilySplit.Reversal)
                     continue;
 
+                if (dailyFamilySplit == DailyFamilySplit.Unknown)
+                    continue;
+
+                var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var liveEntryScore = _candidateScore.Calculate(ctx.Snapshot);
                 var liveBbState = BuildBollingerStateSet(liveRecentSeries);
@@ -467,8 +483,10 @@ namespace IbSwingTrader.Application.Candidates
                     ctx,
                     liveDiagnostics,
                     liveEntryScore,
+                    liveRecentSeries,
                     liveBbState,
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit);
 
                 if (!promoteAsTodayResearchLike)
                     continue;
@@ -604,16 +622,23 @@ namespace IbSwingTrader.Application.Candidates
                 if (firstSeenDate.HasValue && firstSeenDate.Value < todayMarketDate)
                     continue;
 
+                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
+                if (dailyFamilySplit == DailyFamilySplit.Unknown)
+                    continue;
+
+                var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
                 var entryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(ctx.Candles));
+                var bbState = BuildBollingerStateSet(recentSeries);
                 var isTodayResearchLikeCandidate = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
                     diagnostics,
                     entryScore,
+                    recentSeries,
                     bbState,
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit);
 
                 if (!isTodayResearchLikeCandidate)
                     continue;
@@ -648,7 +673,6 @@ namespace IbSwingTrader.Application.Candidates
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
-                var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
                 var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
                 var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
 
@@ -823,6 +847,10 @@ namespace IbSwingTrader.Application.Candidates
             string rejectionLogPrefix,
             IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
         {
+            var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
+            if (dailyFamilySplit == DailyFamilySplit.Unknown)
+                return;
+
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
@@ -830,16 +858,18 @@ namespace IbSwingTrader.Application.Candidates
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
             var isTodayResearchLikeCandidate =
-                !isFromWishlist &&
+                dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
                 IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
                     diagnostics,
                     entryScore,
+                    recentSeries,
                     bbState,
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit);
 
-            if (!isFromWishlist && !isTodayResearchLikeCandidate)
+            if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
                 _logger.Info(
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
@@ -847,7 +877,7 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (isFromWishlist &&
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
                 !IsReversalHookPattern(recentSeries, out var reversalHookDiagnostics))
             {
                 _logger.Info(
@@ -938,12 +968,11 @@ namespace IbSwingTrader.Application.Candidates
             WishListContext ctx,
             CandidateDiagnostics diagnostics,
             decimal entryScore,
+            RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
+            DailyFamilySplit dailyFamilySplit)
         {
-            var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
-            var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
-
             if (dailyFamilySplit == DailyFamilySplit.Unknown)
             {
                 _logger.Info(
@@ -5248,19 +5277,19 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     MidSeries = recentSeries.WeeklyBbMidBandSeries,
                     UpperDistanceSeries = recentSeries.WeeklyBbUpperBandSeries,
-                    WidthSeries = recentSeries.WeeklyBbLowerBandSeries
+                    WidthSeries = recentSeries.WeeklyBbWidthSeries
                 })),
                 Daily = ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
                 {
                     MidSeries = recentSeries.DailyBbMidBandSeries,
                     UpperDistanceSeries = recentSeries.DailyBbUpperBandSeries,
-                    WidthSeries = recentSeries.DailyBbLowerBandSeries
+                    WidthSeries = recentSeries.DailyBbWidthSeries
                 })),
                 H4 = ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
                 {
                     MidSeries = recentSeries.H4BbMidBandSeries,
                     UpperDistanceSeries = recentSeries.H4BbUpperBandSeries,
-                    WidthSeries = recentSeries.H4BbLowerBandSeries
+                    WidthSeries = recentSeries.H4BbWidthSeries
                 }))
             };
         }
