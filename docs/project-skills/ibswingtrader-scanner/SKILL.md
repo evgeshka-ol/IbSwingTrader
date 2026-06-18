@@ -30,26 +30,27 @@ The scanner's job is to find future fat moves early.
 
 1. `get-candidates`
 2. inspect `Data/Tickers/candidates.csv`
-3. inspect `Data/Tickers/wishlist.csv`
-4. compare yesterday's scan with today's `research_top_gainers.csv`
+3. compare yesterday's scan with today's `research_top_gainers.csv`
+
+The scanner no longer uses `wishlist.csv` as an intermediate candidate stage.
+Historical candle accumulation belongs to the historical cache, not to a
+second candidate queue.
 
 ## Main split
 
 - `Reversal`: below-mid / pullback / return-to-mean style ideas.
 - `Runaway`: above-mid / runaway / continuation style ideas.
 
-Internal `TodayResearchLike` subtypes:
+Internal `Runaway` subtypes:
 
 - `BellUp`: squeeze-to-launch continuation, the canonical direct form
 - `Runaway`: strict kink/acceleration launch
 - `LaunchContinuation`: real Bollinger launch with strong daily/H4 expansion
 - `PullbackContinuation`: constructive continuation after a pullback
 
-Current final `Runaway` promotion is intentionally strict: the candidate must
+Current final `Runaway` admission is intentionally strict: the candidate must
 confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. Other
-above-mid continuation subtypes can remain diagnostic/watchlist context, but
-they should not enter the final `Runaway` list until explicitly re-enabled by
-research.
+above-mid continuation subtypes remain diagnostic only.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
@@ -135,7 +136,7 @@ One clean timeframe is enough:
 
 - `H4`: eligible for final `Runaway`, play it today
 - `Daily`: eligible for final `Runaway`, play it for tomorrow
-- `Weekly`: keep it as wishlist / next-week context; do not promote to final `Runaway`
+- `Weekly`: diagnostic / next-week context only; do not promote to final `Runaway`
 
 The source timeframe changes urgency and trade-plan depth, not the family split.
 
@@ -146,19 +147,17 @@ pre-move rows:
   expands upward, mid is not falling, lower band is not simply being dragged
   upward, and H4 RSI/MACD do not contradict the trigger. These candidates can
   be promoted to `Runaway`.
-- `WishListOnly`: Daily/weekly runway shape exists, but H4 trigger is not ready
-  yet. Keep it in `wishlist.csv` even though it is not a reversal. Do not force
-  it into `Reversal`.
+- `NotReady`: Daily/weekly runway shape exists, but H4/Daily trigger is not
+  trade-ready. Reject it from the current final list. Do not force it into
+  `Reversal`.
 - `Neutral`: the saved rows do not confirm a trade-ready runway phase. Do not
   let legacy live-mover/template/bypass branches promote it into
   `Runaway`.
 
 This split is important for same-pattern candidates: UMAC/ONDS-like rows are
-ready for immediate `Runaway` promotion, while SHLS-like
-rows have the same higher-frame runway pattern but belong in `wishlist.csv`
-until the H4 real Bollinger/RSI/MACD rows confirm readiness. Decisions must use
-the saved rows from `candidates.csv`, because those rows represent the
-pre-move state.
+ready for immediate `Runaway` admission, while SHLS-like rows with only a
+higher-frame setup are rejected until a future scan finds a trade-ready
+H4/Daily pattern.
 
 Broader series direction: move pattern logic toward the visual indicators the
 user actually relies on: Bollinger, MACD, and RSI. The priority order for
@@ -190,10 +189,10 @@ beyond the real Bollinger/MACD/RSI rows.
 
 When scanner quality is weak:
 
-1. Check whether the ticker was fully missed, only reached `WishList`, or was present but ranked too low.
+1. Check whether the ticker was missed by the market presets, rejected by the family pattern, or present but ranked too low.
 2. Use the series in `candidates.csv` and `research_top_gainers.csv`.
 3. Prefer fixing:
    - recall
-   - `WishList -> TodayResearchLike` promotion
+   - family pattern recognition after the hard daily split
    - ranking
 4. Touch `TradePlan` only after the list is already good.
