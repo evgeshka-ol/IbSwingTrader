@@ -16,14 +16,10 @@ namespace IbSwingTrader.Application.Candidates
         IFeatureEngine featureEngine,
         ICandidateSignalAnalyzer signalAnalyzer,
         IBollingerFigureAnalyzer bollingerFigureAnalyzer,
-        IWishListFilter wishListFilter,
         IWishListScore wishListScore,
-        ICandidateFilter candidateFilter,
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
-        IWishListReader wishListReader,
-        IWishListMerger wishListMerger,
         IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
@@ -40,14 +36,10 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IFeatureEngine _featureEngine = featureEngine;
         private readonly ICandidateSignalAnalyzer _signalAnalyzer = signalAnalyzer;
         private readonly IBollingerFigureAnalyzer _bollingerFigureAnalyzer = bollingerFigureAnalyzer;
-        private readonly IWishListFilter _wishListFilter = wishListFilter;
         private readonly IWishListScore _wishListScore = wishListScore;
-        private readonly ICandidateFilter _candidateFilter = candidateFilter;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
-        private readonly IWishListReader _wishListReader = wishListReader;
-        private readonly IWishListMerger _wishListMerger = wishListMerger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
@@ -70,7 +62,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
-            var todayMarketDate = marketNow.Date;
             var seriesSimilarityTemplates = await LoadSeriesSimilarityTemplatesAsync(
                 getCandidatesSettings.NextDayRanking.SeriesSimilarity);
 
@@ -82,9 +73,6 @@ namespace IbSwingTrader.Application.Candidates
                 $"CandleCount={finderSettings.CandleCount}, " +
                 $"ContractResolveTimeoutSeconds={finderSettings.ContractResolveTimeoutSeconds}, " +
                 $"ContractResolveMaxAttempts={finderSettings.ContractResolveMaxAttempts}");
-
-            var wishListPath = _pathService.GetWishListFile();
-            var currentWishList = await _wishListReader.ReadAsync(wishListPath);
 
             var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
@@ -199,63 +187,6 @@ namespace IbSwingTrader.Application.Candidates
                     var entryScore = _candidateScore.Calculate(snapshot);
                     var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles));
 
-                    var weeklyBbRejected = ShouldRejectByWeeklyBbForWishlist(bbState.Weekly);
-                    var weeklyBbVetoBypassed = weeklyBbRejected &&
-                        ShouldBypassWeeklyBbVetoForLiveMover(
-                            stock,
-                            preset.ScanCode,
-                            snapshot,
-                            diagnostics,
-                            entryScore);
-
-                    if (weeklyBbRejected && !weeklyBbVetoBypassed)
-                    {
-                        _logger.Info(
-                            $"Wish list BB veto applied: {stock.Ticker}. " +
-                            $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}");
-                        continue;
-                    }
-
-                    if (weeklyBbVetoBypassed)
-                    {
-                        _logger.Info(
-                            $"Wish list BB veto bypassed for live mover: {stock.Ticker}. " +
-                            $"Preset={preset.ScanCode}, Rank={stock.Rank}, " +
-                            $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
-                            $"ATRRatio={diagnostics.ATRRatio:0.##}, " +
-                            $"DailyRsi14={snapshot.Current.DailyRSI14:0.##}, " +
-                            $"EntryScore={entryScore:0.##}");
-                    }
-
-                    if (!_wishListFilter.Pass(snapshot, lastPrice, avgDollarVolume))
-                    {
-                        var weeklyBbBypass = ShouldAllowWeeklyBbWishlistBypass(bbState.Weekly);
-
-                        if (!weeklyBbBypass &&
-                            !ShouldBypassWishListFilterForLiveScan(snapshot, diagnostics, entryScore))
-                        {
-                            _logger.Info($"Wish list rejected: {stock.Ticker}");
-                            continue;
-                        }
-
-                        if (weeklyBbBypass)
-                        {
-                            _logger.Info(
-                                $"Wish list weekly-BB bypass applied: {stock.Ticker}. " +
-                                $"Weekly={bbState.Weekly.Regime}/{bbState.Weekly.Direction}");
-                        }
-                        else
-                        {
-                            _logger.Info(
-                                $"Wish list live-scan bypass applied: {stock.Ticker}. " +
-                                $"EntryScore={_fmt.Generic(entryScore)}, " +
-                                $"DailyRsi14={_fmt.Generic(snapshot.Current.DailyRSI14)}, " +
-                                $"DailyDistance={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}%, " +
-                                $"AtrRatio={_fmt.Generic(diagnostics.ATRRatio)}, " +
-                                $"VolumeRatio20={_fmt.Generic(diagnostics.VolumeRatio20)}");
-                        }
-                    }
-
                     var wishScore = _wishListScore.Calculate(snapshot);
 
                     var wishListItem = BuildWishListItem(
@@ -288,274 +219,43 @@ namespace IbSwingTrader.Application.Candidates
                 .Select(x => x.WishListItem)
                 .ToList();
 
-            var mergedWishList = _wishListMerger.Merge(currentWishList, scannedWishListItems);
-            var forecastedCount = mergedWishList.Count(x => x.ExpectedBarsToTarget != null);
+            var mergedWishList = scannedWishListItems;
 
-            _logger.Info($"WishList merged. Total={mergedWishList.Count}, WithForecast={forecastedCount}");
+            _logger.Info($"Current scan contexts prepared. Total={mergedWishList.Count}");
 
             var mergedMap = mergedWishList.ToDictionary(
                 x => x.Ticker,
                 x => x,
                 StringComparer.OrdinalIgnoreCase);
 
-            var agedWishListItems = mergedWishList
-                .Where(x =>
-                {
-                    var firstSeenDate = x.FirstSeen?.Date;
-                    return firstSeenDate != null && firstSeenDate.Value < todayMarketDate;
-                })
-                .OrderByDescending(x => x.Score.Score)
-                .ThenByDescending(x => x.LastEvaluatedAt ?? DateTime.MinValue)
-                .ToList();
-
-            if (getCandidatesSettings.MaxWishListItems > 0 &&
-                agedWishListItems.Count > getCandidatesSettings.MaxWishListItems)
-            {
-                _logger.Info(
-                    $"Aged wish list evaluation limited: taking top {getCandidatesSettings.MaxWishListItems} of {agedWishListItems.Count} items.");
-
-                agedWishListItems = agedWishListItems
-                    .Take(getCandidatesSettings.MaxWishListItems)
-                    .ToList();
-            }
-
             var sameDayPromotedResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var mergedWishItem in agedWishListItems)
-            {
-                WishListContext? ctx = null;
-
-                if (scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var scannedCtx))
-                {
-                    ctx = scannedCtx;
-                }
-                else
-                {
-                    ctx = await TryBuildWishListContextFromExistingItem(
-                        mergedWishItem,
-                        marketNow,
-                        marketTimezone,
-                        finderSettings,
-                        contractResolveTimeout,
-                        contractResolveMaxAttempts);
-                }
-
-                if (ctx == null)
-                    continue;
-
-                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
-                if (dailyFamilySplit == DailyFamilySplit.Unknown)
-                    continue;
-
-                var agedRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                var agedDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
-                var agedEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var agedBbState = BuildBollingerStateSet(agedRecentSeries);
-                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
-                    mergedWishItem,
-                    ctx,
-                    agedDiagnostics,
-                    agedEntryScore,
-                    agedRecentSeries,
-                    agedBbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit);
-
-                if (promoteAsTodayResearchLike)
-                {
-                    await TryAddCandidate(
-                        sameDayPromotedResults,
-                        mergedWishItem,
-                        ctx,
-                        isFromWishlist: false,
-                        marketTimezone,
-                        bucketName: "runaway promoted candidates",
-                        rejectionLogPrefix: "Entry rejected after runaway promotion",
-                        seriesSimilarityTemplates);
-
-                    continue;
-                }
-
-                if (dailyFamilySplit != DailyFamilySplit.Reversal)
-                {
-                    _logger.Info(
-                        $"Skipping aged reversal promotion for {ctx.Stock.Ticker}. " +
-                        $"Reversal context was not confirmed and TodayResearchLike conditions were not confirmed.");
-                    continue;
-                }
-
-                await TryAddCandidate(
-                    candidateResults,
-                    mergedWishItem,
-                    ctx,
-                    isFromWishlist: true,
-                    marketTimezone,
-                    bucketName: "candidates",
-                    rejectionLogPrefix: "Entry rejected after wish list pass",
-                    seriesSimilarityTemplates);
-            }
-
-            var sameDayWishListItems = mergedWishList
-                .Where(x =>
-                {
-                    var firstSeenDate = x.FirstSeen?.Date;
-                    return firstSeenDate != null && firstSeenDate.Value == todayMarketDate;
-                })
-                .OrderByDescending(x => x.Score.Score)
-                .ToList();
-
-            foreach (var mergedWishItem in sameDayWishListItems)
-            {
-                if (!scannedWishListContexts.TryGetValue(mergedWishItem.Ticker, out var ctx))
-                    continue;
-
-                var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
-                if (dailyFamilySplit == DailyFamilySplit.Unknown)
-                    continue;
-
-                var sameDayRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                var sameDayDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
-                var sameDayEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var sameDayBbState = BuildBollingerStateSet(sameDayRecentSeries);
-                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
-                    mergedWishItem,
-                    ctx,
-                    sameDayDiagnostics,
-                    sameDayEntryScore,
-                    sameDayRecentSeries,
-                    sameDayBbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit);
-
-                if (promoteAsTodayResearchLike)
-                {
-                    await TryAddCandidate(
-                        sameDayPromotedResults,
-                        mergedWishItem,
-                        ctx,
-                        isFromWishlist: false,
-                        marketTimezone,
-                        bucketName: "same-day promoted candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day promotion",
-                        seriesSimilarityTemplates);
-                }
-                else if (dailyFamilySplit == DailyFamilySplit.Reversal)
-                {
-                    await TryAddCandidate(
-                        candidateResults,
-                        mergedWishItem,
-                        ctx,
-                        isFromWishlist: true,
-                        marketTimezone,
-                        bucketName: "same-day reversal candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day reversal promotion",
-                        seriesSimilarityTemplates);
-                }
-                else
-                {
-                    _logger.Info(
-                        $"Skipping same-day classification for {ctx.Stock.Ticker}. " +
-                        $"Reversal context was not confirmed and TodayResearchLike conditions were not confirmed.");
-                }
-            }
 
             foreach (var ctx in scannedWishListContexts.Values)
             {
-                if (sameDayPromotedResults.ContainsKey(ctx.Stock.Ticker))
-                    continue;
-
-                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
+                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var scanItem))
                     continue;
 
                 var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
-                if (dailyFamilySplit == DailyFamilySplit.Reversal)
-                    continue;
-
                 if (dailyFamilySplit == DailyFamilySplit.Unknown)
                     continue;
 
-                var liveRecentSeries = BuildRecentFeatureSeries(ctx.Candles);
-                var liveDiagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
-                var liveEntryScore = _candidateScore.Calculate(ctx.Snapshot);
-                var liveBbState = BuildBollingerStateSet(liveRecentSeries);
-                var promoteAsTodayResearchLike = IsTodayResearchLikeCandidate(
-                    mergedWishItem,
-                    ctx,
-                    liveDiagnostics,
-                    liveEntryScore,
-                    liveRecentSeries,
-                    liveBbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit);
-
-                if (!promoteAsTodayResearchLike)
-                    continue;
-
-                _logger.Info(
-                    $"Live above-mid TodayResearchLike promotion applied: {ctx.Stock.Ticker}. " +
-                    $"Preset={ctx.Preset.ScanCode}, " +
-                    $"FirstSeen={mergedWishItem.FirstSeen?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
-
+                var target = dailyFamilySplit == DailyFamilySplit.Reversal
+                    ? candidateResults
+                    : sameDayPromotedResults;
                 await TryAddCandidate(
-                    sameDayPromotedResults,
-                    mergedWishItem,
+                    target,
+                    scanItem,
                     ctx,
-                    isFromWishlist: false,
+                    isFromWishlist: dailyFamilySplit == DailyFamilySplit.Reversal,
                     marketTimezone,
-                    bucketName: "live runaway candidates",
-                    rejectionLogPrefix: "Entry rejected after live runaway promotion",
+                    bucketName: dailyFamilySplit == DailyFamilySplit.Reversal
+                        ? "reversal candidates"
+                        : "runaway candidates",
+                    rejectionLogPrefix: "Pattern rejected",
                     seriesSimilarityTemplates);
             }
 
-            if (candidateResults.Count == 0)
-            {
-                _logger.Info(
-                    "No entry candidates from aged wish list items. " +
-                    "Trying same-day market-scan fallback.");
-
-                foreach (var ctx in scannedWishListContexts.Values)
-                {
-                    if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var mergedWishItem))
-                        continue;
-
-                    var firstSeenDate = mergedWishItem.FirstSeen?.Date;
-
-                    if (firstSeenDate != null && firstSeenDate.Value < todayMarketDate)
-                        continue;
-
-                    await TryAddCandidate(
-                        sameDayPromotedResults,
-                        mergedWishItem,
-                        ctx,
-                        isFromWishlist: false,
-                        marketTimezone,
-                        bucketName: "fallback candidates",
-                        rejectionLogPrefix: "Entry rejected after same-day fallback",
-                        seriesSimilarityTemplates);
-                }
-
-                _logger.Info($"Same-day market-scan fallback completed. Candidates={sameDayPromotedResults.Count}");
-            }
-
-            var promotedTickers = candidateResults.Values
-                .Concat(sameDayPromotedResults.Values)
-                .Select(x => x.Ticker)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var sameDayPromotedTickers = sameDayPromotedResults.Values
-                .Select(x => x.Ticker)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var premarketSummaryCandidates = await BuildPremarketSummaryCandidates(
-                mergedWishList,
-                mergedMap,
-                scannedWishListContexts,
-                promotedTickers,
-                marketNow,
-                marketTimezone,
-                seriesSimilarityTemplates);
-
             var sameDayCandidates = sameDayPromotedResults.Values
-                .Concat(premarketSummaryCandidates)
                 .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
                     .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
@@ -570,16 +270,8 @@ namespace IbSwingTrader.Application.Candidates
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike);
 
-            var finalWishList = mergedWishList
-                .Where(x => !promotedTickers.Contains(x.Ticker))
-                .ToList();
-
-            var finalForecastedCount = finalWishList.Count(x => x.ExpectedBarsToTarget != null);
-            _logger.Info($"WishList final. Total={finalWishList.Count}, WithForecast={finalForecastedCount}");
-
             var finalCandidates = ReRankCandidates(
                 candidateResults.Values
-                    .Where(x => !sameDayPromotedTickers.Contains(x.Ticker))
                     .ToList(),
                 getCandidatesSettings.FinalTopCandidates,
                 _nextDayRankingSettings,
@@ -590,7 +282,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 Candidates = [.. finalCandidates],
                 SameDayCandidates = sameDayCandidates,
-                WishList = finalWishList
+                WishList = []
             };
         }
 
@@ -854,7 +546,6 @@ namespace IbSwingTrader.Application.Candidates
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
-            var candidateFilterSettings = _getCandidatesSettingsProvider.Get().CandidateFilter;
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
             var isTodayResearchLikeCandidate =
@@ -886,43 +577,7 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (!_candidateFilter.Pass(ctx.Snapshot, 0m, ctx.AvgDollarVolumeDaily))
-            {
-                if (isTodayResearchLikeCandidate)
-                {
-                    _logger.Info(
-                        $"TodayResearchLike candidate-filter bypass applied: {ctx.Stock.Ticker}. " +
-                        $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
-                        $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
-                        $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
-                        $"EntryScore={_fmt.Generic(entryScore)}");
-                }
-                else
-                {
-                    _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}");
-                    return;
-                }
-            }
-
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
-
-            if (trade.ProfitPercent < candidateFilterSettings.MinPlannedProfitPct)
-            {
-                _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    $"Planned profit is too small: ProfitPercent={_fmt.Percent(trade.ProfitPercent)}%, " +
-                    $"MinRequired={_fmt.Percent(candidateFilterSettings.MinPlannedProfitPct)}%");
-                return;
-            }
-
-            if (isTodayResearchLikeCandidate &&
-                !PassFinalAmplitudeProxyGate(ctx, out var amplitudeRejectReason))
-            {
-                _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    amplitudeRejectReason);
-                return;
-            }
 
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
@@ -986,22 +641,6 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to Reversal: {ctx.Stock.Ticker}. " +
                     $"Reason=previous closed daily close is below previous closed daily Bollinger mid.");
-                return false;
-            }
-
-            if (ShouldRejectByWeeklyBbForWishlist(bbState.Weekly) &&
-                !ShouldBypassWeeklyBbVetoForLiveMover(
-                    ctx.Stock,
-                    ctx.Preset.ScanCode,
-                    ctx.Snapshot,
-                    diagnostics,
-                    entryScore) &&
-                !ShouldBypassAgedWeeklyBbVeto(
-                    mergedWishItem,
-                    ctx.Snapshot,
-                    diagnostics,
-                    entryScore))
-            {
                 return false;
             }
 
