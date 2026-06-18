@@ -65,6 +65,15 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 if (IsRunawayBellUpPattern(bellSignal, dailyState, h4State))
                 {
+                    if (HasTerminalMomentumRollover(series, bellSignal.Timeframe))
+                    {
+                        return new CandidatePatternVerdict(
+                            detectedPipeline,
+                            "BellUp",
+                            "Mismatch",
+                            $"Reason=BellUp shape detected on {bellSignal.Timeframe}, but entry phase expired: MACD momentum is rolling over");
+                    }
+
                     return new CandidatePatternVerdict(
                         detectedPipeline,
                         "BellUp",
@@ -345,6 +354,36 @@ namespace IbSwingTrader.Application.Evaluation
             };
         }
 
+        private static bool HasTerminalMomentumRollover(
+            PatternSeries series,
+            BellPatternTimeframe timeframe)
+        {
+            IReadOnlyList<decimal> macdLine = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4MacdLineSeries,
+                BellPatternTimeframe.Daily => series.DailyMacdLineSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> macdHistogram = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4MacdHistogramSeries,
+                BellPatternTimeframe.Daily => series.DailyMacdHistogramSeries,
+                _ => []
+            };
+
+            if (macdLine.Count < 2 || macdHistogram.Count < 4)
+                return false;
+
+            var histogramTail = macdHistogram.TakeLast(4).ToArray();
+            var histogramDeclinesContinuously =
+                histogramTail[1] < histogramTail[0] &&
+                histogramTail[2] < histogramTail[1] &&
+                histogramTail[3] < histogramTail[2];
+            var macdLineStoppedRising = macdLine[^1] <= macdLine[^2];
+
+            return histogramDeclinesContinuously && macdLineStoppedRising;
+        }
+
         private static bool IsReversalHookPattern(PatternSeries series, out string diagnostics)
         {
             diagnostics = string.Empty;
@@ -521,6 +560,8 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries;
                 H4BbWidthSeries = candidate.RecentH4BbWidthSeries;
                 H4BbUpperDistanceSeries = candidate.RecentH4BbUpperDistanceSeries;
+                H4MacdLineSeries = candidate.RecentH4MacdLineSeries;
+                H4MacdHistogramSeries = candidate.RecentH4MacdHistogramSeries;
             }
 
             public PatternSeries(EvaluationDatasetRow row)
@@ -547,6 +588,8 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbLowerBandSeries = row.RecentH4BbLowerBandSeries;
                 H4BbWidthSeries = row.RecentH4BbWidthSeries;
                 H4BbUpperDistanceSeries = row.RecentH4BbUpperDistanceSeries;
+                H4MacdLineSeries = row.RecentH4MacdLineSeries;
+                H4MacdHistogramSeries = row.RecentH4MacdHistogramSeries;
             }
 
             public string CandidateGroup { get; }
@@ -571,6 +614,8 @@ namespace IbSwingTrader.Application.Evaluation
             public List<decimal> H4BbLowerBandSeries { get; }
             public List<decimal> H4BbWidthSeries { get; }
             public List<decimal> H4BbUpperDistanceSeries { get; }
+            public List<decimal> H4MacdLineSeries { get; }
+            public List<decimal> H4MacdHistogramSeries { get; }
         }
     }
 }
