@@ -93,26 +93,29 @@ namespace IbSwingTrader.Infrastructure.Logging
             List<string> headers,
             CandidateDetails candidate)
         {
-            var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                nameof(CandidateDetails.Scan),
-                nameof(CandidateDetails.TradePlan),
-                nameof(CandidateDetails.CandidateSource),
-                nameof(CandidateDetails.Score),
-                nameof(CandidateDetails.Context),
-                nameof(CandidateDetails.Diagnostics),
-                nameof(CandidateDetails.IsFromWishlist),
-                nameof(CandidateDetails.NeedsDeeperEntry),
-                nameof(CandidateDetails.NeedsMomentumExit)
-            };
+            Add(row, headers, nameof(candidate.RecentDailyBbUpperBandSeries), FormatValue(candidate.RecentDailyBbUpperBandSeries));
+            Add(row, headers, nameof(candidate.RecentDailyBbMidBandSeries), FormatValue(candidate.RecentDailyBbMidBandSeries));
+            Add(row, headers, nameof(candidate.RecentDailyBbLowerBandSeries), FormatValue(candidate.RecentDailyBbLowerBandSeries));
+            Add(row, headers, nameof(candidate.RecentDailyMacdLineSeries), FormatValue(candidate.RecentDailyMacdLineSeries));
+            Add(row, headers, nameof(candidate.RecentDailyMacdSignalSeries), FormatValue(candidate.RecentDailyMacdSignalSeries));
+            Add(row, headers, nameof(candidate.RecentDailyMacdHistogramSeries), FormatValue(candidate.RecentDailyMacdHistogramSeries));
+            Add(row, headers, nameof(candidate.RecentDailyRsiSeries), FormatValue(candidate.RecentDailyRsiSeries));
 
-            foreach (var property in _propertyReader.GetOrderedProperties(typeof(CandidateDetails)))
-            {
-                if (skip.Contains(property.Name))
-                    continue;
+            Add(row, headers, nameof(candidate.RecentWeeklyBbUpperBandSeries), FormatValue(candidate.RecentWeeklyBbUpperBandSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyBbMidBandSeries), FormatValue(candidate.RecentWeeklyBbMidBandSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyBbLowerBandSeries), FormatValue(candidate.RecentWeeklyBbLowerBandSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyMacdLineSeries), FormatValue(candidate.RecentWeeklyMacdLineSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyMacdSignalSeries), FormatValue(candidate.RecentWeeklyMacdSignalSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyMacdHistogramSeries), FormatValue(candidate.RecentWeeklyMacdHistogramSeries));
+            Add(row, headers, nameof(candidate.RecentWeeklyRsiSeries), FormatValue(candidate.RecentWeeklyRsiSeries));
 
-                Add(row, headers, property.Name, FormatValue(property.GetValue(candidate)));
-            }
+            Add(row, headers, nameof(candidate.RecentH4BbUpperBandSeries), FormatValue(candidate.RecentH4BbUpperBandSeries));
+            Add(row, headers, nameof(candidate.RecentH4BbMidBandSeries), FormatValue(candidate.RecentH4BbMidBandSeries));
+            Add(row, headers, nameof(candidate.RecentH4BbLowerBandSeries), FormatValue(candidate.RecentH4BbLowerBandSeries));
+            Add(row, headers, nameof(candidate.RecentH4MacdLineSeries), FormatValue(candidate.RecentH4MacdLineSeries));
+            Add(row, headers, nameof(candidate.RecentH4MacdSignalSeries), FormatValue(candidate.RecentH4MacdSignalSeries));
+            Add(row, headers, nameof(candidate.RecentH4MacdHistogramSeries), FormatValue(candidate.RecentH4MacdHistogramSeries));
+            Add(row, headers, nameof(candidate.RecentH4RsiSeries), FormatValue(candidate.RecentH4RsiSeries));
         }
 
         private void FlattenObject(

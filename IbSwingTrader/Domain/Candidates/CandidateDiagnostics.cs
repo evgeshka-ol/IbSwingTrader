@@ -24,21 +24,11 @@ namespace IbSwingTrader.Domain.Candidates
 
         public decimal? SeriesSimilarityTemplateAmplitudePct { get; set; }
 
-        public decimal? SeriesSimilarityDistance { get; set; }
-
-        public decimal? SeriesSimilarityDailyDistance { get; set; }
-
-        public decimal? SeriesSimilarityWeeklyDistance { get; set; }
-
-        public decimal? SeriesSimilarityH4Distance { get; set; }
-
         public decimal? SeriesSimilarityBonus { get; set; }
 
         public string? LowAmplitudeTemplateTicker { get; set; }
 
         public decimal? LowAmplitudeTemplateAmplitudePct { get; set; }
-
-        public decimal? LowAmplitudeDistance { get; set; }
 
         public decimal? LowAmplitudePenalty { get; set; }
 

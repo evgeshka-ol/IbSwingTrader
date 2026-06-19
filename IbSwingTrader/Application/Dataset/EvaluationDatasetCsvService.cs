@@ -26,7 +26,16 @@ namespace IbSwingTrader.Application.Dataset
             nameof(EvaluationDatasetRow.RecentH4BbMidDistanceSeries),
             nameof(EvaluationDatasetRow.RecentH4BbUpperDistanceSeries),
             nameof(EvaluationDatasetRow.RecentH4BbWidthSeries),
-            nameof(EvaluationDatasetRow.RecentH4MacdSeries)
+            nameof(EvaluationDatasetRow.RecentH4MacdSeries),
+            nameof(EvaluationDatasetRow.WeeklyBbMidSlope),
+            nameof(EvaluationDatasetRow.WeeklyBbWidthSlope),
+            nameof(EvaluationDatasetRow.WeeklyBbUpperDistanceSlope),
+            nameof(EvaluationDatasetRow.DailyBbMidSlope),
+            nameof(EvaluationDatasetRow.DailyBbWidthSlope),
+            nameof(EvaluationDatasetRow.DailyBbUpperDistanceSlope),
+            nameof(EvaluationDatasetRow.H4BbMidSlope),
+            nameof(EvaluationDatasetRow.H4BbWidthSlope),
+            nameof(EvaluationDatasetRow.H4BbUpperDistanceSlope)
         ];
 
         private readonly INumberTextFormatter _fmt = numberFormatter;

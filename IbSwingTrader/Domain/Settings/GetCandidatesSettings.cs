@@ -485,12 +485,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal OverextendedPenalty { get; set; } = 0.16m;
         public int SecondPassWindowMultiplier { get; set; } = 4;
         public int SecondPassMinimumWindow { get; set; } = 30;
-        public decimal SecondPassDailySeriesWeight { get; set; } = 0.40m;
-        public decimal SecondPassH4SeriesWeight { get; set; } = 0.40m;
-        public decimal SecondPassContextWeight { get; set; } = 0.15m;
-        public decimal SecondPassSeriesPenaltyWeight { get; set; } = 0.30m;
-        public decimal SecondPassLatePenaltyWeight { get; set; } = 0.35m;
-        public decimal SecondPassOverextendedPenaltyWeight { get; set; } = 0.25m;
         public decimal LateSpikePullbackPenalty { get; set; } = 2.40m;
         public decimal LateSpikePullbackMinDailyRsi { get; set; } = 78.0m;
         public decimal LateSpikePullbackMinBbMid { get; set; } = 25.0m;
@@ -612,20 +606,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal LowAmplitudeMinTemplateAmplitudePct { get; set; } = 0m;
         public decimal LowAmplitudeMaxTemplateAmplitudePct { get; set; } = 10m;
         public decimal LowAmplitudePenaltyWeight { get; set; } = 1.15m;
-        public decimal DailyWeight { get; set; } = 0.35m;
-        public decimal WeeklyWeight { get; set; } = 0.25m;
-        public decimal H4Weight { get; set; } = 0.40m;
         public decimal RelativePointTolerance { get; set; } = 0.06m;
-        public decimal MaSeriesWeight { get; set; } = 0m;
-        public decimal BbMidSeriesWeight { get; set; } = 1.00m;
-        public decimal BbUpperSeriesWeight { get; set; } = 1.15m;
-        public decimal BbWidthSeriesWeight { get; set; } = 0.95m;
-        public decimal RsiSeriesWeight { get; set; } = 0.25m;
-        public decimal MacdSeriesWeight { get; set; } = 0.35m;
-        public decimal MaPointTolerance { get; set; } = 0.25m;
         public decimal BbMidPointTolerance { get; set; } = 0.25m;
         public decimal BbUpperPointTolerance { get; set; } = 0.35m;
-        public decimal BbWidthPointTolerance { get; set; } = 0.60m;
+        public decimal BbLowerPointTolerance { get; set; } = 0.60m;
         public decimal RsiPointTolerance { get; set; } = 1.20m;
         public decimal MacdPointTolerance { get; set; } = 0.03m;
     }
