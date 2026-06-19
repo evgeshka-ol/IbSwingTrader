@@ -31,9 +31,9 @@ namespace IbSwingTrader.Application.Candidates
 
     public sealed class BollingerFeatureSeries
     {
+        public required List<decimal> UpperSeries { get; init; }
         public required List<decimal> MidSeries { get; init; }
-        public required List<decimal> UpperDistanceSeries { get; init; }
-        public required List<decimal> WidthSeries { get; init; }
+        public required List<decimal> LowerSeries { get; init; }
     }
 
     public interface IBollingerFigureAnalyzer
@@ -45,9 +45,18 @@ namespace IbSwingTrader.Application.Candidates
     {
         public BollingerFigureState Analyze(BollingerFeatureSeries series)
         {
-            var midSlope = CalculateRelativeSlopePct(series.MidSeries);
-            var upperSlope = CalculateRelativeSlopePct(series.UpperDistanceSeries);
-            var lowerSlope = CalculateRelativeSlopePct(series.WidthSeries);
+            var count = Math.Min(
+                series.UpperSeries.Count,
+                Math.Min(series.MidSeries.Count, series.LowerSeries.Count));
+            var upper = series.UpperSeries.TakeLast(count).ToArray();
+            var mid = series.MidSeries.TakeLast(count).ToArray();
+            var lower = series.LowerSeries.TakeLast(count).ToArray();
+            var upperDistance = upper.Zip(mid, (u, m) => u - m).ToList();
+            var width = upper.Zip(lower, (u, l) => u - l).ToList();
+
+            var midSlope = CalculateRelativeSlopePct([.. mid]);
+            var upperSlope = CalculateRelativeSlopePct(upperDistance);
+            var lowerSlope = CalculateRelativeSlopePct(width);
             var upperOpening = upperSlope > 0m;
             var midRising = midSlope > 0m;
             var lowerNotOutrunningMid = lowerSlope <= midSlope + 1.0m;

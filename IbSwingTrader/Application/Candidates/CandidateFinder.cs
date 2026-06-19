@@ -659,11 +659,8 @@ namespace IbSwingTrader.Application.Candidates
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
                 $"W={candidateItem.WeeklyBbRegime}/{candidateItem.WeeklyBbDirection} " +
-                $"(mid={_fmt.Generic(candidateItem.WeeklyBbMidSlope)}, width={_fmt.Generic(candidateItem.WeeklyBbWidthSlope)}, upper={_fmt.Generic(candidateItem.WeeklyBbUpperDistanceSlope)}), " +
                 $"D={candidateItem.DailyBbRegime}/{candidateItem.DailyBbDirection} " +
-                $"(mid={_fmt.Generic(candidateItem.DailyBbMidSlope)}, width={_fmt.Generic(candidateItem.DailyBbWidthSlope)}, upper={_fmt.Generic(candidateItem.DailyBbUpperDistanceSlope)}), " +
-                $"H4={candidateItem.H4BbRegime}/{candidateItem.H4BbDirection} " +
-                $"(mid={_fmt.Generic(candidateItem.H4BbMidSlope)}, width={_fmt.Generic(candidateItem.H4BbWidthSlope)}, upper={_fmt.Generic(candidateItem.H4BbUpperDistanceSlope)})");
+                $"H4={candidateItem.H4BbRegime}/{candidateItem.H4BbDirection}");
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
         }
@@ -2086,10 +2083,6 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries,
                 _nextDayRankingSettings);
             var isResearchLikeReadyNow = IsResearchLikeReadyNow(recentSeries, tradeSettings.ResearchLikeExit);
-            var isFreshExpansionWinner = IsFreshExpansionTradeProfile(
-                diagnostics,
-                recentSeries,
-                tradeSettings.FreshExpansionExit);
             var isReversalRecovery = IsReversalRecoveryTradeProfile(
                 ctx.Snapshot,
                 diagnostics,
@@ -2192,23 +2185,6 @@ namespace IbSwingTrader.Application.Candidates
                     $"DefaultProfitPct={_fmt.Percent(constructiveSettings.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(constructiveSettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(constructiveSettings.MaxProfitPct)}");
-            }
-            else if (isFreshExpansionWinner)
-            {
-                var freshExpansionSettings = tradeSettings.FreshExpansionExit;
-                defaultProfitPctOverride = freshExpansionSettings.DefaultProfitPct;
-                minProfitPctOverride = freshExpansionSettings.MinProfitPct;
-                maxProfitPctOverride = freshExpansionSettings.MaxProfitPct;
-                maxLossPctOverride = freshExpansionSettings.MaxLossPct;
-                entryDiscountOverridePct = freshExpansionSettings.EntryDiscountPct;
-
-                _logger.Info(
-                    $"Trade plan fresh-expansion row-family profile applied for {ctx.Stock.Ticker}. " +
-                    $"EntryDiscountPct={_fmt.Percent(freshExpansionSettings.EntryDiscountPct)}, " +
-                    $"DefaultProfitPct={_fmt.Percent(freshExpansionSettings.DefaultProfitPct)}, " +
-                    $"MinProfitPct={_fmt.Percent(freshExpansionSettings.MinProfitPct)}, " +
-                    $"MaxProfitPct={_fmt.Percent(freshExpansionSettings.MaxProfitPct)}, " +
-                    $"MaxLossPct={_fmt.Percent(freshExpansionSettings.MaxLossPct)}");
             }
             else if (isExplosiveMinFirst)
             {
@@ -2353,8 +2329,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var bbEntryDiscountOverridePct = ResolveBollingerEntryDiscountOverridePct(
                 bbState,
-                recentSeries,
-                tradeSettings.H4BollingerEntry,
                 entryDiscountOverridePct);
 
             if (bbEntryDiscountOverridePct != entryDiscountOverridePct)
@@ -2428,24 +2402,6 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
-
-            if (isFreshExpansionWinner &&
-                tradeSettings.FreshExpansionExit.EntryDiscountPct >= 0m)
-            {
-                var freshExpansionEntryDiscountOverridePct = CapDiscount(
-                    entryDiscountOverridePct,
-                    tradeSettings.FreshExpansionExit.EntryDiscountPct);
-
-                if (freshExpansionEntryDiscountOverridePct != entryDiscountOverridePct)
-                {
-                    _logger.Info(
-                        $"Trade plan fresh-expansion entry cap applied for {ctx.Stock.Ticker}. " +
-                        $"EntryDiscountPct={_fmt.Percent(freshExpansionEntryDiscountOverridePct ?? 0m)}, " +
-                        $"PreviousEntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
-                }
-
-                entryDiscountOverridePct = freshExpansionEntryDiscountOverridePct;
-            }
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
@@ -2709,19 +2665,10 @@ namespace IbSwingTrader.Application.Candidates
                 RecentH4MacdHistogramSeries = recentSeries.H4MacdHistogramSeries,
                 WeeklyBbDirection = bbState.Weekly.Direction,
                 WeeklyBbRegime = bbState.Weekly.Regime,
-                WeeklyBbMidSlope = bbState.Weekly.MidSlope,
-                WeeklyBbWidthSlope = bbState.Weekly.WidthSlope,
-                WeeklyBbUpperDistanceSlope = bbState.Weekly.UpperDistanceSlope,
                 DailyBbDirection = bbState.Daily.Direction,
                 DailyBbRegime = bbState.Daily.Regime,
-                DailyBbMidSlope = bbState.Daily.MidSlope,
-                DailyBbWidthSlope = bbState.Daily.WidthSlope,
-                DailyBbUpperDistanceSlope = bbState.Daily.UpperDistanceSlope,
                 H4BbDirection = bbState.H4.Direction,
                 H4BbRegime = bbState.H4.Regime,
-                H4BbMidSlope = bbState.H4.MidSlope,
-                H4BbWidthSlope = bbState.H4.WidthSlope,
-                H4BbUpperDistanceSlope = bbState.H4.UpperDistanceSlope,
                 NeedsDeeperEntry = needsDeeperEntry,
                 NeedsMomentumExit = needsMomentumExit,
                 Scan = new ScanInfo
@@ -3542,284 +3489,6 @@ namespace IbSwingTrader.Application.Candidates
                    lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
         }
 
-        // AI reference now tracks the strict runaway Bollinger kink pattern.
-        private static decimal CalculateAiReferenceAdjustment(
-            CandidateDetails candidate,
-            NextDayRankingSettings settings)
-        {
-            var diagnostics = candidate.Diagnostics;
-            if (diagnostics == null)
-                return 0m;
-
-            var strictRunawayPattern = IsStrictTodayResearchLikeRunawayPattern(
-                new BollingerStateSet
-                {
-                    Weekly = new BollingerStateOutput
-                    {
-                        Direction = candidate.WeeklyBbDirection,
-                        Regime = candidate.WeeklyBbRegime,
-                        MidSlope = candidate.WeeklyBbMidSlope,
-                        WidthSlope = candidate.WeeklyBbWidthSlope,
-                        UpperDistanceSlope = candidate.WeeklyBbUpperDistanceSlope
-                    },
-                    Daily = new BollingerStateOutput
-                    {
-                        Direction = candidate.DailyBbDirection,
-                        Regime = candidate.DailyBbRegime,
-                        MidSlope = candidate.DailyBbMidSlope,
-                        WidthSlope = candidate.DailyBbWidthSlope,
-                        UpperDistanceSlope = candidate.DailyBbUpperDistanceSlope
-                    },
-                    H4 = new BollingerStateOutput
-                    {
-                        Direction = candidate.H4BbDirection,
-                        Regime = candidate.H4BbRegime,
-                        MidSlope = candidate.H4BbMidSlope,
-                        WidthSlope = candidate.H4BbWidthSlope,
-                        UpperDistanceSlope = candidate.H4BbUpperDistanceSlope
-                    }
-                },
-                new RecentFeatureSeries
-                {
-                    DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries,
-                    DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries,
-                    DailyBbLowerBandSeries = candidate.RecentDailyBbLowerBandSeries,
-                    WeeklyBbUpperBandSeries = candidate.RecentWeeklyBbUpperBandSeries,
-                    WeeklyBbMidBandSeries = candidate.RecentWeeklyBbMidBandSeries,
-                    WeeklyBbLowerBandSeries = candidate.RecentWeeklyBbLowerBandSeries,
-                    H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries,
-                    H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries,
-                    H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries
-                });
-
-            if (!strictRunawayPattern)
-                return 0m;
-
-            var score = 0m;
-
-            if (candidate.Context.DistanceTo20dHigh <= -10m)
-                score += 1.0m;
-
-            if (candidate.Context.DailyRSI14 >= 40m && candidate.Context.DailyRSI14 <= 58m)
-                score += 1.0m;
-
-            if (diagnostics.ATRRatio >= 2.6m)
-                score += 0.75m;
-
-            if (diagnostics.TrendPosition <= 1m)
-                score += 0.75m;
-
-            if (diagnostics.DailyTrendPosition <= 1m)
-                score += 0.75m;
-
-            if ((diagnostics.WeeklyMACDHistDelta ?? 0m) >= 0m)
-                score += 0.75m;
-
-            if (CalculateSlope(candidate.RecentDailyRsiSeries) <= 0m)
-                score += 0.5m;
-
-            if (CalculateSlope(candidate.RecentH4RsiSeries) >= 0m)
-                score += 0.75m;
-
-            if (CalculateSlope(candidate.RecentDailyMacdHistogramSeries) >= -0.10m)
-                score += 0.5m;
-
-            if (CalculateSlope(candidate.RecentH4MacdHistogramSeries) >= -0.10m)
-                score += 0.75m;
-
-            if (candidate.WeeklyBbDirection == nameof(BollingerFigureDirection.Up) &&
-                candidate.WeeklyBbRegime is nameof(BollingerFigureRegime.Runaway) or
-                                         nameof(BollingerFigureRegime.Pullback) or
-                                         nameof(BollingerFigureRegime.Reacceleration))
-            {
-                score += 0.75m;
-            }
-
-            if (candidate.DailyBbDirection == nameof(BollingerFigureDirection.Up) &&
-                candidate.DailyBbRegime is nameof(BollingerFigureRegime.Runaway) or
-                                        nameof(BollingerFigureRegime.Pullback) or
-                                        nameof(BollingerFigureRegime.Reacceleration))
-            {
-                score += 1.0m;
-            }
-
-            if (candidate.H4BbDirection == nameof(BollingerFigureDirection.Up) &&
-                candidate.H4BbRegime is nameof(BollingerFigureRegime.Runaway) or
-                                       nameof(BollingerFigureRegime.Reacceleration))
-            {
-                score += 1.0m;
-            }
-
-            if (candidate.TradePlan.ProfitPercent >= 4.5m && candidate.TradePlan.ProfitPercent <= 7.5m)
-                score += 0.75m;
-
-            if (score < 6m)
-                return 0m;
-
-            return decimal.Round(score * settings.AiReferenceBonus, 4, MidpointRounding.AwayFromZero);
-        }
-
-        private static decimal CalculateNarrowRangePenalty(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings,
-            decimal lowAmplitudeFreshLaunchRepairAdjustment,
-            decimal realBollingerEnvelopeExpansionAdjustment)
-        {
-            diagnostics.NarrowRangePenalty = null;
-
-            if (lowAmplitudeFreshLaunchRepairAdjustment > 0m ||
-                realBollingerEnvelopeExpansionAdjustment >= settings.RealBollingerEnvelopeExpansionBonus)
-            {
-                return 0m;
-            }
-
-            var profitPct = candidate.TradePlan.ProfitPercent;
-            var atrRatio = diagnostics.ATRRatio;
-            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
-            var weakH4 =
-                candidate.H4BbRegime == nameof(BollingerFigureRegime.Collapse) ||
-                candidate.H4BbRegime == nameof(BollingerFigureRegime.Neutral) ||
-                h4RsiSlope <= settings.NarrowRangeWeakH4RsiSlopeThreshold;
-            var lowProfit = profitPct < settings.NarrowRangeMinUsefulProfitPct;
-            var lowAtr = atrRatio < settings.NarrowRangeMinAtrRatio;
-            var hardLowProfit = profitPct < settings.NarrowRangeHardMinProfitPct;
-            var hardLowAtr = atrRatio < settings.NarrowRangeHardMinAtrRatio;
-
-            if (!hardLowProfit &&
-                !(lowProfit && lowAtr) &&
-                !(hardLowAtr && weakH4))
-            {
-                return 0m;
-            }
-
-            var profitShortfall = Positive((settings.NarrowRangeMinUsefulProfitPct - profitPct) / 4m);
-            var atrShortfall = Positive((settings.NarrowRangeMinAtrRatio - atrRatio) / 1.2m);
-            var weakH4Penalty = weakH4 ? settings.NarrowRangeWeakH4Penalty : 0m;
-            var rawPenalty = (profitShortfall + atrShortfall + weakH4Penalty) * settings.NarrowRangePenaltyWeight;
-            var penalty = Math.Min(rawPenalty, settings.NarrowRangeMaxPenalty);
-
-            diagnostics.NarrowRangePenalty = decimal.Round(penalty, 4, MidpointRounding.AwayFromZero);
-            return penalty;
-        }
-
-        private static decimal CalculateLowAmplitudeFreshLaunchRepairAdjustment(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings,
-            decimal lowAmplitudeSimilarityPenalty,
-            decimal lateSpikePullbackPenalty)
-        {
-            diagnostics.LowAmplitudeFreshLaunchRepairScore = null;
-
-            if (lowAmplitudeSimilarityPenalty <= 0m || lateSpikePullbackPenalty > 0m)
-                return 0m;
-
-            if (candidate.TradePlan.ProfitPercent < settings.LowAmplitudeFreshLaunchRepairMinProfitPct ||
-                diagnostics.ATRRatio < settings.LowAmplitudeFreshLaunchRepairMinAtrRatio)
-            {
-                return 0m;
-            }
-
-            if (!TryCalculateRealBollingerEnvelope(
-                    candidate.RecentDailyBbUpperBandSeries,
-                    candidate.RecentDailyBbMidBandSeries,
-                    candidate.RecentDailyBbLowerBandSeries,
-                    out var daily) ||
-                !TryCalculateRealBollingerEnvelope(
-                    candidate.RecentH4BbUpperBandSeries,
-                    candidate.RecentH4BbMidBandSeries,
-                    candidate.RecentH4BbLowerBandSeries,
-                    out var h4))
-            {
-                return 0m;
-            }
-
-            var dailyRsiSlope = CalculateSlope(candidate.RecentDailyRsiSeries);
-            var h4RsiSlope = CalculateSlope(candidate.RecentH4RsiSeries);
-            var dailyMacdSlope = CalculateSlope(candidate.RecentDailyMacdHistogramSeries);
-            var h4MacdSlope = CalculateSlope(candidate.RecentH4MacdHistogramSeries);
-
-            var realLaunch =
-                daily.OpenPct >= settings.LowAmplitudeFreshLaunchRepairMinDailyOpenPct &&
-                h4.OpenPct >= settings.LowAmplitudeFreshLaunchRepairMinH4OpenPct &&
-                daily.MidMovePct >= settings.LowAmplitudeFreshLaunchRepairMinDailyMidMovePct &&
-                h4.MidMovePct >= settings.LowAmplitudeFreshLaunchRepairMinH4MidMovePct &&
-                daily.UpperMovePct > daily.MidMovePct &&
-                h4.UpperMovePct > h4.MidMovePct;
-
-            var momentumConfirms =
-                dailyRsiSlope >= settings.LowAmplitudeFreshLaunchRepairMinDailyRsiSlope &&
-                h4RsiSlope >= settings.LowAmplitudeFreshLaunchRepairMinH4RsiSlope &&
-                dailyMacdSlope >= settings.LowAmplitudeFreshLaunchRepairMinDailyMacdSlope &&
-                h4MacdSlope >= settings.LowAmplitudeFreshLaunchRepairMinH4MacdSlope;
-
-            if (!realLaunch || !momentumConfirms)
-                return 0m;
-
-            var weightedPenalty = lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
-            var score = Math.Min(weightedPenalty, settings.LowAmplitudeFreshLaunchRepairMaxBonus);
-            diagnostics.LowAmplitudeFreshLaunchRepairScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
-            return score;
-        }
-
-        private static decimal CalculateRealBollingerEnvelopeExpansionAdjustment(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings,
-            decimal seriesSimilarityBonus,
-            decimal lateSpikePullbackPenalty)
-        {
-            diagnostics.RealBollingerEnvelopeExpansionScore = null;
-
-            if (seriesSimilarityBonus <= 0m || lateSpikePullbackPenalty > 0m)
-                return 0m;
-
-            if (!TryCalculateRealBollingerEnvelope(
-                    candidate.RecentDailyBbUpperBandSeries,
-                    candidate.RecentDailyBbMidBandSeries,
-                    candidate.RecentDailyBbLowerBandSeries,
-                    out var daily) ||
-                !TryCalculateRealBollingerEnvelope(
-                    candidate.RecentH4BbUpperBandSeries,
-                    candidate.RecentH4BbMidBandSeries,
-                    candidate.RecentH4BbLowerBandSeries,
-                    out var h4) ||
-                !TryCalculateRealBollingerEnvelope(
-                    candidate.RecentWeeklyBbUpperBandSeries,
-                    candidate.RecentWeeklyBbMidBandSeries,
-                    candidate.RecentWeeklyBbLowerBandSeries,
-                    out var weekly))
-            {
-                return 0m;
-            }
-
-            var dailyOpens =
-                daily.OpenPct >= settings.RealBollingerEnvelopeMinDailyOpenPct &&
-                daily.UpperMovePct >= settings.RealBollingerEnvelopeMinDailyUpperMovePct &&
-                daily.LowerMovePct <= daily.MidMovePct * settings.RealBollingerEnvelopeMaxLowerVsMidMovePct;
-            var h4Confirms =
-                h4.OpenPct >= settings.RealBollingerEnvelopeMinH4OpenPct &&
-                h4.UpperMovePct >= settings.RealBollingerEnvelopeMinH4UpperMovePct &&
-                h4.LowerMovePct <= h4.MidMovePct * settings.RealBollingerEnvelopeMaxLowerVsMidMovePct;
-            var weeklySupports = weekly.OpenPct >= settings.RealBollingerEnvelopeMinWeeklyOpenPct;
-
-            if (!dailyOpens || !h4Confirms || !weeklySupports)
-                return 0m;
-
-            var score = settings.RealBollingerEnvelopeExpansionBonus;
-
-            if (daily.OpenPct >= settings.RealBollingerEnvelopeMinDailyOpenPct * 2m &&
-                h4.OpenPct >= settings.RealBollingerEnvelopeMinH4OpenPct * 4m &&
-                seriesSimilarityBonus >= settings.SeriesSimilarity.FullMatchBonus)
-            {
-                score += settings.RealBollingerEnvelopeExpansionHighConvictionBonus;
-            }
-
-            diagnostics.RealBollingerEnvelopeExpansionScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
-            return score;
-        }
-
         private static bool TryCalculateRealBollingerEnvelope(
             IReadOnlyList<decimal> upper,
             IReadOnlyList<decimal> mid,
@@ -3850,209 +3519,6 @@ namespace IbSwingTrader.Application.Candidates
                 lowerMovePct,
                 upperMovePct - lowerMovePct);
             return true;
-        }
-
-        private static decimal CalculateLateSpikePullbackPenalty(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings,
-            decimal seriesSimilarityBonus)
-        {
-            diagnostics.LateSpikePullbackPenalty = null;
-
-            if (seriesSimilarityBonus > 0m)
-                return 0m;
-
-            var overheatedContext =
-                candidate.Context.DailyRSI14 >= settings.LateSpikePullbackMinDailyRsi &&
-                diagnostics.BBMidSignedDistancePct >= settings.LateSpikePullbackMinBbMid;
-
-            var fallingAwayFromUpperBand =
-                candidate.DailyBbUpperDistanceSlope <= settings.LateSpikePullbackMaxDailyUpperDistanceSlope &&
-                candidate.H4BbUpperDistanceSlope <= settings.LateSpikePullbackMaxH4UpperDistanceSlope;
-
-            var envelopeStillExpanding =
-                candidate.DailyBbWidthSlope >= settings.LateSpikePullbackMinDailyWidthSlope &&
-                candidate.H4BbWidthSlope >= settings.LateSpikePullbackMinH4WidthSlope;
-
-            if (!overheatedContext || !fallingAwayFromUpperBand || !envelopeStillExpanding)
-                return 0m;
-
-            diagnostics.LateSpikePullbackPenalty = settings.LateSpikePullbackPenalty;
-            return settings.LateSpikePullbackPenalty;
-        }
-
-        private static decimal CalculateDailyBollingerSqueezeLaunchAdjustment(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings)
-        {
-            diagnostics.DailyBollingerSqueezeLaunchScore = null;
-
-            if (candidate.RecentDailyBbUpperBandSeries.Count < 6 ||
-                candidate.RecentDailyBbMidBandSeries.Count < 6 ||
-                candidate.RecentDailyBbLowerBandSeries.Count < 6 ||
-                candidate.RecentDailyBbWidthSeries.Count < 6 ||
-                candidate.RecentDailyBbUpperDistanceSeries.Count < 4 ||
-                candidate.RecentDailyRsiSeries.Count < 1 ||
-                candidate.RecentDailyMacdHistogramSeries.Count < 1)
-            {
-                return 0m;
-            }
-
-            var upper = candidate.RecentDailyBbUpperBandSeries;
-            var mid = candidate.RecentDailyBbMidBandSeries;
-            var lower = candidate.RecentDailyBbLowerBandSeries;
-            var width = candidate.RecentDailyBbWidthSeries;
-            var upperDistance = candidate.RecentDailyBbUpperDistanceSeries;
-            var baseMid = mid[^4];
-
-            if (baseMid <= 0m)
-                return 0m;
-
-            var widthExpansion = width[^1] - width[^4];
-            var preExpansionWidth = width.Take(width.Count - 3).DefaultIfEmpty(width[^4]).Min();
-            var upperMovePct = (upper[^1] - upper[^4]) / baseMid * 100m;
-            var midMovePct = (mid[^1] - mid[^4]) / baseMid * 100m;
-            var lowerMovePct = (lower[^1] - lower[^4]) / baseMid * 100m;
-            var upperAccelerationPct = ((upper[^1] - upper[^2]) - (upper[^3] - upper[^4])) / baseMid * 100m;
-            var lowerDivergesFromMid = lowerMovePct <= settings.DailyBollingerSqueezeLaunchMaxLowerMovePct ||
-                                        lowerMovePct <= midMovePct * 0.40m;
-            var brokeOrTouchedUpperBand = upperDistance.TakeLast(3).Min() <= settings.DailyBollingerSqueezeLaunchMaxUpperDistancePct;
-            var momentumConfirms =
-                GetLatestValue(candidate.RecentDailyRsiSeries) >= settings.DailyBollingerSqueezeLaunchMinRsi &&
-                GetLatestValue(candidate.RecentDailyMacdHistogramSeries) > settings.DailyBollingerSqueezeLaunchMinMacd;
-
-            if (preExpansionWidth > settings.DailyBollingerSqueezeLaunchMaxPreExpansionWidthPct ||
-                widthExpansion < settings.DailyBollingerSqueezeLaunchMinWidthExpansionPct ||
-                upperMovePct < settings.DailyBollingerSqueezeLaunchMinUpperMovePct ||
-                midMovePct < settings.DailyBollingerSqueezeLaunchMinMidMovePct ||
-                upperAccelerationPct <= 0m ||
-                !lowerDivergesFromMid ||
-                !brokeOrTouchedUpperBand ||
-                !momentumConfirms)
-            {
-                return 0m;
-            }
-
-            var score = settings.DailyBollingerSqueezeLaunchBonus;
-
-            if (widthExpansion >= settings.DailyBollingerSqueezeLaunchMinWidthExpansionPct * 1.75m &&
-                upperMovePct >= settings.DailyBollingerSqueezeLaunchMinUpperMovePct * 1.50m &&
-                GetLatestValue(candidate.RecentDailyRsiSeries) >= 70m)
-            {
-                score += settings.DailyBollingerSqueezeLaunchHighConvictionBonus;
-            }
-
-            diagnostics.DailyBollingerSqueezeLaunchScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
-            return score;
-        }
-
-        private static decimal CalculateFreshExpansionWinnerAdjustment(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics,
-            NextDayRankingSettings settings,
-            decimal seriesSimilarityBonus)
-        {
-            diagnostics.FreshExpansionWinnerScore = null;
-
-            if (candidate.TradePlan.ProfitPercent < settings.FreshExpansionMinProfitPct ||
-                diagnostics.ATRRatio < settings.FreshExpansionMinAtrRatio)
-            {
-                return 0m;
-            }
-
-            var weeklyMaLast = GetLatestValue(candidate.RecentWeeklyMaSeries);
-            var dailyMaLast = GetLatestValue(candidate.RecentDailyMaSeries);
-            var h4MaLast = GetLatestValue(candidate.RecentH4MaSeries);
-            var dailyBbWidthLast = GetLatestValue(candidate.RecentDailyBbWidthSeries);
-            var h4BbWidthLast = GetLatestValue(candidate.RecentH4BbWidthSeries);
-            var dailyRsiLast = GetLatestValue(candidate.RecentDailyRsiSeries);
-            var h4RsiLast = GetLatestValue(candidate.RecentH4RsiSeries);
-            var weeklyMacdLast = GetLatestValue(candidate.RecentWeeklyMacdHistogramSeries);
-            var dailyMacdLast = GetLatestValue(candidate.RecentDailyMacdHistogramSeries);
-            var h4MacdLast = GetLatestValue(candidate.RecentH4MacdHistogramSeries);
-
-            var hasFreshWeeklyRecovery =
-                weeklyMaLast >= settings.FreshExpansionMinWeeklyMa &&
-                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMaSeries, settings.FreshExpansionMaxPreviousWeeklyMa) &&
-                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMaSeries, settings.FreshExpansionMinPreviousWeeklyLow);
-            var hasDailyExpansion =
-                dailyMaLast >= settings.FreshExpansionMinDailyMa &&
-                dailyBbWidthLast >= settings.FreshExpansionMinDailyBbWidth &&
-                dailyRsiLast >= settings.FreshExpansionMinDailyRsi &&
-                dailyMacdLast > settings.FreshExpansionMinMacd;
-            var hasH4Expansion =
-                h4MaLast >= settings.FreshExpansionMinH4Ma &&
-                AverageLast(candidate.RecentH4MaSeries, 3) >= settings.FreshExpansionMinH4Ma &&
-                h4BbWidthLast >= settings.FreshExpansionMinH4BbWidth &&
-                h4RsiLast >= settings.FreshExpansionMinH4Rsi &&
-                h4MacdLast > settings.FreshExpansionMinMacd;
-            var hasWeeklyMacdRecovery =
-                weeklyMacdLast >= -0.05m &&
-                HasPreviousValueAtOrBelow(candidate.RecentWeeklyMacdHistogramSeries, 0m);
-
-            if (!hasFreshWeeklyRecovery ||
-                !hasDailyExpansion ||
-                !hasH4Expansion ||
-                !hasWeeklyMacdRecovery)
-            {
-                return 0m;
-            }
-
-            var score = settings.FreshExpansionWinnerBonus;
-
-            if (seriesSimilarityBonus >= settings.SeriesSimilarity.FullMatchBonus)
-                score += settings.FreshExpansionExactTemplateBonus;
-
-            if (candidate.Score.Score >= 100m &&
-                candidate.TradePlan.ProfitPercent >= 10m &&
-                dailyBbWidthLast >= 60m &&
-                h4BbWidthLast >= 55m)
-            {
-                score += settings.FreshExpansionHighConvictionBonus;
-            }
-
-            diagnostics.FreshExpansionWinnerScore = decimal.Round(score, 4, MidpointRounding.AwayFromZero);
-            return score;
-        }
-
-        private static decimal CalculateLiveWinnerContinuationAdjustment(
-            CandidateDetails candidate,
-            CandidateDiagnostics diagnostics)
-        {
-            if (candidate.Scan.PresetScanCode is not ("TOP_PERC_GAIN" or "TOP_OPEN_PERC_GAIN"))
-                return 0m;
-
-            var weeklyMaDistance = GetLatestValue(candidate.RecentWeeklyMaSeries);
-            var dailyMaDistance = GetLatestValue(candidate.RecentDailyMaSeries);
-            var h4MaDistance = GetLatestValue(candidate.RecentH4MaSeries);
-
-            if (weeklyMaDistance <= 0m ||
-                dailyMaDistance <= 0m)
-            {
-                return 0m;
-            }
-
-            if (candidate.TradePlan.ProfitPercent < 3m)
-                return 0m;
-
-            if (diagnostics.ATRRatio < 4m ||
-                candidate.Context.DailyRSI14 < 55m ||
-                diagnostics.VolumeRatio20 < 0.05m)
-            {
-                return 0m;
-            }
-
-            var score = 0.90m;
-
-            if (h4MaDistance > 0m)
-                score += 0.20m;
-
-            if (candidate.TradePlan.ProfitPercent >= 4m)
-                score += 0.15m;
-
-            return score;
         }
 
         private bool PassFinalAmplitudeProxyGate(
@@ -4459,10 +3925,8 @@ namespace IbSwingTrader.Application.Candidates
 
             candidate.Diagnostics.SeriesSimilarityTemplateTicker = match.TemplateTicker;
             candidate.Diagnostics.SeriesSimilarityTemplateFamily = match.TemplateFamily;
-            candidate.Diagnostics.SeriesSimilarityTemplateAmplitudePct = match.TemplateAmplitudePct;
             candidate.Diagnostics.SeriesSimilarityBonus = match.Bonus > 0m ? match.Bonus : null;
             candidate.Diagnostics.LowAmplitudeTemplateTicker = lowAmplitudeMatch.TemplateTicker;
-            candidate.Diagnostics.LowAmplitudeTemplateAmplitudePct = lowAmplitudeMatch.TemplateAmplitudePct;
             candidate.Diagnostics.LowAmplitudePenalty = lowAmplitudeMatch.Bonus > 0m
                 ? lowAmplitudeMatch.Bonus * settings.LowAmplitudePenaltyWeight
                 : null;
@@ -4956,25 +4420,37 @@ namespace IbSwingTrader.Application.Candidates
         {
             return new BollingerStateSet
             {
-                Weekly = ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
-                {
-                    MidSeries = recentSeries.WeeklyBbMidBandSeries,
-                    UpperDistanceSeries = recentSeries.WeeklyBbUpperBandSeries,
-                    WidthSeries = recentSeries.WeeklyBbWidthSeries
-                })),
-                Daily = ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
-                {
-                    MidSeries = recentSeries.DailyBbMidBandSeries,
-                    UpperDistanceSeries = recentSeries.DailyBbUpperBandSeries,
-                    WidthSeries = recentSeries.DailyBbWidthSeries
-                })),
-                H4 = ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
-                {
-                    MidSeries = recentSeries.H4BbMidBandSeries,
-                    UpperDistanceSeries = recentSeries.H4BbUpperBandSeries,
-                    WidthSeries = recentSeries.H4BbWidthSeries
-                }))
+                Weekly = AnalyzeBollingerState(
+                    recentSeries.WeeklyBbUpperBandSeries,
+                    recentSeries.WeeklyBbMidBandSeries,
+                    recentSeries.WeeklyBbLowerBandSeries),
+                Daily = AnalyzeBollingerState(
+                    recentSeries.DailyBbUpperBandSeries,
+                    recentSeries.DailyBbMidBandSeries,
+                    recentSeries.DailyBbLowerBandSeries),
+                H4 = AnalyzeBollingerState(
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries)
             };
+        }
+
+        private BollingerStateOutput AnalyzeBollingerState(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            var alignedUpper = upper.TakeLast(count).ToArray();
+            var alignedMid = mid.TakeLast(count).ToArray();
+            var alignedLower = lower.TakeLast(count).ToArray();
+
+            return ToOutput(_bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
+            {
+                UpperSeries = [.. alignedUpper],
+                MidSeries = [.. alignedMid],
+                LowerSeries = [.. alignedLower]
+            }));
         }
 
         private static BollingerStateOutput ToOutput(BollingerFigureState state)
@@ -5618,8 +5094,6 @@ namespace IbSwingTrader.Application.Candidates
 
         private static decimal? ResolveBollingerEntryDiscountOverridePct(
             BollingerStateSet bbState,
-            RecentFeatureSeries recentSeries,
-            H4BollingerEntrySettings settings,
             decimal? currentEntryDiscountPct)
         {
             var adjusted = currentEntryDiscountPct;
@@ -5630,16 +5104,6 @@ namespace IbSwingTrader.Application.Candidates
                 bbState.Daily.Direction,
                 bbState.H4.Regime,
                 bbState.H4.Direction);
-
-            if (settings.Enabled)
-            {
-                adjusted = ResolveH4BbFigureEntryDiscountPct(
-                    adjusted,
-                    bbState,
-                    recentSeries,
-                    settings,
-                    isBullishMinFirstSetup);
-            }
 
             if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
@@ -5964,63 +5428,6 @@ namespace IbSwingTrader.Application.Candidates
                 h4MacdSlope);
         }
 
-        private static decimal? ResolveH4BbFigureEntryDiscountPct(
-            decimal? currentEntryDiscountPct,
-            BollingerStateSet bbState,
-            RecentFeatureSeries recentSeries,
-            H4BollingerEntrySettings settings,
-            bool isBullishMinFirstSetup)
-        {
-            var latestMidDistancePctSigned = GetLatestSignedPercent(recentSeries.H4BbMidDistanceSeries);
-            if (latestMidDistancePctSigned <= 0m)
-                return currentEntryDiscountPct;
-
-            var latestMidDistancePct = latestMidDistancePctSigned;
-            if (latestMidDistancePct < settings.MinimumDistanceToMidPct)
-                return currentEntryDiscountPct;
-
-            var h4DirectionUp = bbState.H4.Direction == nameof(BollingerFigureDirection.Up);
-            var h4DirectionDown = bbState.H4.Direction == nameof(BollingerFigureDirection.Down);
-            var dailyCorrection =
-                bbState.Daily.Direction == nameof(BollingerFigureDirection.Up) &&
-                (bbState.Daily.Regime is nameof(BollingerFigureRegime.Pullback) or nameof(BollingerFigureRegime.Collapse));
-            var h4Correction =
-                (h4DirectionUp && bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback)) ||
-                (h4DirectionDown && bbState.H4.Regime is nameof(BollingerFigureRegime.Runaway) or nameof(BollingerFigureRegime.Collapse));
-
-            if (!isBullishMinFirstSetup && !(dailyCorrection && h4Correction))
-                return currentEntryDiscountPct;
-
-            var midSlopePct = bbState.H4.MidSlope;
-            decimal targetDiscountPct;
-
-            if (midSlopePct >= settings.UpwardMidSlopeThresholdPct)
-            {
-                targetDiscountPct = latestMidDistancePct * settings.MidpointWeightWhenMidUp;
-
-                if (bbState.H4.Direction == nameof(BollingerFigureDirection.Up) &&
-                    bbState.H4.Regime == nameof(BollingerFigureRegime.Pullback))
-                {
-                    targetDiscountPct = decimal.Min(targetDiscountPct, 0.04m);
-                }
-            }
-            else if (decimal.Abs(midSlopePct) <= settings.FlatMidSlopeThresholdPct)
-            {
-                targetDiscountPct = latestMidDistancePct * settings.MidTouchWeightWhenMidFlat + settings.BelowMidBufferPct;
-            }
-            else
-            {
-                targetDiscountPct = latestMidDistancePct * settings.MidpointWeightWhenMidDown;
-            }
-
-            targetDiscountPct = decimal.Clamp(
-                targetDiscountPct,
-                settings.MinimumDistanceToMidPct,
-                settings.MaximumEntryDiscountPct);
-
-            return MaxDiscount(currentEntryDiscountPct, targetDiscountPct);
-        }
-
         private static decimal? ResolveH4TriangleEntryDiscountOverridePct(
             List<Candle> h4Candles,
             List<Candle>? entryCandles,
@@ -6111,33 +5518,11 @@ namespace IbSwingTrader.Application.Candidates
                 : currentValue;
         }
 
-        private static decimal GetLatestSignedPercent(List<decimal> series)
-        {
-            return series.Count == 0
-                ? 0m
-                : series[^1] / 100m;
-        }
-
         private static decimal GetLatestValue(List<decimal> series)
         {
             return series.Count == 0
                 ? 0m
                 : series[^1];
-        }
-
-        private static bool HasPreviousValueAtOrBelow(List<decimal> series, decimal threshold)
-        {
-            return series.Count >= 2 && series.Take(series.Count - 1).Any(x => x <= threshold);
-        }
-
-        private static decimal AverageLast(List<decimal> series, int count)
-        {
-            if (series.Count == 0 || count <= 0)
-                return 0m;
-
-            return series
-                .Skip(Math.Max(0, series.Count - count))
-                .Average();
         }
 
         private static decimal CalculateRelativeMovePct(decimal from, decimal to)
@@ -6492,53 +5877,6 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.ATRRatio >= settings.MinAtrRatio &&
                    snapshot.Current.DailyRSI14 >= settings.MinDailyRsi14 &&
                    diagnostics.VolumeRatio20 >= settings.MinVolumeRatio20;
-        }
-
-        private static bool IsFreshExpansionTradeProfile(
-            CandidateDiagnostics diagnostics,
-            RecentFeatureSeries recentSeries,
-            FreshExpansionExitSettings settings)
-        {
-            if (!settings.Enabled ||
-                diagnostics.ATRRatio < settings.MinAtrRatio)
-            {
-                return false;
-            }
-
-            var weeklyMaLast = GetLatestValue(recentSeries.WeeklyMaSeries);
-            var dailyMaLast = GetLatestValue(recentSeries.DailyMaSeries);
-            var h4MaLast = GetLatestValue(recentSeries.H4MaSeries);
-            var dailyBbWidthLast = GetLatestValue(recentSeries.DailyBbWidthSeries);
-            var h4BbWidthLast = GetLatestValue(recentSeries.H4BbWidthSeries);
-            var dailyRsiLast = GetLatestValue(recentSeries.DailyRsiSeries);
-            var h4RsiLast = GetLatestValue(recentSeries.H4RsiSeries);
-            var weeklyMacdLast = GetLatestValue(recentSeries.WeeklyMacdHistogramSeries);
-            var dailyMacdLast = GetLatestValue(recentSeries.DailyMacdHistogramSeries);
-            var h4MacdLast = GetLatestValue(recentSeries.H4MacdHistogramSeries);
-
-            var hasFreshWeeklyRecovery =
-                weeklyMaLast >= settings.MinWeeklyMa &&
-                HasPreviousValueAtOrBelow(recentSeries.WeeklyMaSeries, settings.MaxPreviousWeeklyMa) &&
-                HasPreviousValueAtOrBelow(recentSeries.WeeklyMaSeries, settings.MinPreviousWeeklyLow);
-            var hasDailyExpansion =
-                dailyMaLast >= settings.MinDailyMa &&
-                dailyBbWidthLast >= settings.MinDailyBbWidth &&
-                dailyRsiLast >= settings.MinDailyRsi &&
-                dailyMacdLast > settings.MinMacd;
-            var hasH4Expansion =
-                h4MaLast >= settings.MinH4Ma &&
-                AverageLast(recentSeries.H4MaSeries, 3) >= settings.MinH4Ma &&
-                h4BbWidthLast >= settings.MinH4BbWidth &&
-                h4RsiLast >= settings.MinH4Rsi &&
-                h4MacdLast > settings.MinMacd;
-            var hasWeeklyMacdRecovery =
-                weeklyMacdLast >= -0.05m &&
-                HasPreviousValueAtOrBelow(recentSeries.WeeklyMacdHistogramSeries, 0m);
-
-            return hasFreshWeeklyRecovery &&
-                   hasDailyExpansion &&
-                   hasH4Expansion &&
-                   hasWeeklyMacdRecovery;
         }
 
         private static CandidateDiagnostics BuildDiagnostics(
@@ -7085,10 +6423,6 @@ namespace IbSwingTrader.Application.Candidates
         private sealed class RecentFeatureSeries
         {
             public List<decimal> DailyCloseSeries { get; init; } = [];
-            public List<decimal> DailyMaSeries { get; init; } = [];
-            public List<decimal> DailyBbMidDistanceSeries { get; init; } = [];
-            public List<decimal> DailyBbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> DailyBbWidthSeries { get; init; } = [];
             public List<decimal> DailyBbUpperBandSeries { get; init; } = [];
             public List<decimal> DailyBbMidBandSeries { get; init; } = [];
             public List<decimal> DailyBbLowerBandSeries { get; init; } = [];
@@ -7096,10 +6430,6 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> DailyMacdLineSeries { get; init; } = [];
             public List<decimal> DailyMacdSignalSeries { get; init; } = [];
             public List<decimal> DailyMacdHistogramSeries { get; init; } = [];
-            public List<decimal> WeeklyMaSeries { get; init; } = [];
-            public List<decimal> WeeklyBbMidDistanceSeries { get; init; } = [];
-            public List<decimal> WeeklyBbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> WeeklyBbWidthSeries { get; init; } = [];
             public List<decimal> WeeklyBbUpperBandSeries { get; init; } = [];
             public List<decimal> WeeklyBbMidBandSeries { get; init; } = [];
             public List<decimal> WeeklyBbLowerBandSeries { get; init; } = [];
@@ -7107,10 +6437,6 @@ namespace IbSwingTrader.Application.Candidates
             public List<decimal> WeeklyMacdLineSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSignalSeries { get; init; } = [];
             public List<decimal> WeeklyMacdHistogramSeries { get; init; } = [];
-            public List<decimal> H4MaSeries { get; init; } = [];
-            public List<decimal> H4BbMidDistanceSeries { get; init; } = [];
-            public List<decimal> H4BbUpperDistanceSeries { get; init; } = [];
-            public List<decimal> H4BbWidthSeries { get; init; } = [];
             public List<decimal> H4BbUpperBandSeries { get; init; } = [];
             public List<decimal> H4BbMidBandSeries { get; init; } = [];
             public List<decimal> H4BbLowerBandSeries { get; init; } = [];

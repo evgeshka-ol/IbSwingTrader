@@ -22,26 +22,10 @@ namespace IbSwingTrader.Domain.Candidates
 
         public string? SeriesSimilarityTemplateFamily { get; set; }
 
-        public decimal? SeriesSimilarityTemplateAmplitudePct { get; set; }
-
         public decimal? SeriesSimilarityBonus { get; set; }
 
         public string? LowAmplitudeTemplateTicker { get; set; }
 
-        public decimal? LowAmplitudeTemplateAmplitudePct { get; set; }
-
         public decimal? LowAmplitudePenalty { get; set; }
-
-        public decimal? LowAmplitudeFreshLaunchRepairScore { get; set; }
-
-        public decimal? FreshExpansionWinnerScore { get; set; }
-
-        public decimal? DailyBollingerSqueezeLaunchScore { get; set; }
-
-        public decimal? LateSpikePullbackPenalty { get; set; }
-
-        public decimal? RealBollingerEnvelopeExpansionScore { get; set; }
-
-        public decimal? NarrowRangePenalty { get; set; }
     }
 }

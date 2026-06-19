@@ -136,32 +136,10 @@ namespace IbSwingTrader.Domain.Settings
         public ExplosiveMaxFirstExitSettings ExplosiveMaxFirstExit { get; set; } = new();
         public ParabolicExpansionExitSettings ParabolicExpansionExit { get; set; } = new();
         public DeepParabolicExpansionExitSettings DeepParabolicExpansionExit { get; set; } = new();
-        public FreshExpansionExitSettings FreshExpansionExit { get; set; } = new();
         public ResearchLikeExitSettings ResearchLikeExit { get; set; } = new();
         public AiReferenceTradePlanSettings AiReferenceTradePlan { get; set; } = new();
         public SeriesEntryProfileSettings SeriesEntryProfile { get; set; } = new();
         public H4BollingerEntrySettings H4BollingerEntry { get; set; } = new();
-    }
-
-    public class FreshExpansionExitSettings
-    {
-        public bool Enabled { get; set; } = true;
-        public decimal EntryDiscountPct { get; set; } = 0.0m;
-        public decimal DefaultProfitPct { get; set; } = 0.105m;
-        public decimal MinProfitPct { get; set; } = 0.09m;
-        public decimal MaxProfitPct { get; set; } = 0.14m;
-        public decimal MaxLossPct { get; set; } = 0.06m;
-        public decimal MinAtrRatio { get; set; } = 4.0m;
-        public decimal MinWeeklyMa { get; set; } = 6.0m;
-        public decimal MaxPreviousWeeklyMa { get; set; } = 5.0m;
-        public decimal MinPreviousWeeklyLow { get; set; } = -5.0m;
-        public decimal MinDailyMa { get; set; } = 50.0m;
-        public decimal MinDailyBbWidth { get; set; } = 45.0m;
-        public decimal MinDailyRsi { get; set; } = 68.0m;
-        public decimal MinH4Ma { get; set; } = 45.0m;
-        public decimal MinH4BbWidth { get; set; } = 55.0m;
-        public decimal MinH4Rsi { get; set; } = 68.0m;
-        public decimal MinMacd { get; set; } = 0.0m;
     }
 
     public class SeriesEntryProfileSettings
@@ -217,15 +195,6 @@ namespace IbSwingTrader.Domain.Settings
 
     public class H4BollingerEntrySettings
     {
-        public bool Enabled { get; set; } = false;
-        public decimal FlatMidSlopeThresholdPct { get; set; } = 1.0m;
-        public decimal UpwardMidSlopeThresholdPct { get; set; } = 1.0m;
-        public decimal MidpointWeightWhenMidUp { get; set; } = 0.50m;
-        public decimal MidpointWeightWhenMidDown { get; set; } = 0.65m;
-        public decimal MidTouchWeightWhenMidFlat { get; set; } = 1.00m;
-        public decimal BelowMidBufferPct { get; set; } = 0.005m;
-        public decimal MinimumDistanceToMidPct { get; set; } = 0.02m;
-        public decimal MaximumEntryDiscountPct { get; set; } = 0.10m;
         public H4TriangleEntrySettings Triangle { get; set; } = new();
     }
 
@@ -485,102 +454,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal OverextendedPenalty { get; set; } = 0.16m;
         public int SecondPassWindowMultiplier { get; set; } = 4;
         public int SecondPassMinimumWindow { get; set; } = 30;
-        public decimal LateSpikePullbackPenalty { get; set; } = 2.40m;
-        public decimal LateSpikePullbackMinDailyRsi { get; set; } = 78.0m;
-        public decimal LateSpikePullbackMinBbMid { get; set; } = 25.0m;
-        public decimal LateSpikePullbackMaxDailyUpperDistanceSlope { get; set; } = -15.0m;
-        public decimal LateSpikePullbackMaxH4UpperDistanceSlope { get; set; } = -12.0m;
-        public decimal LateSpikePullbackMinDailyWidthSlope { get; set; } = 18.0m;
-        public decimal LateSpikePullbackMinH4WidthSlope { get; set; } = 18.0m;
-        public decimal RealBollingerEnvelopeExpansionBonus { get; set; } = 0.55m;
-        public decimal RealBollingerEnvelopeExpansionHighConvictionBonus { get; set; } = 0.25m;
-        public decimal RealBollingerEnvelopeMinDailyOpenPct { get; set; } = 3.0m;
-        public decimal RealBollingerEnvelopeMinH4OpenPct { get; set; } = 0.5m;
-        public decimal RealBollingerEnvelopeMinWeeklyOpenPct { get; set; } = 10.0m;
-        public decimal RealBollingerEnvelopeMinDailyUpperMovePct { get; set; } = 3.0m;
-        public decimal RealBollingerEnvelopeMinH4UpperMovePct { get; set; } = 1.0m;
-        public decimal RealBollingerEnvelopeMaxLowerVsMidMovePct { get; set; } = 0.75m;
-        public decimal LowAmplitudeFreshLaunchRepairMaxBonus { get; set; } = 1.05m;
-        public decimal LowAmplitudeFreshLaunchRepairMinProfitPct { get; set; } = 8.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinAtrRatio { get; set; } = 3.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinDailyMidMovePct { get; set; } = 8.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinH4MidMovePct { get; set; } = 4.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinDailyOpenPct { get; set; } = 3.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinH4OpenPct { get; set; } = 0.5m;
-        public decimal LowAmplitudeFreshLaunchRepairMinDailyRsiSlope { get; set; } = 12.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinH4RsiSlope { get; set; } = 18.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinDailyMacdSlope { get; set; } = 0.0m;
-        public decimal LowAmplitudeFreshLaunchRepairMinH4MacdSlope { get; set; } = 0.0m;
-        public decimal NarrowRangePenaltyWeight { get; set; } = 1.25m;
-        public decimal NarrowRangeMaxPenalty { get; set; } = 2.40m;
-        public decimal NarrowRangeMinUsefulProfitPct { get; set; } = 8.0m;
-        public decimal NarrowRangeHardMinProfitPct { get; set; } = 5.5m;
-        public decimal NarrowRangeMinAtrRatio { get; set; } = 2.60m;
-        public decimal NarrowRangeHardMinAtrRatio { get; set; } = 2.20m;
-        public decimal NarrowRangeWeakH4Penalty { get; set; } = 0.35m;
-        public decimal NarrowRangeWeakH4RsiSlopeThreshold { get; set; } = -5.0m;
-        public decimal FreshExpansionWinnerBonus { get; set; } = 4.60m;
-        public decimal FreshExpansionExactTemplateBonus { get; set; } = 1.00m;
-        public decimal FreshExpansionHighConvictionBonus { get; set; } = 0.60m;
-        public decimal FreshExpansionMinProfitPct { get; set; } = 8.0m;
-        public decimal FreshExpansionMinAtrRatio { get; set; } = 4.0m;
-        public decimal FreshExpansionMinWeeklyMa { get; set; } = 6.0m;
-        public decimal FreshExpansionMaxPreviousWeeklyMa { get; set; } = 5.0m;
-        public decimal FreshExpansionMinPreviousWeeklyLow { get; set; } = -5.0m;
-        public decimal FreshExpansionMinDailyMa { get; set; } = 50.0m;
-        public decimal FreshExpansionMinDailyBbWidth { get; set; } = 45.0m;
-        public decimal FreshExpansionMinDailyRsi { get; set; } = 68.0m;
-        public decimal FreshExpansionMinH4Ma { get; set; } = 45.0m;
-        public decimal FreshExpansionMinH4BbWidth { get; set; } = 55.0m;
-        public decimal FreshExpansionMinH4Rsi { get; set; } = 68.0m;
-        public decimal FreshExpansionMinMacd { get; set; } = 0.0m;
-        public decimal DailyBollingerSqueezeLaunchBonus { get; set; } = 1.40m;
-        public decimal DailyBollingerSqueezeLaunchHighConvictionBonus { get; set; } = 0.60m;
-        public decimal DailyBollingerSqueezeLaunchMinWidthExpansionPct { get; set; } = 18.0m;
-        public decimal DailyBollingerSqueezeLaunchMaxPreExpansionWidthPct { get; set; } = 35.0m;
-        public decimal DailyBollingerSqueezeLaunchMinUpperMovePct { get; set; } = 12.0m;
-        public decimal DailyBollingerSqueezeLaunchMaxLowerMovePct { get; set; } = 8.0m;
-        public decimal DailyBollingerSqueezeLaunchMinMidMovePct { get; set; } = 3.0m;
-        public decimal DailyBollingerSqueezeLaunchMaxUpperDistancePct { get; set; } = -4.0m;
-        public decimal DailyBollingerSqueezeLaunchMinRsi { get; set; } = 62.0m;
-        public decimal DailyBollingerSqueezeLaunchMinMacd { get; set; } = 0.0m;
-        public decimal ResearchSeriesDailyMaSlopeTarget { get; set; } = 22.95m;
-        public decimal ResearchSeriesDailyMaSlopeTolerance { get; set; } = 18m;
-        public decimal ResearchSeriesDailyRsiSlopeTarget { get; set; } = 19.56m;
-        public decimal ResearchSeriesDailyRsiSlopeTolerance { get; set; } = 15m;
-        public decimal ResearchSeriesDailyMacdSlopeTarget { get; set; } = 0.42m;
-        public decimal ResearchSeriesDailyMacdSlopeTolerance { get; set; } = 0.35m;
-        public decimal ResearchSeriesH4MaSlopeTarget { get; set; } = 24.49m;
-        public decimal ResearchSeriesH4MaSlopeTolerance { get; set; } = 18m;
-        public decimal ResearchSeriesH4RsiSlopeTarget { get; set; } = 38.34m;
-        public decimal ResearchSeriesH4RsiSlopeTolerance { get; set; } = 22m;
-        public decimal ResearchSeriesH4MacdSlopeTarget { get; set; } = 0.26m;
-        public decimal ResearchSeriesH4MacdSlopeTolerance { get; set; } = 0.20m;
-        public decimal ResearchSeriesDailyRsiUpMovesTarget { get; set; } = 3m;
-        public decimal ResearchSeriesDailyRsiUpMovesTolerance { get; set; } = 2m;
-        public decimal ResearchSeriesH4RsiUpMovesTarget { get; set; } = 13m;
-        public decimal ResearchSeriesH4RsiUpMovesTolerance { get; set; } = 4m;
-        public decimal AiReferenceBonus { get; set; } = 1.80m;
-        public decimal AiReferenceDistanceTo20dHighTarget { get; set; } = -15.5m;
-        public decimal AiReferenceDistanceTo20dHighTolerance { get; set; } = 6.0m;
-        public decimal AiReferenceDailyRsiTarget { get; set; } = 45.0m;
-        public decimal AiReferenceDailyRsiTolerance { get; set; } = 8.0m;
-        public decimal AiReferenceTrendPositionTarget { get; set; } = -6.0m;
-        public decimal AiReferenceTrendPositionTolerance { get; set; } = 6.0m;
-        public decimal AiReferenceDailyTrendPositionTarget { get; set; } = -5.0m;
-        public decimal AiReferenceDailyTrendPositionTolerance { get; set; } = 6.0m;
-        public decimal AiReferenceBbMidSignedDistanceTarget { get; set; } = -3.0m;
-        public decimal AiReferenceBbMidSignedDistanceTolerance { get; set; } = 4.0m;
-        public decimal AiReferenceWeeklyMacdHistDeltaTarget { get; set; } = 0.02m;
-        public decimal AiReferenceWeeklyMacdHistDeltaTolerance { get; set; } = 0.12m;
-        public decimal AiReferenceDailyRsiSlopeTarget { get; set; } = -4.0m;
-        public decimal AiReferenceDailyRsiSlopeTolerance { get; set; } = 6.0m;
-        public decimal AiReferenceH4RsiSlopeTarget { get; set; } = 12.0m;
-        public decimal AiReferenceH4RsiSlopeTolerance { get; set; } = 10.0m;
-        public decimal AiReferenceDailyMacdSlopeTarget { get; set; } = -0.05m;
-        public decimal AiReferenceDailyMacdSlopeTolerance { get; set; } = 0.18m;
-        public decimal AiReferenceH4MacdSlopeTarget { get; set; } = 0.10m;
-        public decimal AiReferenceH4MacdSlopeTolerance { get; set; } = 0.18m;
         public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;

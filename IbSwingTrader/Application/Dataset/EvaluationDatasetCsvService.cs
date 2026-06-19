@@ -10,34 +10,6 @@ namespace IbSwingTrader.Application.Dataset
         IArrayCellFormatter arrayCellFormatter,
         IObjectPropertyReader objectPropertyReader) : IEvaluationDatasetCsvService
     {
-        private static readonly HashSet<string> DeprecatedExportProperties =
-        [
-            nameof(EvaluationDatasetRow.RecentDailyMaSeries),
-            nameof(EvaluationDatasetRow.RecentDailyBbMidDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentDailyBbUpperDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentDailyBbWidthSeries),
-            nameof(EvaluationDatasetRow.RecentDailyMacdSeries),
-            nameof(EvaluationDatasetRow.RecentWeeklyMaSeries),
-            nameof(EvaluationDatasetRow.RecentWeeklyBbMidDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentWeeklyBbUpperDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentWeeklyBbWidthSeries),
-            nameof(EvaluationDatasetRow.RecentWeeklyMacdSeries),
-            nameof(EvaluationDatasetRow.RecentH4MaSeries),
-            nameof(EvaluationDatasetRow.RecentH4BbMidDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentH4BbUpperDistanceSeries),
-            nameof(EvaluationDatasetRow.RecentH4BbWidthSeries),
-            nameof(EvaluationDatasetRow.RecentH4MacdSeries),
-            nameof(EvaluationDatasetRow.WeeklyBbMidSlope),
-            nameof(EvaluationDatasetRow.WeeklyBbWidthSlope),
-            nameof(EvaluationDatasetRow.WeeklyBbUpperDistanceSlope),
-            nameof(EvaluationDatasetRow.DailyBbMidSlope),
-            nameof(EvaluationDatasetRow.DailyBbWidthSlope),
-            nameof(EvaluationDatasetRow.DailyBbUpperDistanceSlope),
-            nameof(EvaluationDatasetRow.H4BbMidSlope),
-            nameof(EvaluationDatasetRow.H4BbWidthSlope),
-            nameof(EvaluationDatasetRow.H4BbUpperDistanceSlope)
-        ];
-
         private readonly INumberTextFormatter _fmt = numberFormatter;
         private readonly IArrayCellFormatter _arrayFmt = arrayCellFormatter;
         private readonly IObjectPropertyReader _propertyReader = objectPropertyReader;
@@ -141,7 +113,6 @@ namespace IbSwingTrader.Application.Dataset
 
             var properties = _propertyReader
                 .GetOrderedProperties(typeof(EvaluationDatasetRow))
-                .Where(x => !DeprecatedExportProperties.Contains(x.Name))
                 .ToList();
             var sb = new StringBuilder();
             sb.AppendLine(string.Join(",", properties.Select(x => Escape(x.Name))));

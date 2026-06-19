@@ -31,21 +31,21 @@ namespace IbSwingTrader.Application.Evaluation
                     detectedPipeline,
                     "Unknown",
                     "Unknown",
-                    "Reason=insufficient daily mid-distance rows");
+                    "Reason=candidate family unavailable");
             }
 
             var dailyState = AnalyzeTimeframe(
                 series.DailyBbMidBandSeries,
                 series.DailyBbUpperBandSeries,
-                series.DailyBbWidthSeries);
+                series.DailyBbLowerBandSeries);
             var h4State = AnalyzeTimeframe(
                 series.H4BbMidBandSeries,
                 series.H4BbUpperBandSeries,
-                series.H4BbWidthSeries);
+                series.H4BbLowerBandSeries);
             var weeklyState = AnalyzeTimeframe(
                 series.WeeklyBbMidBandSeries,
                 series.WeeklyBbUpperBandSeries,
-                series.WeeklyBbWidthSeries);
+                series.WeeklyBbLowerBandSeries);
 
             var bellSignal = ClassifyBellPatternSignal(
                 series.DailyBbUpperBandSeries,
@@ -106,14 +106,19 @@ namespace IbSwingTrader.Application.Evaluation
 
         private BollingerFigureState AnalyzeTimeframe(
             IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> upperDistance,
-            IReadOnlyList<decimal> width)
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> lower)
         {
+            var count = Math.Min(mid.Count, Math.Min(upper.Count, lower.Count));
+            var alignedMid = mid.TakeLast(count).ToList();
+            var alignedUpper = upper.TakeLast(count).ToList();
+            var alignedLower = lower.TakeLast(count).ToList();
+
             return _bollingerFigureAnalyzer.Analyze(new BollingerFeatureSeries
             {
-                MidSeries = [.. mid],
-                UpperDistanceSeries = [.. upperDistance],
-                WidthSeries = [.. width]
+                UpperSeries = alignedUpper,
+                MidSeries = alignedMid,
+                LowerSeries = alignedLower
             });
         }
 
@@ -124,18 +129,6 @@ namespace IbSwingTrader.Application.Evaluation
 
             if (series.CandidateGroup.Equals("Reversal", StringComparison.OrdinalIgnoreCase))
                 return "Reversal";
-
-            if (series.DailyBbMidDistanceSeries.Count < 2)
-                return "Unknown";
-
-            var prev = series.DailyBbMidDistanceSeries[^2];
-            var current = series.DailyBbMidDistanceSeries[^1];
-
-            if (prev < 0m && current < 0m)
-                return "Reversal";
-
-            if (prev >= 0m && current >= 0m)
-                return "Runaway";
 
             return "Unknown";
         }
@@ -453,19 +446,13 @@ namespace IbSwingTrader.Application.Evaluation
         {
             diagnostics = string.Empty;
 
-            if (!IsBelowPreviousClosedDailyMid(series.DailyBbMidDistanceSeries))
-            {
-                diagnostics = "Reason=not-below-daily-mid";
-                return false;
-            }
-
             var upper = series.DailyBbUpperBandSeries;
             var mid = series.DailyBbMidBandSeries;
             var lower = series.DailyBbLowerBandSeries;
             var rsi = series.DailyRsiSeries;
             var macdLine = series.DailyMacdLineSeries;
             var macdSignal = series.DailyMacdSignalSeries;
-            var macdHistogram = PreferSeries(series.DailyMacdHistogramSeries, series.DailyMacdSeries);
+            var macdHistogram = series.DailyMacdHistogramSeries;
 
             if (upper.Count < 4 || mid.Count < 4 || lower.Count < 4 || rsi.Count < 4 || macdHistogram.Count < 4)
             {
@@ -539,17 +526,6 @@ namespace IbSwingTrader.Application.Evaluation
                    rsiTurnsUp;
         }
 
-        private static bool IsBelowPreviousClosedDailyMid(IReadOnlyList<decimal> dailyMidDistanceSeries)
-        {
-            if (dailyMidDistanceSeries.Count < 2)
-                return false;
-
-            return dailyMidDistanceSeries[^2] < 0m && dailyMidDistanceSeries[^1] < 0m;
-        }
-
-        private static List<decimal> PreferSeries(List<decimal> preferred, List<decimal> fallback)
-            => preferred.Count > 0 ? preferred : fallback;
-
         private static List<decimal> CalculateDeltas(List<decimal> series)
         {
             if (series.Count < 2)
@@ -603,28 +579,24 @@ namespace IbSwingTrader.Application.Evaluation
         {
             public PatternSeries(CandidateEvaluationResult candidate)
             {
-                CandidateGroup = string.Empty;
-                DailyBbMidDistanceSeries = candidate.RecentDailyBbMidDistanceSeries;
+                CandidateGroup = candidate.CandidateSource.Equals(
+                    "SameDayContinuation",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "Runaway"
+                    : "Reversal";
                 DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries;
                 DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries;
                 DailyBbLowerBandSeries = candidate.RecentDailyBbLowerBandSeries;
-                DailyBbWidthSeries = candidate.RecentDailyBbWidthSeries;
-                DailyBbUpperDistanceSeries = candidate.RecentDailyBbUpperDistanceSeries;
                 DailyRsiSeries = candidate.RecentDailyRsiSeries;
                 DailyMacdLineSeries = candidate.RecentDailyMacdLineSeries;
                 DailyMacdSignalSeries = candidate.RecentDailyMacdSignalSeries;
                 DailyMacdHistogramSeries = candidate.RecentDailyMacdHistogramSeries;
-                DailyMacdSeries = candidate.RecentDailyMacdSeries;
                 WeeklyBbUpperBandSeries = candidate.RecentWeeklyBbUpperBandSeries;
                 WeeklyBbMidBandSeries = candidate.RecentWeeklyBbMidBandSeries;
                 WeeklyBbLowerBandSeries = candidate.RecentWeeklyBbLowerBandSeries;
-                WeeklyBbWidthSeries = candidate.RecentWeeklyBbWidthSeries;
-                WeeklyBbUpperDistanceSeries = candidate.RecentWeeklyBbUpperDistanceSeries;
                 H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries;
                 H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries;
                 H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries;
-                H4BbWidthSeries = candidate.RecentH4BbWidthSeries;
-                H4BbUpperDistanceSeries = candidate.RecentH4BbUpperDistanceSeries;
                 H4MacdLineSeries = candidate.RecentH4MacdLineSeries;
                 H4MacdHistogramSeries = candidate.RecentH4MacdHistogramSeries;
             }
@@ -632,53 +604,37 @@ namespace IbSwingTrader.Application.Evaluation
             public PatternSeries(EvaluationDatasetRow row)
             {
                 CandidateGroup = row.CandidateGroup;
-                DailyBbMidDistanceSeries = row.RecentDailyBbMidDistanceSeries;
                 DailyBbUpperBandSeries = row.RecentDailyBbUpperBandSeries;
                 DailyBbMidBandSeries = row.RecentDailyBbMidBandSeries;
                 DailyBbLowerBandSeries = row.RecentDailyBbLowerBandSeries;
-                DailyBbWidthSeries = row.RecentDailyBbWidthSeries;
-                DailyBbUpperDistanceSeries = row.RecentDailyBbUpperDistanceSeries;
                 DailyRsiSeries = row.RecentDailyRsiSeries;
                 DailyMacdLineSeries = row.RecentDailyMacdLineSeries;
                 DailyMacdSignalSeries = row.RecentDailyMacdSignalSeries;
                 DailyMacdHistogramSeries = row.RecentDailyMacdHistogramSeries;
-                DailyMacdSeries = row.RecentDailyMacdSeries;
                 WeeklyBbUpperBandSeries = row.RecentWeeklyBbUpperBandSeries;
                 WeeklyBbMidBandSeries = row.RecentWeeklyBbMidBandSeries;
                 WeeklyBbLowerBandSeries = row.RecentWeeklyBbLowerBandSeries;
-                WeeklyBbWidthSeries = row.RecentWeeklyBbWidthSeries;
-                WeeklyBbUpperDistanceSeries = row.RecentWeeklyBbUpperDistanceSeries;
                 H4BbUpperBandSeries = row.RecentH4BbUpperBandSeries;
                 H4BbMidBandSeries = row.RecentH4BbMidBandSeries;
                 H4BbLowerBandSeries = row.RecentH4BbLowerBandSeries;
-                H4BbWidthSeries = row.RecentH4BbWidthSeries;
-                H4BbUpperDistanceSeries = row.RecentH4BbUpperDistanceSeries;
                 H4MacdLineSeries = row.RecentH4MacdLineSeries;
                 H4MacdHistogramSeries = row.RecentH4MacdHistogramSeries;
             }
 
             public string CandidateGroup { get; }
-            public List<decimal> DailyBbMidDistanceSeries { get; }
             public List<decimal> DailyBbUpperBandSeries { get; }
             public List<decimal> DailyBbMidBandSeries { get; }
             public List<decimal> DailyBbLowerBandSeries { get; }
-            public List<decimal> DailyBbWidthSeries { get; }
-            public List<decimal> DailyBbUpperDistanceSeries { get; }
             public List<decimal> DailyRsiSeries { get; }
             public List<decimal> DailyMacdLineSeries { get; }
             public List<decimal> DailyMacdSignalSeries { get; }
             public List<decimal> DailyMacdHistogramSeries { get; }
-            public List<decimal> DailyMacdSeries { get; }
             public List<decimal> WeeklyBbUpperBandSeries { get; }
             public List<decimal> WeeklyBbMidBandSeries { get; }
             public List<decimal> WeeklyBbLowerBandSeries { get; }
-            public List<decimal> WeeklyBbWidthSeries { get; }
-            public List<decimal> WeeklyBbUpperDistanceSeries { get; }
             public List<decimal> H4BbUpperBandSeries { get; }
             public List<decimal> H4BbMidBandSeries { get; }
             public List<decimal> H4BbLowerBandSeries { get; }
-            public List<decimal> H4BbWidthSeries { get; }
-            public List<decimal> H4BbUpperDistanceSeries { get; }
             public List<decimal> H4MacdLineSeries { get; }
             public List<decimal> H4MacdHistogramSeries { get; }
         }
