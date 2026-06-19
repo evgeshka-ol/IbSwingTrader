@@ -762,6 +762,32 @@ namespace IbSwingTrader.Application.Candidates
                     $"BellTimeframe={bellPatternSignal.Timeframe}");
                 return false;
             }
+
+            var hasRunawayTemplates = seriesSimilarityTemplates.Any(
+                x => x.Family == SeriesTemplateFamily.TodayResearchLike);
+            var runawayTemplateMatch = CalculateSeriesSimilarityMatch(
+                recentSeries,
+                seriesSimilarityTemplates,
+                SeriesTemplateFamily.TodayResearchLike,
+                _nextDayRankingSettings.SeriesSimilarity);
+
+            if (hasRunawayTemplates && runawayTemplateMatch.TemplateTicker == null)
+            {
+                _logger.Info(
+                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                    "BellUp matched, but no high-amplitude Runaway series template matched on Daily/H4. " +
+                    $"MaxDistance={_fmt.Generic(_nextDayRankingSettings.SeriesSimilarity.WeakMatchDistance)}");
+                return false;
+            }
+
+            _logger.Info(
+                $"Runaway series template confirmed for {ctx.Stock.Ticker}. " +
+                $"Template={runawayTemplateMatch.TemplateTicker ?? "none"}, " +
+                $"AmplitudePct={_fmt.Generic(runawayTemplateMatch.TemplateAmplitudePct ?? 0m)}, " +
+                $"MatchedTimeframe={GetBestTimeframeName(runawayTemplateMatch)}, " +
+                $"DailyDistance={_fmt.Generic(runawayTemplateMatch.DailyDistance ?? 0m)}, " +
+                $"H4Distance={_fmt.Generic(runawayTemplateMatch.H4Distance ?? 0m)}");
+
             var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
             var dailyUpperSlope = CalculateRelativeSlopePct(recentSeries.DailyBbUpperBandSeries);
             var dailyLowerSlope = CalculateRelativeSlopePct(recentSeries.DailyBbLowerBandSeries);
