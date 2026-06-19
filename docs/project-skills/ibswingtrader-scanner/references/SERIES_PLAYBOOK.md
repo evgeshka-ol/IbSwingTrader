@@ -46,8 +46,9 @@ Migration direction:
 Active cleanup supersedes that compatibility allowance for scanner similarity
 and `candidates.csv`: only real Bollinger upper/mid/lower, MACD
 line/signal/histogram, and RSI rows are admitted. There is no weighted
-cross-timeframe total or mean row distance. Daily, Weekly, and H4 are matched
+cross-timeframe total or mean row distance. Daily and H4 are matched
 independently; the worst point of the worst real row controls each timeframe.
+Weekly rows remain context only.
 
 ## Main interpretations
 
@@ -207,9 +208,9 @@ pre-move H4 rows:
 - `ReadyNow`: UMAC/ONDS-like. H4 upper band is opening upward, H4 mid is not
   falling, H4 lower is not simply following upward, and H4 RSI/MACD do not roll
   over. These rows can be promoted and ranked for same-day trading.
-- `WishListOnly`: SHLS-like. Daily/weekly runway is visible, but H4 trigger is
-  not ready. Keep it in `wishlist.csv`; it is still a runway watch, not a
-  reversal.
+- `NotReady`: SHLS-like. Daily/weekly runway is visible, but H4/Daily trigger
+  is not ready. Keep it out of the current final list; it is still runway
+  context, not a reversal.
 - `Neutral`: neither the higher-frame runway nor the H4 trigger is confirmed
   well enough by the saved rows. Keep it out of the trade-ready
   `Runaway` path even if an older live-mover or template
@@ -222,12 +223,13 @@ price. Normalize by the starting point or compare deltas from the first point.
 
 When comparing scanner output to research winners:
 
-- first compare `Weekly`
-- then `Daily`
-- then `H4`
+- compare `Daily`
+- then compare `H4`
+- inspect `Weekly` only as background context
 - compare the actual row values point-by-point after normalizing each series from its first point
-- treat each timeframe as a separate match; one matching timeframe is enough,
-  without averaging it with the two non-matching timeframes
+- treat Daily and H4 as separate matches; either one is enough, without
+  averaging it with the other timeframe
+- never admit a candidate from a Weekly-only match
 - use modest per-point tolerance, not exact equality; tiny deviations are the
   same shape, but differences beyond tolerance should reduce the match
 - prefer close literal similarity to winner rows over broad slope-only matches

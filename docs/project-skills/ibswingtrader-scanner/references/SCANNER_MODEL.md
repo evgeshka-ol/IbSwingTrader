@@ -66,8 +66,8 @@ below-mid split. The pattern is daily-row based:
 - RSI recovers from the recent low
 
 After the hook passes, final admission also requires literal series similarity
-to a high-amplitude reversal template. Use real closed D1 rows for the daily
-part and the saved Weekly/H4 rows for context.
+to a high-amplitude reversal template on real closed D1 or saved H4 rows.
+Weekly rows remain context only.
 
 
 Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
@@ -201,9 +201,10 @@ Comparison principle:
 
 - compare each series point-by-point with modest tolerance
 - normalize each compared series from its first point
-- use Daily, Weekly, and H4 contexts together
-- calculate a separate distance for Daily, Weekly, and H4; matching any one
-  timeframe is sufficient, and the weighted average must not decide admission
+- calculate a separate distance for Daily and H4; matching either timeframe is
+  sufficient, and the weighted average must not decide admission
+- keep Weekly rows as context only; a Weekly-only match must not promote a
+  candidate into today's final list
 - avoid replacing this with only slope/aggregate statistics
 - split templates by outcome role: high-amplitude rows are positive scanner
   templates; low-amplitude rows are rejection templates
@@ -217,11 +218,11 @@ Bell pattern pair:
   recent-expansion requirement. It belongs on the below-mid / reversal side.
 - Use the same real Bollinger upper/mid/lower rows to recognize both forms;
   only the direction changes.
-- The scanner does not require Bell confirmation on all three timeframes.
-  One clean timeframe is enough. The source timeframe controls timing:
+- The scanner matches Bell only on H4 and Daily. One clean matching timeframe
+  is enough. The source timeframe controls timing:
   - `H4` means the setup can be played today and may enter final `Runaway`
   - `Daily` means the setup is for tomorrow and may enter final `Runaway`
-  - `Weekly` means the setup belongs in wishlist / next-week context
+  - `Weekly` remains background context and is not passed to the Bell matcher
 
 For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
 real Bollinger rows in `H4` or `Daily`. Weekly-only Bell and other continuation

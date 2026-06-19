@@ -71,8 +71,9 @@ Both families should produce meaningful future amplitude:
 Current final `Reversal` promotion uses the working `ReversalHook` pattern
 after the hard split. The split only decides that the ticker is below the daily
 Bollinger mid; `ReversalHook` decides whether it is a trade-ready return setup.
-The hook is necessary but not sufficient: the combined real-D1 and Weekly/H4
-rows must also match a high-amplitude (`AmplitudePct >= 10%`) reversal template.
+The hook is necessary but not sufficient: the real D1 or H4 rows must also
+match a high-amplitude (`AmplitudePct >= 10%`) reversal template. Weekly rows
+remain context only.
 The hook is detected on real daily rows:
 
 - lower Bollinger band broke down and then hooks upward
@@ -93,9 +94,9 @@ similarity signal before adding more derived heuristics.
 
 - Compare rows point-by-point with small tolerance, not only by computed slopes.
 - Normalize comparable series from their first point so shape matters more than absolute level.
-- Calculate Daily, Weekly, and H4 similarity independently. A match on any one
-  of the three timeframes is sufficient; do not average the three distances to
-  decide whether the template matched.
+- Calculate Daily and H4 similarity independently. A match on either timeframe
+  is sufficient; do not average their distances. Weekly rows are context only
+  and must not decide template admission or final promotion.
 - Use `research_top_gainers.csv` as the main `Runaway` template source.
 - Use high-amplitude `evaluation-dataset.csv` rows as an additional template source.
 - Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
@@ -136,12 +137,12 @@ either by a broader phase comparison or by a short local turn where the upper
 and mid Bollinger rows bend up together and band width starts opening again.
 `BellDown` is the mirrored form used on the below-mid reversal side.
 
-The scanner does not require all three timeframes to confirm Bell.
-One clean timeframe is enough:
+The scanner matches Bell only on H4 and Daily. One clean matching timeframe is
+enough:
 
 - `H4`: eligible for final `Runaway`, play it today
 - `Daily`: eligible for final `Runaway`, play it for tomorrow
-- `Weekly`: diagnostic / next-week context only; do not promote to final `Runaway`
+- `Weekly`: background context only; it is not passed to the Bell matcher
 
 The source timeframe changes urgency and trade-plan depth, not the family split.
 

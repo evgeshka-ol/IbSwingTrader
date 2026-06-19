@@ -39,9 +39,9 @@ Use this when the right names are present but top summary is wrong.
 
 Controls literal row-shape matching against winner templates.
 
-Use this when candidates are present but the ranking misses names whose Daily,
-Weekly, and H4 rows look like past `research_top_gainers.csv` winners or
-high-amplitude evaluation rows.
+Use this when candidates are present but the ranking misses names whose Daily
+or H4 rows look like past `research_top_gainers.csv` winners or high-amplitude
+evaluation rows. Weekly rows are context only.
 
 Important knobs:
 
@@ -59,9 +59,10 @@ Important knobs:
   vs `4.0` should usually be treated as the same shape; larger differences
   should quickly reduce similarity.
 
-Timeframes and indicator rows are not averaged. Daily, Weekly, and H4 are
-matched independently, and each timeframe uses its worst real-line distance so
-one good line cannot hide a failed Bollinger/MACD/RSI row.
+Timeframes and indicator rows are not averaged. Daily and H4 are matched
+independently, and each timeframe uses its worst real-line distance so one good
+line cannot hide a failed Bollinger/MACD/RSI row. Weekly does not participate
+in admission.
 
 ### `GetCandidates.TradePlan`
 
