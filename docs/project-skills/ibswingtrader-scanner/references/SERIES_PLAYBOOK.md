@@ -43,6 +43,12 @@ Migration direction:
 - Distance/width rows can remain for compatibility and diagnostics, but should
   be removed from primary decision logic over time.
 
+Active cleanup supersedes that compatibility allowance for scanner similarity
+and `candidates.csv`: only real Bollinger upper/mid/lower, MACD
+line/signal/histogram, and RSI rows are admitted. There is no weighted
+cross-timeframe total or mean row distance. Daily, Weekly, and H4 are matched
+independently; the worst point of the worst real row controls each timeframe.
+
 ## Main interpretations
 
 ### Runaway Up
@@ -220,6 +226,8 @@ When comparing scanner output to research winners:
 - then `Daily`
 - then `H4`
 - compare the actual row values point-by-point after normalizing each series from its first point
+- treat each timeframe as a separate match; one matching timeframe is enough,
+  without averaging it with the two non-matching timeframes
 - use modest per-point tolerance, not exact equality; tiny deviations are the
   same shape, but differences beyond tolerance should reduce the match
 - prefer close literal similarity to winner rows over broad slope-only matches

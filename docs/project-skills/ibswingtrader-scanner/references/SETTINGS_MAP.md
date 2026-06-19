@@ -54,11 +54,14 @@ Important knobs:
   amplitude band for negative templates.
 - `LowAmplitudePenaltyWeight`: second-pass rank penalty for candidates matching
   low-amplitude row shapes.
-- `DailyWeight`, `WeeklyWeight`, `H4Weight`: timeframe balance.
 - `RelativePointTolerance` and `*PointTolerance`: per-point tolerance before a
   row difference is counted as real distance. Small differences such as `3.8`
   vs `4.0` should usually be treated as the same shape; larger differences
   should quickly reduce similarity.
+
+Timeframes and indicator rows are not averaged. Daily, Weekly, and H4 are
+matched independently, and each timeframe uses its worst real-line distance so
+one good line cannot hide a failed Bollinger/MACD/RSI row.
 
 ### `GetCandidates.TradePlan`
 

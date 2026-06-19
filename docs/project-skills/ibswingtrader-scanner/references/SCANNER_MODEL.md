@@ -69,6 +69,7 @@ After the hook passes, final admission also requires literal series similarity
 to a high-amplitude reversal template. Use real closed D1 rows for the daily
 part and the saved Weekly/H4 rows for context.
 
+
 Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
 initial working examples. The cleanest entry is normally one to two daily bars
 after the lower-band hook.
@@ -201,6 +202,8 @@ Comparison principle:
 - compare each series point-by-point with modest tolerance
 - normalize each compared series from its first point
 - use Daily, Weekly, and H4 contexts together
+- calculate a separate distance for Daily, Weekly, and H4; matching any one
+  timeframe is sufficient, and the weighted average must not decide admission
 - avoid replacing this with only slope/aggregate statistics
 - split templates by outcome role: high-amplitude rows are positive scanner
   templates; low-amplitude rows are rejection templates

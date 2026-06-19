@@ -93,6 +93,9 @@ similarity signal before adding more derived heuristics.
 
 - Compare rows point-by-point with small tolerance, not only by computed slopes.
 - Normalize comparable series from their first point so shape matters more than absolute level.
+- Calculate Daily, Weekly, and H4 similarity independently. A match on any one
+  of the three timeframes is sufficient; do not average the three distances to
+  decide whether the template matched.
 - Use `research_top_gainers.csv` as the main `Runaway` template source.
 - Use high-amplitude `evaluation-dataset.csv` rows as an additional template source.
 - Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
@@ -172,6 +175,11 @@ scanner prediction, filters, promotion, and ranking is:
 MA rows and older distance/width rows are legacy/context. Do not base new
 prediction logic on them unless a concrete analysis proves they add value
 beyond the real Bollinger/MACD/RSI rows.
+
+Current cleanup rule is stricter: scanner similarity and generated candidate
+series output contain only the real Bollinger upper/mid/lower, MACD
+line/signal/histogram, and RSI rows. Do not reintroduce MA, distance, width,
+MACD aliases, weighted timeframe totals, or stored slope summaries.
 
 ## Main code
 
