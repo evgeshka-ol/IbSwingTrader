@@ -198,8 +198,9 @@ Bell pair:
   - `Weekly` means wishlist / next week
 
 The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
-real Bollinger rows from `H4` or `Daily`. Weekly-only Bell and non-Bell
-continuation shapes are watchlist/diagnostic context, not final `Runaway`
+real Bollinger rows from `H4` or `Daily` whose real Bollinger/MACD/RSI rows
+also match a high-amplitude Runaway template on Daily or H4. Weekly-only Bell
+and non-Bell continuation shapes are diagnostic context, not final `Runaway`
 promotion.
 
 When the higher-frame runway shape is present, separate the phase by the saved

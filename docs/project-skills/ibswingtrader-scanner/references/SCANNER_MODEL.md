@@ -225,5 +225,6 @@ Bell pattern pair:
   - `Weekly` remains background context and is not passed to the Bell matcher
 
 For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
-real Bollinger rows in `H4` or `Daily`. Weekly-only Bell and other continuation
+real Bollinger rows in `H4` or `Daily`, plus a literal Daily or H4 match to a
+high-amplitude Runaway template. Weekly-only Bell and other continuation
 subtypes are context until research explicitly enables them.

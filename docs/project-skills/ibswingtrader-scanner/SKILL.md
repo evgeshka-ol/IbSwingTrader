@@ -49,8 +49,9 @@ Internal `Runaway` subtypes:
 - `PullbackContinuation`: constructive continuation after a pullback
 
 Current final `Runaway` admission is intentionally strict: the candidate must
-confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. Other
-above-mid continuation subtypes remain diagnostic only.
+confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`, and its real
+Daily or H4 Bollinger/MACD/RSI rows must literally match a high-amplitude
+Runaway template. Other above-mid continuation subtypes remain diagnostic only.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
