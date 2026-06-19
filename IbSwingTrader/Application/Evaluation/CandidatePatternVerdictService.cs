@@ -42,11 +42,6 @@ namespace IbSwingTrader.Application.Evaluation
                 series.H4BbMidBandSeries,
                 series.H4BbUpperBandSeries,
                 series.H4BbLowerBandSeries);
-            var weeklyState = AnalyzeTimeframe(
-                series.WeeklyBbMidBandSeries,
-                series.WeeklyBbUpperBandSeries,
-                series.WeeklyBbLowerBandSeries);
-
             var bellSignal = ClassifyBellPatternSignal(
                 series.DailyBbUpperBandSeries,
                 series.DailyBbMidBandSeries,
@@ -54,12 +49,8 @@ namespace IbSwingTrader.Application.Evaluation
                 series.H4BbUpperBandSeries,
                 series.H4BbMidBandSeries,
                 series.H4BbLowerBandSeries,
-                series.WeeklyBbUpperBandSeries,
-                series.WeeklyBbMidBandSeries,
-                series.WeeklyBbLowerBandSeries,
                 dailyState.Direction,
-                h4State.Direction,
-                weeklyState.Direction);
+                h4State.Direction);
 
             if (detectedPipeline == "Runaway")
             {
@@ -140,28 +131,22 @@ namespace IbSwingTrader.Application.Evaluation
             IReadOnlyList<decimal> h4Upper,
             IReadOnlyList<decimal> h4Mid,
             IReadOnlyList<decimal> h4Lower,
-            IReadOnlyList<decimal> weeklyUpper,
-            IReadOnlyList<decimal> weeklyMid,
-            IReadOnlyList<decimal> weeklyLower,
             BollingerFigureDirection dailyDirection,
-            BollingerFigureDirection h4Direction,
-            BollingerFigureDirection weeklyDirection)
+            BollingerFigureDirection h4Direction)
         {
             var dailyKind = ClassifyBellPatternKindForTimeframe(dailyUpper, dailyMid, dailyLower, dailyDirection);
             var h4Kind = ClassifyBellPatternKindForTimeframe(h4Upper, h4Mid, h4Lower, h4Direction);
-            var weeklyKind = ClassifyBellPatternKindForTimeframe(weeklyUpper, weeklyMid, weeklyLower, weeklyDirection);
 
-            var bellUpSignal = SelectBellPatternSignal(dailyKind, h4Kind, weeklyKind, BellPatternKind.BellUp);
+            var bellUpSignal = SelectBellPatternSignal(dailyKind, h4Kind, BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
                 return bellUpSignal;
 
-            return SelectBellPatternSignal(dailyKind, h4Kind, weeklyKind, BellPatternKind.BellDown);
+            return SelectBellPatternSignal(dailyKind, h4Kind, BellPatternKind.BellDown);
         }
 
         private static BellPatternSignal SelectBellPatternSignal(
             BellPatternKind dailyKind,
             BellPatternKind h4Kind,
-            BellPatternKind weeklyKind,
             BellPatternKind targetKind)
         {
             if (h4Kind == targetKind)
@@ -169,9 +154,6 @@ namespace IbSwingTrader.Application.Evaluation
 
             if (dailyKind == targetKind)
                 return new BellPatternSignal(targetKind, BellPatternTimeframe.Daily);
-
-            if (weeklyKind == targetKind)
-                return new BellPatternSignal(targetKind, BellPatternTimeframe.Weekly);
 
             return new BellPatternSignal(BellPatternKind.None, BellPatternTimeframe.None);
         }
@@ -407,7 +389,6 @@ namespace IbSwingTrader.Application.Evaluation
                                            h4State.Regime != BollingerFigureRegime.Collapse,
                 BellPatternTimeframe.Daily => dailyState.Direction != BollingerFigureDirection.Down &&
                                               dailyState.Regime != BollingerFigureRegime.Collapse,
-                BellPatternTimeframe.Weekly => false,
                 _ => false
             };
         }
@@ -571,8 +552,7 @@ namespace IbSwingTrader.Application.Evaluation
         {
             None = 0,
             Daily = 1,
-            H4 = 2,
-            Weekly = 3
+            H4 = 2
         }
 
         private sealed class PatternSeries
