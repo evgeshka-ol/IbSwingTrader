@@ -56,6 +56,15 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 if (IsRunawayBellUpPattern(bellSignal, dailyState, h4State))
                 {
+                    if (IsVerticalSpikeExpansion(series, bellSignal.Timeframe))
+                    {
+                        return new CandidatePatternVerdict(
+                            detectedPipeline,
+                            "None",
+                            "Mismatch",
+                            $"Reason=BellUp not confirmed on {bellSignal.Timeframe}: isolated terminal spike");
+                    }
+
                     if (HasTerminalMomentumRollover(series, bellSignal.Timeframe))
                     {
                         return new CandidatePatternVerdict(
@@ -164,14 +173,15 @@ namespace IbSwingTrader.Application.Evaluation
             IReadOnlyList<decimal> lower,
             BollingerFigureDirection direction)
         {
-            if (IsBellUpPhase(upper, mid, lower) &&
+            if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
+                return BellPatternKind.None;
+
+            if (IsBellUpEnvelope(prior, recent) &&
+                IsBellUpCurveTurn(upper, mid, lower) &&
                 direction != BollingerFigureDirection.Down)
             {
                 return BellPatternKind.BellUp;
             }
-
-            if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
-                return BellPatternKind.None;
 
             if (IsBellDownEnvelope(prior, recent) &&
                 IsBellDownCurveTurn(upper, mid, lower) &&
@@ -181,64 +191,6 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             return BellPatternKind.None;
-        }
-
-        private static bool IsBellUpPhase(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
-        {
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 7)
-                return false;
-
-            var width = Enumerable.Range(0, count)
-                .Select(i => upper[i] - lower[i])
-                .ToArray();
-
-            for (var pivot = 2; pivot <= count - 4; pivot++)
-            {
-                if (width[pivot] > width[pivot - 1] ||
-                    width[pivot] > width[pivot + 1])
-                {
-                    continue;
-                }
-
-                var compressionStart = Math.Max(1, pivot - 3);
-                var compressionSteps = 0;
-                for (var i = compressionStart; i <= pivot; i++)
-                {
-                    if (width[i] <= width[i - 1])
-                        compressionSteps++;
-                }
-
-                if (compressionSteps < 2)
-                    continue;
-
-                var expansionSteps = 0;
-                for (var i = pivot + 1; i < count; i++)
-                {
-                    if (width[i] > width[i - 1])
-                        expansionSteps++;
-                }
-
-                var postPivotSteps = count - pivot - 1;
-                if (expansionSteps < Math.Max(2, postPivotSteps - 1))
-                    continue;
-
-                var upperRise = upper[^1] - upper[pivot];
-                var midRise = mid[^1] - mid[pivot];
-                if (upperRise <= 0m ||
-                    midRise <= 0m ||
-                    upperRise <= midRise)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
         }
 
         private static bool TryCalculateBellPhaseEnvelopes(
@@ -298,9 +250,13 @@ namespace IbSwingTrader.Application.Evaluation
         {
             var midAccelerating = recent.MidMovePct > prior.MidMovePct;
             var openExpanding = recent.OpenPct > prior.OpenPct;
+            var meaningfulOpening =
+                recent.OpenPct >= 1m &&
+                recent.OpenPct >= Math.Abs(recent.MidMovePct) * 0.25m;
 
             return midAccelerating &&
                    openExpanding &&
+                   meaningfulOpening &&
                    recent.UpperMovePct > recent.MidMovePct &&
                    recent.LowerMovePct <= recent.MidMovePct;
         }
@@ -391,6 +347,66 @@ namespace IbSwingTrader.Application.Evaluation
                                               dailyState.Regime != BollingerFigureRegime.Collapse,
                 _ => false
             };
+        }
+
+        private static bool IsVerticalSpikeExpansion(
+            PatternSeries series,
+            BellPatternTimeframe timeframe)
+        {
+            IReadOnlyList<decimal> upper = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4BbUpperBandSeries,
+                BellPatternTimeframe.Daily => series.DailyBbUpperBandSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> lower = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4BbLowerBandSeries,
+                BellPatternTimeframe.Daily => series.DailyBbLowerBandSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> rsi = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4RsiSeries,
+                BellPatternTimeframe.Daily => series.DailyRsiSeries,
+                _ => []
+            };
+            IReadOnlyList<decimal> macdHistogram = timeframe switch
+            {
+                BellPatternTimeframe.H4 => series.H4MacdHistogramSeries,
+                BellPatternTimeframe.Daily => series.DailyMacdHistogramSeries,
+                _ => []
+            };
+
+            var count = Math.Min(upper.Count, lower.Count);
+            if (count < 6 || rsi.Count < count || macdHistogram.Count < count)
+                return false;
+
+            var upperDeltas = CalculateDeltas(upper.TakeLast(count).ToList());
+            var widthDeltas = CalculateDeltas(upper
+                .TakeLast(count)
+                .Zip(lower.TakeLast(count), (u, l) => u - l)
+                .ToList());
+            var rsiDeltas = CalculateDeltas(rsi.TakeLast(count).ToList());
+            var histogramDeltas = CalculateDeltas(macdHistogram.TakeLast(count).ToList());
+
+            for (var i = 1; i < upperDeltas.Count; i++)
+            {
+                var upperJumpDominates =
+                    upperDeltas[i] > 0m &&
+                    upperDeltas[i] > upperDeltas.Take(i).Select(Math.Abs).Sum();
+                var widthJumpDominates =
+                    widthDeltas[i] > 0m &&
+                    widthDeltas[i] > widthDeltas.Take(i).Select(Math.Abs).Sum();
+                var momentumJump =
+                    rsiDeltas[i] > 0m &&
+                    histogramDeltas[i] > 0m;
+
+                if (upperJumpDominates && widthJumpDominates && momentumJump)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool HasTerminalMomentumRollover(
@@ -577,6 +593,7 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries;
                 H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries;
                 H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries;
+                H4RsiSeries = candidate.RecentH4RsiSeries;
                 H4MacdLineSeries = candidate.RecentH4MacdLineSeries;
                 H4MacdHistogramSeries = candidate.RecentH4MacdHistogramSeries;
             }
@@ -597,6 +614,7 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbUpperBandSeries = row.RecentH4BbUpperBandSeries;
                 H4BbMidBandSeries = row.RecentH4BbMidBandSeries;
                 H4BbLowerBandSeries = row.RecentH4BbLowerBandSeries;
+                H4RsiSeries = row.RecentH4RsiSeries;
                 H4MacdLineSeries = row.RecentH4MacdLineSeries;
                 H4MacdHistogramSeries = row.RecentH4MacdHistogramSeries;
             }
@@ -615,6 +633,7 @@ namespace IbSwingTrader.Application.Evaluation
             public List<decimal> H4BbUpperBandSeries { get; }
             public List<decimal> H4BbMidBandSeries { get; }
             public List<decimal> H4BbLowerBandSeries { get; }
+            public List<decimal> H4RsiSeries { get; }
             public List<decimal> H4MacdLineSeries { get; }
             public List<decimal> H4MacdHistogramSeries { get; }
         }
