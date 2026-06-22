@@ -48,9 +48,11 @@ namespace IbSwingTrader.Application.Candidates
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
+        private DateTime? _expectedLatestClosedDailyDate;
         private const int RecentDailySeriesLength = 12;
         private const int RecentWeeklySeriesLength = 10;
         private const int RecentH4SeriesLength = 16;
+        private const int ExperimentalFallbackMaxItems = 4;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -222,8 +224,13 @@ namespace IbSwingTrader.Application.Candidates
                 .ToList();
 
             var mergedWishList = scannedWishListItems;
+            _expectedLatestClosedDailyDate = ResolveExpectedLatestClosedDailyDate(
+                scannedWishListContexts.Values,
+                marketNow.Date);
 
-            _logger.Info($"Current scan contexts prepared. Total={mergedWishList.Count}");
+            _logger.Info(
+                $"Current scan contexts prepared. Total={mergedWishList.Count}, " +
+                $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(marketNow.Date):yyyy-MM-dd}");
 
             var mergedMap = mergedWishList.ToDictionary(
                 x => x.Ticker,
@@ -254,7 +261,37 @@ namespace IbSwingTrader.Application.Candidates
                         ? "reversal candidates"
                         : "runaway candidates",
                     rejectionLogPrefix: "Pattern rejected",
-                    seriesSimilarityTemplates);
+                    seriesSimilarityTemplates,
+                    enforceLowAmplitudeVeto: true);
+            }
+
+            var experimentalFallbackUsed =
+                candidateResults.Count == 0 && sameDayPromotedResults.Count == 0;
+            if (experimentalFallbackUsed)
+            {
+                _logger.Info(
+                    "Strict promotion returned no candidates. " +
+                    "Running experimental Daily/H4 BellUp fallback without low-amplitude template veto.");
+
+                foreach (var ctx in scannedWishListContexts.Values)
+                {
+                    if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var scanItem) ||
+                        ClassifyDailyFamily(ctx, log: false) != DailyFamilySplit.TodayResearchLike)
+                    {
+                        continue;
+                    }
+
+                    await TryAddCandidate(
+                        sameDayPromotedResults,
+                        scanItem,
+                        ctx,
+                        isFromWishlist: false,
+                        marketTimezone,
+                        bucketName: "fallback runaway candidates",
+                        rejectionLogPrefix: "Fallback pattern rejected",
+                        seriesSimilarityTemplates,
+                        enforceLowAmplitudeVeto: false);
+                }
             }
 
             var sameDayCandidates = sameDayPromotedResults.Values
@@ -267,7 +304,11 @@ namespace IbSwingTrader.Application.Candidates
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
-                getCandidatesSettings.PremarketSummary.MaxItems,
+                experimentalFallbackUsed
+                    ? Math.Min(
+                        ExperimentalFallbackMaxItems,
+                        getCandidatesSettings.PremarketSummary.MaxItems)
+                    : getCandidatesSettings.PremarketSummary.MaxItems,
                 _nextDayRankingSettings,
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike);
@@ -332,7 +373,8 @@ namespace IbSwingTrader.Application.Candidates
                     recentSeries,
                     bbState,
                     seriesSimilarityTemplates,
-                    dailyFamilySplit);
+                    dailyFamilySplit,
+                    enforceLowAmplitudeVeto: true);
 
                 if (!isTodayResearchLikeCandidate)
                     continue;
@@ -545,7 +587,8 @@ namespace IbSwingTrader.Application.Candidates
             string marketTimezone,
             string bucketName,
             string rejectionLogPrefix,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
+            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
+            bool enforceLowAmplitudeVeto)
         {
             var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
             if (dailyFamilySplit == DailyFamilySplit.Unknown)
@@ -566,7 +609,8 @@ namespace IbSwingTrader.Application.Candidates
                     recentSeries,
                     bbState,
                     seriesSimilarityTemplates,
-                    dailyFamilySplit);
+                    dailyFamilySplit,
+                    enforceLowAmplitudeVeto);
 
             if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
@@ -696,7 +740,8 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
             IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
-            DailyFamilySplit dailyFamilySplit)
+            DailyFamilySplit dailyFamilySplit,
+            bool enforceLowAmplitudeVeto)
         {
             if (dailyFamilySplit == DailyFamilySplit.Unknown)
             {
@@ -781,7 +826,8 @@ namespace IbSwingTrader.Application.Candidates
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.LowAmplitudeSameDay,
                 _nextDayRankingSettings.SeriesSimilarity);
-            if (lowAmplitudeBellMatch.TemplateTicker != null &&
+            if (enforceLowAmplitudeVeto &&
+                lowAmplitudeBellMatch.TemplateTicker != null &&
                 (runawayTemplateMatch.TemplateTicker == null ||
                  GetBestTimeframeDistance(lowAmplitudeBellMatch) <=
                  GetBestTimeframeDistance(runawayTemplateMatch)))
@@ -1772,7 +1818,7 @@ namespace IbSwingTrader.Application.Candidates
             return true;
         }
 
-        private static bool IsFreshDailySplitDiagnostic(DailySplitDiagnostic diagnostic)
+        private bool IsFreshDailySplitDiagnostic(DailySplitDiagnostic diagnostic)
         {
             if (diagnostic.LatestRawDailyBarDate == DateTime.MinValue)
                 return false;
@@ -1781,13 +1827,40 @@ namespace IbSwingTrader.Application.Candidates
                    GetExpectedLatestClosedDailyDate(diagnostic.MarketToday);
         }
 
-        private static DateTime GetExpectedLatestClosedDailyDate(DateTime marketToday)
+        private DateTime GetExpectedLatestClosedDailyDate(DateTime marketToday)
         {
+            if (_expectedLatestClosedDailyDate.HasValue)
+                return _expectedLatestClosedDailyDate.Value;
+
             var expected = marketToday.Date.AddDays(-1);
             while (expected.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 expected = expected.AddDays(-1);
 
             return expected;
+        }
+
+        private static DateTime? ResolveExpectedLatestClosedDailyDate(
+            IEnumerable<WishListContext> contexts,
+            DateTime marketToday)
+        {
+            var latestDates = contexts
+                .Where(x => x.DailyCandles != null)
+                .Select(x => x.DailyCandles!
+                    .Select(candle => candle.Time.Date)
+                    .Where(date => date < marketToday.Date)
+                    .DefaultIfEmpty(DateTime.MinValue)
+                    .Max())
+                .Where(x => x != DateTime.MinValue)
+                .ToList();
+
+            return latestDates.Count > 0
+                ? latestDates
+                    .GroupBy(x => x)
+                    .OrderByDescending(group => group.Count())
+                    .ThenByDescending(group => group.Key)
+                    .Select(group => group.Key)
+                    .First()
+                : null;
         }
 
         private DailySplitDiagnostic BuildDailySplitDiagnostic(List<Candle> candles, string source)
