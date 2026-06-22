@@ -49,9 +49,10 @@ Internal `Runaway` subtypes:
 - `PullbackContinuation`: constructive continuation after a pullback
 
 Current final `Runaway` admission is intentionally strict: the candidate must
-confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`, and its real
-Daily or H4 Bollinger/MACD/RSI rows must literally match a high-amplitude
-Runaway template. Other above-mid continuation subtypes remain diagnostic only.
+confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. A positive
+high-amplitude template match supports ranking and confidence but is not a hard
+admission requirement. A closer low-amplitude BellUp match is a promotion veto.
+Other above-mid continuation subtypes remain diagnostic only.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
@@ -72,9 +73,9 @@ Both families should produce meaningful future amplitude:
 Current final `Reversal` promotion uses the working `ReversalHook` pattern
 after the hard split. The split only decides that the ticker is below the daily
 Bollinger mid; `ReversalHook` decides whether it is a trade-ready return setup.
-The hook is necessary but not sufficient: the real D1 or H4 rows must also
-match a high-amplitude (`AmplitudePct >= 10%`) reversal template. Weekly rows
-remain context only.
+The hook decides admission. A real D1 or H4 match to a high-amplitude
+(`AmplitudePct >= 10%`) reversal template supports ranking and confidence but
+is not a hard admission requirement. Weekly rows remain context only.
 The hook is detected on real daily rows:
 
 - lower Bollinger band broke down and then hooks upward
@@ -103,7 +104,8 @@ similarity signal before adding more derived heuristics.
 - Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
 - For `Reversal`, use only high-amplitude reversal rows from the evaluation dataset.
 - A candidate close to historical winner templates should get promotion/ranking support.
-- A candidate close to low-amplitude or failed templates can later be penalized, but do not add that before the positive winner-template signal is stable.
+- A candidate matching a low-amplitude BellUp template at least as closely as
+  its positive winner template must be rejected during promotion.
 - If a scan has many candidates above `AmplitudePct >= 10%`, treat them as
   the playable pool and learn low-amplitude rejection from rows below 10%.
   The goal is to remove the low-amplitude third by similarity to today's
@@ -136,6 +138,9 @@ Canonical Bell pattern pair:
 the rows show a squeeze-to-expansion launch. In code, that can be recognized
 either by a broader phase comparison or by a short local turn where the upper
 and mid Bollinger rows bend up together and band width starts opening again.
+The opening must be material, not a nearly parallel upward translation of all
+three bands. Self-matching against the same ticker is not valid positive
+template evidence.
 `BellDown` is the mirrored form used on the below-mid reversal side.
 
 The scanner matches Bell only on H4 and Daily. One clean matching timeframe is

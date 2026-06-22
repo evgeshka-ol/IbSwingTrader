@@ -65,9 +65,9 @@ below-mid split. The pattern is daily-row based:
 - MACD line and signal converge
 - RSI recovers from the recent low
 
-After the hook passes, final admission also requires literal series similarity
-to a high-amplitude reversal template on real closed D1 or saved H4 rows.
-Weekly rows remain context only.
+After the hook passes, literal series similarity to a high-amplitude reversal
+template on real closed D1 or saved H4 rows is supporting evidence, not a hard
+admission requirement. Weekly rows remain context only.
 
 
 Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
@@ -225,6 +225,6 @@ Bell pattern pair:
   - `Weekly` remains background context and is not passed to the Bell matcher
 
 For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
-real Bollinger rows in `H4` or `Daily`, plus a literal Daily or H4 match to a
-high-amplitude Runaway template. Weekly-only Bell and other continuation
-subtypes are context until research explicitly enables them.
+real Bollinger rows in `H4` or `Daily`. Literal Daily/H4 winner similarity
+supports ranking, while a closer low-amplitude BellUp match vetoes promotion.
+Weekly-only Bell and other continuation subtypes remain context.

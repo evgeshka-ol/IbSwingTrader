@@ -29,6 +29,8 @@ For both scanner families:
   - at or above daily mid on the last closed daily bar -> `Runaway`
 - Do not change the family boundary during amplitude or trade-plan tuning; only
   list promotion, ranking, and exit shaping should move after the split is correct.
+- Do not classify an isolated terminal H4/Daily jump as `BellUp`; the expansion
+  must not be explained by one final spike in band width and momentum.
 
 ### Trade plan oracle
 
