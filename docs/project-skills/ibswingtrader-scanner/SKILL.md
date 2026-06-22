@@ -59,6 +59,9 @@ Do not mix the two mentally or in code. They are opposite regimes and need diffe
 Hard classification rule:
 
 - The latest completed daily Bollinger mid bar is the primary hard split.
+- Infer the expected latest closed D1 date from the dominant latest date in
+  the current market-wide D1 data. Do not assume that the previous weekday was
+  a trading day; exchange holidays must not make every family split unknown.
 - If the ticker was below the daily Bollinger mid on the last closed daily bar, it belongs to `Reversal`.
 - If the ticker was at or above the daily Bollinger mid on the last closed daily bar, it belongs to `Runaway`.
 - Weekly and H4 context only refine subtyping, promotion, and ranking inside the family.
@@ -113,6 +116,12 @@ similarity signal before adding more derived heuristics.
 - If you need to reject weak candidates before evaluation knows the true
   `AmplitudePct`, do it late and only through row-based envelope expansion
   proxies. Do not hard-cut the family split or Bell classification.
+- If strict promotion leaves both final families empty, run a limited
+  experimental `Runaway` fallback: keep the real Daily/H4 `BellUp` geometry
+  and readiness checks, but disable only the low-amplitude template veto and
+  retain no more than the four highest-ranked candidates.
+  The evaluator must retain these admissions so their actual amplitude can
+  decide whether the fallback improves recall.
 
 ## Bollinger pattern direction
 

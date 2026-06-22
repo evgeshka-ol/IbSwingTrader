@@ -36,6 +36,8 @@ Hard rule:
 
 - Use the last closed daily bar for this check, not the current intraday
   partial bar.
+- Resolve that closed-bar date from the dominant latest D1 date across the
+  current scan universe. A market holiday must not be treated as a missing bar.
 - If the ticker was below the daily Bollinger mid on the last closed daily bar,
   it is a `Reversal` candidate.
 - If the ticker was at or above the daily Bollinger mid on the last closed
@@ -228,3 +230,9 @@ For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
 real Bollinger rows in `H4` or `Daily`. Literal Daily/H4 winner similarity
 supports ranking, while a closer low-amplitude BellUp match vetoes promotion.
 Weekly-only Bell and other continuation subtypes remain context.
+
+If strict promotion leaves both final families empty, an experimental fallback
+may retry real Daily/H4 `BellUp` candidates without the low-amplitude template
+veto and retain at most the four highest-ranked names. It must not bypass Bell
+geometry, readiness, family split, or the other promotion guards. Preserve
+these rows for evaluator feedback.

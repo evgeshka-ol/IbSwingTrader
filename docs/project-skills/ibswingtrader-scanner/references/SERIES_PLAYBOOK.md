@@ -195,13 +195,20 @@ Bell pair:
   the expected horizon:
   - `H4` means today and may enter final `Runaway`
   - `Daily` means tomorrow and may enter final `Runaway`
-  - `Weekly` means wishlist / next week
+  - `Weekly` is context only and never decides final matching
 
 The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
-real Bollinger rows from `H4` or `Daily` whose real Bollinger/MACD/RSI rows
-also match a high-amplitude Runaway template on Daily or H4. Weekly-only Bell
-and non-Bell continuation shapes are diagnostic context, not final `Runaway`
-promotion.
+real Bollinger rows from `H4` or `Daily`. A high-amplitude Runaway template
+match on either timeframe supports ranking but is not mandatory. A
+low-amplitude template that is at least as close as the positive match vetoes
+strict promotion. Weekly-only Bell and non-Bell continuation shapes are
+diagnostic context, not final `Runaway` promotion.
+
+When strict promotion returns no candidates in either family, the experimental
+fallback may disable only that low-amplitude veto. It still requires valid
+Daily/H4 `BellUp` geometry and all other promotion guards, and its results must
+remain available to the evaluator. Retain no more than the four highest-ranked
+fallback candidates.
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:
