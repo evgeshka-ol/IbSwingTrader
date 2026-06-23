@@ -1,6 +1,4 @@
 ﻿using System.Globalization;
-using System.Reflection;
-using System.Text;
 using IBApi;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
@@ -23,7 +21,7 @@ namespace IbSwingTrader.Application.Candidates
         IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
-        IResearchSettingsProvider researchSettingsProvider,
+        ICandidateFileService candidateFileService,
         IEvaluationDatasetCsvService evaluationDatasetCsvService,
         INumberTextFormatter fmt,
         ITextLogger logger) : ICandidateFinder
@@ -43,7 +41,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
-        private readonly IResearchSettingsProvider _researchSettingsProvider = researchSettingsProvider;
+        private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
@@ -3669,49 +3667,26 @@ namespace IbSwingTrader.Application.Candidates
                 return [];
 
             var templates = new List<SeriesSimilarityTemplate>();
-            var researchPath = Path.GetFullPath(
-                Path.Combine(_pathService.GetDataRoot(), _researchSettingsProvider.Get().OutputFile));
             var evaluationPath = Path.GetFullPath(
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
-
-            foreach (var row in await ReadResearchRowsAsync(researchPath))
-            {
-                if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
-                    continue;
-
-                var features = BuildTemplateFeatures(
-                    row.DailyBbMidBandSeries,
-                    row.DailyBbUpperBandSeries,
-                    row.DailyBbLowerBandSeries,
-                    row.DailyRsiSeries,
-                    row.DailyMacdHistogramSeries,
-                    row.H4BbMidBandSeries ?? [],
-                    row.H4BbUpperBandSeries ?? [],
-                    row.H4BbLowerBandSeries ?? [],
-                    row.H4RsiSeries ?? [],
-                    row.H4MacdHistogramSeries ?? [],
-                    dailyMacdLine: row.DailyMacdLineSeries,
-                    dailyMacdSignal: row.DailyMacdSignalSeries,
-                    h4MacdLine: row.H4MacdLineSeries ?? [],
-                    h4MacdSignal: row.H4MacdSignalSeries ?? []);
-
-                if (features.HasUsefulSeries)
-                    templates.Add(new SeriesSimilarityTemplate(
-                        row.Ticker,
-                        SeriesTemplateFamily.TodayResearchLike,
-                        row.AmplitudePct,
-                        features));
-            }
-
             var evaluationRows = await _evaluationDatasetCsvService.ReadAsync(evaluationPath);
+            var candidateDocument = await _candidateFileService.ReadAsync(_pathService.GetCandidatesFile());
+            var candidateSnapshots = candidateDocument.SameDayCandidates
+                .Concat(candidateDocument.Candidates)
+                .GroupBy(BuildCandidateScanKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x
+                        .OrderByDescending(candidate => candidate.Score.NextDayRank ?? decimal.MinValue)
+                        .ThenByDescending(candidate => candidate.Score.Score)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
             var latestLowAmplitudeScanDate = settings.LowAmplitudeUseLatestScanDateOnly
                 ? evaluationRows
                     .Where(x =>
                         x.HasActiveCandidateSnapshot &&
                         x.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                        x.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase) &&
-                        x.PatternVerdict.Equals("Match", StringComparison.OrdinalIgnoreCase) &&
-                        x.DetectedPattern.Equals("BellUp", StringComparison.OrdinalIgnoreCase) &&
+                        IsConfirmedFamilyPattern(x) &&
                         x.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
                         x.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
                     .Select(x => x.ScanTime.Date)
@@ -3722,35 +3697,34 @@ namespace IbSwingTrader.Application.Candidates
             foreach (var row in evaluationRows)
             {
                 if (!row.HasActiveCandidateSnapshot)
-                {
                     continue;
-                }
+
+                if (!candidateSnapshots.TryGetValue(BuildCandidateScanKey(row), out var snapshot))
+                    continue;
 
                 if (settings.EnableLowAmplitudePenalty &&
                     row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                    row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase) &&
-                    row.PatternVerdict.Equals("Match", StringComparison.OrdinalIgnoreCase) &&
-                    row.DetectedPattern.Equals("BellUp", StringComparison.OrdinalIgnoreCase) &&
+                    IsConfirmedFamilyPattern(row) &&
                     (!settings.LowAmplitudeUseLatestScanDateOnly ||
                      row.ScanTime.Date == latestLowAmplitudeScanDate) &&
                     row.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
                     row.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
                 {
                     var lowAmplitudeFeatures = BuildTemplateFeatures(
-                        row.RecentDailyBbMidBandSeries,
-                        row.RecentDailyBbUpperBandSeries,
-                        row.RecentDailyBbLowerBandSeries,
-                        row.RecentDailyRsiSeries,
-                        row.RecentDailyMacdHistogramSeries,
-                        row.RecentH4BbMidBandSeries,
-                        row.RecentH4BbUpperBandSeries,
-                        row.RecentH4BbLowerBandSeries,
-                        row.RecentH4RsiSeries,
-                        row.RecentH4MacdHistogramSeries,
-                        dailyMacdLine: row.RecentDailyMacdLineSeries,
-                        dailyMacdSignal: row.RecentDailyMacdSignalSeries,
-                        h4MacdLine: row.RecentH4MacdLineSeries,
-                        h4MacdSignal: row.RecentH4MacdSignalSeries);
+                        snapshot.RecentDailyBbMidBandSeries,
+                        snapshot.RecentDailyBbUpperBandSeries,
+                        snapshot.RecentDailyBbLowerBandSeries,
+                        snapshot.RecentDailyRsiSeries,
+                        snapshot.RecentDailyMacdHistogramSeries,
+                        snapshot.RecentH4BbMidBandSeries,
+                        snapshot.RecentH4BbUpperBandSeries,
+                        snapshot.RecentH4BbLowerBandSeries,
+                        snapshot.RecentH4RsiSeries,
+                        snapshot.RecentH4MacdHistogramSeries,
+                        dailyMacdLine: snapshot.RecentDailyMacdLineSeries,
+                        dailyMacdSignal: snapshot.RecentDailyMacdSignalSeries,
+                        h4MacdLine: snapshot.RecentH4MacdLineSeries,
+                        h4MacdSignal: snapshot.RecentH4MacdSignalSeries);
 
                     if (lowAmplitudeFeatures.HasUsefulSeries)
                     {
@@ -3765,31 +3739,28 @@ namespace IbSwingTrader.Application.Candidates
                 if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
                     continue;
 
-                var family = row.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase)
+                if (!IsConfirmedFamilyPattern(row))
+                    continue;
+
+                var family = row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase)
                     ? SeriesTemplateFamily.TodayResearchLike
                     : SeriesTemplateFamily.Reversal;
-                if (family == SeriesTemplateFamily.TodayResearchLike &&
-                    (!row.PatternVerdict.Equals("Match", StringComparison.OrdinalIgnoreCase) ||
-                     !row.DetectedPattern.Equals("BellUp", StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
 
                 var features = BuildTemplateFeatures(
-                    row.RecentDailyBbMidBandSeries,
-                    row.RecentDailyBbUpperBandSeries,
-                    row.RecentDailyBbLowerBandSeries,
-                    row.RecentDailyRsiSeries,
-                    row.RecentDailyMacdHistogramSeries,
-                    row.RecentH4BbMidBandSeries,
-                    row.RecentH4BbUpperBandSeries,
-                    row.RecentH4BbLowerBandSeries,
-                    row.RecentH4RsiSeries,
-                    row.RecentH4MacdHistogramSeries,
-                    dailyMacdLine: row.RecentDailyMacdLineSeries,
-                    dailyMacdSignal: row.RecentDailyMacdSignalSeries,
-                    h4MacdLine: row.RecentH4MacdLineSeries,
-                    h4MacdSignal: row.RecentH4MacdSignalSeries);
+                    snapshot.RecentDailyBbMidBandSeries,
+                    snapshot.RecentDailyBbUpperBandSeries,
+                    snapshot.RecentDailyBbLowerBandSeries,
+                    snapshot.RecentDailyRsiSeries,
+                    snapshot.RecentDailyMacdHistogramSeries,
+                    snapshot.RecentH4BbMidBandSeries,
+                    snapshot.RecentH4BbUpperBandSeries,
+                    snapshot.RecentH4BbLowerBandSeries,
+                    snapshot.RecentH4RsiSeries,
+                    snapshot.RecentH4MacdHistogramSeries,
+                    dailyMacdLine: snapshot.RecentDailyMacdLineSeries,
+                    dailyMacdSignal: snapshot.RecentDailyMacdSignalSeries,
+                    h4MacdLine: snapshot.RecentH4MacdLineSeries,
+                    h4MacdSignal: snapshot.RecentH4MacdSignalSeries);
 
                 if (features.HasUsefulSeries)
                     templates.Add(new SeriesSimilarityTemplate(row.Ticker, family, row.AmplitudePct, features));
@@ -3812,6 +3783,35 @@ namespace IbSwingTrader.Application.Candidates
 
             return selected;
         }
+
+        private static bool IsConfirmedFamilyPattern(EvaluationDatasetRow row)
+        {
+            if (!row.PatternVerdict.Equals("Match", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase))
+                return row.DetectedPattern.Equals("BellUp", StringComparison.OrdinalIgnoreCase);
+
+            if (row.CandidateGroup.Equals("Reversal", StringComparison.OrdinalIgnoreCase))
+                return row.DetectedPattern.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase);
+
+            return false;
+        }
+
+        private static string BuildCandidateScanKey(CandidateDetails candidate)
+            => BuildCandidateScanKey(
+                candidate.Ticker,
+                candidate.Scan.PresetScanCode,
+                candidate.Scan.ScanTime);
+
+        private static string BuildCandidateScanKey(EvaluationDatasetRow row)
+            => BuildCandidateScanKey(row.Ticker, row.PresetScanCode, row.ScanTime);
+
+        private static string BuildCandidateScanKey(
+            string ticker,
+            string presetScanCode,
+            DateTime scanTime)
+            => $"{ticker}|{presetScanCode}|{scanTime:yyyy-MM-dd HH:mm:ss}";
 
         private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
             CandidateDetails candidate,
@@ -4132,223 +4132,6 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return worstPointDistance;
-        }
-
-        private async Task<List<ResearchTopGainerDatasetRow>> ReadResearchRowsAsync(string path)
-        {
-            if (!File.Exists(path))
-                return [];
-
-            var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8);
-            if (lines.Length <= 1)
-                return [];
-
-            var headers = SplitCsvLine(lines[0]);
-            var headerIndex = headers
-                .Select((name, index) => new { name, index })
-                .ToDictionary(x => x.name.TrimStart('\ufeff'), x => x.index, StringComparer.OrdinalIgnoreCase);
-
-            var properties = typeof(ResearchTopGainerDatasetRow)
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(x => x.CanWrite)
-                .ToArray();
-
-            var rows = new List<ResearchTopGainerDatasetRow>();
-
-            foreach (var line in lines.Skip(1))
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
-
-                var values = SplitCsvLine(line);
-                var row = new ResearchTopGainerDatasetRow { Ticker = string.Empty };
-
-                foreach (var property in properties)
-                {
-                    if (!TryGetResearchColumnIndex(headerIndex, property.Name, out var index) ||
-                        index >= values.Count)
-                    {
-                        continue;
-                    }
-
-                    property.SetValue(row, ParseResearchValue(property.PropertyType, values[index]));
-                }
-
-                if (!string.IsNullOrWhiteSpace(row.Ticker))
-                    rows.Add(row);
-            }
-
-            return rows;
-        }
-
-        private static object? ParseResearchValue(Type type, string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                if (Nullable.GetUnderlyingType(type) != null)
-                    return null;
-
-                if (type == typeof(string))
-                    return string.Empty;
-
-                if (type == typeof(List<decimal>))
-                    return new List<decimal>();
-
-                return Activator.CreateInstance(type);
-            }
-
-            var targetType = Nullable.GetUnderlyingType(type) ?? type;
-
-            if (targetType == typeof(string))
-                return raw;
-
-            if (targetType == typeof(DateTime))
-            {
-                if (DateTime.TryParseExact(raw, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
-                    return dt;
-
-                if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out dt))
-                    return dt;
-
-                return Nullable.GetUnderlyingType(type) != null ? null : default(DateTime);
-            }
-
-            if (targetType == typeof(decimal))
-            {
-                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec))
-                    return dec;
-
-                return Nullable.GetUnderlyingType(type) != null ? null : 0m;
-            }
-
-            if (targetType == typeof(int))
-            {
-                if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var i))
-                    return i;
-
-                return 0;
-            }
-
-            if (targetType == typeof(List<decimal>))
-                return ParseDecimalList(raw);
-
-            return Convert.ChangeType(raw, targetType, CultureInfo.InvariantCulture);
-        }
-
-        private static List<decimal> ParseDecimalList(string raw)
-        {
-            var trimmed = raw.Trim();
-            if (trimmed.Length < 2 || trimmed == "[]")
-                return [];
-
-            if (trimmed[0] == '[' && trimmed[^1] == ']')
-                trimmed = trimmed[1..^1];
-
-            if (string.IsNullOrWhiteSpace(trimmed))
-                return [];
-
-            return
-            [
-                .. trimmed
-                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Select(x => decimal.TryParse(x, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec)
-                        ? dec
-                        : 0m)
-            ];
-        }
-
-        private static bool TryGetResearchColumnIndex(
-            Dictionary<string, int> headerIndex,
-            string propertyName,
-            out int index)
-        {
-            if (headerIndex.TryGetValue(propertyName, out index))
-                return true;
-
-            foreach (var alias in GetResearchColumnAliases(propertyName))
-            {
-                if (headerIndex.TryGetValue(alias, out index))
-                    return true;
-            }
-
-            index = -1;
-            return false;
-        }
-
-        private static List<string> GetResearchColumnAliases(string propertyName)
-        {
-            return propertyName switch
-            {
-                nameof(ResearchTopGainerDatasetRow.ScanTime) => ["ReferenceTime"],
-                nameof(ResearchTopGainerDatasetRow.ScanPrice) => ["ReferencePrice"],
-                nameof(ResearchTopGainerDatasetRow.MaxTime) => ["PeakTime"],
-                nameof(ResearchTopGainerDatasetRow.MaxPrice) => ["PeakPrice"],
-                nameof(ResearchTopGainerDatasetRow.AmplitudePct) => ["RunupPct"],
-                nameof(ResearchTopGainerDatasetRow.PositivePotentialPct) => ["RunupPct"],
-                nameof(ResearchTopGainerDatasetRow.NegativePotentialPct) => ["MaxDrawdownBeforePeakPct"],
-                nameof(ResearchTopGainerDatasetRow.BarsToMax) => ["BarsToPeak"],
-                nameof(ResearchTopGainerDatasetRow.DailyBbUpperBandSeries) => ["DailyBollingerUpperBands"],
-                nameof(ResearchTopGainerDatasetRow.DailyBbMidBandSeries) => ["DailyBollingerMidBands"],
-                nameof(ResearchTopGainerDatasetRow.DailyBbLowerBandSeries) => ["DailyBollingerLowerBands"],
-                nameof(ResearchTopGainerDatasetRow.DailyRsiSeries) => ["DailyRsiValues"],
-                nameof(ResearchTopGainerDatasetRow.DailyMacdLineSeries) => ["DailyMacdLineValues"],
-                nameof(ResearchTopGainerDatasetRow.DailyMacdSignalSeries) => ["DailyMacdSignalValues"],
-                nameof(ResearchTopGainerDatasetRow.DailyMacdHistogramSeries) => ["DailyMacdHistogramValues"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyBbUpperBandSeries) => ["WeeklyBollingerUpperBands"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyBbMidBandSeries) => ["WeeklyBollingerMidBands"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyBbLowerBandSeries) => ["WeeklyBollingerLowerBands"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyRsiSeries) => ["WeeklyRsiValues"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyMacdLineSeries) => ["WeeklyMacdLineValues"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyMacdSignalSeries) => ["WeeklyMacdSignalValues"],
-                nameof(ResearchTopGainerDatasetRow.WeeklyMacdHistogramSeries) => ["WeeklyMacdHistogramValues"],
-                nameof(ResearchTopGainerDatasetRow.H4BbUpperBandSeries) => ["H4BollingerUpperBands"],
-                nameof(ResearchTopGainerDatasetRow.H4BbMidBandSeries) => ["H4BollingerMidBands"],
-                nameof(ResearchTopGainerDatasetRow.H4BbLowerBandSeries) => ["H4BollingerLowerBands"],
-                nameof(ResearchTopGainerDatasetRow.H4RsiSeries) => ["H4RsiValues"],
-                nameof(ResearchTopGainerDatasetRow.H4MacdLineSeries) => ["H4MacdLineValues"],
-                nameof(ResearchTopGainerDatasetRow.H4MacdSignalSeries) => ["H4MacdSignalValues"],
-                nameof(ResearchTopGainerDatasetRow.H4MacdHistogramSeries) => ["H4MacdHistogramValues"],
-                _ => []
-            };
-        }
-
-        private static List<string> SplitCsvLine(string line)
-        {
-            var result = new List<string>();
-            var sb = new StringBuilder();
-            var inQuotes = false;
-
-            for (var i = 0; i < line.Length; i++)
-            {
-                var c = line[i];
-
-                if (c == '"')
-                {
-                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
-                    {
-                        sb.Append('"');
-                        i++;
-                    }
-                    else
-                    {
-                        inQuotes = !inQuotes;
-                    }
-
-                    continue;
-                }
-
-                if (c == ',' && !inQuotes)
-                {
-                    result.Add(sb.ToString());
-                    sb.Clear();
-                    continue;
-                }
-
-                sb.Append(c);
-            }
-
-            result.Add(sb.ToString());
-            return result;
         }
 
         private decimal CalculatePatternSeriesAdjustment(
