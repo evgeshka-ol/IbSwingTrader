@@ -172,10 +172,12 @@ The scanner should move toward literal row-shape matching.
 
 For `Runaway`:
 
-- compare the current candidate series against rows in `research_top_gainers.csv`
-- also compare against high-amplitude rows in `evaluation-dataset.csv`
-- treat close matches to research winners as promotion/ranking evidence
-- compare against today's low-amplitude evaluation rows as negative templates;
+- use evaluation rows only to identify historical scan keys that produced
+  confirmed `BellUp` and high amplitude
+- load the actual positive template series from the matching historical
+  `candidates.csv` scan snapshot
+- compare against scan snapshots whose later evaluation had low amplitude as
+  negative templates;
   candidates whose rows look like the low-amplitude third should be demoted or
   filtered before they occupy the top of the list
 - treat the TE-style fresh expansion as a high-priority winner pattern:
@@ -196,11 +198,13 @@ For `Runaway`:
 
 For `Reversal`:
 
-- compare only against high-amplitude reversal rows from `evaluation-dataset.csv`
+- use confirmed high-amplitude `ReversalHook` evaluation labels, then load the
+  feature rows from the matching historical scanner snapshots
 - do not let above-mean continuation templates promote reversal candidates
 
 Comparison principle:
 
+- evaluation provides labels, never template feature values
 - compare each series point-by-point with modest tolerance
 - normalize each compared series from its first point
 - calculate a separate distance for Daily and H4; matching either timeframe is

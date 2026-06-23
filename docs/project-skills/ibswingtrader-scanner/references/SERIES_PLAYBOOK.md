@@ -251,10 +251,15 @@ The question is:
 
 ## Template sources
 
-Use two positive template families:
+Use two positive template families, both sourced from historical
+`candidates.csv` snapshots:
 
-- `research_top_gainers.csv`: primary templates for `Runaway`
-- `evaluation-dataset.csv`: high-amplitude templates for both `Runaway` and `Reversal`
+- scan snapshots later confirmed as high-amplitude `BellUp` for `Runaway`
+- scan snapshots later confirmed as high-amplitude `ReversalHook` for `Reversal`
+
+`evaluation-dataset.csv` supplies the pattern/amplitude label and exact scan
+key only. `research_top_gainers.csv` is an outcome oracle, not a template
+feature source.
 
 For `Reversal`, keep templates below-mean and high-amplitude. The goal is
 not just being a pullback, but being a pullback shape that historically produced
@@ -287,11 +292,11 @@ profit target with the setup's default profit percent.
 
 For summary ranking, compare rows in both directions:
 
-- positive templates: `research_top_gainers.csv` and high-amplitude evaluation
-  rows should lift candidates even when RSI already looks high
-- negative templates: `SameDayContinuation` evaluation rows with
-  `AmplitudePct < 10%` should penalize candidates that look unlikely to clear
-  the 10% amplitude line
+- positive templates: original scan snapshots with a later confirmed pattern
+  and high amplitude should lift candidates even when RSI already looks high
+- negative templates: original `Runaway` scan snapshots whose later evaluation
+  had `AmplitudePct < 10%` should penalize candidates that look unlikely to
+  clear the 10% amplitude line
 
 Do not use the negative templates as a hard scanner filter. They are a ranking
 tool for keeping weak lookalikes out of the current top-ranked `Runaway` rows.

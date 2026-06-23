@@ -23,8 +23,8 @@ The scanner's job is to find future fat moves early.
 - For scanner quality, the main oracle is `AmplitudePct`, not `Win/Loss/NoEntry`.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.
-- Priority #1: names in today's summary `Runaway` should be in tomorrow's `research_top_gainers.csv`.
-- Series shape is a primary scanner signal: compare candidate rows literally against winner rows from `research_top_gainers.csv` and high-amplitude rows from `evaluation-dataset.csv`.
+- Priority #1: names in today's summary `Runaway` should be confirmed by later evaluation as high-amplitude winners.
+- Series shape is a primary scanner signal. The feature row must always come from the saved scanner snapshot. Evaluation supplies only the outcome label and amplitude.
 
 ## Pipeline
 
@@ -102,8 +102,11 @@ similarity signal before adding more derived heuristics.
 - Calculate Daily and H4 similarity independently. A match on either timeframe
   is sufficient; do not average their distances. Weekly rows are context only
   and must not decide template admission or final promotion.
-- Use `research_top_gainers.csv` as the main `Runaway` template source.
-- Use high-amplitude `evaluation-dataset.csv` rows as an additional template source.
+- Never use feature rows from `research_top_gainers.csv` or `evaluation-dataset.csv` as scanner templates; those rows may include bars observed after the original scan.
+- Join evaluation labels back to `candidates.csv` by ticker, preset scan code, and exact scan time.
+- Use `AmplitudePct >= 10%` plus the confirmed family pattern as the positive label.
+- Use the matching low-amplitude range plus the confirmed family pattern as the negative label.
+- Trade-plan outcome is not part of this template label.
 - Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
 - For `Reversal`, use only high-amplitude reversal rows from the evaluation dataset.
 - A candidate close to historical winner templates should get promotion/ranking support.
@@ -216,7 +219,7 @@ MACD aliases, weighted timeframe totals, or stored slope summaries.
 When scanner quality is weak:
 
 1. Check whether the ticker was missed by the market presets, rejected by the family pattern, or present but ranked too low.
-2. Use the series in `candidates.csv` and `research_top_gainers.csv`.
+2. Use the original series in `candidates.csv`; use evaluation only to label those snapshots.
 3. Prefer fixing:
    - recall
    - family pattern recognition after the hard daily split

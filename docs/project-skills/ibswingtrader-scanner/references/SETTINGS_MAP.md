@@ -40,16 +40,16 @@ Use this when the right names are present but top summary is wrong.
 Controls literal row-shape matching against winner templates.
 
 Use this when candidates are present but the ranking misses names whose Daily
-or H4 rows look like past `research_top_gainers.csv` winners or high-amplitude
-evaluation rows. Weekly rows are context only.
+or H4 rows look like historical scanner snapshots later confirmed by evaluation
+as patterned high-amplitude winners. Weekly rows are context only.
 
 Important knobs:
 
 - `MinTemplateAmplitudePct`: minimum amplitude for a row to become a positive template.
 - `FullMatchDistance` / `WeakMatchDistance`: row-similarity thresholds.
 - `FullMatchBonus` / `WeakMatchBonus`: second-pass rank boost for close matches.
-- `EnableLowAmplitudePenalty`: enables negative templates from
-  `SameDayContinuation` evaluation rows that did not reach 10% amplitude.
+- `EnableLowAmplitudePenalty`: enables negative templates from historical
+  `Runaway` scan snapshots whose evaluation did not reach 10% amplitude.
 - `LowAmplitudeMinTemplateAmplitudePct` / `LowAmplitudeMaxTemplateAmplitudePct`:
   amplitude band for negative templates.
 - `LowAmplitudePenaltyWeight`: second-pass rank penalty for candidates matching
