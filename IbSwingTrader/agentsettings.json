@@ -118,7 +118,8 @@
         "RecentScanDays": 1,
         "ScanCodes": [
             "TOP_PERC_GAIN",
-            "TOP_OPEN_PERC_GAIN"
+            "TOP_OPEN_PERC_GAIN",
+            "TOP_VOLUME_RATE"
         ],
         "LookbackCalendarDays": 120,
         "MinimumCandles": 120,
