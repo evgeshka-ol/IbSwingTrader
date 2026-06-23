@@ -177,6 +177,10 @@ pre-move rows:
 - `Neutral`: the saved rows do not confirm a trade-ready runway phase. Do not
   let legacy live-mover/template/bypass branches promote it into
   `Runaway`.
+- Reject a Daily `BellUp` as post-factum when its row phase is already late:
+  either the pattern appears only after H4 RSI and MACD histogram have rolled
+  over from a local peak, or the Daily pattern already existed on the previous
+  point while H4 RSI is terminally extended.
 
 This split is important for same-pattern candidates: UMAC/ONDS-like rows are
 ready for immediate `Runaway` admission, while SHLS-like rows with only a
