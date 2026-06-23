@@ -781,6 +781,15 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
+            if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
+            {
+                _logger.Info(
+                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                    $"Reason={latePhaseReason}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}");
+                return false;
+            }
+
             if (!IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries))
             {
                 _logger.Info(
@@ -1475,6 +1484,63 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return false;
+        }
+
+        private static bool IsLateBellUpPhase(
+            BellPatternSignal bellPatternSignal,
+            RecentFeatureSeries recentSeries,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (bellPatternSignal.Timeframe != BellPatternTimeframe.Daily)
+                return false;
+
+            var previousDailyBellUp = ClassifyBellPatternKindForTimeframe(
+                recentSeries.DailyBbUpperBandSeries.SkipLast(1).ToList(),
+                recentSeries.DailyBbMidBandSeries.SkipLast(1).ToList(),
+                recentSeries.DailyBbLowerBandSeries.SkipLast(1).ToList(),
+                ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries.SkipLast(1)));
+            var h4Rsi = recentSeries.H4RsiSeries;
+            var h4Histogram = recentSeries.H4MacdHistogramSeries;
+            if (h4Rsi.Count < 2 || h4Histogram.Count < 2)
+                return false;
+
+            var h4RsiRollingOver = h4Rsi[^1] < h4Rsi[^2];
+            var h4HistogramRollingOver = h4Histogram[^1] < h4Histogram[^2];
+            var recentH4RsiPeak = h4Rsi.TakeLast(Math.Min(4, h4Rsi.Count)).Max();
+
+            if (previousDailyBellUp != BellPatternKind.BellUp &&
+                recentH4RsiPeak >= 70m &&
+                h4RsiRollingOver &&
+                h4HistogramRollingOver)
+            {
+                reason = "Daily BellUp appeared only after H4 momentum had already rolled over";
+                return true;
+            }
+
+            if (previousDailyBellUp == BellPatternKind.BellUp &&
+                h4Rsi[^1] >= 80m)
+            {
+                reason = "Daily BellUp is no longer new and H4 RSI is already terminally extended";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string ResolveSeriesDirection(IEnumerable<decimal> midSeries)
+        {
+            var values = midSeries.ToList();
+            if (values.Count < 2)
+                return nameof(BollingerFigureDirection.Flat);
+
+            if (values[^1] > values[0])
+                return nameof(BollingerFigureDirection.Up);
+
+            if (values[^1] < values[0])
+                return nameof(BollingerFigureDirection.Down);
+
+            return nameof(BollingerFigureDirection.Flat);
         }
 
         private static bool IsStrictTodayResearchLikeRunawayPatternReadyNow(
@@ -2614,7 +2680,7 @@ namespace IbSwingTrader.Application.Candidates
             WishListScoreResult wishScore)
         {
             _logger.Info(
-                $"WishList item build started: {stock.Ticker}. " +
+                $"Scan context build started: {stock.Ticker}. " +
                 $"DailyMaSignedDistancePct={_fmt.Generic(snapshot.Current.DailyMaSignedDistancePct)}, " +
                 $"WeeklyMaSignedDistancePct={_fmt.Generic(snapshot.Current.WeeklyMaSignedDistancePct ?? 0m)}, " +
                 $"DailyMaDelta3={_fmt.Generic(snapshot.DailyMaDelta3)}, " +
@@ -2631,7 +2697,7 @@ namespace IbSwingTrader.Application.Candidates
                 scanTimeMarket);
 
             _logger.Info(
-                $"WishList item build completed: {stock.Ticker}. " +
+                $"Scan context build completed: {stock.Ticker}. " +
                 $"ExpectedBarsToTarget={targetForecast.ExpectedBarsToTarget?.ToString() ?? "null"}, " +
                 $"ExpectedTargetTime={targetForecast.ExpectedTargetMarketTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null"}");
 
@@ -5756,7 +5822,7 @@ namespace IbSwingTrader.Application.Candidates
             var currentDistancePct = snapshot.Current.DailyMaSignedDistancePct;
 
             _logger.Info(
-                $"WishList forecast input: {ticker}. " +
+                $"Scan target forecast input: {ticker}. " +
                 $"CurrentDailyDistancePct={currentDistancePct}, " +
                 $"DailyMaDelta3={snapshot.DailyMaDelta3}, " +
                 $"H4MaDelta3={snapshot.H4MaDelta3}, " +
@@ -5765,7 +5831,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (currentDistancePct >= 0m)
             {
-                _logger.Info($"WishList forecast: {ticker} reached/exceeded daily mid already.");
+                _logger.Info($"Scan target forecast: {ticker} reached/exceeded daily mid already.");
                 return (0, scanTimeMarket);
             }
 
@@ -5794,13 +5860,13 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             _logger.Info(
-                $"WishList forecast progress: {ticker}. " +
+                $"Scan target forecast progress: {ticker}. " +
                 $"ProgressSource={progressSource}, " +
                 $"ProgressPerBar={progressPerBar}");
 
             if (progressPerBar <= 0m)
             {
-                _logger.Info($"WishList forecast failed: {ticker}. No positive progress signal.");
+                _logger.Info($"Scan target forecast failed: {ticker}. No positive progress signal.");
                 return (null, null);
             }
 
@@ -5808,13 +5874,13 @@ namespace IbSwingTrader.Application.Candidates
             var expectedBars = (int)Math.Ceiling((double)(remainingDistancePct / progressPerBar));
 
             _logger.Info(
-                $"WishList forecast raw result: {ticker}. " +
+                $"Scan target forecast raw result: {ticker}. " +
                 $"RemainingDistancePct={remainingDistancePct}, " +
                 $"ExpectedBarsRaw={expectedBars}");
 
             if (expectedBars <= 0)
             {
-                _logger.Info($"WishList forecast normalized to zero bars: {ticker}.");
+                _logger.Info($"Scan target forecast normalized to zero bars: {ticker}.");
                 return (0, scanTimeMarket);
             }
 
@@ -5823,7 +5889,7 @@ namespace IbSwingTrader.Application.Candidates
             var expectedTargetMarketTime = scanTimeMarket.Add(step * cappedBars);
 
             _logger.Info(
-                $"WishList forecast final result: {ticker}. " +
+                $"Scan target forecast final result: {ticker}. " +
                 $"ExpectedBarsCapped={cappedBars}, " +
                 $"Step={step}, " +
                 $"ExpectedTargetMarketTime={expectedTargetMarketTime:yyyy-MM-dd HH:mm:ss}");
