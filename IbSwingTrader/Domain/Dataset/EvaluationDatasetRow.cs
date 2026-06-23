@@ -177,13 +177,5 @@ namespace IbSwingTrader.Domain.Dataset
         public List<decimal> RecentH4MacdLineSeries { get; set; } = [];
         public List<decimal> RecentH4MacdSignalSeries { get; set; } = [];
         public List<decimal> RecentH4MacdHistogramSeries { get; set; } = [];
-        public string WeeklyBbDirection { get; set; } = string.Empty;
-        public string WeeklyBbRegime { get; set; } = string.Empty;
-
-        public string DailyBbDirection { get; set; } = string.Empty;
-        public string DailyBbRegime { get; set; } = string.Empty;
-
-        public string H4BbDirection { get; set; } = string.Empty;
-        public string H4BbRegime { get; set; } = string.Empty;
     }
 }

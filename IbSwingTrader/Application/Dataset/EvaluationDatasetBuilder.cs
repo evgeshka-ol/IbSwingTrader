@@ -114,6 +114,7 @@ namespace IbSwingTrader.Application.Dataset
                 mergedRows = [.. mergedRows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
             }
 
+            EnsureDerivedFields(mergedRows);
             mergedRows.Sort((left, right) => CompareRows(left, right, settings));
             await _evaluationDatasetCsvService.WriteAsync(outputPath, mergedRows);
         }
@@ -256,6 +257,7 @@ namespace IbSwingTrader.Application.Dataset
                 rows = [.. rows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
             }
 
+            EnsureDerivedFields(rows);
             rows.Sort((left, right) => CompareRows(left, right, settings));
 
             await _evaluationDatasetCsvService.WriteAsync(outputPath, rows);
@@ -458,13 +460,7 @@ namespace IbSwingTrader.Application.Dataset
                 RecentH4RsiSeries = ResolveSeries(candidate?.RecentH4RsiSeries, evaluation.RecentH4RsiSeries, recentSeries?.H4RsiSeries),
                 RecentH4MacdLineSeries = ResolveSeries(candidate?.RecentH4MacdLineSeries, evaluation.RecentH4MacdLineSeries, recentSeries?.H4MacdLineSeries),
                 RecentH4MacdSignalSeries = ResolveSeries(candidate?.RecentH4MacdSignalSeries, evaluation.RecentH4MacdSignalSeries, recentSeries?.H4MacdSignalSeries),
-                RecentH4MacdHistogramSeries = ResolveSeries(candidate?.RecentH4MacdHistogramSeries, evaluation.RecentH4MacdHistogramSeries, recentSeries?.H4MacdHistogramSeries),
-                WeeklyBbDirection = candidate?.WeeklyBbDirection ?? evaluation.WeeklyBbDirection,
-                WeeklyBbRegime = candidate?.WeeklyBbRegime ?? evaluation.WeeklyBbRegime,
-                DailyBbDirection = candidate?.DailyBbDirection ?? evaluation.DailyBbDirection,
-                DailyBbRegime = candidate?.DailyBbRegime ?? evaluation.DailyBbRegime,
-                H4BbDirection = candidate?.H4BbDirection ?? evaluation.H4BbDirection,
-                H4BbRegime = candidate?.H4BbRegime ?? evaluation.H4BbRegime
+                RecentH4MacdHistogramSeries = ResolveSeries(candidate?.RecentH4MacdHistogramSeries, evaluation.RecentH4MacdHistogramSeries, recentSeries?.H4MacdHistogramSeries)
             };
 
             var verdict = ResolvePatternVerdict(row);
@@ -491,6 +487,18 @@ namespace IbSwingTrader.Application.Dataset
             }
 
             return _patternVerdictService.Analyze(row);
+        }
+
+        private void EnsureDerivedFields(IEnumerable<EvaluationDatasetRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                var verdict = ResolvePatternVerdict(row);
+                row.DetectedPipeline = verdict.DetectedPipeline;
+                row.DetectedPattern = verdict.DetectedPattern;
+                row.PatternVerdict = verdict.PatternVerdict;
+                row.PatternVerdictReason = verdict.PatternVerdictReason;
+            }
         }
 
         private CacheMetrics? TryBuildCacheMetrics(
@@ -827,7 +835,29 @@ namespace IbSwingTrader.Application.Dataset
             if (existing.EvaluatedAt != evaluation.EvaluatedAt)
                 return true;
 
+            if (NeedsPostScanMetricsRebuild(existing))
+                return true;
+
             return candidateIndex.ContainsKey(key);
+        }
+
+        private static bool NeedsPostScanMetricsRebuild(EvaluationDatasetRow row)
+        {
+            if (row.Outcome.Equals("InsufficientFutureData", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return row.ScanPrice <= 0m ||
+                   !row.ScanMovePct.HasValue ||
+                   !row.CurrentPct.HasValue ||
+                   !row.MaxPct.HasValue ||
+                   !row.MaxPrice.HasValue ||
+                   !row.MaxTime.HasValue ||
+                   !row.MinPct.HasValue ||
+                   !row.MinPrice.HasValue ||
+                   !row.MinTime.HasValue ||
+                   !row.PostMaxDrawdownPct.HasValue ||
+                   !row.MinutesFromMinToMax.HasValue ||
+                   !row.MaxDownBeforeMaxUp.HasValue;
         }
 
         private async Task<List<EvaluationDatasetRow>> BuildLegacyNoEntryZeroAmplitudeBackfillRowsAsync(

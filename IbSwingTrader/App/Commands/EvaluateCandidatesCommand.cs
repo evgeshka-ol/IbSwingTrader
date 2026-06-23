@@ -145,6 +145,24 @@ namespace IbSwingTrader.App.Commands
                 _logger.Info($"Open reevaluation enabled: additionalOpenCandidates={openCandidates.Count}");
             }
 
+            var incompleteCandidates = existingDatasetRows
+                .Where(NeedsPostScanMetricsReevaluation)
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(y => y.EvaluatedAt)
+                    .First())
+                .Select(RebuildCandidateFromDatasetRow)
+                .ToList();
+
+            foreach (var incompleteCandidate in incompleteCandidates)
+                candidatesToEvaluate[BuildScanKey(incompleteCandidate)] = incompleteCandidate;
+
+            if (incompleteCandidates.Count > 0)
+            {
+                _logger.Info(
+                    $"Incomplete evaluation retry enabled: additionalCandidates={incompleteCandidates.Count}");
+            }
+
             _logger.Info(
                 $"Candidate evaluation selection: pending={candidatesToEvaluate.Count}, " +
                 "already evaluated rows will be overwritten");
@@ -318,12 +336,6 @@ namespace IbSwingTrader.App.Commands
                 RecentH4MacdLineSeries = [.. evaluation.RecentH4MacdLineSeries],
                 RecentH4MacdSignalSeries = [.. evaluation.RecentH4MacdSignalSeries],
                 RecentH4MacdHistogramSeries = [.. evaluation.RecentH4MacdHistogramSeries],
-                WeeklyBbDirection = evaluation.WeeklyBbDirection,
-                WeeklyBbRegime = evaluation.WeeklyBbRegime,
-                DailyBbDirection = evaluation.DailyBbDirection,
-                DailyBbRegime = evaluation.DailyBbRegime,
-                H4BbDirection = evaluation.H4BbDirection,
-                H4BbRegime = evaluation.H4BbRegime,
                 IsFromWishlist = evaluation.IsFromWishlist,
                 Scan = new ScanInfo
                 {
@@ -345,6 +357,25 @@ namespace IbSwingTrader.App.Commands
                     LossPercent = CalcPct(evaluation.EntryPrice, evaluation.StopLoss)
                 }
             };
+        }
+
+        private static bool NeedsPostScanMetricsReevaluation(EvaluationDatasetRow row)
+        {
+            if (row.Outcome.Equals("InsufficientFutureData", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return row.ScanPrice <= 0m ||
+                   !row.ScanMovePct.HasValue ||
+                   !row.CurrentPct.HasValue ||
+                   !row.MaxPct.HasValue ||
+                   !row.MaxPrice.HasValue ||
+                   !row.MaxTime.HasValue ||
+                   !row.MinPct.HasValue ||
+                   !row.MinPrice.HasValue ||
+                   !row.MinTime.HasValue ||
+                   !row.PostMaxDrawdownPct.HasValue ||
+                   !row.MinutesFromMinToMax.HasValue ||
+                   !row.MaxDownBeforeMaxUp.HasValue;
         }
 
         private static decimal CalcPct(decimal from, decimal to)
