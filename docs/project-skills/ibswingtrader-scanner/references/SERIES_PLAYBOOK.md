@@ -196,6 +196,16 @@ Bell pair:
   - `H4` means today and may enter final `Runaway`
   - `Daily` means tomorrow and may enter final `Runaway`
   - `Weekly` is context only and never decides final matching
+- A valid H4 `BellUp` may be a gradual squeeze launch, not only a final local
+  kink. The upper band should pull away from a rising mid while the lower band
+  lags, flattens, or opens down; do not require the final point to be the
+  strongest acceleration point.
+- Reject near-parallel upward translations of all three bands as `BellUp`.
+  If the lower band rises materially with the mid, the envelope is not opening
+  cleanly enough for this pattern.
+- A Daily `BellUp` or `ReversalHook` still needs H4 not to contradict the setup
+  for today's trade-ready list. Weekly can strengthen context, but Weekly must
+  not be the reason a candidate is admitted.
 
 The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
 real Bollinger rows from `H4` or `Daily`. A high-amplitude Runaway template
