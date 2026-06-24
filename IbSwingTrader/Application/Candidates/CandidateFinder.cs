@@ -614,6 +614,15 @@ namespace IbSwingTrader.Application.Candidates
                     return;
                 }
 
+                if (reversalPatternSource == "D1" &&
+                    IsH4ContradictingDailyReversalHook(bbState, recentSeries, out var h4ReversalDiagnostics))
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        $"ReversalHook not trade-ready. {h4ReversalDiagnostics}");
+                    return;
+                }
+
                 var reversalSimilaritySeries = BuildReversalSimilaritySeries(
                     recentSeries,
                     reversalPatternSeries!);
@@ -1244,8 +1253,9 @@ namespace IbSwingTrader.Application.Candidates
             if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
                 return BellPatternKind.None;
 
-            if (IsBellUpEnvelope(prior, recent) &&
-                IsBellUpCurveTurn(upper, mid, lower) &&
+            if (((IsBellUpEnvelope(prior, recent) &&
+                  IsBellUpCurveTurn(upper, mid, lower)) ||
+                 IsGradualBellUpLaunch(upper, mid, lower)) &&
                 direction != nameof(BollingerFigureDirection.Down))
             {
                 return BellPatternKind.BellUp;
@@ -1305,7 +1315,42 @@ namespace IbSwingTrader.Application.Candidates
                    openExpanding &&
                    meaningfulOpening &&
                    recent.UpperMovePct > recent.MidMovePct &&
-                   recent.LowerMovePct <= recent.MidMovePct;
+                   IsLowerBandLaggingForBellUp(recent);
+        }
+
+        private static bool IsLowerBandLaggingForBellUp(RealBollingerEnvelope recent)
+        {
+            return recent.LowerMovePct <= 0m ||
+                   recent.LowerMovePct <= recent.MidMovePct * 0.6m;
+        }
+
+        private static bool IsGradualBellUpLaunch(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 6)
+                return false;
+
+            var upperTailSlope = CalculateTailRelativeSlopePct(upper.ToList(), 4);
+            var midTailSlope = CalculateTailRelativeSlopePct(mid.ToList(), 4);
+            var lowerTailSlope = CalculateTailRelativeSlopePct(lower.ToList(), 4);
+            var width = upper
+                .TakeLast(count)
+                .Zip(lower.TakeLast(count), (u, l) => u - l)
+                .ToList();
+            var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
+
+            return midTailSlope > 0m &&
+                   upperTailSlope >= midTailSlope + 0.5m &&
+                   IsLowerBandLaggingForBellUp(new RealBollingerEnvelope(
+                       upperTailSlope,
+                       midTailSlope,
+                       lowerTailSlope,
+                       widthTailSlope)) &&
+                   widthTailSlope >= 5m &&
+                   width[^1] > width[^2];
         }
 
         private static bool IsBellUpCurveTurn(
@@ -1400,9 +1445,49 @@ namespace IbSwingTrader.Application.Candidates
                 BellPatternTimeframe.H4 => bbState.H4.Direction != nameof(BollingerFigureDirection.Down) &&
                                            bbState.H4.Regime != nameof(BollingerFigureRegime.Collapse),
                 BellPatternTimeframe.Daily => bbState.Daily.Direction != nameof(BollingerFigureDirection.Down) &&
-                                              bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse),
+                                              bbState.Daily.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                                              !IsH4ContradictingDailyBellUp(bbState, recentSeries),
                 _ => false
             };
+        }
+
+        private static bool IsH4ContradictingDailyBellUp(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries)
+        {
+            if (bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
+                return true;
+
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdHistogramTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+
+            return h4RsiTail < -3m &&
+                   h4MacdHistogramTail <= 0m;
+        }
+
+        private static bool IsH4ContradictingDailyReversalHook(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries,
+            out string diagnostics)
+        {
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdHistogramTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+
+            diagnostics =
+                $"Reason=H4 does not confirm daily ReversalHook, " +
+                $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                $"H4RsiTail={h4RsiTail}, " +
+                $"H4MacdHistogramTail={h4MacdHistogramTail}";
+
+            if (bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
+                return true;
+
+            if (bbState.H4.Direction == nameof(BollingerFigureDirection.Down) &&
+                h4RsiTail <= 0m)
+                return true;
+
+            return false;
         }
 
         private static bool IsVerticalSpikeExpansion(
