@@ -117,8 +117,12 @@
         "OutputFile": "datasets/research_top_gainers.csv",
         "RecentScanDays": 0,
         "ScanCodes": [
-            "TOP_PERC_GAIN",
+            "TOP_OPEN_PERC_LOSE",
+            "TOP_PERC_LOSE",
+            "HOT_BY_VOLUME",
+            "MOST_ACTIVE",
             "TOP_OPEN_PERC_GAIN",
+            "TOP_PERC_GAIN",
             "TOP_VOLUME_RATE"
         ],
         "LookbackCalendarDays": 120,
