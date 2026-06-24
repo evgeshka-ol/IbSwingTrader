@@ -787,6 +787,19 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
+            if (IsH4BellUpTerminalPullback(
+                    bellPatternSignal,
+                    recentSeries,
+                    ctx.Candles,
+                    out var terminalPullbackReason))
+            {
+                _logger.Info(
+                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                    $"Reason={terminalPullbackReason}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}");
+                return false;
+            }
+
             if (!IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries))
             {
                 _logger.Info(
@@ -1600,6 +1613,60 @@ namespace IbSwingTrader.Application.Candidates
                     2) >= 4m)
             {
                 reason = "Daily BellUp is no longer new and H4 bands are already in terminal expansion";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsH4BellUpTerminalPullback(
+            BellPatternSignal bellPatternSignal,
+            RecentFeatureSeries recentSeries,
+            List<Candle> candles,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (bellPatternSignal.Timeframe != BellPatternTimeframe.H4)
+                return false;
+
+            var count = Math.Min(
+                recentSeries.H4BbUpperBandSeries.Count,
+                recentSeries.H4BbMidBandSeries.Count);
+            if (count < 4 || candles.Count < 2 || recentSeries.H4RsiSeries.Count < 2)
+                return false;
+
+            var upper = recentSeries.H4BbUpperBandSeries[^1];
+            var mid = recentSeries.H4BbMidBandSeries[^1];
+            if (upper <= mid)
+                return false;
+
+            var latest = candles[^1];
+            var previous = candles[^2];
+            var latestRed = latest.Close < latest.Open;
+            var previousNearUpper = previous.Close >= mid + (upper - mid) * 0.55m;
+            var closeBackToMiddle = latest.Close <= mid + (upper - mid) * 0.5m;
+            var bodyBackToMiddle =
+                latestRed &&
+                latest.Open > mid + (upper - mid) * 0.55m &&
+                closeBackToMiddle;
+            var rsiRolledOver = recentSeries.H4RsiSeries[^1] < recentSeries.H4RsiSeries[^2];
+            var macdHistogramRolledOver =
+                recentSeries.H4MacdHistogramSeries.Count >= 2 &&
+                recentSeries.H4MacdHistogramSeries[^1] <= recentSeries.H4MacdHistogramSeries[^2];
+            var upperBandBentDown =
+                recentSeries.H4BbUpperBandSeries.Count >= 2 &&
+                recentSeries.H4BbUpperBandSeries[^1] <= recentSeries.H4BbUpperBandSeries[^2];
+            var lowerBandClosing =
+                recentSeries.H4BbLowerBandSeries.Count >= 2 &&
+                recentSeries.H4BbLowerBandSeries[^1] >= recentSeries.H4BbLowerBandSeries[^2];
+
+            if (bodyBackToMiddle &&
+                previousNearUpper &&
+                rsiRolledOver &&
+                (macdHistogramRolledOver || upperBandBentDown || lowerBandClosing))
+            {
+                reason =
+                    "H4 BellUp has terminal pullback/rollover: latest candle closed back toward mid with momentum rollover";
                 return true;
             }
 
