@@ -5,7 +5,7 @@ namespace IbSwingTrader.Domain.Settings
         public string Mode { get; set; } = "top_gainers";
         public string Source { get; set; } = "tws_top_gainers";
         public string OutputFile { get; set; } = "datasets/research_top_gainers.csv";
-        public int? RecentScanDays { get; set; } = 1;
+        public int? RecentScanDays { get; set; } = 0;
         public int? RecentEvaluationScanDays { get; set; } = 7;
         public List<string> ScanCodes { get; set; } =
         [

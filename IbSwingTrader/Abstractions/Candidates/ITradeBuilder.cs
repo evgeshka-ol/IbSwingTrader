@@ -8,6 +8,7 @@ namespace IbSwingTrader.Abstractions.Candidates
             decimal? scanPriceOverride = null,
             decimal? scanPriceFloorOverride = null,
             decimal? entryDiscountOverridePct = null,
+            TradeEntryPatternFamily entryPatternFamily = TradeEntryPatternFamily.None,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
             decimal? maxProfitPctOverride = null,

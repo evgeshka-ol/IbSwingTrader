@@ -2,6 +2,8 @@ namespace IbSwingTrader.Domain.Candidates
 {
     public class TradePlanInfo
     {
+        public decimal LiveReferencePrice { get; set; }
+
         public decimal EntryPrice { get; set; }
 
         public decimal ExitPrice { get; set; }

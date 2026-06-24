@@ -115,7 +115,7 @@
         "Mode": "top_gainers",
         "Source": "tws_top_gainers",
         "OutputFile": "datasets/research_top_gainers.csv",
-        "RecentScanDays": 1,
+        "RecentScanDays": 0,
         "ScanCodes": [
             "TOP_PERC_GAIN",
             "TOP_OPEN_PERC_GAIN",

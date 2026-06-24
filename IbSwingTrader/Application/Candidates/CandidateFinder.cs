@@ -50,7 +50,6 @@ namespace IbSwingTrader.Application.Candidates
         private const int RecentDailySeriesLength = 12;
         private const int RecentWeeklySeriesLength = 10;
         private const int RecentH4SeriesLength = 16;
-        private const int ExperimentalFallbackMaxItems = 4;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -263,35 +262,6 @@ namespace IbSwingTrader.Application.Candidates
                     enforceLowAmplitudeVeto: true);
             }
 
-            var experimentalFallbackUsed =
-                candidateResults.Count == 0 && sameDayPromotedResults.Count == 0;
-            if (experimentalFallbackUsed)
-            {
-                _logger.Info(
-                    "Strict promotion returned no candidates. " +
-                    "Running experimental Daily/H4 BellUp fallback without low-amplitude template veto.");
-
-                foreach (var ctx in scannedWishListContexts.Values)
-                {
-                    if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var scanItem) ||
-                        ClassifyDailyFamily(ctx, log: false) != DailyFamilySplit.TodayResearchLike)
-                    {
-                        continue;
-                    }
-
-                    await TryAddCandidate(
-                        sameDayPromotedResults,
-                        scanItem,
-                        ctx,
-                        isFromWishlist: false,
-                        marketTimezone,
-                        bucketName: "fallback runaway candidates",
-                        rejectionLogPrefix: "Fallback pattern rejected",
-                        seriesSimilarityTemplates,
-                        enforceLowAmplitudeVeto: false);
-                }
-            }
-
             var sameDayCandidates = sameDayPromotedResults.Values
                 .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -302,11 +272,7 @@ namespace IbSwingTrader.Application.Candidates
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
-                experimentalFallbackUsed
-                    ? Math.Min(
-                        ExperimentalFallbackMaxItems,
-                        getCandidatesSettings.PremarketSummary.MaxItems)
-                    : getCandidatesSettings.PremarketSummary.MaxItems,
+                getCandidatesSettings.PremarketSummary.MaxItems,
                 _nextDayRankingSettings,
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike);
@@ -621,27 +587,36 @@ namespace IbSwingTrader.Application.Candidates
             if (dailyFamilySplit == DailyFamilySplit.Reversal)
             {
                 var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
-                if (reversalPatternSeries == null)
+                var reversalPatternSource = "D1";
+                if (!HasMinimumReversalPatternRows(reversalPatternSeries))
+                {
+                    reversalPatternSeries = BuildH4ReversalPatternSeries(
+                        ctx.Candles,
+                        recentSeries);
+                    reversalPatternSource = "H4 IPO fallback";
+                }
+
+                if (!HasMinimumReversalPatternRows(reversalPatternSeries))
                 {
                     _logger.Info(
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook not confirmed on real D1 rows. " +
-                        "Reason=reliable daily pattern rows unavailable");
+                        $"ReversalHook not confirmed. " +
+                        "Reason=reliable D1 and H4 pattern rows unavailable");
                     return;
                 }
 
-                if (!IsReversalHookPattern(reversalPatternSeries, out var reversalHookDiagnostics))
+                if (!IsReversalHookPattern(reversalPatternSeries!, out var reversalHookDiagnostics))
                 {
                     _logger.Info(
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook not confirmed on real D1 rows. " +
+                        $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
                         $"{reversalHookDiagnostics}");
                     return;
                 }
 
                 var reversalSimilaritySeries = BuildReversalSimilaritySeries(
                     recentSeries,
-                    reversalPatternSeries);
+                    reversalPatternSeries!);
                 var reversalTemplates = seriesSimilarityTemplates
                     .Where(x =>
                         x.Family == SeriesTemplateFamily.Reversal &&
@@ -654,7 +629,7 @@ namespace IbSwingTrader.Application.Candidates
                     _nextDayRankingSettings.SeriesSimilarity);
 
                 _logger.Info(
-                    $"ReversalHook confirmed for {ctx.Stock.Ticker}. " +
+                    $"ReversalHook confirmed for {ctx.Stock.Ticker} on {reversalPatternSource}. " +
                     $"Template={reversalTemplateMatch.TemplateTicker ?? "none"}, " +
                     $"AmplitudePct={_fmt.Generic(reversalTemplateMatch.TemplateAmplitudePct ?? 0m)}, " +
                     $"MatchedTimeframe={GetBestTimeframeName(reversalTemplateMatch)}, " +
@@ -663,6 +638,19 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+            if (isTodayResearchLikeCandidate &&
+                IsLiveRunawayStructureInvalidated(
+                    trade.LiveReferencePrice,
+                    ctx.Candles,
+                    recentSeries,
+                    out var liveInvalidationReason))
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    $"Runaway candidate rejected because the live price invalidated the saved H4 structure. " +
+                    liveInvalidationReason);
+                return;
+            }
 
             var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
             var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
@@ -1519,9 +1507,14 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             if (previousDailyBellUp == BellPatternKind.BellUp &&
-                h4Rsi[^1] >= 80m)
+                h4Rsi[^1] >= 75m &&
+                CalculateTerminalBandOpeningPct(
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries,
+                    2) >= 4m)
             {
-                reason = "Daily BellUp is no longer new and H4 RSI is already terminally extended";
+                reason = "Daily BellUp is no longer new and H4 bands are already in terminal expansion";
                 return true;
             }
 
@@ -1541,6 +1534,31 @@ namespace IbSwingTrader.Application.Candidates
                 return nameof(BollingerFigureDirection.Down);
 
             return nameof(BollingerFigureDirection.Flat);
+        }
+
+        private static decimal CalculateTerminalBandOpeningPct(
+            List<decimal> upper,
+            List<decimal> mid,
+            List<decimal> lower,
+            int lookback)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            var offset = Math.Max(1, lookback);
+            if (count <= offset)
+                return 0m;
+
+            var startIndex = count - offset - 1;
+            var endIndex = count - 1;
+            var baseMid = mid[startIndex];
+            if (baseMid == 0m)
+                return 0m;
+
+            var startWidth = upper[startIndex] - lower[startIndex];
+            var endWidth = upper[endIndex] - lower[endIndex];
+            return decimal.Round(
+                (endWidth - startWidth) / Math.Abs(baseMid) * 100m,
+                2,
+                MidpointRounding.AwayFromZero);
         }
 
         private static bool IsStrictTodayResearchLikeRunawayPatternReadyNow(
@@ -1800,8 +1818,31 @@ namespace IbSwingTrader.Application.Candidates
                 return DailyFamilySplit.Unknown;
             }
 
-            // H4 rows include extended-hours bars and cannot reliably reproduce the
-            // official regular-session daily close used by the family boundary.
+            if (ctx.Candles.Count >= _getCandidatesSettingsProvider.Get().Finder.MinimumCandles)
+            {
+                var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
+                var h4Mid = recentSeries.H4BbMidBandSeries.LastOrDefault();
+                var h4Close = ctx.Candles
+                    .OrderBy(x => x.Time)
+                    .Last()
+                    .Close;
+
+                if (h4Mid > 0m && h4Close > 0m)
+                {
+                    if (log)
+                    {
+                        _logger.Info(
+                            $"Daily split IPO fallback: {ctx.Stock.Ticker}. " +
+                            $"Source=H4, Close={_fmt.Price(h4Close)}, Mid={_fmt.Price(h4Mid)}, " +
+                            $"BelowMid={h4Close < h4Mid}");
+                    }
+
+                    return h4Close < h4Mid
+                        ? DailyFamilySplit.Reversal
+                        : DailyFamilySplit.TodayResearchLike;
+                }
+            }
+
             if (TryBuildBuiltDailyRowsSplitDiagnostic(ctx.Candles, out var rowDiagnostic, out var rowRejectionReason))
             {
                 if (log)
@@ -2568,6 +2609,9 @@ namespace IbSwingTrader.Application.Candidates
                 scanPrice,
                 scanPriceFloorOverride,
                 entryDiscountOverridePct,
+                ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal
+                    ? TradeEntryPatternFamily.ReversalHook
+                    : TradeEntryPatternFamily.BellUp,
                 defaultProfitPctOverride,
                 minProfitPctOverride,
                 maxProfitPctOverride,
@@ -2575,6 +2619,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return new TradePlanInfo
             {
+                LiveReferencePrice = ResolveLiveReferencePrice(entryCandles, scanPrice),
                 EntryPrice = trade.Entry,
                 ExitPrice = trade.Exit,
                 StopLoss = trade.Stop,
@@ -2583,6 +2628,69 @@ namespace IbSwingTrader.Application.Candidates
                 LossPercent = CalculatePercent(trade.Entry, trade.Stop),
                 ExitProfile = trade.ExitProfile
             };
+        }
+
+        private static decimal ResolveLiveReferencePrice(
+            List<Candle>? entryCandles,
+            decimal fallbackPrice)
+        {
+            if (entryCandles == null || entryCandles.Count == 0)
+                return fallbackPrice;
+
+            return entryCandles
+                .OrderBy(x => x.Time)
+                .Last()
+                .Close;
+        }
+
+        private static bool IsLiveRunawayStructureInvalidated(
+            decimal liveReferencePrice,
+            List<Candle> h4Candles,
+            RecentFeatureSeries recentSeries,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (liveReferencePrice <= 0m ||
+                h4Candles.Count == 0 ||
+                recentSeries.H4BbMidBandSeries.Count == 0)
+            {
+                return false;
+            }
+
+            var orderedH4 = h4Candles
+                .OrderBy(x => x.Time)
+                .ToList();
+            var latestH4Mid = recentSeries.H4BbMidBandSeries[^1];
+            if (latestH4Mid <= 0m || liveReferencePrice >= latestH4Mid)
+            {
+                return false;
+            }
+
+            var comparableCount = Math.Min(orderedH4.Count, recentSeries.H4BbMidBandSeries.Count);
+            var lookbackCount = Math.Min(2, comparableCount);
+            decimal? priorCloseAboveMid = null;
+            decimal? priorMid = null;
+            for (var offset = lookbackCount; offset >= 1; offset--)
+            {
+                var h4Close = orderedH4[^offset].Close;
+                var h4Mid = recentSeries.H4BbMidBandSeries[^offset];
+                if (h4Mid > 0m && h4Close >= h4Mid)
+                {
+                    priorCloseAboveMid = h4Close;
+                    priorMid = h4Mid;
+                    break;
+                }
+            }
+
+            if (!priorCloseAboveMid.HasValue)
+                return false;
+
+            reason =
+                $"PreviousH4Close={priorCloseAboveMid.Value:0.####}, " +
+                $"PreviousH4Mid={priorMid!.Value:0.####}, " +
+                $"CurrentH4Mid={latestH4Mid:0.####}, " +
+                $"LiveM15={liveReferencePrice:0.####}";
+            return true;
         }
 
         private static decimal ResolveScanPrice(CandidateSignalSnapshot snapshot)
@@ -4315,6 +4423,40 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
+        private static bool HasMinimumReversalPatternRows(RecentFeatureSeries? series)
+        {
+            return series != null &&
+                   series.DailyCloseSeries.Count >= 6 &&
+                   series.DailyBbUpperBandSeries.Count >= 6 &&
+                   series.DailyBbMidBandSeries.Count >= 6 &&
+                   series.DailyBbLowerBandSeries.Count >= 6 &&
+                   series.DailyRsiSeries.Count >= 4 &&
+                   series.DailyMacdHistogramSeries.Count >= 4;
+        }
+
+        private static RecentFeatureSeries BuildH4ReversalPatternSeries(
+            List<Candle> candles,
+            RecentFeatureSeries scannerSeries)
+        {
+            var closes = candles
+                .OrderBy(x => x.Time)
+                .TakeLast(scannerSeries.H4BbMidBandSeries.Count)
+                .Select(x => decimal.Round(x.Close, 2, MidpointRounding.AwayFromZero))
+                .ToList();
+
+            return new RecentFeatureSeries
+            {
+                DailyCloseSeries = closes,
+                DailyBbUpperBandSeries = [.. scannerSeries.H4BbUpperBandSeries],
+                DailyBbMidBandSeries = [.. scannerSeries.H4BbMidBandSeries],
+                DailyBbLowerBandSeries = [.. scannerSeries.H4BbLowerBandSeries],
+                DailyRsiSeries = [.. scannerSeries.H4RsiSeries],
+                DailyMacdLineSeries = [.. scannerSeries.H4MacdLineSeries],
+                DailyMacdSignalSeries = [.. scannerSeries.H4MacdSignalSeries],
+                DailyMacdHistogramSeries = [.. scannerSeries.H4MacdHistogramSeries]
+            };
+        }
+
         private List<decimal> BuildRecentDailyCloseSeries(List<Candle> candles)
         {
             var dailyBars = BuildDailyBars(candles);
@@ -4725,6 +4867,9 @@ namespace IbSwingTrader.Application.Candidates
                 lowerRecent.Count >= 2 &&
                 lowerRecent.Count(x => x >= 0m) >= 2 &&
                 lowerRecent[^1] >= 0m;
+            var lowerHookFresh =
+                lowerRecent.Count >= 2 &&
+                lowerRecent.Take(lowerRecent.Count - 1).Any(x => x < 0m);
 
             var midRecent = midDeltas.TakeLast(3).ToList();
             var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
@@ -4772,6 +4917,7 @@ namespace IbSwingTrader.Application.Candidates
             diagnostics =
                 $"LowerBrokeDown={lowerBrokeDown}, " +
                 $"LowerHooked={lowerHooked}, " +
+                $"LowerHookFresh={lowerHookFresh}, " +
                 $"MidHooked={midHooked}, " +
                 $"BandCompression={bandCompression}, " +
                 $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
@@ -4783,6 +4929,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return lowerBrokeDown &&
                    lowerHooked &&
+                   lowerHookFresh &&
                    midHooked &&
                    bandCompression &&
                    histogramTurnsUp &&

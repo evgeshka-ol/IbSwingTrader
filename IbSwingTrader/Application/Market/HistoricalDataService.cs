@@ -117,6 +117,48 @@ namespace IbSwingTrader.Application.Market
             var chunkSpan = timeframe.GetMaxRequestSpan();
             var allCandles = new List<Candle>();
 
+            if (timeframe == Timeframe.H4)
+            {
+                var h4ChunkEnd = end;
+
+                while (h4ChunkEnd > start)
+                {
+                    var h4ChunkStart = h4ChunkEnd.Subtract(chunkSpan);
+                    if (h4ChunkStart < start)
+                        h4ChunkStart = start;
+
+                    _logger.Debug(
+                        $"Historical chunk load: {symbol}, tf={timeframe}, start={h4ChunkStart:yyyy-MM-dd HH:mm:ss}, end={h4ChunkEnd:yyyy-MM-dd HH:mm:ss}");
+
+                    List<Candle>? chunkCandles;
+                    using (await _throttler.AcquireAsync())
+                    {
+                        chunkCandles = await _provider.GetHistoricalRange(
+                            contract,
+                            timeframe,
+                            h4ChunkStart,
+                            h4ChunkEnd);
+                    }
+
+                    if (chunkCandles != null && chunkCandles.Count > 0)
+                    {
+                        allCandles.AddRange(chunkCandles);
+                    }
+                    else if (allCandles.Count > 0)
+                    {
+                        _logger.Info(
+                            $"Historical H4 listing boundary reached: {symbol}, " +
+                            $"start={h4ChunkStart:yyyy-MM-dd HH:mm:ss}, end={h4ChunkEnd:yyyy-MM-dd HH:mm:ss}, " +
+                            $"loadedCandles={allCandles.Count}");
+                        break;
+                    }
+
+                    h4ChunkEnd = h4ChunkStart;
+                }
+
+                return MergeCandles(allCandles);
+            }
+
             var chunkStart = start;
 
             while (chunkStart < end)
@@ -133,41 +175,21 @@ namespace IbSwingTrader.Application.Market
 
                 List<Candle>? chunkCandles;
 
-                if (timeframe == Timeframe.H4)
+                chunkCandles = await _retryPolicy.ExecuteAsync(async () =>
                 {
                     using (await _throttler.AcquireAsync())
                     {
-                        chunkCandles = await _provider.GetHistoricalRange(
+                        return await _provider.GetHistoricalRange(
                             contract,
                             timeframe,
                             currentChunkStart,
                             currentChunkEnd);
                     }
-                }
-                else
-                {
-                    chunkCandles = await _retryPolicy.ExecuteAsync(async () =>
-                    {
-                        using (await _throttler.AcquireAsync())
-                        {
-                            return await _provider.GetHistoricalRange(
-                                contract,
-                                timeframe,
-                                currentChunkStart,
-                                currentChunkEnd);
-                        }
-                    });
-                }
+                });
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
                 {
                     allCandles.AddRange(chunkCandles);
-                }
-                else if (timeframe == Timeframe.H4 && allCandles.Count == 0)
-                {
-                    _logger.Error(
-                        $"Historical range aborted after first failed chunk: {symbol}, tf={timeframe}, start={currentChunkStart:yyyy-MM-dd HH:mm:ss}, end={currentChunkEnd:yyyy-MM-dd HH:mm:ss}");
-                    break;
                 }
 
                 chunkStart = chunkEnd;

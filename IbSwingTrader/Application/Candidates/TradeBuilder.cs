@@ -15,6 +15,7 @@ namespace IbSwingTrader.Application.Candidates
             decimal? scanPriceOverride = null,
             decimal? scanPriceFloorOverride = null,
             decimal? entryDiscountOverridePct = null,
+            TradeEntryPatternFamily entryPatternFamily = TradeEntryPatternFamily.None,
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
             decimal? maxProfitPctOverride = null,
@@ -37,7 +38,8 @@ namespace IbSwingTrader.Application.Candidates
                 settings,
                 scanPriceOverride,
                 scanPriceFloorOverride,
-                entryDiscountOverridePct);
+                entryDiscountOverridePct,
+                entryPatternFamily);
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -132,7 +134,8 @@ namespace IbSwingTrader.Application.Candidates
             TradePlanSettings settings,
             decimal? scanPriceOverride,
             decimal? scanPriceFloorOverride,
-            decimal? entryDiscountOverridePct)
+            decimal? entryDiscountOverridePct,
+            TradeEntryPatternFamily entryPatternFamily)
         {
             var scanPrice = scanPriceOverride.GetValueOrDefault();
             var hasScanPrice = scanPrice > 0m;
@@ -161,6 +164,20 @@ namespace IbSwingTrader.Application.Candidates
 
             var current = ordered[^1].Close;
             var referencePrice = hasScanPrice ? scanPrice : fallbackEntry;
+
+            if (TryResolvePatternEntry(
+                    ordered,
+                    entryPatternFamily,
+                    settings.MinimumEntryCandles,
+                    out var patternEntry,
+                    out var patternDiagnostics))
+            {
+                _logger.Info(
+                    $"Trade entry predicted from M15 {entryPatternFamily}. " +
+                    $"Current={_fmt.Price(current)}, Entry={_fmt.Price(patternEntry)}, " +
+                    patternDiagnostics);
+                return patternEntry;
+            }
 
             if (ordered.Count < settings.MinimumEntryCandles)
             {
@@ -298,6 +315,135 @@ namespace IbSwingTrader.Application.Candidates
                 $"ProjectedPrice={_fmt.Price(projectedPrice)}, MinDiscount={_fmt.Price(minimumDiscount)}, LimitEntry={_fmt.Price(entry)}");
 
             return entry > 0m ? entry : fallbackEntry;
+        }
+
+        private static bool TryResolvePatternEntry(
+            List<Candle> candles,
+            TradeEntryPatternFamily family,
+            int minimumCandles,
+            out decimal entry,
+            out string diagnostics)
+        {
+            entry = 0m;
+            diagnostics = string.Empty;
+            if (family == TradeEntryPatternFamily.None ||
+                candles.Count < Math.Max(20, minimumCandles))
+                return false;
+
+            var closes = candles.Select(x => x.Close).ToList();
+            var bollinger = BuildBollingerSeries(closes, 20, 2m);
+            var macd = BuildMacdHistogram(closes);
+            var rsi = BuildRsiSeries(closes, 14);
+            if (bollinger.Count < 6 || macd.Count < 6 || rsi.Count < 6)
+                return false;
+
+            var current = candles[^1].Close;
+            var latest = bollinger[^1];
+            var prior = bollinger[^3];
+            var latestWidth = latest.Upper - latest.Lower;
+            var priorWidth = prior.Upper - prior.Lower;
+            var recentLow = candles.TakeLast(3).Min(x => x.Low);
+            var histogramTurnsUp =
+                macd[^1] > macd[^2] &&
+                macd[^2] >= macd[^3];
+            var rsiRecovers = rsi[^1] > rsi.TakeLast(5).Min();
+
+            if (family == TradeEntryPatternFamily.BellUp)
+            {
+                var bandsOpenUp =
+                    latest.Upper > bollinger[^2].Upper &&
+                    latest.Mid >= bollinger[^2].Mid &&
+                    latestWidth > priorWidth;
+                var momentumConfirms =
+                    histogramTurnsUp ||
+                    (macd[^1] > 0m && rsi[^1] >= 50m);
+                if (!bandsOpenUp || !momentumConfirms || current < latest.Mid)
+                    return false;
+
+                entry = Math.Min(current, Math.Max(latest.Mid, recentLow));
+                diagnostics =
+                    $"Mid={latest.Mid:0.####}, Width={latestWidth:0.####}, " +
+                    $"PriorWidth={priorWidth:0.####}, Rsi={rsi[^1]:0.##}, " +
+                    $"MacdHistogram={macd[^1]:0.####}";
+                return entry > 0m;
+            }
+
+            var lowerHooked =
+                bollinger[^4].Lower > bollinger[^3].Lower &&
+                bollinger[^2].Lower >= bollinger[^3].Lower &&
+                latest.Lower >= bollinger[^2].Lower;
+            var channelCompresses = latestWidth <= priorWidth;
+            if (!lowerHooked || !channelCompresses || !histogramTurnsUp || !rsiRecovers)
+                return false;
+
+            entry = Math.Min(current, Math.Max(latest.Lower, recentLow));
+            diagnostics =
+                $"Lower={latest.Lower:0.####}, Width={latestWidth:0.####}, " +
+                $"PriorWidth={priorWidth:0.####}, Rsi={rsi[^1]:0.##}, " +
+                $"MacdHistogram={macd[^1]:0.####}";
+            return entry > 0m;
+        }
+
+        private static List<BollingerPoint> BuildBollingerSeries(
+            List<decimal> closes,
+            int length,
+            decimal deviationMultiplier)
+        {
+            var result = new List<BollingerPoint>();
+            for (var i = length - 1; i < closes.Count; i++)
+            {
+                var window = closes.Skip(i - length + 1).Take(length).ToList();
+                var mean = window.Average();
+                var variance = window
+                    .Select(x => (x - mean) * (x - mean))
+                    .Average();
+                var deviation = (decimal)Math.Sqrt((double)variance);
+                result.Add(new BollingerPoint(
+                    mean + deviation * deviationMultiplier,
+                    mean,
+                    mean - deviation * deviationMultiplier));
+            }
+
+            return result;
+        }
+
+        private static List<decimal> BuildRsiSeries(List<decimal> closes, int length)
+        {
+            var result = new List<decimal>();
+            if (closes.Count <= length)
+                return result;
+
+            decimal averageGain = 0m;
+            decimal averageLoss = 0m;
+            for (var i = 1; i <= length; i++)
+            {
+                var change = closes[i] - closes[i - 1];
+                averageGain += Math.Max(change, 0m);
+                averageLoss += Math.Max(-change, 0m);
+            }
+
+            averageGain /= length;
+            averageLoss /= length;
+            result.Add(CalculateRsi(averageGain, averageLoss));
+
+            for (var i = length + 1; i < closes.Count; i++)
+            {
+                var change = closes[i] - closes[i - 1];
+                averageGain = (averageGain * (length - 1) + Math.Max(change, 0m)) / length;
+                averageLoss = (averageLoss * (length - 1) + Math.Max(-change, 0m)) / length;
+                result.Add(CalculateRsi(averageGain, averageLoss));
+            }
+
+            return result;
+        }
+
+        private static decimal CalculateRsi(decimal averageGain, decimal averageLoss)
+        {
+            if (averageLoss <= 0m)
+                return 100m;
+
+            var relativeStrength = averageGain / averageLoss;
+            return 100m - 100m / (1m + relativeStrength);
         }
 
         private decimal CalculateRiskFloor(
@@ -449,5 +595,10 @@ namespace IbSwingTrader.Application.Candidates
 
             return value;
         }
+
+        private sealed record BollingerPoint(
+            decimal Upper,
+            decimal Mid,
+            decimal Lower);
     }
 }
