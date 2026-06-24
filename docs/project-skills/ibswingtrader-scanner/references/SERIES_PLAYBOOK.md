@@ -203,6 +203,11 @@ Bell pair:
 - Reject near-parallel upward translations of all three bands as `BellUp`.
   If the lower band rises materially with the mid, the envelope is not opening
   cleanly enough for this pattern.
+- Reject an H4 `BellUp` that has already rolled into a terminal pullback. A
+  setup can be valid on the prior H4 segment and still be unsafe now when the
+  latest red candle moves by body from the upper-band zone back toward the mid,
+  RSI rolls over, and MACD/band geometry begins to close or bend against the
+  move. KMI on 2026-06-24 is the working negative example.
 - A Daily `BellUp` or `ReversalHook` still needs H4 not to contradict the setup
   for today's trade-ready list. Weekly can strengthen context, but Weekly must
   not be the reason a candidate is admitted.
