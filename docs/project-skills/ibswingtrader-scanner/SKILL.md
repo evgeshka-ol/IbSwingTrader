@@ -36,6 +36,11 @@ The scanner no longer uses `wishlist.csv` as an intermediate candidate stage.
 Historical candle accumulation belongs to the historical cache, not to a
 second candidate queue.
 
+For H4 history, load missing chunks newest-first. A recently listed ticker may
+have no data at the old edge of the requested lookback while still having
+enough recent H4 bars for scanner analysis. The first empty older chunk after
+valid data marks the listing boundary and must not discard the loaded bars.
+
 ## Main split
 
 - `Reversal`: below-mid / pullback / return-to-mean style ideas.
@@ -64,6 +69,9 @@ Hard classification rule:
   a trading day; exchange holidays must not make every family split unknown.
 - If the ticker was below the daily Bollinger mid on the last closed daily bar, it belongs to `Reversal`.
 - If the ticker was at or above the daily Bollinger mid on the last closed daily bar, it belongs to `Runaway`.
+- For a recent IPO without enough reliable D1 rows, use H4 close versus H4 mid
+  as a scoped family fallback and detect `ReversalHook` on H4 rows. Do not use
+  this fallback when sufficient D1 history exists.
 - Weekly and H4 context only refine subtyping, promotion, and ranking inside the family.
 - Do not retune this family split when trying to improve list quality; keep the category boundary fixed and work only on promotion, ranking, and trade-plan behavior after the split.
 
@@ -82,6 +90,8 @@ is not a hard admission requirement. Weekly rows remain context only.
 The hook is detected on real daily rows:
 
 - lower Bollinger band broke down and then hooks upward
+- the lower-band turn must be fresh: the transition from a negative delta to
+  non-negative deltas must still be visible in the last three daily points
 - daily mid is still weak but the downward move is decelerating or turning
 - band width is compressing after the breakdown
 - MACD histogram is still weak/negative but turns upward toward zero
@@ -119,12 +129,10 @@ similarity signal before adding more derived heuristics.
 - If you need to reject weak candidates before evaluation knows the true
   `AmplitudePct`, do it late and only through row-based envelope expansion
   proxies. Do not hard-cut the family split or Bell classification.
-- If strict promotion leaves both final families empty, run a limited
-  experimental `Runaway` fallback: keep the real Daily/H4 `BellUp` geometry
-  and readiness checks, but disable only the low-amplitude template veto and
-  retain no more than the four highest-ranked candidates.
-  The evaluator must retain these admissions so their actual amplitude can
-  decide whether the fallback improves recall.
+- If strict promotion leaves both final families empty, return an empty result.
+  Do not disable the low-amplitude template veto to manufacture a candidate:
+  that re-admits rows which the evaluation feedback has already identified as
+  weak and damages top-1 quality.
 
 ## Bollinger pattern direction
 
@@ -180,7 +188,18 @@ pre-move rows:
 - Reject a Daily `BellUp` as post-factum when its row phase is already late:
   either the pattern appears only after H4 RSI and MACD histogram have rolled
   over from a local peak, or the Daily pattern already existed on the previous
-  point while H4 RSI is terminally extended.
+  point while H4 RSI is elevated and the last two H4 rows show terminal band
+  expansion.
+- After loading the current M15 rows, reject a `Runaway` whose latest closed H4
+  close was above the H4 Bollinger mid but whose live M15 price has crossed
+  below that same mid. This is a structural invalidation of the saved setup,
+  not a fixed percentage-move filter.
+- Use M15 only for execution timing after D1/H4 classification. For `Runaway`,
+  a confirmed M15 `BellUp` predicts entry near the rising M15 mid or the latest
+  shallow pullback low. For `Reversal`, a confirmed M15 `ReversalHook` predicts
+  entry near the hooked lower band or the latest local low. If the matching
+  M15 pattern is unavailable, retain the existing entry forecast as fallback;
+  M15 must not change the D1 family split.
 
 This split is important for same-pattern candidates: UMAC/ONDS-like rows are
 ready for immediate `Runaway` admission, while SHLS-like rows with only a

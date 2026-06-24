@@ -235,8 +235,6 @@ real Bollinger rows in `H4` or `Daily`. Literal Daily/H4 winner similarity
 supports ranking, while a closer low-amplitude BellUp match vetoes promotion.
 Weekly-only Bell and other continuation subtypes remain context.
 
-If strict promotion leaves both final families empty, an experimental fallback
-may retry real Daily/H4 `BellUp` candidates without the low-amplitude template
-veto and retain at most the four highest-ranked names. It must not bypass Bell
-geometry, readiness, family split, or the other promotion guards. Preserve
-these rows for evaluator feedback.
+If strict promotion leaves both final families empty, keep the result empty.
+The low-amplitude template veto represents observed evaluation feedback and
+must not be disabled merely to populate the output.

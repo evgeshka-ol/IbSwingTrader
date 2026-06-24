@@ -204,11 +204,8 @@ low-amplitude template that is at least as close as the positive match vetoes
 strict promotion. Weekly-only Bell and non-Bell continuation shapes are
 diagnostic context, not final `Runaway` promotion.
 
-When strict promotion returns no candidates in either family, the experimental
-fallback may disable only that low-amplitude veto. It still requires valid
-Daily/H4 `BellUp` geometry and all other promotion guards, and its results must
-remain available to the evaluator. Retain no more than the four highest-ranked
-fallback candidates.
+When strict promotion returns no candidates in either family, keep the result
+empty. Never disable the low-amplitude veto simply to fill the list.
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:

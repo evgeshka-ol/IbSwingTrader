@@ -73,9 +73,11 @@ Use it only after the list quality is good.
 
 ### `Research.RecentScanDays`
 
-Use rolling day windows instead of editing a manual date.
+Use rolling day windows for the research output retention cutoff.
 
-`1` means today's research rows only.
+`0` or a missing/negative value keeps all existing research rows and appends
+new daily oracle rows after de-duplication. `1` means today's research rows
+only and will drop older rows from `research_top_gainers.csv`.
 
 ### `Research.RecentEvaluationScanDays`
 
