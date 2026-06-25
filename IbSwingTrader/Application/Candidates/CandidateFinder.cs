@@ -73,7 +73,9 @@ namespace IbSwingTrader.Application.Candidates
                 $"ContractResolveTimeoutSeconds={finderSettings.ContractResolveTimeoutSeconds}, " +
                 $"ContractResolveMaxAttempts={finderSettings.ContractResolveMaxAttempts}");
 
+            var emitAllSeenCandidates = finderSettings.EmitAllSeenCandidates;
             var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
+            var allScannedWishListContexts = new List<WishListContext>();
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
             foreach (var preset in _scannerPresets.GetAll())
             {
@@ -199,52 +201,52 @@ namespace IbSwingTrader.Application.Candidates
                         marketTimezone,
                         wishScore);
 
+                    var scanContext = new WishListContext
+                    {
+                        Stock = stock,
+                        Contract = contract,
+                        Preset = preset,
+                        Snapshot = snapshot,
+                        Candles = candles,
+                        DailyCandles = dailyCandles,
+                        ScanTimeMarket = marketNow,
+                        AvgDollarVolumeDaily = avgDollarVolume,
+                        WishListItem = wishListItem
+                    };
+
+                    allScannedWishListContexts.Add(scanContext);
+
                     AddOrReplaceWishListContext(
                         scannedWishListContexts,
-                        new WishListContext
-                        {
-                            Stock = stock,
-                            Contract = contract,
-                            Preset = preset,
-                            Snapshot = snapshot,
-                            Candles = candles,
-                            DailyCandles = dailyCandles,
-                            ScanTimeMarket = marketNow,
-                            AvgDollarVolumeDaily = avgDollarVolume,
-                            WishListItem = wishListItem
-                        });
+                        scanContext);
                 }
             }
 
-            var scannedWishListItems = scannedWishListContexts.Values
+            var contextsForOutput = emitAllSeenCandidates
+                ? allScannedWishListContexts
+                : scannedWishListContexts.Values.ToList();
+            var scannedWishListItems = contextsForOutput
                 .Select(x => x.WishListItem)
                 .ToList();
 
             var mergedWishList = scannedWishListItems;
             _expectedLatestClosedDailyDate = ResolveExpectedLatestClosedDailyDate(
-                scannedWishListContexts.Values,
+                contextsForOutput,
                 marketNow.Date);
 
             _logger.Info(
                 $"Current scan contexts prepared. Total={mergedWishList.Count}, " +
+                $"UniqueTickers={scannedWishListContexts.Count}, " +
+                $"EmitAllSeenCandidates={emitAllSeenCandidates}, " +
                 $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(marketNow.Date):yyyy-MM-dd}");
-
-            var mergedMap = mergedWishList.ToDictionary(
-                x => x.Ticker,
-                x => x,
-                StringComparer.OrdinalIgnoreCase);
 
             var sameDayPromotedResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var ctx in scannedWishListContexts.Values)
+            foreach (var ctx in contextsForOutput)
             {
-                if (!mergedMap.TryGetValue(ctx.Stock.Ticker, out var scanItem))
-                    continue;
+                var scanItem = ctx.WishListItem;
 
                 var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
-                if (dailyFamilySplit == DailyFamilySplit.Unknown)
-                    continue;
-
                 var target = dailyFamilySplit == DailyFamilySplit.Reversal
                     ? candidateResults
                     : sameDayPromotedResults;
@@ -262,13 +264,15 @@ namespace IbSwingTrader.Application.Candidates
                     enforceLowAmplitudeVeto: true);
             }
 
-            var sameDayCandidates = sameDayPromotedResults.Values
-                .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x
-                    .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
-                    .ThenByDescending(y => y.Score.Score)
-                    .First())
-                .ToList();
+            var sameDayCandidates = emitAllSeenCandidates
+                ? sameDayPromotedResults.Values.ToList()
+                : sameDayPromotedResults.Values
+                    .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x
+                        .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
+                        .ThenByDescending(y => y.Score.Score)
+                        .First())
+                    .ToList();
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
@@ -540,7 +544,7 @@ namespace IbSwingTrader.Application.Candidates
         {
             return string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{item.Ticker}|{item.TradePlan.EntryPrice:G29}|{item.TradePlan.ExitPrice:G29}|{item.TradePlan.StopLoss:G29}");
+                $"{item.Ticker}|{item.Scan.PresetScanCode}|{item.TradePlan.EntryPrice:G29}|{item.TradePlan.ExitPrice:G29}|{item.TradePlan.StopLoss:G29}");
         }
 
         private async Task TryAddCandidate(
@@ -555,26 +559,11 @@ namespace IbSwingTrader.Application.Candidates
             bool enforceLowAmplitudeVeto)
         {
             var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
-            if (dailyFamilySplit == DailyFamilySplit.Unknown)
-                return;
-
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
-            var isTodayResearchLikeCandidate =
-                dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
-                IsTodayResearchLikeCandidate(
-                    mergedWishItem,
-                    ctx,
-                    diagnostics,
-                    entryScore,
-                    recentSeries,
-                    bbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit,
-                    enforceLowAmplitudeVeto);
             var emitAllSeenCandidates = _getCandidatesSettingsProvider.Get().Finder.EmitAllSeenCandidates;
 
             async Task EmitDiagnosticRejectedCandidateAsync(string reason)
@@ -614,6 +603,29 @@ namespace IbSwingTrader.Application.Candidates
 
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
             }
+
+            if (dailyFamilySplit == DailyFamilySplit.Unknown)
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    "Daily family split is unknown.");
+                await EmitDiagnosticRejectedCandidateAsync(
+                    "Rejected: daily family split is unknown");
+                return;
+            }
+
+            var isTodayResearchLikeCandidate =
+                dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
+                IsTodayResearchLikeCandidate(
+                    mergedWishItem,
+                    ctx,
+                    diagnostics,
+                    entryScore,
+                    recentSeries,
+                    bbState,
+                    seriesSimilarityTemplates,
+                    dailyFamilySplit,
+                    enforceLowAmplitudeVeto);
 
             if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
