@@ -276,7 +276,8 @@
             "AvgVolumePeriod": 20,
             "LookbackCalendarDays": 240,
             "ContractResolveTimeoutSeconds": 15,
-            "ContractResolveMaxAttempts": 2
+            "ContractResolveMaxAttempts": 2,
+            "EmitAllSeenCandidates": true
         },
 
         "PreFilter": {

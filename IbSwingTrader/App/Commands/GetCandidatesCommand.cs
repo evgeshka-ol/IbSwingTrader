@@ -25,8 +25,8 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Candidates saved: {candidatesPath}");
             _logger.Info(
                 $"GetCandidates completed. " +
-                $"Candidates count: {result.Candidates.Count}, " +
-                $"Same-day count: {result.SameDayCandidates.Count}");
+                $"Reversal ranking rows: {result.Candidates.Count}, " +
+                $"Runaway ranking rows: {result.SameDayCandidates.Count}");
         }
     }
 }

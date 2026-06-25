@@ -575,12 +575,53 @@ namespace IbSwingTrader.Application.Candidates
                     seriesSimilarityTemplates,
                     dailyFamilySplit,
                     enforceLowAmplitudeVeto);
+            var emitAllSeenCandidates = _getCandidatesSettingsProvider.Get().Finder.EmitAllSeenCandidates;
+
+            async Task EmitDiagnosticRejectedCandidateAsync(string reason)
+            {
+                if (!emitAllSeenCandidates)
+                    return;
+
+                var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+                var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
+                var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
+                var finalScore = dailyScore + weeklyScore + entryScore;
+                var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
+                var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
+                var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
+
+                var candidateItem = BuildCandidateItem(
+                    ctx.Stock,
+                    isFromWishlist,
+                    needsDeeperEntry,
+                    needsMomentumExit,
+                    ctx.Preset,
+                    ctx.Snapshot,
+                    ctx.Candles,
+                    trade,
+                    diagnostics,
+                    ctx.ScanTimeMarket,
+                    marketTimezone,
+                    dailyScore,
+                    weeklyScore,
+                    entryScore,
+                    finalScore,
+                    todayResearchLikePatternKind,
+                    todayResearchLikeSeriesScore);
+
+                candidateItem.CandidateSource = "DiagnosticRejected";
+                candidateItem.Context.Notes = AppendDiagnosticNote(candidateItem.Context.Notes, reason);
+
+                AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+            }
 
             if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
                 _logger.Info(
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     "Runaway candidate rejected because BellUp pattern was not confirmed on H4/Daily.");
+                await EmitDiagnosticRejectedCandidateAsync(
+                    "Rejected: Runaway BellUp pattern was not confirmed on H4/Daily");
                 return;
             }
 
@@ -602,6 +643,8 @@ namespace IbSwingTrader.Application.Candidates
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not confirmed. " +
                         "Reason=reliable D1 and H4 pattern rows unavailable");
+                    await EmitDiagnosticRejectedCandidateAsync(
+                        "Rejected: ReversalHook reliable D1 and H4 pattern rows unavailable");
                     return;
                 }
 
@@ -611,6 +654,8 @@ namespace IbSwingTrader.Application.Candidates
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
                         $"{reversalHookDiagnostics}");
+                    await EmitDiagnosticRejectedCandidateAsync(
+                        $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}");
                     return;
                 }
 
@@ -620,6 +665,8 @@ namespace IbSwingTrader.Application.Candidates
                     _logger.Info(
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not trade-ready. {h4ReversalDiagnostics}");
+                    await EmitDiagnosticRejectedCandidateAsync(
+                        $"Rejected: ReversalHook not trade-ready. {h4ReversalDiagnostics}");
                     return;
                 }
 
@@ -658,6 +705,8 @@ namespace IbSwingTrader.Application.Candidates
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     $"Runaway candidate rejected because the live price invalidated the saved H4 structure. " +
                     liveInvalidationReason);
+                await EmitDiagnosticRejectedCandidateAsync(
+                    $"Rejected: Runaway live price invalidated saved H4 structure. {liveInvalidationReason}");
                 return;
             }
 
@@ -687,6 +736,9 @@ namespace IbSwingTrader.Application.Candidates
                 finalScore,
                 todayResearchLikePatternKind,
                 todayResearchLikeSeriesScore);
+            candidateItem.CandidateSource = dailyFamilySplit == DailyFamilySplit.TodayResearchLike
+                ? "SameDayContinuation"
+                : "Primary";
 
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
@@ -695,6 +747,14 @@ namespace IbSwingTrader.Application.Candidates
                 $"H4={candidateItem.H4BbRegime}/{candidateItem.H4BbDirection}");
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+        }
+
+        private static string AppendDiagnosticNote(string? notes, string diagnostic)
+        {
+            if (string.IsNullOrWhiteSpace(notes))
+                return diagnostic;
+
+            return $"{notes}; {diagnostic}";
         }
 
         private static RecentFeatureSeries BuildReversalSimilaritySeries(
@@ -4012,7 +4072,6 @@ namespace IbSwingTrader.Application.Candidates
                     .Where(x =>
                         x.HasActiveCandidateSnapshot &&
                         x.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                        IsConfirmedFamilyPattern(x) &&
                         x.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
                         x.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
                     .Select(x => x.ScanTime.Date)
@@ -4030,7 +4089,6 @@ namespace IbSwingTrader.Application.Candidates
 
                 if (settings.EnableLowAmplitudePenalty &&
                     row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                    IsConfirmedFamilyPattern(row) &&
                     (!settings.LowAmplitudeUseLatestScanDateOnly ||
                      row.ScanTime.Date == latestLowAmplitudeScanDate) &&
                     row.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
@@ -4063,9 +4121,6 @@ namespace IbSwingTrader.Application.Candidates
                 }
 
                 if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
-                    continue;
-
-                if (!IsConfirmedFamilyPattern(row))
                     continue;
 
                 var family = row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase)
@@ -4108,20 +4163,6 @@ namespace IbSwingTrader.Application.Candidates
                 $"LowAmplitudeScanDate={(latestLowAmplitudeScanDate == DateTime.MinValue ? "all" : latestLowAmplitudeScanDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
 
             return selected;
-        }
-
-        private static bool IsConfirmedFamilyPattern(EvaluationDatasetRow row)
-        {
-            if (!row.PatternVerdict.Equals("Match", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase))
-                return row.DetectedPattern.Equals("BellUp", StringComparison.OrdinalIgnoreCase);
-
-            if (row.CandidateGroup.Equals("Reversal", StringComparison.OrdinalIgnoreCase))
-                return row.DetectedPattern.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase);
-
-            return false;
         }
 
         private static string BuildCandidateScanKey(CandidateDetails candidate)
@@ -5015,10 +5056,12 @@ namespace IbSwingTrader.Application.Candidates
             var lowerRecent = lowerDeltas.TakeLast(3).ToList();
             var lowerPrior = lowerDeltas.Take(Math.Max(0, lowerDeltas.Count - 2)).TakeLast(5).ToList();
             var lowerBrokeDown = lowerPrior.Any(x => x < 0m) || lowerDeltas.TakeLast(5).Any(x => x < 0m);
+            var lowerHookStrengthPct = CalculateTailRelativeSlopePct(lower, 3);
             var lowerHooked =
                 lowerRecent.Count >= 2 &&
                 lowerRecent.Count(x => x >= 0m) >= 2 &&
                 lowerRecent[^1] >= 0m;
+            var lowerHookStrong = lowerHooked && lowerHookStrengthPct >= 0.8m;
             var lowerHookFresh =
                 lowerRecent.Count >= 2 &&
                 lowerRecent.Take(lowerRecent.Count - 1).Any(x => x < 0m);
@@ -5026,6 +5069,13 @@ namespace IbSwingTrader.Application.Candidates
             var midRecent = midDeltas.TakeLast(3).ToList();
             var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
             var midWorstPrior = midPrior.Count > 0 ? midPrior.Min() : 0m;
+            var midRecentSlopePct = CalculateTailRelativeSlopePct(mid, 3);
+            var midPriorSlopePct = CalculateSegmentRelativeSlopePct(mid, 3, 3);
+            var midDecelerated =
+                midRecentSlopePct >= 0m ||
+                (midPriorSlopePct < 0m &&
+                 midRecentSlopePct < 0m &&
+                 Math.Abs(midRecentSlopePct) <= Math.Abs(midPriorSlopePct) * 0.65m);
             var midHooked =
                 midRecent.Count >= 2 &&
                 (midRecent[^1] >= 0m ||
@@ -5065,28 +5115,75 @@ namespace IbSwingTrader.Application.Candidates
                 rsi.Count < 4 ||
                 (rsi[^1] > rsi[^2] &&
                  rsi[^1] > rsi.TakeLast(4).Min());
+            var priceTurnsTowardMid = IsPriceTurningTowardDailyMid(recentSeries);
 
             diagnostics =
                 $"LowerBrokeDown={lowerBrokeDown}, " +
                 $"LowerHooked={lowerHooked}, " +
+                $"LowerHookStrong={lowerHookStrong}, " +
                 $"LowerHookFresh={lowerHookFresh}, " +
                 $"MidHooked={midHooked}, " +
+                $"MidDecelerated={midDecelerated}, " +
+                $"PriceTurnsTowardMid={priceTurnsTowardMid}, " +
                 $"BandCompression={bandCompression}, " +
                 $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
                 $"MacdConverges={macdConverges}, " +
                 $"RsiTurnsUp={rsiTurnsUp}, " +
+                $"LowerHookStrengthPct={lowerHookStrengthPct}, " +
+                $"MidRecentSlopePct={midRecentSlopePct}, " +
+                $"MidPriorSlopePct={midPriorSlopePct}, " +
                 $"LowerDeltasTail={FormatTail(lowerDeltas, 4)}, " +
                 $"MidDeltasTail={FormatTail(midDeltas, 4)}, " +
                 $"MacdHistogramTail={FormatTail(macdHistogram, 4)}";
 
             return lowerBrokeDown &&
                    lowerHooked &&
+                   lowerHookStrong &&
                    lowerHookFresh &&
                    midHooked &&
+                   midDecelerated &&
+                   priceTurnsTowardMid &&
                    bandCompression &&
                    histogramTurnsUp &&
                    macdConverges &&
                    rsiTurnsUp;
+        }
+
+        private static bool IsPriceTurningTowardDailyMid(RecentFeatureSeries recentSeries)
+        {
+            var close = recentSeries.DailyCloseSeries;
+            var mid = recentSeries.DailyBbMidBandSeries;
+            var count = Math.Min(close.Count, mid.Count);
+            if (count < 4)
+                return false;
+
+            var alignedClose = close.TakeLast(count).ToList();
+            var alignedMid = mid.TakeLast(count).ToList();
+            if (alignedClose[^1] >= alignedMid[^1])
+                return false;
+
+            var latestClose = alignedClose[^1];
+            var previousClose = alignedClose[^2];
+            var recentLowBeforeLatest = alignedClose
+                .Take(count - 1)
+                .TakeLast(4)
+                .Min();
+            var priceStoppedFalling =
+                latestClose >= previousClose ||
+                latestClose > recentLowBeforeLatest;
+
+            var distances = alignedClose
+                .Zip(alignedMid, (c, m) => m - c)
+                .Where(x => x > 0m)
+                .ToList();
+            if (distances.Count < 3)
+                return false;
+
+            var distanceCompressing =
+                distances[^1] < distances[^2] &&
+                distances[^1] < distances[^3];
+
+            return priceStoppedFalling && distanceCompressing;
         }
 
         private static bool IsRealBollingerLaunch(

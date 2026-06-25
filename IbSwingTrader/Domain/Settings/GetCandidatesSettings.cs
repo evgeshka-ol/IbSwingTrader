@@ -512,6 +512,7 @@ namespace IbSwingTrader.Domain.Settings
         public int LookbackCalendarDays { get; set; } = 240;
         public int ContractResolveTimeoutSeconds { get; set; } = 45;
         public int ContractResolveMaxAttempts { get; set; } = 2;
+        public bool EmitAllSeenCandidates { get; set; } = false;
     }
 
     public class PreFilterSettings

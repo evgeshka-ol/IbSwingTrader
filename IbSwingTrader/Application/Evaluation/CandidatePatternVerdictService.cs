@@ -553,11 +553,20 @@ namespace IbSwingTrader.Application.Evaluation
             var lowerRecent = lowerDeltas.TakeLast(3).ToList();
             var lowerPrior = lowerDeltas.Take(Math.Max(0, lowerDeltas.Count - 2)).TakeLast(5).ToList();
             var lowerBrokeDown = lowerPrior.Any(x => x < 0m) || lowerDeltas.TakeLast(5).Any(x => x < 0m);
+            var lowerHookStrengthPct = CalculateTailRelativeSlopePct(lower, 3);
             var lowerHooked = lowerRecent.Count >= 2 && lowerRecent.Count(x => x >= 0m) >= 2 && lowerRecent[^1] >= 0m;
+            var lowerHookStrong = lowerHooked && lowerHookStrengthPct >= 0.8m;
 
             var midRecent = midDeltas.TakeLast(3).ToList();
             var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
             var midWorstPrior = midPrior.Count > 0 ? midPrior.Min() : 0m;
+            var midRecentSlopePct = CalculateTailRelativeSlopePct(mid, 3);
+            var midPriorSlopePct = CalculateSegmentRelativeSlopePct(mid, 3, 3);
+            var midDecelerated =
+                midRecentSlopePct >= 0m ||
+                (midPriorSlopePct < 0m &&
+                 midRecentSlopePct < 0m &&
+                 Math.Abs(midRecentSlopePct) <= Math.Abs(midPriorSlopePct) * 0.65m);
             var midHooked = midRecent.Count >= 2 &&
                             (midRecent[^1] >= 0m || midRecent[^1] > midWorstPrior || midRecent[^1] >= midRecent[^2]);
 
@@ -597,15 +606,22 @@ namespace IbSwingTrader.Application.Evaluation
             diagnostics =
                 $"LowerBrokeDown={lowerBrokeDown}, " +
                 $"LowerHooked={lowerHooked}, " +
+                $"LowerHookStrong={lowerHookStrong}, " +
                 $"MidHooked={midHooked}, " +
+                $"MidDecelerated={midDecelerated}, " +
                 $"BandCompression={bandCompression}, " +
                 $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
                 $"MacdConverges={macdConverges}, " +
-                $"RsiTurnsUp={rsiTurnsUp}";
+                $"RsiTurnsUp={rsiTurnsUp}, " +
+                $"LowerHookStrengthPct={lowerHookStrengthPct}, " +
+                $"MidRecentSlopePct={midRecentSlopePct}, " +
+                $"MidPriorSlopePct={midPriorSlopePct}";
 
             return lowerBrokeDown &&
                    lowerHooked &&
+                   lowerHookStrong &&
                    midHooked &&
+                   midDecelerated &&
                    bandCompression &&
                    histogramTurnsUp &&
                    macdConverges &&
@@ -658,6 +674,23 @@ namespace IbSwingTrader.Application.Evaluation
 
             var tail = series.TakeLast(Math.Min(length, series.Count)).ToList();
             return tail[^1] - tail[0];
+        }
+
+        private static decimal CalculateSegmentRelativeSlopePct(
+            IReadOnlyList<decimal> series,
+            int lookback,
+            int offsetFromEnd)
+        {
+            var segmentLength = Math.Max(2, lookback);
+            if (series.Count < segmentLength + offsetFromEnd)
+                return 0m;
+
+            var segment = series
+                .Skip(series.Count - offsetFromEnd - segmentLength)
+                .Take(segmentLength)
+                .ToList();
+
+            return CalculateRelativeSlopePct(segment);
         }
 
         private readonly record struct RealBollingerEnvelope(
