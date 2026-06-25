@@ -122,11 +122,21 @@ mid.
 The row shape:
 
 - daily lower Bollinger band was falling and then hooks upward
+- the lower-band hook is strong enough to show a real turn, not only a small
+  horizontal support bounce
 - daily mid band is weak but decelerates or begins to turn
 - upper/lower envelope compresses after the breakdown
 - daily MACD histogram turns upward toward zero
 - daily MACD line and signal converge
 - daily RSI recovers from its recent low
+- price stops making lower closes and begins compressing the distance back to
+  the daily mid
+
+Reject descending-triangle or drift-under-mid cases as `ReversalHook`. In
+those cases price may oscillate along a support/diagonal while the daily mid is
+still almost linear; the likely path is the mid moving toward price while the
+figure closes, not price exploding toward the mid. TSN on 2026-06-24 is the
+working negative example.
 
 The best timing is the first or second daily bar after the lower-band hook.
 POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set are the first
@@ -266,12 +276,18 @@ The question is:
 Use two positive template families, both sourced from historical
 `candidates.csv` snapshots:
 
-- scan snapshots later confirmed as high-amplitude `BellUp` for `Runaway`
-- scan snapshots later confirmed as high-amplitude `ReversalHook` for `Reversal`
+- scan snapshots later confirmed as high-amplitude `Runaway` rows
+- scan snapshots later confirmed as high-amplitude `Reversal` rows
 
-`evaluation-dataset.csv` supplies the pattern/amplitude label and exact scan
-key only. `research_top_gainers.csv` is an outcome oracle, not a template
-feature source.
+`evaluation-dataset.csv` supplies the amplitude outcome and exact scan key
+only. `research_top_gainers.csv` is an outcome oracle, not a template feature
+source.
+
+Template admission is amplitude-based, not pattern-verdict based. A row that
+later produced high amplitude should become a positive ranking template even
+when the current `PatternVerdict` says `Mismatch/None`. The pattern verdict is
+diagnostic context; the ranking target is whether future high-amplitude names
+rise above weak names.
 
 For `Reversal`, keep templates below-mean and high-amplitude. The goal is
 not just being a pullback, but being a pullback shape that historically produced

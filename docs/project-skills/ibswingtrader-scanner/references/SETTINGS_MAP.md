@@ -29,6 +29,14 @@ Controls conversion from `WishList` to candidate.
 
 Useful when too many names are seen but not promoted.
 
+### `GetCandidates.Finder`
+
+- `EmitAllSeenCandidates`: temporary recall/ranking diagnostic mode. When
+  `true`, the scanner writes seen-but-rejected tickers into the normal
+  `candidates.csv` sections so the evaluator can score the full scanner input.
+  Use this to judge whether high-amplitude names rank above weak names before
+  re-enabling stricter final filters.
+
 ### `GetCandidates.NextDayRanking`
 
 Controls final ordering.
