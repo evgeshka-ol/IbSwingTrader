@@ -289,12 +289,76 @@ namespace IbSwingTrader.Application.Candidates
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.Reversal);
 
+            if (emitAllSeenCandidates)
+                (finalCandidates, sameDayCandidates) = DeduplicateCurrentScanByTicker(
+                    finalCandidates,
+                    sameDayCandidates);
+
             return new CandidateSearchResult
             {
                 Candidates = [.. finalCandidates],
                 SameDayCandidates = sameDayCandidates,
                 WishList = []
             };
+        }
+
+        private (List<CandidateDetails> FinalCandidates, List<CandidateDetails> SameDayCandidates)
+            DeduplicateCurrentScanByTicker(
+                List<CandidateDetails> finalCandidates,
+                List<CandidateDetails> sameDayCandidates)
+        {
+            var candidates = finalCandidates
+                .Select(x => new CandidateGroupItem(x, IsSameDay: false))
+                .Concat(sameDayCandidates.Select(x => new CandidateGroupItem(x, IsSameDay: true)))
+                .ToList();
+
+            if (candidates.Count <= 1)
+                return (finalCandidates, sameDayCandidates);
+
+            var selected = candidates
+                .GroupBy(x => x.Candidate.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x =>
+                {
+                    var scanCodes = x
+                        .Select(y => y.Candidate.Scan.PresetScanCode)
+                        .Where(y => !string.IsNullOrWhiteSpace(y))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(y => y, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    var best = x
+                        .OrderByDescending(y => GetCandidateSourcePriority(y.Candidate))
+                        .ThenByDescending(y => y.Candidate.Score.NextDayRank ?? decimal.MinValue)
+                        .ThenByDescending(y => y.Candidate.TradePlan.ProfitPercent)
+                        .ThenByDescending(y => y.Candidate.Score.Score)
+                        .ThenBy(y => y.Candidate.Scan.PresetScanCode, StringComparer.OrdinalIgnoreCase)
+                        .First();
+
+                    if (scanCodes.Count > 1)
+                    {
+                        best.Candidate.Context.Notes = AppendDiagnosticNote(
+                            best.Candidate.Context.Notes,
+                            $"SeenScanCodes={string.Join(",", scanCodes)}");
+                    }
+
+                    return best;
+                })
+                .ToList();
+
+            var dedupedFinal = selected
+                .Where(x => !x.IsSameDay)
+                .Select(x => x.Candidate)
+                .ToList();
+            var dedupedSameDay = selected
+                .Where(x => x.IsSameDay)
+                .Select(x => x.Candidate)
+                .ToList();
+
+            _logger.Info(
+                $"Current scan ticker de-duplication applied. " +
+                $"Before={candidates.Count}, After={selected.Count}");
+
+            return (dedupedFinal, dedupedSameDay);
         }
 
         private async Task<List<CandidateDetails>> BuildPremarketSummaryCandidates(
@@ -767,6 +831,18 @@ namespace IbSwingTrader.Application.Candidates
                 return diagnostic;
 
             return $"{notes}; {diagnostic}";
+        }
+
+        private static int GetCandidateSourcePriority(CandidateDetails candidate)
+        {
+            if (string.Equals(candidate.CandidateSource, "DiagnosticRejected", StringComparison.OrdinalIgnoreCase))
+                return 0;
+
+            if (string.Equals(candidate.CandidateSource, "Primary", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(candidate.CandidateSource, "SameDayContinuation", StringComparison.OrdinalIgnoreCase))
+                return 2;
+
+            return 1;
         }
 
         private static RecentFeatureSeries BuildReversalSimilaritySeries(
@@ -6859,6 +6935,10 @@ namespace IbSwingTrader.Application.Candidates
             decimal LatestClosedDailyClose,
             decimal PreviousClosedDailyMid,
             bool IsBelowMid);
+
+        private sealed record CandidateGroupItem(
+            CandidateDetails Candidate,
+            bool IsSameDay);
 
         private sealed record SeriesSimilarityMatch(
             string? TemplateTicker,

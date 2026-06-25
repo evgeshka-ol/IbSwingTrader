@@ -183,7 +183,9 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
             _scannerRequests[requestId] = tcs;
             _scannerResults[requestId] = [];
 
-            _logger.Info($"Scanner request: {subscription.Instrument} {subscription.LocationCode} {subscription.ScanCode}");
+            _logger.Info(
+                $"Scanner request: {subscription.Instrument} {subscription.LocationCode} {subscription.ScanCode}, " +
+                $"NumberOfRows={subscription.NumberOfRows}");
 
             try
             {

@@ -4,9 +4,11 @@ using IBApi;
 namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 {
     public class TwsStockUniverseProvider(
-        ITwsConnection tws) : IStockUniverseProvider
+        ITwsConnection tws,
+        IGetCandidatesSettingsProvider getCandidatesSettingsProvider) : IStockUniverseProvider
     {
         private readonly ITwsConnection _twsConnection = tws;
+        private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
 
         private const double MinMarketCap = 300_000_000;
 
@@ -21,11 +23,14 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public async Task<List<StockInfo>> GetStocksAsync(string scanCode)
         {
+            var settings = _getCandidatesSettingsProvider.Get();
+
             var subscription = new ScannerSubscription
             {
                 Instrument = "STK",
                 LocationCode = LocationCode,
                 ScanCode = scanCode,
+                NumberOfRows = Math.Max(1, settings.RowsPerScan),
 
                 // IB scanner uses reversed market cap semantics here.
                 // MarketCapBelow acts like our minimum market cap threshold.
