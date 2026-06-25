@@ -17,7 +17,6 @@
         logger.Info("  get-candidates");
         logger.Info("  evaluate-candidates");
         logger.Info("  normalize-reports");
-        logger.Info("  evaluate-wishlist");
         logger.Info("  clean-up");
         logger.Info("  get-scanner-params");
         logger.Info("  download-fundamental-snapshot");
@@ -55,12 +54,6 @@
         case "normalize-reports":
             await services
                 .GetRequiredService<NormalizeReportsCommand>()
-                .RunAsync();
-            break;
-
-        case "evaluate-wishlist":
-            await services
-                .GetRequiredService<EvaluateWishlistCommand>()
                 .RunAsync();
             break;
 

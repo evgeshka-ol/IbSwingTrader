@@ -22,7 +22,6 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<IFeatureCalculationSettingsProvider, FeatureCalculationSettingsProvider>();
             services.AddSingleton<IGetCandidatesSettingsProvider, GetCandidatesSettingsProvider>();
             services.AddSingleton<ICandidateEvaluationSettingsProvider, CandidateEvaluationSettingsProvider>();
-            services.AddSingleton<IWishListEvaluationSettingsProvider, WishListEvaluationSettingsProvider>();
             services.AddSingleton<ICleanUpSettingsProvider, CleanUpSettingsProvider>();
             services.AddSingleton<INormalizeReportsSettingsProvider, NormalizeReportsSettingsProvider>();
             services.AddSingleton<ICsvTradeReaderSettingsProvider, CsvTradeReaderSettingsProvider>();
@@ -90,10 +89,8 @@ namespace IbSwingTrader.App.Bootstrap
             // candidate evaluation
             services.AddSingleton<ICandidateEvaluator, CandidateEvaluator>();
             services.AddSingleton<ICandidatePatternVerdictService, CandidatePatternVerdictService>();
-            services.AddSingleton<IWishListEvaluator, WishListEvaluator>();
             services.AddSingleton<IJsonFileService, JsonFileService>();
             services.AddSingleton<ICandidateEvaluationCsvService, CandidateEvaluationCsvService>();
-            services.AddSingleton<IWishListEvaluationCsvService, WishListEvaluationCsvService>();
             services.AddSingleton<IProcessedCandidateFilesService, ProcessedCandidateFilesService>();
             services.AddSingleton<IFileHashService, FileHashService>();
 
@@ -104,7 +101,6 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddTransient<EvaluateCandidatesCommand>();
             services.AddTransient<NormalizeEvaluationsCommand>();
             services.AddTransient<NormalizeReportsCommand>();
-            services.AddTransient<EvaluateWishlistCommand>();
             services.AddTransient<CleanUpCommand>();
             services.AddTransient<GetScannerParamsCommand>();
             services.AddTransient<DownloadFundamentalSnapshotCommand>();

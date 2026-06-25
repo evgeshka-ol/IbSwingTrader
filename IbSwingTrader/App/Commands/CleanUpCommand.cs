@@ -31,6 +31,7 @@ namespace IbSwingTrader.App.Commands
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var settings = _cleanUpSettingsProvider.Get();
             var marketNow = MarketTime.Now(_marketSettingsProvider.Get().Timezone);
 
@@ -41,7 +42,7 @@ namespace IbSwingTrader.App.Commands
             var deletedFiles = CleanOldFiles(settings, marketNow);
 
             _logger.Info(
-                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} EvaluationsRemoved={evaluationsRemoved} EvaluationDatasetRemoved={evaluationDatasetRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles}");
+                $"Clean-up completed. CandidatesRemoved={candidatesRemoved} EvaluationsRemoved={evaluationsRemoved} EvaluationDatasetRemoved={evaluationDatasetRemoved} WishListRemoved={wishListRemoved} FilesDeleted={deletedFiles} Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
         private async Task<int> CleanCandidatesAsync(CleanUpSettings settings)

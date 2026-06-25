@@ -1,3 +1,5 @@
+using IbSwingTrader.Common.Time;
+
 namespace IbSwingTrader.App.Commands
 {
     public class NormalizeEvaluationsCommand(
@@ -23,6 +25,7 @@ namespace IbSwingTrader.App.Commands
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var evaluationsPath = _pathService.GetEvaluationsFile();
             var evaluationsArchivePath = _pathService.GetEvaluationsArchiveFile();
             var records = await _candidateEvaluationCsvService.ReadAsync(evaluationsPath);
@@ -79,6 +82,12 @@ namespace IbSwingTrader.App.Commands
 
             _logger.Info("Rebuilding evaluation dataset after normalization...");
             await _evaluationDatasetBuilder.RunAsync();
+            _logger.Info(
+                $"NormalizeEvaluations completed. " +
+                $"Active={activeRecords.Count}, " +
+                $"ArchivedStaleOpen={staleOpenRecords.Count}, " +
+                $"ArchiveTotal={archivedRecords.Count}, " +
+                $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
         private void EnsureConnected(TwsSettings twsSettings)

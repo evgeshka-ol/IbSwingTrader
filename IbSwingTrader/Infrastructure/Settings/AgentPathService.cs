@@ -21,7 +21,6 @@ namespace IbSwingTrader.Infrastructure.Settings
         public string GetEvaluationsFile() => Combine(_paths.EvaluationsFile);
         public string GetEvaluationsArchiveFile() => Combine(_paths.EvaluationsArchiveFile);
         public string GetWishListFile() => Combine(_paths.WishListFile);
-        public string GetWishListEvaluationsFile() => Combine(_paths.WishListEvaluationsFile);
 
         public string GetProcessedCandidateFilesManifest() =>
             Combine(_paths.ProcessedCandidateFilesManifest);

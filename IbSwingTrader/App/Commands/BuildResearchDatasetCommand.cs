@@ -46,6 +46,7 @@ namespace IbSwingTrader.App.Commands
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var settings = _researchSettingsProvider.Get();
             var twsSettings = _twsSettingsProvider.Get();
             var outputPath = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), settings.OutputFile));
@@ -72,7 +73,9 @@ namespace IbSwingTrader.App.Commands
 
             if (tickers.Count == 0)
             {
-                _logger.Error("No research tickers found.");
+                _logger.Error(
+                    $"No research tickers found. " +
+                    $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
                 return;
             }
 
@@ -122,6 +125,13 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Failed requests: {_failedRequests.Count}");
             _logger.EmptyLine();
             _logger.InfoBlock("FAILED HISTORY REQUESTS", _failedHistoryRequestTableFormatter.Format(_failedRequests));
+            _logger.Info(
+                $"BuildResearchDataset completed. " +
+                $"Tickers={tickers.Count}, " +
+                $"FreshRows={freshRows.Count}, " +
+                $"TotalRows={allRows.Count}, " +
+                $"FailedRequests={_failedRequests.Count}, " +
+                $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
         private static bool IsSupportedResearchSource(string source)

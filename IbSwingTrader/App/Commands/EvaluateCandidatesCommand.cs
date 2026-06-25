@@ -23,18 +23,22 @@ namespace IbSwingTrader.App.Commands
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var twsSettings = _twsSettingsProvider.Get();
 
             var candidatesPath = _pathService.GetCandidatesFile();
 
             EnsureConnected(twsSettings);
 
-            await EvaluateCandidatesAsync(candidatesPath);
+            var evaluated = await EvaluateCandidatesAsync(candidatesPath);
 
-            _logger.Info("Candidate evaluation completed.");
+            _logger.Info(
+                $"Candidate evaluation completed. " +
+                $"Evaluated={evaluated}, " +
+                $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
-        private async Task EvaluateCandidatesAsync(
+        private async Task<int> EvaluateCandidatesAsync(
             string candidatesPath)
         {
             var candidates = await LoadCandidatesAsync(candidatesPath);
@@ -69,7 +73,7 @@ namespace IbSwingTrader.App.Commands
                     $"availableUntil={availableNow:yyyy-MM-dd HH:mm:ss}, " +
                     $"latestEvaluatedScanDate={FormatDate(latestEvaluatedScanDate)}, " +
                     $"candidates={candidates.Count}");
-                return;
+                return 0;
             }
 
             var selectedScanDateSet = selectedScanDates.ToHashSet();
@@ -173,7 +177,7 @@ namespace IbSwingTrader.App.Commands
                     $"Nothing to evaluate. Current market date={marketToday:yyyy-MM-dd}, " +
                     $"selected scan dates={string.Join(", ", selectedScanDates.Select(x => x.ToString("yyyy-MM-dd")))}, " +
                     $"candidates={candidates.Count}");
-                return;
+                return 0;
             }
 
             var results = await _candidateEvaluator.EvaluateAsync(candidatesToEvaluate.Values.ToList());
@@ -192,6 +196,7 @@ namespace IbSwingTrader.App.Commands
             await _evaluationDatasetBuilder.UpsertAsync(results);
             _logger.Info("Evaluation step: evaluation dataset merge completed");
             LogCandidateSummary(Path.GetFileName(candidatesPath), results);
+            return results.Count;
         }
 
         private void EnsureConnected(TwsSettings twsSettings)

@@ -121,6 +121,7 @@ namespace IbSwingTrader.Application.Dataset
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var settings = _buildEvaluationDatasetSettingsProvider.Get();
             var evaluationsPath = _pathService.GetEvaluationsFile();
             var evaluationsArchivePath = _pathService.GetEvaluationsArchiveFile();
@@ -159,7 +160,9 @@ namespace IbSwingTrader.Application.Dataset
 
             if (evaluations.Count == 0)
             {
-                _logger.Error("No evaluations found.");
+                _logger.Error(
+                    $"No evaluations found. " +
+                    $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
                 return;
             }
 
@@ -268,6 +271,11 @@ namespace IbSwingTrader.Application.Dataset
             _logger.Info($"Group TradeCandidate: {rows.Count(x => x.GroupLabel == "TradeCandidate")}");
             _logger.Info($"Group Wishlist: {rows.Count(x => x.GroupLabel == "Wishlist")}");
             _logger.Info($"Group FilterReference: {rows.Count(x => x.GroupLabel == "FilterReference")}");
+            _logger.Info(
+                $"Evaluation dataset build completed. " +
+                $"Evaluations={evaluations.Count}, " +
+                $"Rows={rows.Count}, " +
+                $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
         private async Task<List<RankedCandidateSnapshot>> LoadCurrentCandidatesAsync()

@@ -642,18 +642,6 @@
         "UseAmbiguousBarResolver": true
     },
 
-    "WishListEvaluation": {
-        "HistoryDaysToLoad": 90,
-        "MaxAdditionalDropFromWishListPct": -12.0,
-        "MinCurrentDailyRsi14": 30.0,
-        "MaxCurrentDailyMacdLineMinusSignal": -1.5,
-        "MinWeeklyMaSignedDistancePct": -14.0,
-        "MaxDaysInWishListWithoutImprovement": 10,
-        "MinDailyMaDelta3ToKeep": 0.0,
-        "MinDailyRsiDelta3ToKeep": 0.0,
-        "MinDailyMacdDelta3ToKeep": 0.0
-    },
-
     "CleanUp": {
         "RemoveEvaluatedCandidates": true,
         "CandidateOutcomesToRemove": [

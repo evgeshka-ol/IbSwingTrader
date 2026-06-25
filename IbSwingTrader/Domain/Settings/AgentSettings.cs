@@ -16,7 +16,6 @@ namespace IbSwingTrader.Domain.Settings
 
         public GetCandidatesSettings GetCandidates { get; set; } = new();
         public CandidateEvaluationSettings CandidateEvaluation { get; set; } = new();
-        public WishListEvaluationSettings WishListEvaluation { get; set; } = new();
         public CleanUpSettings CleanUp { get; set; } = new();
         public NormalizeReportsSettings NormalizeReports { get; set; } = new();
 

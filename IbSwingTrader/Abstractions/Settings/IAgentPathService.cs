@@ -10,7 +10,6 @@ namespace IbSwingTrader.Abstractions.Settings
         string GetEvaluationsFile();
         string GetEvaluationsArchiveFile();
         string GetWishListFile();
-        string GetWishListEvaluationsFile();
         string GetProcessedCandidateFilesManifest();
         string GetLogsFolder();
     }

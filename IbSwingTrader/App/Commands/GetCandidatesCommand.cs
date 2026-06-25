@@ -1,3 +1,5 @@
+using IbSwingTrader.Common.Time;
+
 namespace IbSwingTrader.App.Commands
 {
     public class GetCandidatesCommand(
@@ -13,6 +15,7 @@ namespace IbSwingTrader.App.Commands
 
         public async Task RunAsync()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var result = await _finder.FindAsync();
             var candidatesPath = _pathService.GetCandidatesFile();
 
@@ -26,7 +29,8 @@ namespace IbSwingTrader.App.Commands
             _logger.Info(
                 $"GetCandidates completed. " +
                 $"Reversal ranking rows: {result.Candidates.Count}, " +
-                $"Runaway ranking rows: {result.SameDayCandidates.Count}");
+                $"Runaway ranking rows: {result.SameDayCandidates.Count}, " +
+                $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
     }
 }
