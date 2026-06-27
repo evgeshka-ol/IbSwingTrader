@@ -192,6 +192,19 @@ namespace IbSwingTrader.App.Commands
                 }
             }
 
+            if (ShouldSkipDatasetMergeDueToDataFailures(results, evaluationSettings, out var dataFailures, out var dataFailureRatio))
+            {
+                _logger.Error(
+                    $"Evaluation dataset merge skipped because data failure ratio is too high. " +
+                    $"DataFailures={dataFailures}/{results.Count}, " +
+                    $"Ratio={dataFailureRatio:P1}, " +
+                    $"MaxAllowed={evaluationSettings.MaxDataFailureRatioBeforeSkipMerge:P1}. " +
+                    "TWS historical data is likely unavailable or too unstable.");
+
+                LogCandidateSummary(Path.GetFileName(candidatesPath), results);
+                return results.Count;
+            }
+
             _logger.Info($"Evaluation step: merging {results.Count} rows directly into evaluation dataset");
             await _evaluationDatasetBuilder.UpsertAsync(results);
             _logger.Info("Evaluation step: evaluation dataset merge completed");
@@ -241,6 +254,29 @@ namespace IbSwingTrader.App.Commands
 
             _logger.Info(
                 $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} NoData={noData} Errors={errors}");
+        }
+
+        private static bool ShouldSkipDatasetMergeDueToDataFailures(
+            List<CandidateEvaluationResult> results,
+            CandidateEvaluationSettings settings,
+            out int dataFailures,
+            out decimal dataFailureRatio)
+        {
+            dataFailures = results.Count(IsDataFailure);
+            dataFailureRatio = results.Count == 0
+                ? 0m
+                : dataFailures / (decimal)results.Count;
+
+            return settings.MaxDataFailureRatioBeforeSkipMerge > 0m &&
+                   dataFailureRatio > settings.MaxDataFailureRatioBeforeSkipMerge;
+        }
+
+        private static bool IsDataFailure(CandidateEvaluationResult result)
+        {
+            return result.Outcome != null &&
+                   (result.Outcome.Equals("NoData", StringComparison.OrdinalIgnoreCase) ||
+                    result.Outcome.Equals("NoDataAfterScan", StringComparison.OrdinalIgnoreCase) ||
+                    result.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task<List<CandidateDetails>> LoadCandidatesAsync(string candidatesPath)

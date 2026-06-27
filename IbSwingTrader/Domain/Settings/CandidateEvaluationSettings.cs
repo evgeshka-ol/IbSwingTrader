@@ -9,5 +9,7 @@ namespace IbSwingTrader.Domain.Settings
         public bool UseAmbiguousBarResolver { get; set; } = true;
         public bool ReevaluateOpenCandidates { get; set; } = false;
         public bool ReevaluateAllCandidatesWithSeries { get; set; } = false;
+        public int MaxConsecutiveDataFailuresBeforeAbort { get; set; } = 10;
+        public decimal MaxDataFailureRatioBeforeSkipMerge { get; set; } = 0.5m;
     }
 }

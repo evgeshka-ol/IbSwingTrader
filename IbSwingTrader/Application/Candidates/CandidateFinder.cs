@@ -3650,6 +3650,18 @@ namespace IbSwingTrader.Application.Candidates
                 score -= s.OverextendedPenalty;
             }
 
+            if (IsExhaustedMoverProxy(snapshot, diagnostics, s))
+                score -= s.ExhaustedMoverPenalty;
+
+            if (IsAnomalousVolatilityProxy(diagnostics, s))
+                score -= s.AnomalousVolatilityPenalty;
+
+            score += CalculateHighAmplitudeProxyAdjustment(
+                snapshot,
+                diagnostics,
+                s,
+                todayResearchLikePatternKind);
+
             score += CalculatePatternSeriesAdjustment(recentSeries, s);
 
             if (IsResearchLikeLaunch(snapshot, diagnostics, recentSeries, s))
@@ -3704,6 +3716,75 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries);
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal CalculateHighAmplitudeProxyAdjustment(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            TodayResearchLikePatternKind todayResearchLikePatternKind)
+        {
+            var score = 0m;
+            var constructiveRsi =
+                snapshot.Current.DailyRSI14 >= settings.HighAmplitudeProxyConstructiveRsiMin &&
+                snapshot.Current.DailyRSI14 <= settings.HighAmplitudeProxyConstructiveRsiMax;
+            var deepEnough =
+                snapshot.Current.DistanceTo20dHigh <= settings.HighAmplitudeProxyDeepDistanceTo20dHigh ||
+                diagnostics.Pullback10d <= settings.HighAmplitudeProxyDeepPullback10d ||
+                diagnostics.DailyPullback10d <= settings.HighAmplitudeProxyDeepPullback10d;
+
+            if (diagnostics.ATRRatio >= settings.HighAmplitudeProxyMinAtrRatio &&
+                constructiveRsi &&
+                deepEnough)
+            {
+                score += settings.HighAmplitudeProxyBonus;
+
+                if (diagnostics.ATRRatio >= settings.HighAmplitudeProxyStrongAtrRatio)
+                    score += settings.HighAmplitudeProxyStrongBonus;
+            }
+
+            var runawayLike =
+                todayResearchLikePatternKind != TodayResearchLikePatternKind.None ||
+                diagnostics.TrendPosition >= settings.RunawayHighAmplitudeTrendPositionThreshold ||
+                diagnostics.DailyTrendPosition >= settings.RunawayHighAmplitudeTrendPositionThreshold;
+
+            if (runawayLike &&
+                diagnostics.ATRRatio >= settings.HighAmplitudeProxyMinAtrRatio &&
+                diagnostics.TrendPosition >= settings.RunawayHighAmplitudeTrendPositionThreshold &&
+                constructiveRsi &&
+                !IsExhaustedMoverProxy(snapshot, diagnostics, settings))
+            {
+                score += settings.RunawayHighAmplitudeTrendBonus;
+            }
+
+            var shallowLowEnergy =
+                diagnostics.ATRRatio <= settings.LowAmplitudeProxyMaxAtrRatio &&
+                snapshot.Current.DistanceTo20dHigh > settings.HighAmplitudeProxyDeepDistanceTo20dHigh &&
+                diagnostics.Pullback10d > settings.LowAmplitudeProxyShallowPullback10d &&
+                diagnostics.DailyPullback10d > settings.LowAmplitudeProxyShallowPullback10d;
+
+            if (shallowLowEnergy)
+                score -= settings.LowAmplitudeProxyPenalty;
+
+            return score;
+        }
+
+        private static bool IsAnomalousVolatilityProxy(
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            return diagnostics.ATRRatio >= settings.AnomalousVolatilityAtrRatioThreshold &&
+                   diagnostics.VolumeRatio20 <= settings.AnomalousVolatilityMaxVolumeRatio20;
+        }
+
+        private static bool IsExhaustedMoverProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            return snapshot.Current.DailyRSI14 >= settings.ExhaustedMoverDailyRsi14Threshold &&
+                   (diagnostics.TrendPosition >= settings.ExhaustedMoverTrendPositionThreshold ||
+                    diagnostics.DailyTrendPosition >= settings.ExhaustedMoverDailyTrendPositionThreshold);
         }
 
         private static bool IsResearchLikePreLaunchRankProxy(
@@ -4208,7 +4289,8 @@ namespace IbSwingTrader.Application.Candidates
                     }
                 }
 
-                if (row.AmplitudePct < settings.MinTemplateAmplitudePct)
+                if (row.AmplitudePct < settings.MinTemplateAmplitudePct ||
+                    row.AmplitudePct > settings.MaxTemplateAmplitudePct)
                     continue;
 
                 var family = row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase)

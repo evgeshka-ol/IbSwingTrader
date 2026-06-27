@@ -22,6 +22,9 @@ namespace IbSwingTrader.Application.Evaluation
             List<CandidateDetails> candidates)
         {
             var results = new List<CandidateEvaluationResult>();
+            var settings = _candidateEvaluationSettingsProvider.Get();
+            var maxConsecutiveDataFailures = Math.Max(0, settings.MaxConsecutiveDataFailuresBeforeAbort);
+            var consecutiveDataFailures = 0;
 
             for (var i = 0; i < candidates.Count; i++)
             {
@@ -34,21 +37,87 @@ namespace IbSwingTrader.Application.Evaluation
                 {
                     var result = await EvaluateOneAsync(candidate);
                     results.Add(result);
+                    consecutiveDataFailures = UpdateConsecutiveDataFailures(
+                        result,
+                        consecutiveDataFailures,
+                        maxConsecutiveDataFailures,
+                        i + 1,
+                        candidates.Count);
+
                     _logger.Info(
                         $"Evaluation completed: {i + 1}/{candidates.Count} {candidate.Ticker} [{candidate.Scan.PresetScanCode}] " +
                         $"outcome={result.Outcome ?? "Unknown"} entryTouched={result.EntryTouched} " +
                         $"entryTime={FormatTime(result.EntryTime)} exitTime={FormatTime(result.ExitTime)} stopTime={FormatTime(result.StopTime)}");
+
+                    if (ShouldAbortAfterDataFailures(consecutiveDataFailures, maxConsecutiveDataFailures))
+                        break;
                 }
                 catch (Exception ex)
                 {
                     _logger.Error(
                         $"Evaluate failed for {candidate.Ticker} [{candidate.Scan.PresetScanCode}]: {ex.Message}");
 
-                    results.Add(CreateErrorResult(candidate, ex.Message));
+                    var result = CreateErrorResult(candidate, ex.Message);
+                    results.Add(result);
+                    consecutiveDataFailures = UpdateConsecutiveDataFailures(
+                        result,
+                        consecutiveDataFailures,
+                        maxConsecutiveDataFailures,
+                        i + 1,
+                        candidates.Count);
+
+                    if (ShouldAbortAfterDataFailures(consecutiveDataFailures, maxConsecutiveDataFailures))
+                        break;
                 }
             }
 
             return results;
+        }
+
+        private int UpdateConsecutiveDataFailures(
+            CandidateEvaluationResult result,
+            int current,
+            int maxConsecutiveDataFailures,
+            int processed,
+            int total)
+        {
+            if (!IsDataFailure(result))
+                return 0;
+
+            var next = current + 1;
+
+            if (maxConsecutiveDataFailures > 0)
+            {
+                _logger.Info(
+                    $"Evaluation data failure streak: {next}/{maxConsecutiveDataFailures} " +
+                    $"after {processed}/{total} {result.Ticker} outcome={result.Outcome}");
+
+                if (next >= maxConsecutiveDataFailures)
+                {
+                    _logger.Error(
+                        $"Evaluation aborted after {next} consecutive data failures. " +
+                        $"Processed={processed}/{total}. LastTicker={result.Ticker}. " +
+                        "TWS historical data is likely unavailable or too unstable.");
+                }
+            }
+
+            return next;
+        }
+
+        private static bool ShouldAbortAfterDataFailures(
+            int consecutiveDataFailures,
+            int maxConsecutiveDataFailures)
+        {
+            return maxConsecutiveDataFailures > 0 &&
+                   consecutiveDataFailures >= maxConsecutiveDataFailures;
+        }
+
+        private static bool IsDataFailure(CandidateEvaluationResult result)
+        {
+            return result.Outcome != null &&
+                   (result.Outcome.Equals("NoData", StringComparison.OrdinalIgnoreCase) ||
+                    result.Outcome.Equals("NoDataAfterScan", StringComparison.OrdinalIgnoreCase) ||
+                    result.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task<CandidateEvaluationResult> EvaluateOneAsync(

@@ -452,6 +452,26 @@ namespace IbSwingTrader.Domain.Settings
         public decimal OverextendedDailyRsi14Threshold { get; set; } = 66.0m;
         public decimal OverextendedBbMidThreshold { get; set; } = 5.0m;
         public decimal OverextendedPenalty { get; set; } = 0.16m;
+        public decimal ExhaustedMoverDailyRsi14Threshold { get; set; } = 80.0m;
+        public decimal ExhaustedMoverTrendPositionThreshold { get; set; } = 9.0m;
+        public decimal ExhaustedMoverDailyTrendPositionThreshold { get; set; } = 10.0m;
+        public decimal ExhaustedMoverPenalty { get; set; } = 3.0m;
+        public decimal HighAmplitudeProxyMinAtrRatio { get; set; } = 4.0m;
+        public decimal HighAmplitudeProxyDeepDistanceTo20dHigh { get; set; } = -12.0m;
+        public decimal HighAmplitudeProxyDeepPullback10d { get; set; } = -8.0m;
+        public decimal HighAmplitudeProxyConstructiveRsiMin { get; set; } = 35.0m;
+        public decimal HighAmplitudeProxyConstructiveRsiMax { get; set; } = 68.0m;
+        public decimal HighAmplitudeProxyBonus { get; set; } = 0.65m;
+        public decimal HighAmplitudeProxyStrongAtrRatio { get; set; } = 5.5m;
+        public decimal HighAmplitudeProxyStrongBonus { get; set; } = 0.35m;
+        public decimal RunawayHighAmplitudeTrendPositionThreshold { get; set; } = 8.0m;
+        public decimal RunawayHighAmplitudeTrendBonus { get; set; } = 0.35m;
+        public decimal LowAmplitudeProxyMaxAtrRatio { get; set; } = 2.5m;
+        public decimal LowAmplitudeProxyShallowPullback10d { get; set; } = -5.0m;
+        public decimal LowAmplitudeProxyPenalty { get; set; } = 0.35m;
+        public decimal AnomalousVolatilityAtrRatioThreshold { get; set; } = 15.0m;
+        public decimal AnomalousVolatilityMaxVolumeRatio20 { get; set; } = 0.10m;
+        public decimal AnomalousVolatilityPenalty { get; set; } = 1.5m;
         public int SecondPassWindowMultiplier { get; set; } = 4;
         public int SecondPassMinimumWindow { get; set; } = 30;
         public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
@@ -469,6 +489,7 @@ namespace IbSwingTrader.Domain.Settings
     {
         public bool Enabled { get; set; } = true;
         public decimal MinTemplateAmplitudePct { get; set; } = 10m;
+        public decimal MaxTemplateAmplitudePct { get; set; } = 50m;
         public int MaxTemplatesPerFamily { get; set; } = 160;
         public decimal FullMatchDistance { get; set; } = 1.20m;
         public decimal WeakMatchDistance { get; set; } = 2.20m;

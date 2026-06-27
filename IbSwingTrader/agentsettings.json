@@ -585,6 +585,26 @@
             "OverextendedDailyRsi14Threshold": 66.0,
             "OverextendedBbMidThreshold": 5.0,
             "OverextendedPenalty": 0.16,
+            "ExhaustedMoverDailyRsi14Threshold": 80.0,
+            "ExhaustedMoverTrendPositionThreshold": 9.0,
+            "ExhaustedMoverDailyTrendPositionThreshold": 10.0,
+            "ExhaustedMoverPenalty": 3.0,
+            "HighAmplitudeProxyMinAtrRatio": 4.0,
+            "HighAmplitudeProxyDeepDistanceTo20dHigh": -12.0,
+            "HighAmplitudeProxyDeepPullback10d": -8.0,
+            "HighAmplitudeProxyConstructiveRsiMin": 35.0,
+            "HighAmplitudeProxyConstructiveRsiMax": 68.0,
+            "HighAmplitudeProxyBonus": 0.65,
+            "HighAmplitudeProxyStrongAtrRatio": 5.5,
+            "HighAmplitudeProxyStrongBonus": 0.35,
+            "RunawayHighAmplitudeTrendPositionThreshold": 8.0,
+            "RunawayHighAmplitudeTrendBonus": 0.35,
+            "LowAmplitudeProxyMaxAtrRatio": 2.5,
+            "LowAmplitudeProxyShallowPullback10d": -5.0,
+            "LowAmplitudeProxyPenalty": 0.35,
+            "AnomalousVolatilityAtrRatioThreshold": 15.0,
+            "AnomalousVolatilityMaxVolumeRatio20": 0.10,
+            "AnomalousVolatilityPenalty": 1.5,
             "SecondPassWindowMultiplier": 4,
             "SecondPassMinimumWindow": 30,
             "AiReferenceTradePlan": {
@@ -597,6 +617,7 @@
             "SeriesSimilarity": {
                 "Enabled": true,
                 "MinTemplateAmplitudePct": 10.0,
+                "MaxTemplateAmplitudePct": 50.0,
                 "MaxTemplatesPerFamily": 160,
                 "FullMatchDistance": 1.20,
                 "WeakMatchDistance": 2.20,
@@ -639,7 +660,9 @@
         "ReevaluateAllCandidatesWithSeries": false,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
-        "UseAmbiguousBarResolver": true
+        "UseAmbiguousBarResolver": true,
+        "MaxConsecutiveDataFailuresBeforeAbort": 10,
+        "MaxDataFailureRatioBeforeSkipMerge": 0.5
     },
 
     "CleanUp": {
