@@ -49,6 +49,10 @@ namespace IbSwingTrader.Application.Evaluation
                 series.H4BbUpperBandSeries,
                 series.H4BbMidBandSeries,
                 series.H4BbLowerBandSeries,
+                series.DailyRsiSeries,
+                series.DailyMacdHistogramSeries,
+                series.H4RsiSeries,
+                series.H4MacdHistogramSeries,
                 dailyState.Direction,
                 h4State.Direction);
 
@@ -150,11 +154,23 @@ namespace IbSwingTrader.Application.Evaluation
             IReadOnlyList<decimal> h4Upper,
             IReadOnlyList<decimal> h4Mid,
             IReadOnlyList<decimal> h4Lower,
+            IReadOnlyList<decimal> dailyRsi,
+            IReadOnlyList<decimal> dailyMacdHistogram,
+            IReadOnlyList<decimal> h4Rsi,
+            IReadOnlyList<decimal> h4MacdHistogram,
             BollingerFigureDirection dailyDirection,
             BollingerFigureDirection h4Direction)
         {
             var dailyKind = ClassifyBellPatternKindForTimeframe(dailyUpper, dailyMid, dailyLower, dailyDirection);
             var h4Kind = ClassifyBellPatternKindForTimeframe(h4Upper, h4Mid, h4Lower, h4Direction);
+
+            if (dailyKind == BellPatternKind.BellUp &&
+                h4Kind == BellPatternKind.BellUp &&
+                IsVerticalSpikeExpansion(h4Upper, h4Lower, h4Rsi, h4MacdHistogram) &&
+                !IsVerticalSpikeExpansion(dailyUpper, dailyLower, dailyRsi, dailyMacdHistogram))
+            {
+                return new BellPatternSignal(BellPatternKind.BellUp, BellPatternTimeframe.Daily);
+            }
 
             var bellUpSignal = SelectBellPatternSignal(dailyKind, h4Kind, BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
@@ -188,7 +204,8 @@ namespace IbSwingTrader.Application.Evaluation
 
             if (((IsBellUpEnvelope(prior, recent) &&
                   IsBellUpCurveTurn(upper, mid, lower)) ||
-                 IsGradualBellUpLaunch(upper, mid, lower)) &&
+                 IsGradualBellUpLaunch(upper, mid, lower) ||
+                 IsExplosiveBellUpExpansion(upper, mid, lower)) &&
                 direction != BollingerFigureDirection.Down)
             {
                 return BellPatternKind.BellUp;
@@ -307,6 +324,31 @@ namespace IbSwingTrader.Application.Evaluation
                    width[^1] > width[^2];
         }
 
+        private static bool IsExplosiveBellUpExpansion(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 6)
+                return false;
+
+            var upperTailSlope = CalculateTailRelativeSlopePct(upper, 4);
+            var midTailSlope = CalculateTailRelativeSlopePct(mid, 4);
+            var width = upper
+                .TakeLast(count)
+                .Zip(lower.TakeLast(count), (u, l) => u - l)
+                .ToList();
+            var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
+
+            return upperTailSlope >= 8m &&
+                   midTailSlope >= 5m &&
+                   widthTailSlope >= 8m &&
+                   upper[^1] > upper[^2] &&
+                   mid[^1] > mid[^2] &&
+                   width[^1] > width[^2];
+        }
+
         private static bool IsBellDownEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
         {
             var midDecelerating = recent.MidMovePct < prior.MidMovePct;
@@ -407,6 +449,15 @@ namespace IbSwingTrader.Application.Evaluation
                 h4State.Regime == BollingerFigureRegime.Collapse)
                 return true;
 
+            if (ClassifyBellPatternKindForTimeframe(
+                    series.H4BbUpperBandSeries,
+                    series.H4BbMidBandSeries,
+                    series.H4BbLowerBandSeries,
+                    h4State.Direction) == BellPatternKind.BellUp)
+            {
+                return false;
+            }
+
             var h4RsiTail = CalculateTailSlope(series.H4RsiSeries, 4);
             var h4MacdHistogramTail = CalculateTailSlope(series.H4MacdHistogramSeries, 4);
 
@@ -467,6 +518,15 @@ namespace IbSwingTrader.Application.Evaluation
                 _ => []
             };
 
+            return IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
+        }
+
+        private static bool IsVerticalSpikeExpansion(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> lower,
+            IReadOnlyList<decimal> rsi,
+            IReadOnlyList<decimal> macdHistogram)
+        {
             var count = Math.Min(upper.Count, lower.Count);
             if (count < 6 || rsi.Count < count || macdHistogram.Count < count)
                 return false;
@@ -556,6 +616,16 @@ namespace IbSwingTrader.Application.Evaluation
             var lowerHookStrengthPct = CalculateTailRelativeSlopePct(lower, 3);
             var lowerHooked = lowerRecent.Count >= 2 && lowerRecent.Count(x => x >= 0m) >= 2 && lowerRecent[^1] >= 0m;
             var lowerHookStrong = lowerHooked && lowerHookStrengthPct >= 0.8m;
+            var lowerHookEmerging =
+                lowerRecent.Count >= 3 &&
+                lowerRecent[^1] < 0m &&
+                lowerRecent[^1] > lowerRecent[^2] &&
+                lowerRecent[^2] > lowerRecent[^3];
+            var lowerHookTurning =
+                lowerRecent.Count >= 3 &&
+                lowerRecent[^1] >= 0m &&
+                lowerRecent[^2] < 0m &&
+                lowerRecent[^2] > lowerRecent[^3];
 
             var midRecent = midDeltas.TakeLast(3).ToList();
             var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
@@ -602,13 +672,17 @@ namespace IbSwingTrader.Application.Evaluation
                 rsi.Count < 4 ||
                 (rsi[^1] > rsi[^2] &&
                  rsi[^1] > rsi.TakeLast(4).Min());
+            var midContextOk = midHooked && (midDecelerated || lowerHookTurning);
 
             diagnostics =
                 $"LowerBrokeDown={lowerBrokeDown}, " +
                 $"LowerHooked={lowerHooked}, " +
                 $"LowerHookStrong={lowerHookStrong}, " +
+                $"LowerHookEmerging={lowerHookEmerging}, " +
+                $"LowerHookTurning={lowerHookTurning}, " +
                 $"MidHooked={midHooked}, " +
                 $"MidDecelerated={midDecelerated}, " +
+                $"MidContextOk={midContextOk}, " +
                 $"BandCompression={bandCompression}, " +
                 $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
                 $"MacdConverges={macdConverges}, " +
@@ -618,13 +692,10 @@ namespace IbSwingTrader.Application.Evaluation
                 $"MidPriorSlopePct={midPriorSlopePct}";
 
             return lowerBrokeDown &&
-                   lowerHooked &&
-                   lowerHookStrong &&
-                   midHooked &&
-                   midDecelerated &&
+                   (lowerHookStrong || lowerHookEmerging || lowerHookTurning) &&
+                   midContextOk &&
                    bandCompression &&
-                   histogramTurnsUp &&
-                   macdConverges &&
+                   (histogramTurnsUp || macdConverges || lowerHookEmerging) &&
                    rsiTurnsUp;
         }
 

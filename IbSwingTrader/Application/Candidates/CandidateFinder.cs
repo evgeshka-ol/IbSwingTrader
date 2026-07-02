@@ -1372,6 +1372,15 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.H4BbMidBandSeries,
                 recentSeries.H4BbLowerBandSeries,
                 bbState.H4.Direction);
+
+            if (dailyKind == BellPatternKind.BellUp &&
+                h4Kind == BellPatternKind.BellUp &&
+                IsVerticalSpikeExpansion(recentSeries, BellPatternTimeframe.H4) &&
+                !IsVerticalSpikeExpansion(recentSeries, BellPatternTimeframe.Daily))
+            {
+                return new BellPatternSignal(BellPatternKind.BellUp, BellPatternTimeframe.Daily);
+            }
+
             var bellUpSignal = SelectBellPatternSignal(
                 dailyKind,
                 h4Kind,
@@ -1416,7 +1425,8 @@ namespace IbSwingTrader.Application.Candidates
 
             if (((IsBellUpEnvelope(prior, recent) &&
                   IsBellUpCurveTurn(upper, mid, lower)) ||
-                 IsGradualBellUpLaunch(upper, mid, lower)) &&
+                 IsGradualBellUpLaunch(upper, mid, lower) ||
+                 IsExplosiveBellUpExpansion(upper, mid, lower)) &&
                 direction != nameof(BollingerFigureDirection.Down))
             {
                 return BellPatternKind.BellUp;
@@ -1511,6 +1521,31 @@ namespace IbSwingTrader.Application.Candidates
                        lowerTailSlope,
                        widthTailSlope)) &&
                    widthTailSlope >= 5m &&
+                   width[^1] > width[^2];
+        }
+
+        private static bool IsExplosiveBellUpExpansion(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 6)
+                return false;
+
+            var upperTailSlope = CalculateTailRelativeSlopePct(upper.ToList(), 4);
+            var midTailSlope = CalculateTailRelativeSlopePct(mid.ToList(), 4);
+            var width = upper
+                .TakeLast(count)
+                .Zip(lower.TakeLast(count), (u, l) => u - l)
+                .ToList();
+            var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
+
+            return upperTailSlope >= 8m &&
+                   midTailSlope >= 5m &&
+                   widthTailSlope >= 8m &&
+                   upper[^1] > upper[^2] &&
+                   mid[^1] > mid[^2] &&
                    width[^1] > width[^2];
         }
 
@@ -1619,6 +1654,15 @@ namespace IbSwingTrader.Application.Candidates
             if (bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
                 return true;
+
+            if (ClassifyBellPatternKindForTimeframe(
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries,
+                    bbState.H4.Direction) == BellPatternKind.BellUp)
+            {
+                return false;
+            }
 
             var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
             var h4MacdHistogramTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
@@ -3614,6 +3658,12 @@ namespace IbSwingTrader.Application.Candidates
             if (isEarlyReversal)
                 score += s.EarlyReversalBonus;
 
+            if (IsReversalDeepHookProxy(snapshot, diagnostics, s))
+                score += s.ReversalDeepHookBonus;
+
+            if (IsReversalH4BellUpHybridProxy(snapshot, diagnostics, s, recentSeries, bbState))
+                score += s.ReversalH4BellUpHybridBonus;
+
             if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
                 score -= s.WeakDeepPullbackPenalty;
 
@@ -3653,8 +3703,20 @@ namespace IbSwingTrader.Application.Candidates
             if (IsExhaustedMoverProxy(snapshot, diagnostics, s))
                 score -= s.ExhaustedMoverPenalty;
 
-            if (IsAnomalousVolatilityProxy(diagnostics, s))
+            var isExplosiveBellUpAnomalyBypass = IsExplosiveBellUpAnomalyBypassProxy(
+                snapshot,
+                diagnostics,
+                s,
+                recentSeries,
+                bbState);
+            if (isExplosiveBellUpAnomalyBypass)
+                score += s.ExplosiveBellUpAnomalyBypassBonus;
+
+            if (IsAnomalousVolatilityProxy(diagnostics, s) &&
+                !isExplosiveBellUpAnomalyBypass)
+            {
                 score -= s.AnomalousVolatilityPenalty;
+            }
 
             score += CalculateHighAmplitudeProxyAdjustment(
                 snapshot,
@@ -3775,6 +3837,26 @@ namespace IbSwingTrader.Application.Candidates
         {
             return diagnostics.ATRRatio >= settings.AnomalousVolatilityAtrRatioThreshold &&
                    diagnostics.VolumeRatio20 <= settings.AnomalousVolatilityMaxVolumeRatio20;
+        }
+
+        private static bool IsExplosiveBellUpAnomalyBypassProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState)
+        {
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            if (bellPatternSignal.Kind != BellPatternKind.BellUp)
+                return false;
+
+            return diagnostics.ATRRatio >= settings.ExplosiveBellUpAnomalyMinAtrRatio &&
+                   diagnostics.TrendPosition >= settings.ExplosiveBellUpAnomalyMinTrendPosition &&
+                   diagnostics.DailyTrendPosition >= settings.ExplosiveBellUpAnomalyMinTrendPosition &&
+                   snapshot.Current.DailyRSI14 <= settings.ExplosiveBellUpAnomalyMaxDailyRsi14 &&
+                   snapshot.Current.DistanceTo20dHigh <= settings.ExplosiveBellUpAnomalyMaxDistanceTo20dHigh &&
+                   (diagnostics.Pullback10d <= settings.HighAmplitudeProxyDeepPullback10d ||
+                    diagnostics.DailyPullback10d <= settings.HighAmplitudeProxyDeepPullback10d);
         }
 
         private static bool IsExhaustedMoverProxy(
@@ -5232,6 +5314,16 @@ namespace IbSwingTrader.Application.Candidates
                 lowerRecent.Count(x => x >= 0m) >= 2 &&
                 lowerRecent[^1] >= 0m;
             var lowerHookStrong = lowerHooked && lowerHookStrengthPct >= 0.8m;
+            var lowerHookEmerging =
+                lowerRecent.Count >= 3 &&
+                lowerRecent[^1] < 0m &&
+                lowerRecent[^1] > lowerRecent[^2] &&
+                lowerRecent[^2] > lowerRecent[^3];
+            var lowerHookTurning =
+                lowerRecent.Count >= 3 &&
+                lowerRecent[^1] >= 0m &&
+                lowerRecent[^2] < 0m &&
+                lowerRecent[^2] > lowerRecent[^3];
             var lowerHookFresh =
                 lowerRecent.Count >= 2 &&
                 lowerRecent.Take(lowerRecent.Count - 1).Any(x => x < 0m);
@@ -5286,14 +5378,18 @@ namespace IbSwingTrader.Application.Candidates
                 (rsi[^1] > rsi[^2] &&
                  rsi[^1] > rsi.TakeLast(4).Min());
             var priceTurnsTowardMid = IsPriceTurningTowardDailyMid(recentSeries);
+            var midContextOk = midHooked && (midDecelerated || lowerHookTurning);
 
             diagnostics =
                 $"LowerBrokeDown={lowerBrokeDown}, " +
                 $"LowerHooked={lowerHooked}, " +
                 $"LowerHookStrong={lowerHookStrong}, " +
+                $"LowerHookEmerging={lowerHookEmerging}, " +
+                $"LowerHookTurning={lowerHookTurning}, " +
                 $"LowerHookFresh={lowerHookFresh}, " +
                 $"MidHooked={midHooked}, " +
                 $"MidDecelerated={midDecelerated}, " +
+                $"MidContextOk={midContextOk}, " +
                 $"PriceTurnsTowardMid={priceTurnsTowardMid}, " +
                 $"BandCompression={bandCompression}, " +
                 $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
@@ -5307,15 +5403,12 @@ namespace IbSwingTrader.Application.Candidates
                 $"MacdHistogramTail={FormatTail(macdHistogram, 4)}";
 
             return lowerBrokeDown &&
-                   lowerHooked &&
-                   lowerHookStrong &&
+                   (lowerHookStrong || lowerHookEmerging || lowerHookTurning) &&
                    lowerHookFresh &&
-                   midHooked &&
-                   midDecelerated &&
+                   midContextOk &&
                    priceTurnsTowardMid &&
                    bandCompression &&
-                   histogramTurnsUp &&
-                   macdConverges &&
+                   (histogramTurnsUp || macdConverges || lowerHookEmerging) &&
                    rsiTurnsUp;
         }
 
@@ -6343,6 +6436,47 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.DailyTrendPosition <= settings.EarlyReversalMaxDailyTrendPosition &&
                    snapshot.DailyMaDelta3 > 0m &&
                    snapshot.DailyRsiDelta3 > 0m;
+        }
+
+        private static bool IsReversalDeepHookProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= settings.ReversalDeepHookMaxDistanceTo20dHigh &&
+                   f.DailyRSI14 >= settings.ReversalDeepHookMinDailyRsi14 &&
+                   f.DailyRSI14 <= settings.ReversalDeepHookMaxDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.ReversalDeepHookMinAtrRatio &&
+                   diagnostics.TrendPosition <= settings.ReversalDeepHookMaxTrendPosition &&
+                   diagnostics.DailyTrendPosition <= settings.ReversalDeepHookMaxDailyTrendPosition &&
+                   diagnostics.BBMidSignedDistancePct <= settings.ReversalDeepHookMaxBbMid &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings);
+        }
+
+        private static bool IsReversalH4BellUpHybridProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            RecentFeatureSeries recentSeries,
+            BollingerStateSet bbState)
+        {
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            if (bellPatternSignal.Kind != BellPatternKind.BellUp ||
+                bellPatternSignal.Timeframe != BellPatternTimeframe.H4)
+            {
+                return false;
+            }
+
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= settings.ReversalH4BellUpMaxDistanceTo20dHigh &&
+                   f.DailyRSI14 >= settings.ReversalH4BellUpMinDailyRsi14 &&
+                   f.DailyRSI14 <= settings.ReversalH4BellUpMaxDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.ReversalH4BellUpMinAtrRatio &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings) &&
+                   !IsExhaustedMoverProxy(snapshot, diagnostics, settings);
         }
 
         private bool IsDeepParabolicExpansionProxy(
