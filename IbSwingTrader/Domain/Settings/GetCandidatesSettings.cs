@@ -431,6 +431,25 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ReversalH4BellUpMinDailyRsi14 { get; set; } = 35.0m;
         public decimal ReversalH4BellUpMaxDailyRsi14 { get; set; } = 55.0m;
         public decimal ReversalH4BellUpMinAtrRatio { get; set; } = 3.0m;
+        public decimal ReversalHighAmplitudeBonus { get; set; } = 0.75m;
+        public decimal ReversalHighAmplitudeStrongBonus { get; set; } = 0.35m;
+        public decimal ReversalHighAmplitudeMinDailyRsi14 { get; set; } = 29.0m;
+        public decimal ReversalHighAmplitudeEarlyRsiMax { get; set; } = 43.0m;
+        public decimal ReversalHighAmplitudeMaxDailyRsi14 { get; set; } = 52.0m;
+        public decimal ReversalHighAmplitudeMinAtrRatio { get; set; } = 2.4m;
+        public decimal ReversalHighAmplitudeStrongAtrRatio { get; set; } = 3.8m;
+        public decimal ReversalHighAmplitudeMaxDistanceTo20dHigh { get; set; } = -13.0m;
+        public decimal ReversalHighAmplitudeMaxPullback10d { get; set; } = -8.0m;
+        public decimal ReversalHighAmplitudeMaxDailyPullback10d { get; set; } = -8.0m;
+        public decimal ReversalHighAmplitudeMinTrendPosition { get; set; } = -25.0m;
+        public decimal ReversalHighAmplitudeMinDailyTrendPosition { get; set; } = -30.0m;
+        public decimal ReversalHighAmplitudeMinBbMid { get; set; } = -8.0m;
+        public decimal ReversalHighAmplitudeMidRsiMinDailyTrendPosition { get; set; } = -12.0m;
+        public decimal ReversalHighAmplitudeMidRsiMinBbMid { get; set; } = -4.0m;
+        public decimal ReversalMatureWeakBouncePenalty { get; set; } = 0.55m;
+        public decimal ReversalMatureWeakBounceMinDailyRsi14 { get; set; } = 53.0m;
+        public decimal ReversalMatureWeakBounceMinDistanceTo20dHigh { get; set; } = -18.0m;
+        public decimal ReversalMatureWeakBounceMaxBbMid { get; set; } = 0.0m;
 
         public decimal DailyTrendNegativePenaltyThreshold { get; set; } = 0m;
         public decimal DailyTrendNegativePenalty { get; set; } = 0.08m;

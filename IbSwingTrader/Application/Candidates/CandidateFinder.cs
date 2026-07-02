@@ -447,6 +447,7 @@ namespace IbSwingTrader.Application.Candidates
                 var candidateItem = BuildCandidateItem(
                     ctx.Stock,
                     isFromWishlist: false,
+                    DailyFamilySplit.TodayResearchLike,
                     needsDeeperEntry,
                     needsMomentumExit,
                     ctx.Preset,
@@ -646,6 +647,7 @@ namespace IbSwingTrader.Application.Candidates
                 var candidateItem = BuildCandidateItem(
                     ctx.Stock,
                     isFromWishlist,
+                    dailyFamilySplit,
                     needsDeeperEntry,
                     needsMomentumExit,
                     ctx.Preset,
@@ -797,6 +799,7 @@ namespace IbSwingTrader.Application.Candidates
             var candidateItem = BuildCandidateItem(
                 ctx.Stock,
                 isFromWishlist,
+                dailyFamilySplit,
                 needsDeeperEntry,
                 needsMomentumExit,
                 ctx.Preset,
@@ -3208,6 +3211,7 @@ namespace IbSwingTrader.Application.Candidates
         private CandidateDetails BuildCandidateItem(
             StockInfo stock,
             bool isFromWishlist,
+            DailyFamilySplit dailyFamilySplit,
             bool needsDeeperEntry,
             bool needsMomentumExit,
             PresetScanCode preset,
@@ -3239,6 +3243,7 @@ namespace IbSwingTrader.Application.Candidates
                 candles,
                 recentSeries,
                 bbState,
+                dailyFamilySplit,
                 todayResearchLikePatternKind,
                 todayResearchLikeSeriesScore);
 
@@ -3587,6 +3592,7 @@ namespace IbSwingTrader.Application.Candidates
             List<Candle> candles,
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
+            DailyFamilySplit dailyFamilySplit,
             TodayResearchLikePatternKind todayResearchLikePatternKind,
             decimal todayResearchLikeSeriesScore)
         {
@@ -3663,6 +3669,21 @@ namespace IbSwingTrader.Application.Candidates
 
             if (IsReversalH4BellUpHybridProxy(snapshot, diagnostics, s, recentSeries, bbState))
                 score += s.ReversalH4BellUpHybridBonus;
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalHighAmplitudeProxy(snapshot, diagnostics, s))
+            {
+                score += s.ReversalHighAmplitudeBonus;
+
+                if (diagnostics.ATRRatio >= s.ReversalHighAmplitudeStrongAtrRatio)
+                    score += s.ReversalHighAmplitudeStrongBonus;
+            }
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalMatureWeakBounceProxy(snapshot, diagnostics, s))
+            {
+                score -= s.ReversalMatureWeakBouncePenalty;
+            }
 
             if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
                 score -= s.WeakDeepPullbackPenalty;
@@ -6477,6 +6498,50 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.ATRRatio >= settings.ReversalH4BellUpMinAtrRatio &&
                    !IsAnomalousVolatilityProxy(diagnostics, settings) &&
                    !IsExhaustedMoverProxy(snapshot, diagnostics, settings);
+        }
+
+        private static bool IsReversalHighAmplitudeProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            var f = snapshot.Current;
+
+            var deepEnough =
+                f.DistanceTo20dHigh <= settings.ReversalHighAmplitudeMaxDistanceTo20dHigh &&
+                (diagnostics.Pullback10d <= settings.ReversalHighAmplitudeMaxPullback10d ||
+                 diagnostics.DailyPullback10d <= settings.ReversalHighAmplitudeMaxDailyPullback10d);
+            var earlyRsiHook =
+                f.DailyRSI14 >= settings.ReversalHighAmplitudeMinDailyRsi14 &&
+                f.DailyRSI14 <= settings.ReversalHighAmplitudeEarlyRsiMax;
+            var midRsiHook =
+                f.DailyRSI14 > settings.ReversalHighAmplitudeEarlyRsiMax &&
+                f.DailyRSI14 <= settings.ReversalHighAmplitudeMaxDailyRsi14 &&
+                diagnostics.DailyTrendPosition >= settings.ReversalHighAmplitudeMidRsiMinDailyTrendPosition &&
+                diagnostics.BBMidSignedDistancePct >= settings.ReversalHighAmplitudeMidRsiMinBbMid;
+
+            return deepEnough &&
+                   (earlyRsiHook || midRsiHook) &&
+                   diagnostics.ATRRatio >= settings.ReversalHighAmplitudeMinAtrRatio &&
+                   diagnostics.TrendPosition >= settings.ReversalHighAmplitudeMinTrendPosition &&
+                   diagnostics.DailyTrendPosition >= settings.ReversalHighAmplitudeMinDailyTrendPosition &&
+                   diagnostics.BBMidSignedDistancePct >= settings.ReversalHighAmplitudeMinBbMid &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings) &&
+                   !IsExhaustedMoverProxy(snapshot, diagnostics, settings);
+        }
+
+        private static bool IsReversalMatureWeakBounceProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            var f = snapshot.Current;
+
+            return f.DailyRSI14 >= settings.ReversalMatureWeakBounceMinDailyRsi14 &&
+                   f.DistanceTo20dHigh >= settings.ReversalMatureWeakBounceMinDistanceTo20dHigh &&
+                   diagnostics.BBMidSignedDistancePct <= settings.ReversalMatureWeakBounceMaxBbMid &&
+                   diagnostics.DailyTrendPosition < settings.DailyTrendNegativePenaltyThreshold &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings);
         }
 
         private bool IsDeepParabolicExpansionProxy(
