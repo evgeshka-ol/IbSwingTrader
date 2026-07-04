@@ -8,6 +8,7 @@ namespace IbSwingTrader.App.Commands
         IEvaluationDatasetBuilder evaluationDatasetBuilder,
         ICandidateFileService candidateFileService,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
+        ILocalMarketScheduleProvider localMarketScheduleProvider,
         ITextLogger logger,
         IAgentPathService pathService,
         ITwsSettingsProvider twsSettingsProvider) : ICommand
@@ -17,6 +18,7 @@ namespace IbSwingTrader.App.Commands
         private readonly IEvaluationDatasetBuilder _evaluationDatasetBuilder = evaluationDatasetBuilder;
         private readonly ICandidateFileService _candidateFileService = candidateFileService;
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
+        private readonly ILocalMarketScheduleProvider _localMarketScheduleProvider = localMarketScheduleProvider;
         private readonly ITextLogger _logger = logger;
         private readonly IAgentPathService _pathService = pathService;
         private readonly ITwsSettingsProvider _twsSettingsProvider = twsSettingsProvider;
@@ -54,14 +56,15 @@ namespace IbSwingTrader.App.Commands
                 .Distinct()
                 .OrderByDescending(x => x)
                 .ToList();
+            var tradingScanDates = FilterTradingScanDates(evaluableScanDates);
             var latestEvaluatedScanDate = existingDatasetRows.Count == 0
                 ? DateTime.MinValue
                 : existingDatasetRows.Max(x => x.ScanTime.Date);
             var recentScanDateCount = Math.Max(1, evaluationSettings.ForwardEvaluationDays + 1);
-            var recentScanDates = evaluableScanDates
+            var recentScanDates = tradingScanDates
                 .Take(recentScanDateCount)
                 .ToHashSet();
-            var selectedScanDates = evaluableScanDates
+            var selectedScanDates = tradingScanDates
                 .Where(x => recentScanDates.Contains(x) || x > latestEvaluatedScanDate)
                 .OrderBy(x => x)
                 .ToList();
@@ -228,6 +231,35 @@ namespace IbSwingTrader.App.Commands
                 throw new InvalidOperationException("Failed to connect to TWS.");
 
             _logger.Info("TWS connected.");
+        }
+
+        private List<DateTime> FilterTradingScanDates(List<DateTime> scanDates)
+        {
+            if (scanDates.Count == 0)
+                return [];
+
+            var scheduleStartUtc = DateTime.SpecifyKind(scanDates.Min().AddDays(-1), DateTimeKind.Utc);
+            var scheduleEndUtc = DateTime.SpecifyKind(scanDates.Max().AddDays(2), DateTimeKind.Utc);
+            var schedule = _localMarketScheduleProvider.BuildSchedule(scheduleStartUtc, scheduleEndUtc);
+            var tradingDates = schedule.Days
+                .Where(x => x.IsTradingDay)
+                .Select(x => x.Date)
+                .ToHashSet();
+            var skipped = scanDates
+                .Where(x => !tradingDates.Contains(DateOnly.FromDateTime(x)))
+                .OrderBy(x => x)
+                .ToList();
+
+            if (skipped.Count > 0)
+            {
+                _logger.Info(
+                    $"Skipping non-trading scan dates: " +
+                    $"{string.Join(", ", skipped.Select(x => x.ToString("yyyy-MM-dd")))}");
+            }
+
+            return scanDates
+                .Where(x => tradingDates.Contains(DateOnly.FromDateTime(x)))
+                .ToList();
         }
 
         private static string FormatDate(DateTime value)
