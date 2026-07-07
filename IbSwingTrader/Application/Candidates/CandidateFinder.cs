@@ -3680,6 +3680,18 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalConstructiveDeepBounceProxy(snapshot, diagnostics, s, candidateScore, entryScore))
+            {
+                score += s.ReversalConstructiveDeepBounceBonus;
+            }
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalBrokenDownProxy(snapshot, diagnostics, s))
+            {
+                score -= s.ReversalBrokenDownPenalty;
+            }
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
                 IsReversalMatureWeakBounceProxy(snapshot, diagnostics, s))
             {
                 score -= s.ReversalMatureWeakBouncePenalty;
@@ -6541,6 +6553,49 @@ namespace IbSwingTrader.Application.Candidates
                    f.DistanceTo20dHigh >= settings.ReversalMatureWeakBounceMinDistanceTo20dHigh &&
                    diagnostics.BBMidSignedDistancePct <= settings.ReversalMatureWeakBounceMaxBbMid &&
                    diagnostics.DailyTrendPosition < settings.DailyTrendNegativePenaltyThreshold &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings);
+        }
+
+        private static bool IsReversalConstructiveDeepBounceProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings,
+            decimal candidateScore,
+            decimal entryScore)
+        {
+            var f = snapshot.Current;
+            var deepEnough =
+                diagnostics.Pullback10d <= settings.ReversalConstructiveDeepBounceMaxPullback10d ||
+                diagnostics.DailyPullback10d <= settings.ReversalConstructiveDeepBounceMaxDailyPullback10d;
+            var qualityEnough =
+                candidateScore >= settings.ReversalConstructiveDeepBounceMinCandidateScore ||
+                (entryScore >= settings.ReversalConstructiveDeepBounceStrongEntryScore &&
+                 diagnostics.BBMidSignedDistancePct >= settings.ReversalConstructiveDeepBounceStrongEntryMinBbMid);
+
+            return entryScore >= settings.ReversalConstructiveDeepBounceMinEntryScore &&
+                   qualityEnough &&
+                   f.DailyRSI14 >= settings.ReversalConstructiveDeepBounceMinDailyRsi14 &&
+                   f.DailyRSI14 <= settings.ReversalConstructiveDeepBounceMaxDailyRsi14 &&
+                   diagnostics.ATRRatio >= settings.ReversalConstructiveDeepBounceMinAtrRatio &&
+                   f.DistanceTo20dHigh <= settings.ReversalConstructiveDeepBounceMaxDistanceTo20dHigh &&
+                   deepEnough &&
+                   diagnostics.DailyTrendPosition >= settings.ReversalConstructiveDeepBounceMinDailyTrendPosition &&
+                   diagnostics.BBMidSignedDistancePct >= settings.ReversalConstructiveDeepBounceMinBbMid &&
+                   !IsAnomalousVolatilityProxy(diagnostics, settings) &&
+                   !IsExhaustedMoverProxy(snapshot, diagnostics, settings);
+        }
+
+        private static bool IsReversalBrokenDownProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            NextDayRankingSettings settings)
+        {
+            var f = snapshot.Current;
+
+            return f.DistanceTo20dHigh <= settings.ReversalBrokenDownMaxDistanceTo20dHigh &&
+                   diagnostics.BBMidSignedDistancePct <= settings.ReversalBrokenDownMaxBbMid &&
+                   diagnostics.TrendPosition <= settings.ReversalBrokenDownMaxTrendPosition &&
+                   diagnostics.DailyTrendPosition <= settings.ReversalBrokenDownMaxDailyTrendPosition &&
                    !IsAnomalousVolatilityProxy(diagnostics, settings);
         }
 
