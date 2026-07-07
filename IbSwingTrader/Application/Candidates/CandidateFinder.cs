@@ -77,23 +77,85 @@ namespace IbSwingTrader.Application.Candidates
             var scannedWishListContexts = new Dictionary<string, WishListContext>(StringComparer.OrdinalIgnoreCase);
             var allScannedWishListContexts = new List<WishListContext>();
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
+            var performance = new ScanPerformanceSummary();
             foreach (var preset in _scannerPresets.GetAll())
             {
+                var stageMetric = performance.BeginStage(preset.ScanCode);
                 var stocks = await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
+                stageMetric.Input = stocks.Count;
 
                 foreach (var stock in stocks)
                 {
-                    if (!_preFilter.Pass(stock))
-                        continue;
-
-                    Contract? contract = null;
-                    List<Candle>? candles;
-
-                    if (!TryLoadPreparedH4CandlesFromCache(stock.Ticker, finderSettings, out candles))
+                    var tickerMetric = performance.BeginTicker(preset.ScanCode, stock.Ticker);
+                    try
                     {
+                        stageMetric.Processed++;
+
+                        if (!_preFilter.Pass(stock))
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            continue;
+                        }
+
+                        stageMetric.UniqueTickers.Add(stock.Ticker);
+
+                        Contract? contract = null;
+                        List<Candle>? candles;
+
+                        if (TryLoadPreparedH4CandlesFromCache(stock.Ticker, finderSettings, out candles))
+                        {
+                            stageMetric.CacheHits++;
+                            tickerMetric.CacheHits++;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                contract = await _contractResolver.ResolveStockAsync(
+                                    stock.Ticker,
+                                    contractResolveTimeout,
+                                    contractResolveMaxAttempts);
+
+                                var end = MarketTime.Now();
+                                var start = end.AddDays(-finderSettings.LookbackCalendarDays);
+
+                                stageMetric.HistoricalLoads++;
+                                tickerMetric.HistoricalLoads++;
+                                candles = await _historicalData.GetCandlesRange(
+                                    stock.Ticker,
+                                    contract,
+                                    Timeframe.H4,
+                                    start,
+                                    end);
+
+                                candles = PrepareFinderCandles(stock.Ticker, candles, finderSettings);
+                            }
+                            catch (Exception ex)
+                            {
+                                stageMetric.Skipped++;
+                                tickerMetric.Skipped = true;
+                                tickerMetric.Errors++;
+                                _logger.Info($"Skipping {stock.Ticker}: failed to load candles. {ex.Message}");
+                                continue;
+                            }
+                        }
+
+                        if (candles == null || candles.Count < finderSettings.MinimumCandles)
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            _logger.Info(
+                                $"Skipping {stock.Ticker}: not enough candles " +
+                                $"({candles?.Count ?? 0} < {finderSettings.MinimumCandles}).");
+                            continue;
+                        }
+
+                        List<Candle>? dailyCandles = null;
+
                         try
                         {
-                            contract = await _contractResolver.ResolveStockAsync(
+                            contract ??= await _contractResolver.ResolveStockAsync(
                                 stock.Ticker,
                                 contractResolveTimeout,
                                 contractResolveMaxAttempts);
@@ -101,125 +163,106 @@ namespace IbSwingTrader.Application.Candidates
                             var end = MarketTime.Now();
                             var start = end.AddDays(-finderSettings.LookbackCalendarDays);
 
-                            candles = await _historicalData.GetCandlesRange(
+                            stageMetric.HistoricalLoads++;
+                            tickerMetric.HistoricalLoads++;
+                            dailyCandles = await _historicalData.GetCandlesRange(
                                 stock.Ticker,
                                 contract,
-                                Timeframe.H4,
+                                Timeframe.D1,
                                 start,
                                 end);
-
-                            candles = PrepareFinderCandles(stock.Ticker, candles, finderSettings);
                         }
                         catch (Exception ex)
                         {
-                            _logger.Info($"Skipping {stock.Ticker}: failed to load candles. {ex.Message}");
+                            tickerMetric.Errors++;
+                            _logger.Info($"Daily candles load skipped for {stock.Ticker}. {ex.Message}");
+                        }
+
+                        var dailyBars = dailyCandles ?? BuildDailyBars(candles);
+                        var weeklyBars = BuildWeeklyBars(candles);
+
+                        _logger.Info(
+                            $"Ticker history prepared: {stock.Ticker}. " +
+                            $"H4={candles.Count}, D1={dailyBars.Count}, W1={weeklyBars.Count}");
+
+                        if (TryRejectByRecentDailyPriceFloor(stock.Ticker, dailyBars, out var recentPriceFloorReason))
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            _logger.Info($"Skipping {stock.Ticker}: {recentPriceFloorReason}");
                             continue;
                         }
-                    }
 
-                    if (candles == null || candles.Count < finderSettings.MinimumCandles)
-                    {
+                        CandidateSignalSnapshot snapshot;
+
+                        try
+                        {
+                            snapshot = _signalAnalyzer.Analyze(candles);
+                        }
+                        catch (Exception ex)
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            tickerMetric.Errors++;
+                            _logger.Info($"Skipping {stock.Ticker}: failed to analyze signals. {ex.Message}");
+                            continue;
+                        }
+
+                        var lastPrice = candles[^1].Close;
+                        var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
+
                         _logger.Info(
-                            $"Skipping {stock.Ticker}: not enough candles " +
-                            $"({candles?.Count ?? 0} < {finderSettings.MinimumCandles}).");
-                        continue;
+                            $"Processing ticker ({stock.Ticker}), " +
+                            $"preset ({preset.ScanCode}), " +
+                            $"stock type ({stock.StockType}), " +
+                            $"trading class ({stock.TradingClass}), " +
+                            $"exchange ({stock.Exchange}), " +
+                            $"rank ({stock.Rank}), " +
+                            $"avgDollarVolume={_fmt.Generic(avgDollarVolume)}");
+
+                        var diagnostics = BuildDiagnostics(snapshot, candles);
+                        var entryScore = _candidateScore.Calculate(snapshot);
+                        var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles));
+
+                        var wishScore = _wishListScore.Calculate(snapshot);
+
+                        var wishListItem = BuildWishListItem(
+                            stock,
+                            preset,
+                            snapshot,
+                            candles,
+                            marketNow,
+                            marketTimezone,
+                            wishScore);
+
+                        var scanContext = new WishListContext
+                        {
+                            Stock = stock,
+                            Contract = contract,
+                            Preset = preset,
+                            Snapshot = snapshot,
+                            Candles = candles,
+                            DailyCandles = dailyCandles,
+                            ScanTimeMarket = marketNow,
+                            AvgDollarVolumeDaily = avgDollarVolume,
+                            WishListItem = wishListItem
+                        };
+
+                        allScannedWishListContexts.Add(scanContext);
+                        stageMetric.Added++;
+                        tickerMetric.Added = true;
+
+                        AddOrReplaceWishListContext(
+                            scannedWishListContexts,
+                            scanContext);
                     }
-
-                    List<Candle>? dailyCandles = null;
-
-                    try
+                    finally
                     {
-                        contract ??= await _contractResolver.ResolveStockAsync(
-                            stock.Ticker,
-                            contractResolveTimeout,
-                            contractResolveMaxAttempts);
-
-                        var end = MarketTime.Now();
-                        var start = end.AddDays(-finderSettings.LookbackCalendarDays);
-
-                        dailyCandles = await _historicalData.GetCandlesRange(
-                            stock.Ticker,
-                            contract,
-                            Timeframe.D1,
-                            start,
-                            end);
+                        tickerMetric.Stop();
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.Info($"Daily candles load skipped for {stock.Ticker}. {ex.Message}");
-                    }
-
-                    var dailyBars = dailyCandles ?? BuildDailyBars(candles);
-                    var weeklyBars = BuildWeeklyBars(candles);
-
-                    _logger.Info(
-                        $"Ticker history prepared: {stock.Ticker}. " +
-                        $"H4={candles.Count}, D1={dailyBars.Count}, W1={weeklyBars.Count}");
-
-                    if (TryRejectByRecentDailyPriceFloor(stock.Ticker, dailyBars, out var recentPriceFloorReason))
-                    {
-                        _logger.Info($"Skipping {stock.Ticker}: {recentPriceFloorReason}");
-                        continue;
-                    }
-
-                    CandidateSignalSnapshot snapshot;
-
-                    try
-                    {
-                        snapshot = _signalAnalyzer.Analyze(candles);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Info($"Skipping {stock.Ticker}: failed to analyze signals. {ex.Message}");
-                        continue;
-                    }
-
-                    var lastPrice = candles[^1].Close;
-                    var avgDollarVolume = CalculateAverageDollarVolumeDaily(candles, finderSettings.AvgVolumePeriod);
-
-                    _logger.Info(
-                        $"Processing ticker ({stock.Ticker}), " +
-                        $"preset ({preset.ScanCode}), " +
-                        $"stock type ({stock.StockType}), " +
-                        $"trading class ({stock.TradingClass}), " +
-                        $"exchange ({stock.Exchange}), " +
-                        $"rank ({stock.Rank}), " +
-                        $"avgDollarVolume={_fmt.Generic(avgDollarVolume)}");
-
-                    var diagnostics = BuildDiagnostics(snapshot, candles);
-                    var entryScore = _candidateScore.Calculate(snapshot);
-                    var bbState = BuildBollingerStateSet(BuildRecentFeatureSeries(candles));
-
-                    var wishScore = _wishListScore.Calculate(snapshot);
-
-                    var wishListItem = BuildWishListItem(
-                        stock,
-                        preset,
-                        snapshot,
-                        candles,
-                        marketNow,
-                        marketTimezone,
-                        wishScore);
-
-                    var scanContext = new WishListContext
-                    {
-                        Stock = stock,
-                        Contract = contract,
-                        Preset = preset,
-                        Snapshot = snapshot,
-                        Candles = candles,
-                        DailyCandles = dailyCandles,
-                        ScanTimeMarket = marketNow,
-                        AvgDollarVolumeDaily = avgDollarVolume,
-                        WishListItem = wishListItem
-                    };
-
-                    allScannedWishListContexts.Add(scanContext);
-
-                    AddOrReplaceWishListContext(
-                        scannedWishListContexts,
-                        scanContext);
                 }
+
+                stageMetric.Stop();
             }
 
             var contextsForOutput = emitAllSeenCandidates
@@ -242,27 +285,54 @@ namespace IbSwingTrader.Application.Candidates
 
             var sameDayPromotedResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
 
+            var rankingStageMetric = performance.BeginStage("Ranking/Rebuild");
+            rankingStageMetric.Input = contextsForOutput.Count;
             foreach (var ctx in contextsForOutput)
             {
+                rankingStageMetric.Processed++;
+                rankingStageMetric.UniqueTickers.Add(ctx.Stock.Ticker);
+                var rankingTickerMetric = performance.BeginTicker("Ranking/Rebuild", ctx.Stock.Ticker);
+                ctx.PerformanceMetric = rankingTickerMetric;
                 var scanItem = ctx.WishListItem;
 
                 var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
                 var target = dailyFamilySplit == DailyFamilySplit.Reversal
                     ? candidateResults
                     : sameDayPromotedResults;
-                await TryAddCandidate(
-                    target,
-                    scanItem,
-                    ctx,
-                    isFromWishlist: dailyFamilySplit == DailyFamilySplit.Reversal,
-                    marketTimezone,
-                    bucketName: dailyFamilySplit == DailyFamilySplit.Reversal
-                        ? "reversal candidates"
-                        : "runaway candidates",
-                    rejectionLogPrefix: "Pattern rejected",
-                    seriesSimilarityTemplates,
-                    enforceLowAmplitudeVeto: true);
+                var countBefore = target.Count;
+                try
+                {
+                    await TryAddCandidate(
+                        target,
+                        scanItem,
+                        ctx,
+                        isFromWishlist: dailyFamilySplit == DailyFamilySplit.Reversal,
+                        marketTimezone,
+                        bucketName: dailyFamilySplit == DailyFamilySplit.Reversal
+                            ? "reversal candidates"
+                            : "runaway candidates",
+                        rejectionLogPrefix: "Pattern rejected",
+                        seriesSimilarityTemplates,
+                        enforceLowAmplitudeVeto: true);
+                }
+                finally
+                {
+                    rankingTickerMetric.Stop();
+                    ctx.PerformanceMetric = null;
+                }
+
+                if (target.Count > countBefore)
+                {
+                    rankingStageMetric.Added++;
+                    rankingTickerMetric.Added = true;
+                }
+                else
+                {
+                    rankingStageMetric.Skipped++;
+                    rankingTickerMetric.Skipped = true;
+                }
             }
+            rankingStageMetric.Stop();
 
             var sameDayCandidates = emitAllSeenCandidates
                 ? sameDayPromotedResults.Values.ToList()
@@ -293,6 +363,8 @@ namespace IbSwingTrader.Application.Candidates
                 (finalCandidates, sameDayCandidates) = DeduplicateCurrentScanByTicker(
                     finalCandidates,
                     sameDayCandidates);
+
+            LogScanPerformanceSummary(performance);
 
             return new CandidateSearchResult
             {
@@ -2590,6 +2662,7 @@ namespace IbSwingTrader.Application.Candidates
                     var end = MarketTime.Now();
                     var start = ResolveEntryHistoryStart(end, tradeSettings.EntryLookbackHours);
 
+                    ctx.PerformanceMetric?.AddHistoricalLoad();
                     entryCandles = await _historicalData.GetCandlesRange(
                         ctx.Stock.Ticker,
                         ctx.Contract,
@@ -5158,6 +5231,88 @@ namespace IbSwingTrader.Application.Candidates
         private static bool HasPositiveSlope(List<decimal> series, decimal minSlope)
             => series.Count >= 2 && series[^1] - series[0] >= minSlope;
 
+        private void LogScanPerformanceSummary(ScanPerformanceSummary performance)
+        {
+            if (performance.Stages.Count == 0)
+                return;
+
+            _logger.Info("Scan performance summary:");
+            _logger.Info("Stage                 Input  Proc  Unique  HistLoads  Cache  Added  Skipped  Elapsed");
+
+            foreach (var stage in performance.Stages)
+            {
+                _logger.Info(
+                    $"{TrimOrPad(stage.Name, 21)}" +
+                    $"{stage.Input,6}" +
+                    $"{stage.Processed,6}" +
+                    $"{stage.UniqueTickers.Count,8}" +
+                    $"{stage.HistoricalLoads,11}" +
+                    $"{stage.CacheHits,7}" +
+                    $"{stage.Added,7}" +
+                    $"{stage.Skipped,9}" +
+                    $"{ElapsedTimeFormatter.Format(stage.Elapsed),9}");
+            }
+
+            var totalInput = performance.Stages.Sum(x => x.Input);
+            var totalProcessed = performance.Stages.Sum(x => x.Processed);
+            var totalUnique = performance.Stages
+                .SelectMany(x => x.UniqueTickers)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            var totalHistoricalLoads = performance.Stages.Sum(x => x.HistoricalLoads);
+            var totalCacheHits = performance.Stages.Sum(x => x.CacheHits);
+            var totalAdded = performance.Stages.Sum(x => x.Added);
+            var totalSkipped = performance.Stages.Sum(x => x.Skipped);
+            var totalElapsed = TimeSpan.FromTicks(performance.Stages.Sum(x => x.Elapsed.Ticks));
+
+            _logger.Info(
+                $"{TrimOrPad("Total", 21)}" +
+                $"{totalInput,6}" +
+                $"{totalProcessed,6}" +
+                $"{totalUnique,8}" +
+                $"{totalHistoricalLoads,11}" +
+                $"{totalCacheHits,7}" +
+                $"{totalAdded,7}" +
+                $"{totalSkipped,9}" +
+                $"{ElapsedTimeFormatter.Format(totalElapsed),9}");
+
+            var slowest = performance.Tickers
+                .Where(x => x.Elapsed > TimeSpan.Zero)
+                .OrderByDescending(x => x.Elapsed)
+                .Take(10)
+                .ToList();
+
+            if (slowest.Count == 0)
+                return;
+
+            _logger.Info("Slowest ticker operations:");
+            _logger.Info("Stage                 Ticker  HistLoads  Cache  Added  Skipped  Errors  Elapsed");
+
+            foreach (var ticker in slowest)
+            {
+                _logger.Info(
+                    $"{TrimOrPad(ticker.StageName, 21)}" +
+                    $"{TrimOrPad(ticker.Ticker, 8)}" +
+                    $"{ticker.HistoricalLoads,11}" +
+                    $"{ticker.CacheHits,7}" +
+                    $"{BoolFlag(ticker.Added),7}" +
+                    $"{BoolFlag(ticker.Skipped),9}" +
+                    $"{ticker.Errors,8}" +
+                    $"{ElapsedTimeFormatter.Format(ticker.Elapsed),9}");
+            }
+        }
+
+        private static string TrimOrPad(string value, int width)
+        {
+            if (value.Length > width)
+                return value[..width];
+
+            return value.PadRight(width);
+        }
+
+        private static string BoolFlag(bool value)
+            => value ? "Y" : "";
+
         private static bool HasPositiveRelativeSlope(List<decimal> series, decimal minSlopePct)
             => CalculateRelativeSlopePct(series) >= minSlopePct;
 
@@ -7292,6 +7447,93 @@ namespace IbSwingTrader.Application.Candidates
             decimal? Daily,
             decimal? H4);
 
+        private sealed class ScanPerformanceSummary
+        {
+            public List<ScanPerformanceStageMetric> Stages { get; } = [];
+            public List<ScanPerformanceTickerMetric> Tickers { get; } = [];
+
+            public ScanPerformanceStageMetric BeginStage(string name)
+            {
+                var metric = new ScanPerformanceStageMetric(name);
+                Stages.Add(metric);
+                return metric;
+            }
+
+            public ScanPerformanceTickerMetric BeginTicker(string stageName, string ticker)
+            {
+                var stage = Stages.LastOrDefault(x =>
+                    string.Equals(x.Name, stageName, StringComparison.OrdinalIgnoreCase));
+                var metric = new ScanPerformanceTickerMetric(stageName, ticker, stage);
+                Tickers.Add(metric);
+                return metric;
+            }
+        }
+
+        private sealed class ScanPerformanceStageMetric
+        {
+            private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            public ScanPerformanceStageMetric(string name)
+            {
+                Name = name;
+            }
+
+            public string Name { get; }
+            public int Input { get; set; }
+            public int Processed { get; set; }
+            public HashSet<string> UniqueTickers { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public int HistoricalLoads { get; set; }
+            public int CacheHits { get; set; }
+            public int Added { get; set; }
+            public int Skipped { get; set; }
+            public TimeSpan Elapsed { get; private set; }
+
+            public void Stop()
+            {
+                _stopwatch.Stop();
+                Elapsed = _stopwatch.Elapsed;
+            }
+        }
+
+        private sealed class ScanPerformanceTickerMetric
+        {
+            private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            private readonly ScanPerformanceStageMetric? _stage;
+
+            public ScanPerformanceTickerMetric(
+                string stageName,
+                string ticker,
+                ScanPerformanceStageMetric? stage)
+            {
+                StageName = stageName;
+                Ticker = ticker;
+                _stage = stage;
+            }
+
+            public string StageName { get; }
+            public string Ticker { get; }
+            public int HistoricalLoads { get; set; }
+            public int CacheHits { get; set; }
+            public bool Added { get; set; }
+            public bool Skipped { get; set; }
+            public int Errors { get; set; }
+            public TimeSpan Elapsed { get; private set; }
+
+            public void AddHistoricalLoad()
+            {
+                HistoricalLoads++;
+
+                if (_stage != null)
+                    _stage.HistoricalLoads++;
+            }
+
+            public void Stop()
+            {
+                _stopwatch.Stop();
+                Elapsed = _stopwatch.Elapsed;
+            }
+        }
+
         private sealed record SeriesFeatureSet(
             IReadOnlyList<List<decimal>> Daily,
             IReadOnlyList<List<decimal>> H4)
@@ -7313,6 +7555,7 @@ namespace IbSwingTrader.Application.Candidates
             public required decimal AvgDollarVolumeDaily { get; init; }
             public required WishListItem WishListItem { get; init; }
             public TradePlanInfo? Trade { get; set; }
+            public ScanPerformanceTickerMetric? PerformanceMetric { get; set; }
         }
     }
 }
