@@ -2475,6 +2475,47 @@ namespace IbSwingTrader.Application.Candidates
                    bbState.H4.Direction != nameof(BollingerFigureDirection.Down);
         }
 
+        private static bool IsReversalSeriesRecoveryTradeProfile(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            ReversalRecoveryExitSettings settings)
+        {
+            if (!settings.Enabled)
+                return false;
+
+            if (snapshot.Current.DistanceTo20dHigh > settings.SeriesMaxDistanceTo20dHigh ||
+                snapshot.Current.DailyRSI14 > settings.SeriesMaxDailyRsi14 ||
+                diagnostics.ATRRatio < settings.SeriesMinAtrRatio)
+            {
+                return false;
+            }
+
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var dailyWidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
+                4);
+            var h4WidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.H4BbUpperBandSeries,
+                recentSeries.H4BbMidBandSeries,
+                recentSeries.H4BbLowerBandSeries,
+                4);
+            var h4MacdTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdLeg =
+                h4MacdTail >= settings.SeriesMinH4MacdTailSlope &&
+                h4RsiTail >= settings.SeriesMinH4RsiTailForMacdLeg;
+
+            return dailyMidSlope <= settings.SeriesMaxDailyMidSlopePct &&
+                   dailyWidthTail <= -settings.SeriesMinDailyWidthCompressionPct &&
+                   h4RsiTail <= settings.SeriesMaxH4RsiTailSlope &&
+                   (h4MacdLeg ||
+                    h4WidthTail >= settings.SeriesMinH4WidthExpansionPct ||
+                    h4RsiTail >= settings.SeriesMinH4RsiTailSlope);
+        }
+
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
             WishListItem item,
             DateTime marketNow,
@@ -2709,7 +2750,12 @@ namespace IbSwingTrader.Application.Candidates
                 ctx.Candles,
                 recentSeries,
                 bbState,
-                tradeSettings.ReversalRecoveryExit);
+                tradeSettings.ReversalRecoveryExit) ||
+                IsReversalSeriesRecoveryTradeProfile(
+                    ctx.Snapshot,
+                    diagnostics,
+                    recentSeries,
+                    tradeSettings.ReversalRecoveryExit);
             var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
                 ctx.Snapshot,
                 diagnostics,
@@ -3768,6 +3814,18 @@ namespace IbSwingTrader.Application.Candidates
                 IsReversalMatureWeakBounceProxy(snapshot, diagnostics, s))
             {
                 score -= s.ReversalMatureWeakBouncePenalty;
+            }
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalSeriesRecoveryProxy(snapshot, diagnostics, recentSeries, s))
+            {
+                score += s.ReversalSeriesRecoveryBonus;
+            }
+
+            if (dailyFamilySplit == DailyFamilySplit.Reversal &&
+                IsReversalWeakContinuationProxy(snapshot, recentSeries, s))
+            {
+                score -= s.ReversalWeakContinuationPenalty;
             }
 
             if (IsWeakDeepPullbackProxy(snapshot, diagnostics, needsDeeperEntry))
@@ -5357,6 +5415,28 @@ namespace IbSwingTrader.Application.Candidates
             return decimal.Round((tail[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
         }
 
+        private static decimal CalculateTailBandWidthDeltaPct(
+            List<decimal> upper,
+            List<decimal> mid,
+            List<decimal> lower,
+            int lookback)
+        {
+            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
+            if (count < 2)
+                return 0m;
+
+            var widths = upper
+                .TakeLast(count)
+                .Zip(mid.TakeLast(count), (u, m) => new { Upper = u, Mid = m })
+                .Zip(lower.TakeLast(count), (x, l) =>
+                    x.Mid == 0m
+                        ? 0m
+                        : (x.Upper - l) / Math.Abs(x.Mid) * 100m)
+                .ToList();
+
+            return CalculateTailSlope(widths, lookback);
+        }
+
         private static decimal CalculateTailSlope(List<decimal> series, int lookback)
         {
             if (series.Count < 2)
@@ -6709,6 +6789,62 @@ namespace IbSwingTrader.Application.Candidates
                    diagnostics.BBMidSignedDistancePct <= settings.ReversalMatureWeakBounceMaxBbMid &&
                    diagnostics.DailyTrendPosition < settings.DailyTrendNegativePenaltyThreshold &&
                    !IsAnomalousVolatilityProxy(diagnostics, settings);
+        }
+
+        private static bool IsReversalSeriesRecoveryProxy(
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            NextDayRankingSettings settings)
+        {
+            if (snapshot.Current.DistanceTo20dHigh > settings.ReversalSeriesMaxDistanceTo20dHigh ||
+                snapshot.Current.DailyRSI14 > settings.ReversalSeriesMaxDailyRsi14 ||
+                diagnostics.ATRRatio < settings.ReversalSeriesMinAtrRatio ||
+                IsAnomalousVolatilityProxy(diagnostics, settings) ||
+                IsExhaustedMoverProxy(snapshot, diagnostics, settings))
+            {
+                return false;
+            }
+
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var dailyWidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
+                4);
+            var h4WidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.H4BbUpperBandSeries,
+                recentSeries.H4BbMidBandSeries,
+                recentSeries.H4BbLowerBandSeries,
+                4);
+            var h4MacdTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdLeg =
+                h4MacdTail >= settings.ReversalSeriesMinH4MacdTailSlope &&
+                h4RsiTail >= settings.ReversalSeriesMinH4RsiTailForMacdLeg;
+
+            return dailyMidSlope <= settings.ReversalSeriesMaxDailyMidSlopePct &&
+                   dailyWidthTail <= -settings.ReversalSeriesMinDailyWidthCompressionPct &&
+                   (h4MacdLeg ||
+                    h4WidthTail >= settings.ReversalSeriesMinH4WidthExpansionPct ||
+                    h4RsiTail >= settings.ReversalSeriesMinH4RsiTailSlope);
+        }
+
+        private static bool IsReversalWeakContinuationProxy(
+            CandidateSignalSnapshot snapshot,
+            RecentFeatureSeries recentSeries,
+            NextDayRankingSettings settings)
+        {
+            if (snapshot.Current.DailyRSI14 > settings.ReversalWeakMaxDailyRsi14)
+                return false;
+
+            var h4MidSlope = CalculateRelativeSlopePct(recentSeries.H4BbMidBandSeries);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+
+            return h4MidSlope <= settings.ReversalWeakMaxH4MidSlopePct &&
+                   h4RsiTail <= settings.ReversalWeakMaxH4RsiTailSlope &&
+                   h4MacdTail <= settings.ReversalWeakMaxH4MacdTailSlope;
         }
 
         private static bool IsReversalConstructiveDeepBounceProxy(
