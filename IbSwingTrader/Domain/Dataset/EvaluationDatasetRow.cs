@@ -116,6 +116,24 @@ namespace IbSwingTrader.Domain.Dataset
 
         public int? MinutesFromEntryToMin { get; set; }
 
+        public int? BestEntryDelayBarsM15 { get; set; }
+
+        public int? BestEntryDelayBarsH1 { get; set; }
+
+        public decimal? MinBeforeMaxPct { get; set; }
+
+        public int? BarsToMin { get; set; }
+
+        public int? BarsToMax { get; set; }
+
+        public bool? ReachedTargetBeforeEntry { get; set; }
+
+        public string EntryMissReason { get; set; } = string.Empty;
+
+        public decimal? OptimalEntryDiscountPct { get; set; }
+
+        public decimal? AdverseMoveBeforeRunPct { get; set; }
+
         public bool? MaxDownBeforeMaxUp { get; set; }
 
         public bool HasActiveCandidateSnapshot { get; set; }

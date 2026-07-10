@@ -206,11 +206,13 @@ namespace IbSwingTrader.Application.Evaluation
                 CalcEntryDistanceToMinPct(
                     candidate.TradePlan.EntryPrice,
                     result.MinLowAfterScan));
+            FillPostScanEntryTimingStats(result, ordered, result.ScanPrice, entryPrice, exitPrice);
 
             var entryCandle = ordered.FirstOrDefault(x => TouchesPrice(x, entryPrice));
             if (entryCandle == null)
             {
                 result.EntryTouched = false;
+                result.EntryMissReason = ResolveNoEntryMissReason(result.ReachedTargetBeforeEntry, ordered, entryPrice);
                 LogNoEntryDiagnostics(candidate, ordered, entryPrice);
                 result.Outcome = "NoEntry";
                 _logger.Info($"Evaluation step: entry not touched for {candidate.Ticker}");
@@ -519,6 +521,97 @@ namespace IbSwingTrader.Application.Evaluation
         private static decimal RoundPct(decimal value)
         {
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static void FillPostScanEntryTimingStats(
+            CandidateEvaluationResult result,
+            List<Candle> ordered,
+            decimal scanPrice,
+            decimal entryPrice,
+            decimal exitPrice)
+        {
+            if (ordered.Count == 0 || scanPrice <= 0m)
+                return;
+
+            var maxIndex = IndexOfMaxHigh(ordered);
+            var minIndex = IndexOfMinLow(ordered);
+            var minBeforeMaxIndex = IndexOfMinLow(ordered.Take(maxIndex + 1).ToList());
+            var minBeforeMax = ordered[minBeforeMaxIndex];
+            var minBeforeMaxPct = RoundPct(CalcPct(scanPrice, minBeforeMax.Low));
+            var optimalDiscountPct = Math.Max(-minBeforeMaxPct, 0m);
+            var firstTargetIndex = exitPrice > 0m
+                ? ordered.FindIndex(x => x.High >= exitPrice)
+                : -1;
+            var firstEntryIndex = entryPrice > 0m
+                ? ordered.FindIndex(x => TouchesPrice(x, entryPrice))
+                : -1;
+
+            result.BarsToMax = NormalizeM5BarsToM15(maxIndex + 1);
+            result.BarsToMin = NormalizeM5BarsToM15(minIndex + 1);
+            result.BestEntryDelayBarsM15 = NormalizeM5BarsToM15(minBeforeMaxIndex + 1);
+            result.BestEntryDelayBarsH1 = NormalizeM5BarsToH1(minBeforeMaxIndex + 1);
+            result.MinBeforeMaxPct = minBeforeMaxPct;
+            result.OptimalEntryDiscountPct = RoundPct(optimalDiscountPct);
+            result.AdverseMoveBeforeRunPct = RoundPct(optimalDiscountPct);
+            result.ReachedTargetBeforeEntry = firstTargetIndex >= 0 &&
+                                              (firstEntryIndex < 0 || firstTargetIndex < firstEntryIndex);
+        }
+
+        private static int IndexOfMaxHigh(List<Candle> candles)
+        {
+            var bestIndex = 0;
+            for (var i = 1; i < candles.Count; i++)
+            {
+                if (candles[i].High > candles[bestIndex].High)
+                    bestIndex = i;
+            }
+
+            return bestIndex;
+        }
+
+        private static int IndexOfMinLow(List<Candle> candles)
+        {
+            var bestIndex = 0;
+            for (var i = 1; i < candles.Count; i++)
+            {
+                if (candles[i].Low < candles[bestIndex].Low)
+                    bestIndex = i;
+            }
+
+            return bestIndex;
+        }
+
+        private static int NormalizeM5BarsToM15(int bars)
+        {
+            return Math.Max(1, (int)Math.Ceiling(bars / 3m));
+        }
+
+        private static int NormalizeM5BarsToH1(int bars)
+        {
+            return Math.Max(1, (int)Math.Ceiling(bars / 12m));
+        }
+
+        private static string ResolveNoEntryMissReason(
+            bool? reachedTargetBeforeEntry,
+            List<Candle> ordered,
+            decimal entryPrice)
+        {
+            if (reachedTargetBeforeEntry == true)
+                return "TargetBeforeEntry";
+
+            if (entryPrice <= 0m || ordered.Count == 0)
+                return "NoEntry";
+
+            var minLow = ordered.Min(x => x.Low);
+            var maxHigh = ordered.Max(x => x.High);
+
+            if (minLow > entryPrice)
+                return "EntryTooDeep";
+
+            if (maxHigh < entryPrice)
+                return "GappedBelowEntry";
+
+            return "NoEntry";
         }
 
         private static string FormatTime(DateTime? value)

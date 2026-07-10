@@ -90,6 +90,15 @@ namespace IbSwingTrader.Domain.Candidates
         public int? MinutesFromMinToMax { get; set; }
         public int? MinutesFromEntryToMax { get; set; }
         public int? MinutesFromEntryToMin { get; set; }
+        public int? BestEntryDelayBarsM15 { get; set; }
+        public int? BestEntryDelayBarsH1 { get; set; }
+        public decimal? MinBeforeMaxPct { get; set; }
+        public int? BarsToMin { get; set; }
+        public int? BarsToMax { get; set; }
+        public bool? ReachedTargetBeforeEntry { get; set; }
+        public string? EntryMissReason { get; set; }
+        public decimal? OptimalEntryDiscountPct { get; set; }
+        public decimal? AdverseMoveBeforeRunPct { get; set; }
 
         public DateTime? EvaluationStartTime { get; set; }
         public DateTime? EvaluationEndTime { get; set; }

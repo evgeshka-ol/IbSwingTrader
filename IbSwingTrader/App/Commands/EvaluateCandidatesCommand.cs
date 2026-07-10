@@ -448,6 +448,14 @@ namespace IbSwingTrader.App.Commands
                    !row.MinTime.HasValue ||
                    !row.PostMaxDrawdownPct.HasValue ||
                    !row.MinutesFromMinToMax.HasValue ||
+                   !row.BestEntryDelayBarsM15.HasValue ||
+                   !row.BestEntryDelayBarsH1.HasValue ||
+                   !row.MinBeforeMaxPct.HasValue ||
+                   !row.BarsToMin.HasValue ||
+                   !row.BarsToMax.HasValue ||
+                   !row.ReachedTargetBeforeEntry.HasValue ||
+                   !row.OptimalEntryDiscountPct.HasValue ||
+                   !row.AdverseMoveBeforeRunPct.HasValue ||
                    !row.MaxDownBeforeMaxUp.HasValue;
         }
 

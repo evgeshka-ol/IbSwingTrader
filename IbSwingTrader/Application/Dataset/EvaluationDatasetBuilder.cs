@@ -352,6 +352,15 @@ namespace IbSwingTrader.Application.Dataset
             var minutesFromMinToMax = cacheMetrics?.MinutesFromMinToMax ?? evaluation.MinutesFromMinToMax;
             var minutesFromEntryToMax = cacheMetrics?.MinutesFromEntryToMax ?? evaluation.MinutesFromEntryToMax;
             var minutesFromEntryToMin = cacheMetrics?.MinutesFromEntryToMin ?? evaluation.MinutesFromEntryToMin;
+            var bestEntryDelayBarsM15 = cacheMetrics?.BestEntryDelayBarsM15 ?? evaluation.BestEntryDelayBarsM15;
+            var bestEntryDelayBarsH1 = cacheMetrics?.BestEntryDelayBarsH1 ?? evaluation.BestEntryDelayBarsH1;
+            var minBeforeMaxPct = cacheMetrics?.MinBeforeMaxPct ?? evaluation.MinBeforeMaxPct;
+            var barsToMin = cacheMetrics?.BarsToMin ?? evaluation.BarsToMin;
+            var barsToMax = cacheMetrics?.BarsToMax ?? evaluation.BarsToMax;
+            var reachedTargetBeforeEntry = cacheMetrics?.ReachedTargetBeforeEntry ?? evaluation.ReachedTargetBeforeEntry;
+            var entryMissReason = cacheMetrics?.EntryMissReason ?? evaluation.EntryMissReason ?? string.Empty;
+            var optimalEntryDiscountPct = cacheMetrics?.OptimalEntryDiscountPct ?? evaluation.OptimalEntryDiscountPct;
+            var adverseMoveBeforeRunPct = cacheMetrics?.AdverseMoveBeforeRunPct ?? evaluation.AdverseMoveBeforeRunPct;
             var minDepthGroup = GetMinDepthGroup(minPct);
             var maxStrengthGroup = GetMaxStrengthGroup(maxPct);
             var extremumSubgroup = BuildExtremumSubgroup(extremumOrder, minDepthGroup, maxStrengthGroup);
@@ -428,6 +437,15 @@ namespace IbSwingTrader.Application.Dataset
                 MinutesFromMinToMax = minutesFromMinToMax,
                 MinutesFromEntryToMax = minutesFromEntryToMax,
                 MinutesFromEntryToMin = minutesFromEntryToMin,
+                BestEntryDelayBarsM15 = bestEntryDelayBarsM15,
+                BestEntryDelayBarsH1 = bestEntryDelayBarsH1,
+                MinBeforeMaxPct = minBeforeMaxPct,
+                BarsToMin = barsToMin,
+                BarsToMax = barsToMax,
+                ReachedTargetBeforeEntry = reachedTargetBeforeEntry,
+                EntryMissReason = entryMissReason,
+                OptimalEntryDiscountPct = optimalEntryDiscountPct,
+                AdverseMoveBeforeRunPct = adverseMoveBeforeRunPct,
                 MaxDownBeforeMaxUp = CompareTimes(minTime, maxTime),
                 GroupLabel = Classify(amplitudePct, daysToMaxUpFromScan),
                 CandidateSource = candidateSource,
@@ -623,6 +641,12 @@ namespace IbSwingTrader.Application.Dataset
             var (exitMissAbs, exitMissPct, nearTakeProfitMiss) = hasEntry
                 ? CalculateExitMiss(evaluation, maxAfterScan.High)
                 : (null, null, false);
+            var entryTiming = CalculateEntryTimingMetrics(
+                scanWindow,
+                evaluation.ScanPrice,
+                evaluation.EntryPrice,
+                evaluation.ExitPrice,
+                hasEntry);
 
             return new CacheMetrics
             {
@@ -647,7 +671,16 @@ namespace IbSwingTrader.Application.Dataset
                 ExtremumOrder = GetExtremumOrder(minAfterScan.Time, maxAfterScan.Time),
                 MinutesFromMinToMax = DiffMinutes(minAfterScan.Time, maxAfterScan.Time),
                 MinutesFromEntryToMax = hasEntry ? DiffMinutes(evaluation.EntryTime, maxAfterScan.Time) : null,
-                MinutesFromEntryToMin = hasEntry ? DiffMinutes(evaluation.EntryTime, minAfterScan.Time) : null
+                MinutesFromEntryToMin = hasEntry ? DiffMinutes(evaluation.EntryTime, minAfterScan.Time) : null,
+                BestEntryDelayBarsM15 = entryTiming.BestEntryDelayBarsM15,
+                BestEntryDelayBarsH1 = entryTiming.BestEntryDelayBarsH1,
+                MinBeforeMaxPct = entryTiming.MinBeforeMaxPct,
+                BarsToMin = entryTiming.BarsToMin,
+                BarsToMax = entryTiming.BarsToMax,
+                ReachedTargetBeforeEntry = entryTiming.ReachedTargetBeforeEntry,
+                EntryMissReason = entryTiming.EntryMissReason,
+                OptimalEntryDiscountPct = entryTiming.OptimalEntryDiscountPct,
+                AdverseMoveBeforeRunPct = entryTiming.AdverseMoveBeforeRunPct
             };
         }
 
@@ -828,7 +861,15 @@ namespace IbSwingTrader.Application.Dataset
                    evaluation.MaxTime.HasValue &&
                    evaluation.MinPct.HasValue &&
                    evaluation.MinPrice.HasValue &&
-                   evaluation.MinTime.HasValue;
+                   evaluation.MinTime.HasValue &&
+                   evaluation.BestEntryDelayBarsM15.HasValue &&
+                   evaluation.BestEntryDelayBarsH1.HasValue &&
+                   evaluation.MinBeforeMaxPct.HasValue &&
+                   evaluation.BarsToMin.HasValue &&
+                   evaluation.BarsToMax.HasValue &&
+                   evaluation.ReachedTargetBeforeEntry.HasValue &&
+                   evaluation.OptimalEntryDiscountPct.HasValue &&
+                   evaluation.AdverseMoveBeforeRunPct.HasValue;
         }
 
         private static string BuildCandidateKey(CandidateDetails row)
@@ -870,6 +911,14 @@ namespace IbSwingTrader.Application.Dataset
                    !row.MinTime.HasValue ||
                    !row.PostMaxDrawdownPct.HasValue ||
                    !row.MinutesFromMinToMax.HasValue ||
+                   !row.BestEntryDelayBarsM15.HasValue ||
+                   !row.BestEntryDelayBarsH1.HasValue ||
+                   !row.MinBeforeMaxPct.HasValue ||
+                   !row.BarsToMin.HasValue ||
+                   !row.BarsToMax.HasValue ||
+                   !row.ReachedTargetBeforeEntry.HasValue ||
+                   !row.OptimalEntryDiscountPct.HasValue ||
+                   !row.AdverseMoveBeforeRunPct.HasValue ||
                    !row.MaxDownBeforeMaxUp.HasValue;
         }
 
@@ -1182,6 +1231,103 @@ namespace IbSwingTrader.Application.Dataset
             return Round(CalcPct(maxAfterEntry.High, minAfterMax));
         }
 
+        private static EntryTimingMetrics CalculateEntryTimingMetrics(
+            List<Candle> ordered,
+            decimal scanPrice,
+            decimal entryPrice,
+            decimal exitPrice,
+            bool hasEntry)
+        {
+            if (ordered.Count == 0 || scanPrice <= 0m)
+                return new EntryTimingMetrics();
+
+            var maxIndex = IndexOfMaxHigh(ordered);
+            var minIndex = IndexOfMinLow(ordered);
+            var minBeforeMaxIndex = IndexOfMinLow(ordered.Take(maxIndex + 1).ToList());
+            var minBeforeMaxPct = Round(CalcPct(scanPrice, ordered[minBeforeMaxIndex].Low));
+            var optimalDiscountPct = Math.Max(-minBeforeMaxPct, 0m);
+            var firstTargetIndex = exitPrice > 0m
+                ? ordered.FindIndex(x => x.High >= exitPrice)
+                : -1;
+            var firstEntryIndex = entryPrice > 0m
+                ? ordered.FindIndex(x => x.Low <= entryPrice && x.High >= entryPrice)
+                : -1;
+            var reachedTargetBeforeEntry = firstTargetIndex >= 0 &&
+                                           (firstEntryIndex < 0 || firstTargetIndex < firstEntryIndex);
+
+            return new EntryTimingMetrics
+            {
+                BestEntryDelayBarsM15 = NormalizeM5BarsToM15(minBeforeMaxIndex + 1),
+                BestEntryDelayBarsH1 = NormalizeM5BarsToH1(minBeforeMaxIndex + 1),
+                MinBeforeMaxPct = minBeforeMaxPct,
+                BarsToMin = NormalizeM5BarsToM15(minIndex + 1),
+                BarsToMax = NormalizeM5BarsToM15(maxIndex + 1),
+                ReachedTargetBeforeEntry = reachedTargetBeforeEntry,
+                EntryMissReason = hasEntry
+                    ? string.Empty
+                    : ResolveNoEntryMissReason(reachedTargetBeforeEntry, ordered, entryPrice),
+                OptimalEntryDiscountPct = Round(optimalDiscountPct),
+                AdverseMoveBeforeRunPct = Round(optimalDiscountPct)
+            };
+        }
+
+        private static int IndexOfMaxHigh(List<Candle> candles)
+        {
+            var bestIndex = 0;
+            for (var i = 1; i < candles.Count; i++)
+            {
+                if (candles[i].High > candles[bestIndex].High)
+                    bestIndex = i;
+            }
+
+            return bestIndex;
+        }
+
+        private static int IndexOfMinLow(List<Candle> candles)
+        {
+            var bestIndex = 0;
+            for (var i = 1; i < candles.Count; i++)
+            {
+                if (candles[i].Low < candles[bestIndex].Low)
+                    bestIndex = i;
+            }
+
+            return bestIndex;
+        }
+
+        private static int NormalizeM5BarsToM15(int bars)
+        {
+            return Math.Max(1, (int)Math.Ceiling(bars / 3m));
+        }
+
+        private static int NormalizeM5BarsToH1(int bars)
+        {
+            return Math.Max(1, (int)Math.Ceiling(bars / 12m));
+        }
+
+        private static string ResolveNoEntryMissReason(
+            bool reachedTargetBeforeEntry,
+            List<Candle> ordered,
+            decimal entryPrice)
+        {
+            if (reachedTargetBeforeEntry)
+                return "TargetBeforeEntry";
+
+            if (entryPrice <= 0m || ordered.Count == 0)
+                return "NoEntry";
+
+            var minLow = ordered.Min(x => x.Low);
+            var maxHigh = ordered.Max(x => x.High);
+
+            if (minLow > entryPrice)
+                return "EntryTooDeep";
+
+            if (maxHigh < entryPrice)
+                return "GappedBelowEntry";
+
+            return "NoEntry";
+        }
+
         private static (decimal? ExitMissAbs, decimal? ExitMissPct, bool NearTakeProfitMiss) CalculateExitMiss(
             CandidateEvaluationResult evaluation,
             decimal maxHigh)
@@ -1246,6 +1392,28 @@ namespace IbSwingTrader.Application.Dataset
             public int? MinutesFromMinToMax { get; init; }
             public int? MinutesFromEntryToMax { get; init; }
             public int? MinutesFromEntryToMin { get; init; }
+            public int? BestEntryDelayBarsM15 { get; init; }
+            public int? BestEntryDelayBarsH1 { get; init; }
+            public decimal? MinBeforeMaxPct { get; init; }
+            public int? BarsToMin { get; init; }
+            public int? BarsToMax { get; init; }
+            public bool? ReachedTargetBeforeEntry { get; init; }
+            public string EntryMissReason { get; init; } = string.Empty;
+            public decimal? OptimalEntryDiscountPct { get; init; }
+            public decimal? AdverseMoveBeforeRunPct { get; init; }
+        }
+
+        private sealed class EntryTimingMetrics
+        {
+            public int? BestEntryDelayBarsM15 { get; init; }
+            public int? BestEntryDelayBarsH1 { get; init; }
+            public decimal? MinBeforeMaxPct { get; init; }
+            public int? BarsToMin { get; init; }
+            public int? BarsToMax { get; init; }
+            public bool? ReachedTargetBeforeEntry { get; init; }
+            public string EntryMissReason { get; init; } = string.Empty;
+            public decimal? OptimalEntryDiscountPct { get; init; }
+            public decimal? AdverseMoveBeforeRunPct { get; init; }
         }
 
         private sealed class RecentFeatureSeries
