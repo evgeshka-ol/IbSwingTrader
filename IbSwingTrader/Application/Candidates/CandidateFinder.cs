@@ -2512,8 +2512,50 @@ namespace IbSwingTrader.Application.Candidates
                    dailyWidthTail <= -settings.SeriesMinDailyWidthCompressionPct &&
                    h4RsiTail <= settings.SeriesMaxH4RsiTailSlope &&
                    (h4MacdLeg ||
-                    h4WidthTail >= settings.SeriesMinH4WidthExpansionPct ||
+                   h4WidthTail >= settings.SeriesMinH4WidthExpansionPct ||
                     h4RsiTail >= settings.SeriesMinH4RsiTailSlope);
+        }
+
+        private static bool IsReversalNearTermEntryTradeProfile(
+            string presetScanCode,
+            CandidateSignalSnapshot snapshot,
+            CandidateDiagnostics diagnostics,
+            RecentFeatureSeries recentSeries,
+            ReversalRecoveryExitSettings settings)
+        {
+            if (!settings.Enabled)
+                return false;
+
+            if (IsGainPreset(presetScanCode))
+                return false;
+
+            if (diagnostics.ATRRatio < settings.NearTermMinAtrRatio ||
+                snapshot.Current.DistanceTo20dHigh > settings.NearTermMaxDistanceTo20dHigh ||
+                snapshot.Current.DailyRSI14 > settings.NearTermMaxDailyRsi14 ||
+                diagnostics.BBMidSignedDistancePct > settings.NearTermMaxBbMid)
+            {
+                return false;
+            }
+
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            var dailyWidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
+                4);
+            var h4WidthTail = CalculateTailBandWidthDeltaPct(
+                recentSeries.H4BbUpperBandSeries,
+                recentSeries.H4BbMidBandSeries,
+                recentSeries.H4BbLowerBandSeries,
+                4);
+            var h4RsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 4);
+            var h4MacdTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 4);
+
+            return dailyMidSlope >= settings.NearTermMinDailyMidSlopePct ||
+                   dailyWidthTail <= -settings.NearTermMinDailyWidthCompressionPct ||
+                   h4WidthTail >= settings.NearTermMinH4WidthExpansionPct ||
+                   h4RsiTail >= settings.NearTermMinH4RsiTailSlope ||
+                   h4MacdTail >= settings.NearTermMinH4MacdTailSlope;
         }
 
         private async Task<WishListContext?> TryBuildWishListContextFromExistingItem(
@@ -2756,6 +2798,12 @@ namespace IbSwingTrader.Application.Candidates
                     diagnostics,
                     recentSeries,
                     tradeSettings.ReversalRecoveryExit);
+            var isReversalNearTermEntry = IsReversalNearTermEntryTradeProfile(
+                ctx.Preset.ScanCode,
+                ctx.Snapshot,
+                diagnostics,
+                recentSeries,
+                tradeSettings.ReversalRecoveryExit);
             var aiReferenceLiveRecovery = IsAiReferenceLiveRecoveryCandidate(
                 ctx.Snapshot,
                 diagnostics,
@@ -2818,6 +2866,16 @@ namespace IbSwingTrader.Application.Candidates
                     $"MinProfitPct={_fmt.Percent(reversalRecoverySettings.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(reversalRecoverySettings.MaxProfitPct)}, " +
                     $"MaxLossPct={_fmt.Percent(reversalRecoverySettings.MaxLossPct)}");
+            }
+            else if (isReversalNearTermEntry)
+            {
+                var reversalRecoverySettings = tradeSettings.ReversalRecoveryExit;
+                entryDiscountOverridePct = reversalRecoverySettings.NearTermEntryDiscountPct;
+
+                _logger.Info(
+                    $"Trade plan reversal near-term entry profile applied for {ctx.Stock.Ticker}. " +
+                    $"EntryDiscountPct={_fmt.Percent(reversalRecoverySettings.NearTermEntryDiscountPct)}, " +
+                    $"MaxEntryDiscountPct={_fmt.Percent(reversalRecoverySettings.NearTermMaxEntryDiscountPct)}");
             }
             else if (IsWeakDeepPullbackProxy(ctx.Snapshot, diagnostics, needsDeeperEntry))
             {
@@ -3068,6 +3126,29 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
+
+            if ((isReversalRecovery || isReversalNearTermEntry) &&
+                (isReversalRecovery
+                    ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
+                    : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct) >= 0m)
+            {
+                var maxRecoveryEntryDiscountPct = isReversalRecovery
+                    ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
+                    : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct;
+                var cappedRecoveryEntryDiscountPct = CapDiscount(
+                    entryDiscountOverridePct,
+                    maxRecoveryEntryDiscountPct);
+
+                if (cappedRecoveryEntryDiscountPct != entryDiscountOverridePct)
+                {
+                    _logger.Info(
+                        $"Trade plan reversal entry cap applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(cappedRecoveryEntryDiscountPct ?? 0m)}, " +
+                        $"PreviousEntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
+                }
+
+                entryDiscountOverridePct = cappedRecoveryEntryDiscountPct;
+            }
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
