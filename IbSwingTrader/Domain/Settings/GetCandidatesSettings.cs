@@ -3,7 +3,6 @@ namespace IbSwingTrader.Domain.Settings
     public class GetCandidatesSettings
     {
         public int RowsPerScan { get; set; }
-        public int FinalTopCandidates { get; set; }
         public bool UseWishListFirst { get; set; }
         public int MaxWishListItems { get; set; }
 
@@ -564,8 +563,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ExplosiveBellUpAnomalyMinTrendPosition { get; set; } = 30.0m;
         public decimal ExplosiveBellUpAnomalyMaxDailyRsi14 { get; set; } = 75.0m;
         public decimal ExplosiveBellUpAnomalyMaxDistanceTo20dHigh { get; set; } = -15.0m;
-        public int SecondPassWindowMultiplier { get; set; } = 4;
-        public int SecondPassMinimumWindow { get; set; } = 30;
         public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;

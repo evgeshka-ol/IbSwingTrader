@@ -346,7 +346,6 @@ namespace IbSwingTrader.Application.Candidates
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
-                getCandidatesSettings.PremarketSummary.MaxItems,
                 _nextDayRankingSettings,
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike);
@@ -354,7 +353,6 @@ namespace IbSwingTrader.Application.Candidates
             var finalCandidates = ReRankCandidates(
                 candidateResults.Values
                     .ToList(),
-                getCandidatesSettings.FinalTopCandidates,
                 _nextDayRankingSettings,
                 seriesSimilarityTemplates,
                 SeriesTemplateFamily.Reversal);
@@ -4367,7 +4365,6 @@ namespace IbSwingTrader.Application.Candidates
 
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
-            int finalTopCandidates,
             NextDayRankingSettings settings,
             IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
             SeriesTemplateFamily family)
@@ -4412,11 +4409,7 @@ namespace IbSwingTrader.Application.Candidates
                 })
                 .ToList();
 
-            var window = family == SeriesTemplateFamily.TodayResearchLike
-                ? rankedInputs.Count
-                : Math.Min(
-                    rankedInputs.Count,
-                    Math.Max(settings.SecondPassMinimumWindow, finalTopCandidates * settings.SecondPassWindowMultiplier));
+            var window = rankedInputs.Count;
 
             if (window <= 1)
                 return rankedInputs.Select(x => x.Candidate).ToList();

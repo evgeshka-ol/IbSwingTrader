@@ -126,28 +126,12 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             foreach (var property in _propertyReader.GetOrderedProperties(value.GetType()))
             {
-                if (ShouldSkipCsvProperty(prefix, property.Name))
-                    continue;
-
                 var name = string.IsNullOrWhiteSpace(prefix)
                     ? property.Name
                     : $"{prefix}{property.Name}";
 
                 Add(row, headers, name, FormatValue(property.GetValue(value)));
             }
-        }
-
-        private static bool ShouldSkipCsvProperty(string prefix, string propertyName)
-        {
-            if (!prefix.Equals("Diagnostics", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            return propertyName is
-                nameof(CandidateDiagnostics.SeriesSimilarityTemplateTicker) or
-                nameof(CandidateDiagnostics.SeriesSimilarityTemplateFamily) or
-                nameof(CandidateDiagnostics.SeriesSimilarityBonus) or
-                nameof(CandidateDiagnostics.LowAmplitudeTemplateTicker) or
-                nameof(CandidateDiagnostics.LowAmplitudePenalty);
         }
 
         private static List<CandidateDetails> OrderForDisplay(IEnumerable<CandidateDetails> candidates)

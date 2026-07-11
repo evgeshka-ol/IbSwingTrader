@@ -196,7 +196,6 @@
 
     "GetCandidates": {
         "RowsPerScan": 100,
-        "FinalTopCandidates": 10,
         "UseWishListFirst": true,
         "MaxWishListItems": 300,
 
@@ -738,8 +737,6 @@
             "ExplosiveBellUpAnomalyMinTrendPosition": 30.0,
             "ExplosiveBellUpAnomalyMaxDailyRsi14": 75.0,
             "ExplosiveBellUpAnomalyMaxDistanceTo20dHigh": -15.0,
-            "SecondPassWindowMultiplier": 4,
-            "SecondPassMinimumWindow": 30,
             "AiReferenceTradePlan": {
                 "Enabled": true,
                 "EntryDiscountPct": 0.02,
