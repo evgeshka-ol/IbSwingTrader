@@ -134,6 +134,33 @@ similarity signal before adding more derived heuristics.
   that re-admits rows which the evaluation feedback has already identified as
   weak and damages top-1 quality.
 
+### Current ranking implementation (2026-07-11)
+
+The literal series-template signal above is no longer just an additive bonus
+sitting alongside ~30 unrelated heuristic proxies. `ReRankCandidates` in
+`CandidateFinder.cs` now sorts by a strict tier first:
+
+- `Confirmed` (close template match, no low-amplitude veto) always outranks
+  `Weak` (looser match), which always outranks `None` (no match, or vetoed by
+  a closer low-amplitude template match).
+- Inside a tier, the matched template's realized `AmplitudePct` is the primary
+  sort key — this is the literal "sort descending by predicted amplitude"
+  behavior. The legacy heuristic `NextDayRank` score only breaks ties within
+  the same tier and the same (rounded) template amplitude.
+- Both `Runaway` and `Reversal` now rerank across their entire candidate pool
+  for a given scan, not just a capped top window; `Reversal` previously left
+  roughly the bottom half of a large list unadjusted by template matching.
+- `candidates.csv` now exposes `Diagnostics.TemplateRankTier`,
+  `SeriesSimilarityTemplateTicker/Family/Bonus`, and
+  `LowAmplitudeTemplateTicker/Penalty` per row, so a ranking outcome can be
+  audited directly instead of inferred from raw indicator series.
+
+`FullMatchBonus`/`WeakMatchBonus`/`LowAmplitudePenaltyWeight` still exist for
+the diagnostic `SeriesSimilarityBonus`/`LowAmplitudePenalty` values shown in
+the CSV, but no longer move the final rank by themselves; `FullMatchDistance`
+decides the `Confirmed`/`Weak` boundary and `WeakMatchDistance` decides whether
+there is a match at all.
+
 ## Bollinger pattern direction
 
 Bollinger band shape patterns are timeframe-scalable. Do not treat them as
@@ -226,7 +253,9 @@ MACD aliases, weighted timeframe totals, or stored slope summaries.
 ## Main code
 
 - Scanner core: `IbSwingTrader/Application/Candidates/CandidateFinder.cs`
+- Ranking/tiering: `ReRankCandidates` / `ResolveTemplateRankTier` in `CandidateFinder.cs`
 - Output writer: `IbSwingTrader/Infrastructure/Logging/CandidateResultWriter.cs`
+- CSV column export (incl. ranking diagnostics): `IbSwingTrader/Infrastructure/Logging/CandidateCsvRowBuilder.cs`
 - Settings: `IbSwingTrader/agentsettings.json`
 - Command: `IbSwingTrader/App/Commands/GetCandidatesCommand.cs`
 
@@ -243,8 +272,13 @@ When scanner quality is weak:
 
 1. Check whether the ticker was missed by the market presets, rejected by the family pattern, or present but ranked too low.
 2. Use the original series in `candidates.csv`; use evaluation only to label those snapshots.
-3. Prefer fixing:
+3. For a ranking question specifically, read `TemplateRankTier`,
+   `SeriesSimilarityTemplateTicker`, and `SeriesSimilarityBonus` on the
+   candidate directly from `candidates.csv` before guessing: `None` means no
+   winner template matched (or a low-amplitude template vetoed it), which
+   points at recall/matching, not at the tier/sort mechanism itself.
+4. Prefer fixing:
    - recall
    - family pattern recognition after the hard daily split
    - ranking
-4. Touch `TradePlan` only after the list is already good.
+5. Touch `TradePlan` only after the list is already good.

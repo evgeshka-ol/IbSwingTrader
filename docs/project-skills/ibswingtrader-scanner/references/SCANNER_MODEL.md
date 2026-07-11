@@ -238,3 +238,16 @@ Weekly-only Bell and other continuation subtypes remain context.
 If strict promotion leaves both final families empty, keep the result empty.
 The low-amplitude template veto represents observed evaluation feedback and
 must not be disabled merely to populate the output.
+
+## Ranking implementation status (2026-07-11)
+
+The comparison principle above is implemented as a strict tiered sort, not an
+additive bonus: `Confirmed` template match > `Weak` template match > `None`,
+and within a tier the matched template's `AmplitudePct` is the primary sort
+key, with the old heuristic score only breaking ties. A low-amplitude match at
+least as close as the positive match forces `None` regardless of how strong
+the positive match looked, which is the concrete form of "the low-amplitude
+template veto ... must not be disabled." Both `Runaway` and `Reversal` rerank
+across their full candidate pool per scan; there is no more top-window cap
+that could leave part of a large list unadjusted by template matching. See
+`ReRankCandidates`/`ResolveTemplateRankTier` in `CandidateFinder.cs`.

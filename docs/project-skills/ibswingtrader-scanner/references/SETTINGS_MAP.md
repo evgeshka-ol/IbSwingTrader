@@ -54,14 +54,23 @@ as patterned high-amplitude winners. Weekly rows are context only.
 Important knobs:
 
 - `MinTemplateAmplitudePct`: minimum amplitude for a row to become a positive template.
-- `FullMatchDistance` / `WeakMatchDistance`: row-similarity thresholds.
-- `FullMatchBonus` / `WeakMatchBonus`: second-pass rank boost for close matches.
+- `FullMatchDistance`: below this distance a match is the `Confirmed` rank tier.
+- `WeakMatchDistance`: below this distance (and above `FullMatchDistance`) a
+  match is the `Weak` rank tier; above it, there is no match at all (`None`).
+- `FullMatchBonus` / `WeakMatchBonus`: only feed the diagnostic
+  `SeriesSimilarityBonus` value written to `candidates.csv`. They no longer
+  move the final rank themselves — since 2026-07-11 the rank tier and the
+  matched template's `AmplitudePct` decide order; see
+  `references/SCANNER_MODEL.md` "Ranking implementation status".
 - `EnableLowAmplitudePenalty`: enables negative templates from historical
-  `Runaway` scan snapshots whose evaluation did not reach 10% amplitude.
+  `Runaway` scan snapshots whose evaluation did not reach 10% amplitude. When
+  `false`, no negative templates load and the low-amplitude veto never fires.
 - `LowAmplitudeMinTemplateAmplitudePct` / `LowAmplitudeMaxTemplateAmplitudePct`:
   amplitude band for negative templates.
-- `LowAmplitudePenaltyWeight`: second-pass rank penalty for candidates matching
-  low-amplitude row shapes.
+- `LowAmplitudePenaltyWeight`: only feeds the diagnostic `LowAmplitudePenalty`
+  value in `candidates.csv`. The actual veto is now boolean (a closer
+  low-amplitude match demotes the candidate straight to rank tier `None`), not
+  a weighted score subtraction.
 - `RelativePointTolerance` and `*PointTolerance`: per-point tolerance before a
   row difference is counted as real distance. Small differences such as `3.8`
   vs `4.0` should usually be treated as the same shape; larger differences
@@ -71,6 +80,12 @@ Timeframes and indicator rows are not averaged. Daily and H4 are matched
 independently, and each timeframe uses its worst real-line distance so one good
 line cannot hide a failed Bollinger/MACD/RSI row. Weekly does not participate
 in admission.
+
+`FinalTopCandidates`, `SecondPassWindowMultiplier`, and
+`SecondPassMinimumWindow` were removed on 2026-07-11: `Reversal` reranking
+previously capped its second-pass window using these, silently leaving part of
+a large list unadjusted by template matching. Both `Runaway` and `Reversal`
+now always rerank their full candidate pool.
 
 ### `GetCandidates.TradePlan`
 

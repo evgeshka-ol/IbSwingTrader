@@ -323,8 +323,14 @@ For summary ranking, compare rows in both directions:
 - positive templates: original scan snapshots with a later confirmed pattern
   and high amplitude should lift candidates even when RSI already looks high
 - negative templates: original `Runaway` scan snapshots whose later evaluation
-  had `AmplitudePct < 10%` should penalize candidates that look unlikely to
+  had `AmplitudePct < 10%` should push down candidates that look unlikely to
   clear the 10% amplitude line
 
-Do not use the negative templates as a hard scanner filter. They are a ranking
-tool for keeping weak lookalikes out of the current top-ranked `Runaway` rows.
+Do not use the negative templates as a hard scanner filter — a vetoed
+candidate stays in the list, it does not get removed from admission. Since
+2026-07-11 the veto is a hard rank-tier demotion rather than a subtracted
+score: a candidate whose positive template match would otherwise be
+`Confirmed`/`Weak` drops straight to the same `None` rank tier as a candidate
+with no template match at all, whenever a low-amplitude template matches it at
+least as closely. It is a ranking tool for keeping weak lookalikes out of the
+current top-ranked `Runaway` rows, not an admission filter.
