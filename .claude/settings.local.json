@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python3 *)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(git -C /mnt/c/Git_Home/IbSwingTrader diff --stat -- docs/)"
     ]
   }
 }
