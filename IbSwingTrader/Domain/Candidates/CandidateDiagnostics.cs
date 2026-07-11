@@ -27,5 +27,7 @@ namespace IbSwingTrader.Domain.Candidates
         public string? LowAmplitudeTemplateTicker { get; set; }
 
         public decimal? LowAmplitudePenalty { get; set; }
+
+        public string? TemplateRankTier { get; set; }
     }
 }

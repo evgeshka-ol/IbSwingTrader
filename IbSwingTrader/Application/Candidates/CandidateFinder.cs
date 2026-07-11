@@ -4363,6 +4363,17 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
+        // Tier beats amplitude beats heuristic score: the weights below are spaced so a lower tier or amplitude can never be outweighed by the one below it.
+        private const decimal TemplateTierRankWeight = 100000m;
+        private const decimal TemplateAmplitudeRankWeight = 100m;
+
+        private enum SeriesTemplateRankTier
+        {
+            None = 0,
+            Weak = 1,
+            Confirmed = 2
+        }
+
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
             NextDayRankingSettings settings,
@@ -4377,7 +4388,8 @@ namespace IbSwingTrader.Application.Candidates
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)
                 .ToList();
-            var rankedInputs = ordered
+
+            var ranked = ordered
                 .Select(x =>
                 {
                     var seriesSimilarityMatch = CalculateSeriesSimilarityMatch(
@@ -4398,34 +4410,32 @@ namespace IbSwingTrader.Application.Candidates
                     if (IsSelfSeriesTemplateMatch(x.Ticker, lowAmplitudeMatch))
                         lowAmplitudeMatch = SeriesSimilarityMatch.Empty;
 
-                    ApplySeriesSimilarityDiagnostics(x, seriesSimilarityMatch, lowAmplitudeMatch, settings.SeriesSimilarity);
+                    var tier = ResolveTemplateRankTier(
+                        seriesSimilarityMatch,
+                        lowAmplitudeMatch,
+                        family,
+                        settings.SeriesSimilarity);
+
+                    ApplySeriesSimilarityDiagnostics(
+                        x,
+                        seriesSimilarityMatch,
+                        lowAmplitudeMatch,
+                        tier,
+                        settings.SeriesSimilarity);
+
+                    var templateAmplitudePct = tier == SeriesTemplateRankTier.None
+                        ? 0m
+                        : seriesSimilarityMatch.TemplateAmplitudePct ?? 0m;
+
+                    var adjustedRank =
+                        (int)tier * TemplateTierRankWeight +
+                        templateAmplitudePct * TemplateAmplitudeRankWeight +
+                        (x.Score.NextDayRank ?? 0m);
 
                     return new
                     {
                         Candidate = x,
-                        SeriesSimilarityMatch = seriesSimilarityMatch,
-                        LowAmplitudeMatch = lowAmplitudeMatch
-                    };
-                })
-                .ToList();
-
-            var window = rankedInputs.Count;
-
-            if (window <= 1)
-                return rankedInputs.Select(x => x.Candidate).ToList();
-
-            var topWindow = rankedInputs
-                .Take(window)
-                .Select(x =>
-                {
-                    return new
-                    {
-                        x.Candidate,
-                        AdjustedRank = (x.Candidate.Score.NextDayRank ?? decimal.MinValue) +
-                            CalculateSecondPassAdjustment(
-                                settings,
-                                x.SeriesSimilarityMatch.Bonus,
-                                x.LowAmplitudeMatch.Bonus)
+                        AdjustedRank = adjustedRank
                     };
                 })
                 .OrderByDescending(x => x.AdjustedRank)
@@ -4433,28 +4443,38 @@ namespace IbSwingTrader.Application.Candidates
                 .ThenByDescending(x => x.Candidate.Score.Score)
                 .ToList();
 
-            for (var i = 0; i < topWindow.Count; i++)
+            foreach (var item in ranked)
             {
-                topWindow[i].Candidate.Score.NextDayRank = decimal.Round(
-                    topWindow[i].AdjustedRank,
+                item.Candidate.Score.NextDayRank = decimal.Round(
+                    item.AdjustedRank,
                     4,
                     MidpointRounding.AwayFromZero);
             }
 
-            return
-            [
-                .. topWindow.Select(x => x.Candidate),
-                .. rankedInputs.Skip(window).Select(x => x.Candidate)
-            ];
+            return ranked.Select(x => x.Candidate).ToList();
         }
 
-        private decimal CalculateSecondPassAdjustment(
-            NextDayRankingSettings settings,
-            decimal seriesSimilarityBonus,
-            decimal lowAmplitudeSimilarityPenalty)
+        private static SeriesTemplateRankTier ResolveTemplateRankTier(
+            SeriesSimilarityMatch match,
+            SeriesSimilarityMatch lowAmplitudeMatch,
+            SeriesTemplateFamily family,
+            SeriesSimilaritySettings settings)
         {
-            return seriesSimilarityBonus -
-                   lowAmplitudeSimilarityPenalty * settings.SeriesSimilarity.LowAmplitudePenaltyWeight;
+            if (match.Bonus <= 0m)
+                return SeriesTemplateRankTier.None;
+
+            // A low-amplitude match at least as close as the winner match vetoes promotion to Confirmed/Weak.
+            var isVetoedByLowAmplitudeMatch =
+                family == SeriesTemplateFamily.TodayResearchLike &&
+                lowAmplitudeMatch.Bonus > 0m &&
+                GetBestTimeframeDistance(lowAmplitudeMatch) <= GetBestTimeframeDistance(match);
+
+            if (isVetoedByLowAmplitudeMatch)
+                return SeriesTemplateRankTier.None;
+
+            return GetBestTimeframeDistance(match) <= settings.FullMatchDistance
+                ? SeriesTemplateRankTier.Confirmed
+                : SeriesTemplateRankTier.Weak;
         }
 
         private static bool TryCalculateRealBollingerEnvelope(
@@ -4860,6 +4880,7 @@ namespace IbSwingTrader.Application.Candidates
             CandidateDetails candidate,
             SeriesSimilarityMatch match,
             SeriesSimilarityMatch lowAmplitudeMatch,
+            SeriesTemplateRankTier tier,
             SeriesSimilaritySettings settings)
         {
             if (candidate.Diagnostics == null)
@@ -4872,6 +4893,7 @@ namespace IbSwingTrader.Application.Candidates
             candidate.Diagnostics.LowAmplitudePenalty = lowAmplitudeMatch.Bonus > 0m
                 ? lowAmplitudeMatch.Bonus * settings.LowAmplitudePenaltyWeight
                 : null;
+            candidate.Diagnostics.TemplateRankTier = tier.ToString();
         }
 
 
