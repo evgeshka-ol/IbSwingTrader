@@ -12,6 +12,12 @@ namespace IbSwingTrader.Application.Dataset
         private readonly INumberTextFormatter _fmt = numberFormatter;
         private readonly IBuildDatasetSettingsProvider _settingsProvider = settingsProvider;
 
+        // Same window lengths as the scanner (CandidateFinder.cs) and the evaluation dataset builder,
+        // so Recent*Series here is directly comparable to candidates.csv.
+        private const int RecentDailySeriesLength = 12;
+        private const int RecentWeeklySeriesLength = 10;
+        private const int RecentH4SeriesLength = 16;
+
         public List<TradeDatasetRow> Build(
             List<TradeRecord> trades,
             List<Candle> candles)
@@ -197,6 +203,113 @@ namespace IbSwingTrader.Application.Dataset
 
             if (row.HoldDays <= 1)
                 FillH4Series(row, candles, entryIndex, exitIndex);
+
+            FillRecentSeries(row, candles, entryIndex);
+        }
+
+        private void FillRecentSeries(
+            TradeDatasetRow row,
+            List<Candle> candles,
+            int entryIndex)
+        {
+            row.RecentDailyBbUpperBandSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyBollingerUpperBand);
+            row.RecentDailyBbMidBandSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyBollingerMidBand);
+            row.RecentDailyBbLowerBandSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyBollingerLowerBand);
+            row.RecentDailyRsiSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyRSI14);
+            row.RecentDailyMacdLineSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyMACDLine);
+            row.RecentDailyMacdSignalSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyMACDSignal);
+            row.RecentDailyMacdHistogramSeries = BuildRecentDailySeries(candles, entryIndex, x => x.DailyMACDHistogram);
+
+            row.RecentWeeklyBbUpperBandSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyBollingerUpperBand ?? 0m);
+            row.RecentWeeklyBbMidBandSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyBollingerMidBand ?? 0m);
+            row.RecentWeeklyBbLowerBandSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyBollingerLowerBand ?? 0m);
+            row.RecentWeeklyRsiSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyRSI14 ?? 0m);
+            row.RecentWeeklyMacdLineSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyMACDLine ?? 0m);
+            row.RecentWeeklyMacdSignalSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyMACDSignal ?? 0m);
+            row.RecentWeeklyMacdHistogramSeries = BuildRecentWeeklySeries(candles, entryIndex, x => x.WeeklyMACDHistogram ?? 0m);
+
+            row.RecentH4BbUpperBandSeries = BuildRecentH4Series(candles, entryIndex, x => x.H4BollingerUpperBand);
+            row.RecentH4BbMidBandSeries = BuildRecentH4Series(candles, entryIndex, x => x.H4BollingerMidBand);
+            row.RecentH4BbLowerBandSeries = BuildRecentH4Series(candles, entryIndex, x => x.H4BollingerLowerBand);
+            row.RecentH4RsiSeries = BuildRecentH4Series(candles, entryIndex, x => x.RSI14);
+            row.RecentH4MacdLineSeries = BuildRecentH4Series(candles, entryIndex, x => x.MACDLine);
+            row.RecentH4MacdSignalSeries = BuildRecentH4Series(candles, entryIndex, x => x.MACDSignal);
+            row.RecentH4MacdHistogramSeries = BuildRecentH4Series(candles, entryIndex, x => x.MACDHistogram);
+        }
+
+        private List<decimal> BuildRecentDailySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentWeeklySeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedWeeks = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var weekStart = GetWeekStart(candles[i].Time);
+                if (!usedWeeks.Add(weekStart))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentWeeklySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private List<decimal> BuildRecentH4Series(
+            List<Candle> candles,
+            int scanIndex,
+            Func<FeatureSet, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedBuckets = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var bucket = StartOfH4Bucket(candles[i].Time);
+                if (!usedBuckets.Add(bucket))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+        }
+
+        private static DateTime StartOfH4Bucket(DateTime time)
+        {
+            var hour = time.Hour - (time.Hour % 4);
+            return new DateTime(time.Year, time.Month, time.Day, hour, 0, 0, time.Kind);
         }
 
         private void FillDailySeries(

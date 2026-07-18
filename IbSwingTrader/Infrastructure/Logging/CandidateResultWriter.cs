@@ -382,6 +382,12 @@ namespace IbSwingTrader.Infrastructure.Logging
             _console.Write($"{_fmt.Percent(candidate.TradePlan.ProfitPercent)}%", ConsoleColor.Green);
             _console.Write("/", ConsoleColor.DarkGray);
             _console.Write($"{_fmt.Percent(candidate.TradePlan.LossPercent)}%", ConsoleColor.Red);
+            _console.Write(" ", ConsoleColor.Gray);
+            _console.Write(
+                candidate.Diagnostics?.EstimatedHitRatePct is { } hitRatePct
+                    ? $"conf={_fmt.Generic(hitRatePct)}%"
+                    : "conf=n/a",
+                ConsoleColor.Cyan);
             _console.WriteLine(string.Empty, ConsoleColor.Gray);
         }
 

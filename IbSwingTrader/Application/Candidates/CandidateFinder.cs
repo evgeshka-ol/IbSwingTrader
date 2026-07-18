@@ -4363,9 +4363,8 @@ namespace IbSwingTrader.Application.Candidates
             return score;
         }
 
-        // Tier beats amplitude beats heuristic score: the weights below are spaced so a lower tier or amplitude can never be outweighed by the one below it.
-        private const decimal TemplateTierRankWeight = 100000m;
-        private const decimal TemplateAmplitudeRankWeight = 100m;
+        // Validated 2026-07-13 against evaluation-dataset.csv: Daily/H4 Bollinger mid+upper slope predicts Runaway amplitude (AUC ~0.84 on extreme groups); Daily band compression + lower-band hook slope predicts Reversal amplitude (AUC ~0.63). Series-template distance-matching (below) showed no such signal and no longer drives ranking; it stays for its diagnostics only.
+        private const decimal QualityScoreRankWeight = 50m;
 
         private enum SeriesTemplateRankTier
         {
@@ -4423,13 +4422,18 @@ namespace IbSwingTrader.Application.Candidates
                         tier,
                         settings.SeriesSimilarity);
 
-                    var templateAmplitudePct = tier == SeriesTemplateRankTier.None
-                        ? 0m
-                        : seriesSimilarityMatch.TemplateAmplitudePct ?? 0m;
+                    var qualityScore = family == SeriesTemplateFamily.TodayResearchLike
+                        ? CalculateRunawayLaunchQualityScore(x)
+                        : CalculateReversalHookQualityScore(x);
+
+                    if (x.Diagnostics != null)
+                    {
+                        x.Diagnostics.RankingQualityScore = qualityScore;
+                        x.Diagnostics.EstimatedHitRatePct = EstimateHitRatePct(qualityScore, family);
+                    }
 
                     var adjustedRank =
-                        (int)tier * TemplateTierRankWeight +
-                        templateAmplitudePct * TemplateAmplitudeRankWeight +
+                        qualityScore * QualityScoreRankWeight +
                         (x.Score.NextDayRank ?? 0m);
 
                     return new
@@ -4475,6 +4479,54 @@ namespace IbSwingTrader.Application.Candidates
             return GetBestTimeframeDistance(match) <= settings.FullMatchDistance
                 ? SeriesTemplateRankTier.Confirmed
                 : SeriesTemplateRankTier.Weak;
+        }
+
+        private static decimal CalculateRunawayLaunchQualityScore(CandidateDetails candidate)
+        {
+            var dailyMidSlope = CalculateTailRelativeSlopePct(candidate.RecentDailyBbMidBandSeries, 4);
+            var dailyUpperSlope = CalculateTailRelativeSlopePct(candidate.RecentDailyBbUpperBandSeries, 4);
+            var h4MidSlope = CalculateTailRelativeSlopePct(candidate.RecentH4BbMidBandSeries, 4);
+
+            return dailyMidSlope * 1.0m + dailyUpperSlope * 0.5m + h4MidSlope * 0.5m;
+        }
+
+        private static decimal CalculateReversalHookQualityScore(CandidateDetails candidate)
+        {
+            var upper = candidate.RecentDailyBbUpperBandSeries;
+            var lower = candidate.RecentDailyBbLowerBandSeries;
+
+            var compressionInverse = 0m;
+            if (upper.Count >= 4 && lower.Count >= 4)
+            {
+                var currentWidth = upper[^1] - lower[^1];
+                var previousWidth = upper[^4] - lower[^4];
+                if (previousWidth != 0m)
+                    compressionInverse = 1m - currentWidth / previousWidth;
+            }
+
+            var lowerHookSlope = CalculateTailRelativeSlopePct(lower, 3);
+
+            return compressionInverse * 30m + lowerHookSlope * 0.5m;
+        }
+
+        // Coarse, honest buckets from a thin historical sample (evaluation-dataset.csv, checked 2026-07-14):
+        // Runaway n=23 scan-days, Reversal n=19. This is a rough historical hit-rate readout, not a
+        // statistically calibrated probability - recheck and adjust these breakpoints/rates as more days
+        // of evaluation data accumulate rather than trusting them as fixed truth.
+        private static decimal EstimateHitRatePct(decimal qualityScore, SeriesTemplateFamily family)
+        {
+            if (family == SeriesTemplateFamily.TodayResearchLike)
+            {
+                if (qualityScore >= 20m)
+                    return 70m;
+                if (qualityScore >= 10m)
+                    return 65m;
+                return 10m;
+            }
+
+            return qualityScore >= 15m
+                ? 50m
+                : 30m;
         }
 
         private static bool TryCalculateRealBollingerEnvelope(

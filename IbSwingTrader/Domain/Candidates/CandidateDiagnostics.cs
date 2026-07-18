@@ -29,5 +29,9 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? LowAmplitudePenalty { get; set; }
 
         public string? TemplateRankTier { get; set; }
+
+        public decimal? RankingQualityScore { get; set; }
+
+        public decimal? EstimatedHitRatePct { get; set; }
     }
 }
