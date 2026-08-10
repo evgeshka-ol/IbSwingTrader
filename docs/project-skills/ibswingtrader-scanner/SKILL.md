@@ -134,32 +134,77 @@ similarity signal before adding more derived heuristics.
   that re-admits rows which the evaluation feedback has already identified as
   weak and damages top-1 quality.
 
-### Current ranking implementation (2026-07-11)
+### Shared Bell/ReversalHook classifier (2026-08-10)
 
-The literal series-template signal above is no longer just an additive bonus
-sitting alongside ~30 unrelated heuristic proxies. `ReRankCandidates` in
-`CandidateFinder.cs` now sorts by a strict tier first:
+Bell/ReversalHook pattern classification (envelope math, curve-turn checks,
+vertical-spike detection, and the slope/delta helpers they depend on) now
+lives in one place: `BellPatternClassifier` (static class in
+`Application/Candidates/BellPatternClassifier.cs`). Both the live scan path
+(`CandidateFinder.cs`) and the offline evaluation path
+(`CandidatePatternVerdictService.cs`) call into this shared class instead of
+keeping their own copies.
 
-- `Confirmed` (close template match, no low-amplitude veto) always outranks
-  `Weak` (looser match), which always outranks `None` (no match, or vetoed by
-  a closer low-amplitude template match).
-- Inside a tier, the matched template's realized `AmplitudePct` is the primary
-  sort key — this is the literal "sort descending by predicted amplitude"
-  behavior. The legacy heuristic `NextDayRank` score only breaks ties within
-  the same tier and the same (rounded) template amplitude.
-- Both `Runaway` and `Reversal` now rerank across their entire candidate pool
-  for a given scan, not just a capped top window; `Reversal` previously left
-  roughly the bottom half of a large list unadjusted by template matching.
-- `candidates.csv` now exposes `Diagnostics.TemplateRankTier`,
-  `SeriesSimilarityTemplateTicker/Family/Bonus`, and
-  `LowAmplitudeTemplateTicker/Penalty` per row, so a ranking outcome can be
-  audited directly instead of inferred from raw indicator series.
+- Before this extraction the two copies had already drifted apart (the live
+  scanner's `IsReversalHookPattern` required `lowerHookFresh` and
+  `priceTurnsTowardMid`; the offline copy silently skipped both). The shared
+  class uses the live (stricter) version as canonical, so a scanner decision
+  and its later offline evaluation now agree by construction.
+- If a Bell/ReversalHook rule needs to change, change it once in
+  `BellPatternClassifier.cs`. Do not reintroduce a local copy in
+  `CandidateFinder.cs` or `CandidatePatternVerdictService.cs` — that is exactly
+  the drift this extraction closed.
+- `CandidateFinder.cs` still keeps a few thin wrappers around the shared
+  methods (e.g. selecting which timeframe's series to pass in) — those are
+  convenience shims, not duplicate logic, and are fine to keep.
 
-`FullMatchBonus`/`WeakMatchBonus`/`LowAmplitudePenaltyWeight` still exist for
-the diagnostic `SeriesSimilarityBonus`/`LowAmplitudePenalty` values shown in
-the CSV, but no longer move the final rank by themselves; `FullMatchDistance`
-decides the `Confirmed`/`Weak` boundary and `WeakMatchDistance` decides whether
-there is a match at all.
+### Superseded: series-template tiered sort (2026-07-11)
+
+`ReRankCandidates` briefly sorted by a strict series-template tier
+(`Confirmed`/`Weak`/`None`) with the matched template's realized
+`AmplitudePct` as the primary sort key inside a tier. **This was empirically
+disproven on 2026-07-13**: on a real scan, all candidates came back
+`TemplateRankTier=None` even with hundreds of templates loaded correctly —
+literal point/curve comparison of historical Bollinger/MACD/RSI series did not
+discriminate future high-amplitude winners from losers in this dataset. Do not
+resurrect distance-threshold tuning (`FullMatchDistance`/`WeakMatchDistance`)
+as a way to fix ranking; there was no signal there to threshold on. The
+general lesson: validate that a signal actually predicts the outcome before
+retuning its thresholds.
+
+### Current ranking implementation: validated quality score (2026-07-13)
+
+`ReRankCandidates` in `CandidateFinder.cs` now ranks by a **template-free
+quality score** validated by AUC against `evaluation-dataset.csv` history
+(Daily/H4 Bollinger band slope was the strongest individual finding, AUC 0.64
+mild → 0.84 extreme contrast for Runaway; band-width compression + lower-band
+hook slope for Reversal, AUC 0.60 → 0.63, weaker but real):
+
+- `CalculateRunawayLaunchQualityScore` (Runaway/`TodayResearchLike`): weighted
+  sum of Daily mid-band tail slope, Daily upper-band tail slope, and H4
+  mid-band tail slope.
+- `CalculateReversalHookQualityScore` (Reversal): weighted sum of Daily
+  band-width compression (inverse of current/previous width ratio) and the
+  Daily lower-band hook tail slope.
+- Final sort key is `AdjustedRank = qualityScore * QualityScoreRankWeight (50)
+  + legacy heuristic NextDayRank`. The quality score dominates; the old
+  heuristic score only nudges within that.
+- `Diagnostics.RankingQualityScore` and `Diagnostics.EstimatedHitRatePct`
+  (coarse historical buckets, checked 2026-07-14 on a thin sample — recheck
+  as more evaluation days accumulate) are written per candidate in
+  `candidates.csv`.
+- The series-template tier/distance machinery above (`ResolveTemplateRankTier`,
+  `Diagnostics.TemplateRankTier`, `SeriesSimilarityTemplateTicker/Family/Bonus`,
+  `LowAmplitudeTemplateTicker/Penalty`) is **still computed and still written
+  to `candidates.csv` for audit**, but as of this rework it no longer affects
+  sort order at all — do not expect it to explain why one candidate outranks
+  another; check `RankingQualityScore` for that instead.
+- Both `Runaway` and `Reversal` still rerank across their entire candidate
+  pool per scan (no capped top window).
+
+If you need to improve ranking further, validate a new candidate feature's
+AUC against realized `AmplitudePct` in `evaluation-dataset.csv` before wiring
+it into either quality-score function — that discipline is exactly what
+caught the 2026-07-11 approach not working.
 
 ## Bollinger pattern direction
 
@@ -254,6 +299,8 @@ MACD aliases, weighted timeframe totals, or stored slope summaries.
 
 - Scanner core: `IbSwingTrader/Application/Candidates/CandidateFinder.cs`
 - Ranking/tiering: `ReRankCandidates` / `ResolveTemplateRankTier` in `CandidateFinder.cs`
+- Shared Bell/ReversalHook pattern classifier (used by both the live scan and
+  offline evaluation): `IbSwingTrader/Application/Candidates/BellPatternClassifier.cs`
 - Output writer: `IbSwingTrader/Infrastructure/Logging/CandidateResultWriter.cs`
 - CSV column export (incl. ranking diagnostics): `IbSwingTrader/Infrastructure/Logging/CandidateCsvRowBuilder.cs`
 - Settings: `IbSwingTrader/agentsettings.json`

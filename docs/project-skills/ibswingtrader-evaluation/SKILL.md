@@ -35,8 +35,18 @@ For scanner quality, the key metric is `AmplitudePct`.
 ## Main code
 
 - evaluator: `IbSwingTrader/Application/Evaluation/CandidateEvaluator.cs`
+- pattern verdicts (Bell/ReversalHook re-check on realized rows): `IbSwingTrader/Application/Evaluation/CandidatePatternVerdictService.cs`
 - evaluation dataset: `IbSwingTrader/Application/Dataset/EvaluationDatasetBuilder.cs`
 - command: `IbSwingTrader/App/Commands/EvaluateCandidatesCommand.cs`
+
+`CandidatePatternVerdictService.cs` classifies Bell/ReversalHook by calling the
+same `BellPatternClassifier` (`Application/Candidates/BellPatternClassifier.cs`)
+that the live scanner (`CandidateFinder.cs`) uses (as of 2026-08-10). Before
+this extraction the two paths had quietly drifted apart, so a pattern verdict
+here and the scanner's original decision could disagree even on the same rows.
+If a pattern rule looks wrong here, fix it in `BellPatternClassifier.cs`, not
+locally in this file — a local fix would immediately re-diverge from the live
+scan path. See the `ibswingtrader-scanner` skill for the scanner side.
 
 ## Read these references
 

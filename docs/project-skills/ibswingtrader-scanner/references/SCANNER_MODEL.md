@@ -239,15 +239,51 @@ If strict promotion leaves both final families empty, keep the result empty.
 The low-amplitude template veto represents observed evaluation feedback and
 must not be disabled merely to populate the output.
 
-## Ranking implementation status (2026-07-11)
+## Shared classifier implementation status (2026-08-10)
 
-The comparison principle above is implemented as a strict tiered sort, not an
-additive bonus: `Confirmed` template match > `Weak` template match > `None`,
-and within a tier the matched template's `AmplitudePct` is the primary sort
-key, with the old heuristic score only breaking ties. A low-amplitude match at
-least as close as the positive match forces `None` regardless of how strong
-the positive match looked, which is the concrete form of "the low-amplitude
-template veto ... must not be disabled." Both `Runaway` and `Reversal` rerank
-across their full candidate pool per scan; there is no more top-window cap
-that could leave part of a large list unadjusted by template matching. See
-`ReRankCandidates`/`ResolveTemplateRankTier` in `CandidateFinder.cs`.
+`BellPatternClassifier` (`Application/Candidates/BellPatternClassifier.cs`) is
+now the single implementation of Bell/ReversalHook classification, the real
+Bollinger envelope math behind it, and the generic slope/delta helpers it
+depends on. `CandidateFinder.cs` (live scan) and
+`CandidatePatternVerdictService.cs` (offline evaluation) both call into it
+instead of keeping parallel copies. This closes a real drift that had already
+happened between the two paths (the live `IsReversalHookPattern` required
+`lowerHookFresh` and `priceTurnsTowardMid`; the offline copy silently skipped
+both) — the shared class kept the stricter live behavior as canonical. Any
+future change to Bell/ReversalHook rules belongs in this one file.
+
+## Ranking implementation status — superseded (2026-07-11), then replaced (2026-07-13)
+
+The comparison principle above was briefly implemented as a strict tiered
+sort: `Confirmed` template match > `Weak` template match > `None`, with the
+matched template's `AmplitudePct` as the primary sort key inside a tier.
+
+**This tiered sort was empirically disproven on 2026-07-13**: on a real scan
+every candidate came back `TemplateRankTier=None` even though hundreds of
+templates loaded correctly. Root-caused across seven independent comparison
+variants (raw distance, %-normalized distance, RSI-only, level-correlation,
+first-diff-correlation, worst-of vs avg-of-lines, mild vs extreme amplitude
+contrast) — literal point/curve comparison of historical Bollinger/MACD/RSI
+series does not discriminate future high-amplitude winners from losers in
+this dataset. The low-amplitude veto logic described above is still real
+*mechanically*, but tuning `FullMatchDistance`/`WeakMatchDistance` will not
+fix a ranking problem, because there was no signal there to threshold on.
+
+Current ranking (since 2026-07-13) is a validated, template-free quality
+score instead: `CalculateRunawayLaunchQualityScore` (Daily mid/upper-band tail
+slope + H4 mid-band tail slope) for `Runaway`, `CalculateReversalHookQualityScore`
+(Daily band-width compression + lower-band hook tail slope) for `Reversal`.
+Both were individually validated by AUC against `evaluation-dataset.csv`
+before being wired in — Daily/H4 Bollinger band slope was the strongest
+finding of the investigation (AUC 0.64 mild → 0.84 extreme contrast).
+`ReRankCandidates` sorts by `qualityScore * 50 + legacyNextDayRank`; the
+template tier/distance machinery (`ResolveTemplateRankTier`) still runs and
+still writes `Diagnostics.TemplateRankTier` etc. for audit, but no longer
+affects sort order. Both `Runaway` and `Reversal` still rerank across their
+full candidate pool per scan (no top-window cap). See
+`ReRankCandidates`/`CalculateRunawayLaunchQualityScore`/`CalculateReversalHookQualityScore`
+in `CandidateFinder.cs`.
+
+If extending ranking further, validate a candidate feature's AUC against
+realized `AmplitudePct` before wiring it into a quality-score function —
+that discipline is what caught the 2026-07-11 approach not working.

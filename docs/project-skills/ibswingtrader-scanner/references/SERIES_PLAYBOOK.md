@@ -2,6 +2,16 @@
 
 These are the main series used to understand a ticker before it fully expands.
 
+The `Recent*Series` window lengths (Daily/Weekly/H4 lookback, plus the swing-
+boundary-detector bounds) are defined once in
+`Domain/Settings/RecentSeriesWindow.cs` (as of 2026-08-10). They used to be
+duplicated as private consts across `CandidateFinder.cs`,
+`EvaluationDatasetBuilder.cs`, `TradeDatasetBuilder.cs`,
+`BuildResearchDatasetCommand.cs`, `NormalizeReportsCommand.cs`, and
+`HistoricalCache.cs`. Change a window length there, not in any one consumer —
+otherwise the scanner, the evaluation dataset, and the research dataset can
+silently start looking at different amounts of history for the same ticker.
+
 ## Primary series
 
 Prefer real chart-like indicator lines for pattern detection and confidence.

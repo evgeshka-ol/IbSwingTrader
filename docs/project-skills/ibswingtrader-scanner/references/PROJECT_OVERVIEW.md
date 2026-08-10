@@ -14,6 +14,19 @@
 - `build-research-dataset`
   - builds today's oracle of strong movers
   - writes `Data/datasets/research_top_gainers.csv`
+- `build-dataset` (added 2026-08-10)
+  - reads real broker trade fills (not scanner candidates) from the trades CSV
+  - `ITradePositionMerger` merges fills for the same ticker/direction within a
+    settings-driven time window into one `TradeRecord` position (a broker
+    per-order share cap can split one real position into several fills);
+    positions below `MinimumEntryQuantity` are dropped as probe/experiment
+    orders, not real trading decisions
+  - fetches surrounding H4 candles per merged position and builds
+    `TradeDatasetRow` rows with feature series, for studying real executed
+    trades rather than scanner-found candidates
+  - writes the trade dataset CSV via `ITradeDatasetBuilder`
+  - settings: `BuildDatasetSettings` (`FillMergeWindowMinutes`, `MinimumEntryQuantity`, `TickerAliases`, ...)
+  - command: `IbSwingTrader/App/Commands/BuildDatasetCommand.cs`
 - `clean-up`
   - removes stale files and legacy rows
 
