@@ -221,6 +221,35 @@ but the trade decision changes with timeframe. Use the real band series
 (`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
 shape, then use timeframe context to decide ranking strength and trade profile.
 
+### Open direction (2026-08-10, unvalidated): band-kink as a general reversal precursor
+
+The user's working heuristic from live chart reading: a band's slope
+decelerating/kinking — not yet reversing outright, just losing its prior
+acceleration — is an early reversal warning, symmetric on the upper and lower
+bands, with a kink/break of the **mid** band treated as the more decisive of
+the two. Two same-day grounding examples:
+
+- `HELP` (Daily): upper-band day-over-day delta went +0.58 → +0.66 → +0.71 →
+  +0.55 (three days accelerating, then decelerating on the latest closed bar)
+  together with Daily RSI rolling from a peak of 86.26 to 83.52 — classic
+  blow-off-top geometry visible a full day before price actually cracked.
+  `IsLateBellUpPhase` missed this: it only ever checks H4 RSI/histogram, never
+  Daily, and even its H4 branch requires bands still violently widening
+  (`CalculateTerminalBandOpeningPct >= 4m`), so it structurally can't see an
+  orderly kink, only a violent blow-off.
+- `DKNG` (H4): after a flush through the lower band, two successive
+  deceleration kinks in the lower band (each on a small green candle,
+  each followed by a bigger bounce) preceded a mid-band break that flipped the
+  mid band's slope from falling to flat. Working name `ChannelReclaim`, not
+  yet formalized into a precise multi-candle criterion.
+
+This is a felt/experiential heuristic, not yet validated against
+`evaluation-dataset.csv` — treat "did any Daily/H4 band's bar-over-bar delta
+shrink relative to its own recent trend, especially the mid band" as a
+candidate general-purpose reversal-risk feature worth testing on its own once
+there is enough evaluation history, not something to wire into admission or
+ranking before that check comes back.
+
 Canonical Bell pattern pair:
 
 - `BellUp`: squeeze, launch, then late flattening/mean-reversion warning on the direct bullish form
