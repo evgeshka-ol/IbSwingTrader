@@ -93,6 +93,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             List<string> headers,
             CandidateDetails candidate)
         {
+            Add(row, headers, nameof(candidate.RecentDailyCloseSeries), FormatValue(candidate.RecentDailyCloseSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbUpperBandSeries), FormatValue(candidate.RecentDailyBbUpperBandSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbMidBandSeries), FormatValue(candidate.RecentDailyBbMidBandSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbLowerBandSeries), FormatValue(candidate.RecentDailyBbLowerBandSeries));

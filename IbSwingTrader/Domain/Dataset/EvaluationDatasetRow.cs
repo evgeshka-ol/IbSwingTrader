@@ -168,6 +168,7 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal? WeeklyMacdHistDelta { get; set; }
 
+        public List<decimal> RecentDailyCloseSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbLowerBandSeries { get; set; } = [];

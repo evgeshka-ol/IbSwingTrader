@@ -114,11 +114,11 @@
 
     "BuildDataset": {
         "MinimumCandlesRequired": 60,
-        "IncludeSyntheticTrades": true,
         "MaxParallelTickers": 3,
         "HistoryWarmupDays": 120,
         "FuturePaddingDays": 21,
-        "SyntheticEntryFractions": [ 0.25, 0.5, 0.75 ],
+        "FillMergeWindowMinutes": 30,
+        "MinimumEntryQuantity": 5,
         "TickerAliases": {
             "NYCB": "FLG"
         }
@@ -852,6 +852,10 @@
                 "Index": 6
             },
             {
+                "Name": "EntryQuantity",
+                "Index": 5
+            },
+            {
                 "Name": "ExitDate",
                 "Index": 10
             },
@@ -862,6 +866,10 @@
             {
                 "Name": "ExitPrice",
                 "Index": 13
+            },
+            {
+                "Name": "ExitQuantity",
+                "Index": 12
             },
             {
                 "Name": "IsShort",

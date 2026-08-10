@@ -12,9 +12,9 @@ namespace IbSwingTrader.App.Commands
         IAgentPathService pathService,
         ITextLogger logger) : ICommand
     {
-        private const int RecentDailySeriesLength = 12;
-        private const int RecentWeeklySeriesLength = 10;
-        private const int RecentH4SeriesLength = 16;
+        private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
+        private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
+        private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
 
         private readonly INormalizeReportsSettingsProvider _normalizeReportsSettingsProvider = normalizeReportsSettingsProvider;
         private readonly ICandidateFileService _candidateFileService = candidateFileService;

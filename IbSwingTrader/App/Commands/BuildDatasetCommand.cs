@@ -6,6 +6,7 @@ namespace IbSwingTrader.App.Commands
     public class BuildDatasetCommand : ICommand
     {
         private readonly ICsvTradeReader _csvTradeReader;
+        private readonly ITradePositionMerger _tradePositionMerger;
         private readonly ITwsConnection _connection;
         private readonly ICsvWriter _csvWriter;
         private readonly IContractResolver _contractResolver;
@@ -21,6 +22,7 @@ namespace IbSwingTrader.App.Commands
 
         public BuildDatasetCommand(
             ICsvTradeReader csvTradeReader,
+            ITradePositionMerger tradePositionMerger,
             ITwsConnection connection,
             ICsvWriter csvWriter,
             IContractResolver contractResolver,
@@ -32,6 +34,7 @@ namespace IbSwingTrader.App.Commands
             IFailedHistoryRequestTableFormatter failedHistoryRequestTableFormatter)
         {
             _csvTradeReader = csvTradeReader;
+            _tradePositionMerger = tradePositionMerger;
             _connection = connection;
             _csvWriter = csvWriter;
             _contractResolver = contractResolver;
@@ -50,11 +53,21 @@ namespace IbSwingTrader.App.Commands
             var tradesPath = _pathService.GetTradesFile();
             var datasetPath = _pathService.GetDatasetFile();
 
-            var trades = _csvTradeReader.Read(tradesPath);
+            var rawFills = _csvTradeReader.Read(tradesPath);
+
+            if (rawFills.Count == 0)
+            {
+                _logger.Error("No trades found");
+                return;
+            }
+
+            var trades = _tradePositionMerger.Merge(rawFills);
+
+            _logger.Info($"Raw fills: {rawFills.Count} -> merged trades: {trades.Count}");
 
             if (trades.Count == 0)
             {
-                _logger.Error("No trades found");
+                _logger.Error("No trades left after merging fills");
                 return;
             }
 

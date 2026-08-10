@@ -56,11 +56,17 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                     var entryTime = Get(parts, map, "EntryTime", rowIndex).Trim();
                     var entryPrice = ParseMoney(
                         Get(parts, map, "EntryPrice", rowIndex));
+                    var entryQuantity = int.Parse(
+                        Get(parts, map, "EntryQuantity", rowIndex).Trim(),
+                        CultureInfo.InvariantCulture);
 
                     var exitDate = Get(parts, map, "ExitDate", rowIndex).Trim();
                     var exitTime = Get(parts, map, "ExitTime", rowIndex).Trim();
                     var exitPrice = ParseMoney(
                         Get(parts, map, "ExitPrice", rowIndex));
+                    var exitQuantity = int.Parse(
+                        Get(parts, map, "ExitQuantity", rowIndex).Trim(),
+                        CultureInfo.InvariantCulture);
 
                     var isShortRaw = Get(parts, map, "IsShort", rowIndex).Trim();
                     var isShort = ParseIsShort(isShortRaw);
@@ -81,8 +87,10 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                         IsShort = isShort,
                         EntryTimeMarket = entryLocal,
                         EntryPrice = entryPrice,
+                        EntryQuantity = entryQuantity,
                         ExitTimeMarket = exitLocal,
                         ExitPrice = exitPrice,
+                        ExitQuantity = exitQuantity,
                         ProfitPercent = profitPercent,
                         HoldDays = holdDays
                     };
@@ -132,9 +140,11 @@ namespace IbSwingTrader.Infrastructure.Persistence.Csv
                 "EntryDate",
                 "EntryTime",
                 "EntryPrice",
+                "EntryQuantity",
                 "ExitDate",
                 "ExitTime",
                 "ExitPrice",
+                "ExitQuantity",
                 "IsShort"
             };
 

@@ -47,9 +47,9 @@ namespace IbSwingTrader.Application.Candidates
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
         private DateTime? _expectedLatestClosedDailyDate;
-        private const int RecentDailySeriesLength = 12;
-        private const int RecentWeeklySeriesLength = 10;
-        private const int RecentH4SeriesLength = 16;
+        private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
+        private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
+        private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -1431,20 +1431,23 @@ namespace IbSwingTrader.Application.Candidates
                    bellPatternSignal.Timeframe is BellPatternTimeframe.H4 or BellPatternTimeframe.Daily;
         }
 
+        private static BollingerFigureDirection ParseDirection(string direction)
+            => Enum.Parse<BollingerFigureDirection>(direction);
+
         private static BellPatternSignal ClassifyBellPatternSignal(
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            var dailyKind = ClassifyBellPatternKindForTimeframe(
+            var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.DailyBbUpperBandSeries,
                 recentSeries.DailyBbMidBandSeries,
                 recentSeries.DailyBbLowerBandSeries,
-                bbState.Daily.Direction);
-            var h4Kind = ClassifyBellPatternKindForTimeframe(
+                ParseDirection(bbState.Daily.Direction));
+            var h4Kind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.H4BbUpperBandSeries,
                 recentSeries.H4BbMidBandSeries,
                 recentSeries.H4BbLowerBandSeries,
-                bbState.H4.Direction);
+                ParseDirection(bbState.H4.Direction));
 
             if (dailyKind == BellPatternKind.BellUp &&
                 h4Kind == BellPatternKind.BellUp &&
@@ -1454,14 +1457,14 @@ namespace IbSwingTrader.Application.Candidates
                 return new BellPatternSignal(BellPatternKind.BellUp, BellPatternTimeframe.Daily);
             }
 
-            var bellUpSignal = SelectBellPatternSignal(
+            var bellUpSignal = BellPatternClassifier.SelectBellPatternSignal(
                 dailyKind,
                 h4Kind,
                 BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
                 return bellUpSignal;
 
-            var bellDownSignal = SelectBellPatternSignal(
+            var bellDownSignal = BellPatternClassifier.SelectBellPatternSignal(
                 dailyKind,
                 h4Kind,
                 BellPatternKind.BellDown);
@@ -1472,231 +1475,6 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
             => ClassifyBellPatternSignal(bbState, recentSeries).Kind;
-
-        private static BellPatternSignal SelectBellPatternSignal(
-            BellPatternKind dailyKind,
-            BellPatternKind h4Kind,
-            BellPatternKind targetKind)
-        {
-            if (h4Kind == targetKind)
-                return new BellPatternSignal(targetKind, BellPatternTimeframe.H4);
-
-            if (dailyKind == targetKind)
-                return new BellPatternSignal(targetKind, BellPatternTimeframe.Daily);
-
-            return new BellPatternSignal(BellPatternKind.None, BellPatternTimeframe.None);
-        }
-
-        private static BellPatternKind ClassifyBellPatternKindForTimeframe(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower,
-            string direction)
-        {
-            if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
-                return BellPatternKind.None;
-
-            if (((IsBellUpEnvelope(prior, recent) &&
-                  IsBellUpCurveTurn(upper, mid, lower)) ||
-                 IsGradualBellUpLaunch(upper, mid, lower) ||
-                 IsExplosiveBellUpExpansion(upper, mid, lower)) &&
-                direction != nameof(BollingerFigureDirection.Down))
-            {
-                return BellPatternKind.BellUp;
-            }
-
-            if (IsBellDownEnvelope(prior, recent) &&
-                IsBellDownCurveTurn(upper, mid, lower) &&
-                direction != nameof(BollingerFigureDirection.Up))
-            {
-                return BellPatternKind.BellDown;
-            }
-
-            return BellPatternKind.None;
-        }
-
-        private static bool TryCalculateBellPhaseEnvelopes(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower,
-            out RealBollingerEnvelope prior,
-            out RealBollingerEnvelope recent)
-        {
-            prior = default;
-            recent = default;
-
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 6)
-                return false;
-
-            var half = count / 2;
-            if (half < 3)
-                return false;
-
-            var priorUpper = upper.Take(half).ToList();
-            var priorMid = mid.Take(half).ToList();
-            var priorLower = lower.Take(half).ToList();
-            var recentUpper = upper.Skip(half).ToList();
-            var recentMid = mid.Skip(half).ToList();
-            var recentLower = lower.Skip(half).ToList();
-
-            return TryCalculateRealBollingerEnvelope(priorUpper, priorMid, priorLower, out prior) &&
-                   TryCalculateRealBollingerEnvelope(recentUpper, recentMid, recentLower, out recent);
-        }
-
-        private static bool IsBellUpEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
-        {
-            var midAccelerating =
-                recent.MidMovePct > prior.MidMovePct;
-
-            var openExpanding =
-                recent.OpenPct > prior.OpenPct;
-            var meaningfulOpening =
-                recent.OpenPct >= 1m &&
-                recent.OpenPct >= Math.Abs(recent.MidMovePct) * 0.25m;
-
-            return midAccelerating &&
-                   openExpanding &&
-                   meaningfulOpening &&
-                   recent.UpperMovePct > recent.MidMovePct &&
-                   IsLowerBandLaggingForBellUp(recent);
-        }
-
-        private static bool IsLowerBandLaggingForBellUp(RealBollingerEnvelope recent)
-        {
-            return recent.LowerMovePct <= 0m ||
-                   recent.LowerMovePct <= recent.MidMovePct * 0.6m;
-        }
-
-        private static bool IsGradualBellUpLaunch(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
-        {
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 6)
-                return false;
-
-            var upperTailSlope = CalculateTailRelativeSlopePct(upper.ToList(), 4);
-            var midTailSlope = CalculateTailRelativeSlopePct(mid.ToList(), 4);
-            var lowerTailSlope = CalculateTailRelativeSlopePct(lower.ToList(), 4);
-            var width = upper
-                .TakeLast(count)
-                .Zip(lower.TakeLast(count), (u, l) => u - l)
-                .ToList();
-            var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
-
-            return midTailSlope > 0m &&
-                   upperTailSlope >= midTailSlope + 0.5m &&
-                   IsLowerBandLaggingForBellUp(new RealBollingerEnvelope(
-                       upperTailSlope,
-                       midTailSlope,
-                       lowerTailSlope,
-                       widthTailSlope)) &&
-                   widthTailSlope >= 5m &&
-                   width[^1] > width[^2];
-        }
-
-        private static bool IsExplosiveBellUpExpansion(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
-        {
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 6)
-                return false;
-
-            var upperTailSlope = CalculateTailRelativeSlopePct(upper.ToList(), 4);
-            var midTailSlope = CalculateTailRelativeSlopePct(mid.ToList(), 4);
-            var width = upper
-                .TakeLast(count)
-                .Zip(lower.TakeLast(count), (u, l) => u - l)
-                .ToList();
-            var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
-
-            return upperTailSlope >= 8m &&
-                   midTailSlope >= 5m &&
-                   widthTailSlope >= 8m &&
-                   upper[^1] > upper[^2] &&
-                   mid[^1] > mid[^2] &&
-                   width[^1] > width[^2];
-        }
-
-        private static bool IsBellUpCurveTurn(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
-        {
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 4)
-                return false;
-
-            var upperTail = upper.TakeLast(4).ToArray();
-            var midTail = mid.TakeLast(4).ToArray();
-            var lowerTail = lower.TakeLast(4).ToArray();
-
-            var upperPrevDelta = upperTail[2] - upperTail[1];
-            var upperLastDelta = upperTail[3] - upperTail[2];
-            var midPrevDelta = midTail[2] - midTail[1];
-            var midLastDelta = midTail[3] - midTail[2];
-            var lowerPrevDelta = lowerTail[2] - lowerTail[1];
-            var lowerLastDelta = lowerTail[3] - lowerTail[2];
-            var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
-            var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
-
-            return upperLastDelta > 0m &&
-                   upperLastDelta >= upperPrevDelta &&
-                   midLastDelta >= 0m &&
-                   midLastDelta >= midPrevDelta &&
-                   lowerLastDelta <= lowerPrevDelta &&
-                   widthLastDelta > 0m &&
-                   widthLastDelta >= widthPrevDelta;
-        }
-
-        private static bool IsBellDownEnvelope(RealBollingerEnvelope prior, RealBollingerEnvelope recent)
-        {
-            var midDecelerating =
-                recent.MidMovePct < prior.MidMovePct;
-
-            var openExpanding =
-                recent.OpenPct > prior.OpenPct;
-
-            return midDecelerating &&
-                   openExpanding &&
-                   recent.LowerMovePct < recent.MidMovePct &&
-                   recent.UpperMovePct >= recent.MidMovePct;
-        }
-
-        private static bool IsBellDownCurveTurn(
-            IReadOnlyList<decimal> upper,
-            IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
-        {
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            if (count < 4)
-                return false;
-
-            var upperTail = upper.TakeLast(4).ToArray();
-            var midTail = mid.TakeLast(4).ToArray();
-            var lowerTail = lower.TakeLast(4).ToArray();
-
-            var upperPrevDelta = upperTail[2] - upperTail[1];
-            var upperLastDelta = upperTail[3] - upperTail[2];
-            var midPrevDelta = midTail[2] - midTail[1];
-            var midLastDelta = midTail[3] - midTail[2];
-            var lowerPrevDelta = lowerTail[2] - lowerTail[1];
-            var lowerLastDelta = lowerTail[3] - lowerTail[2];
-            var widthPrevDelta = (upperTail[2] - lowerTail[2]) - (upperTail[1] - lowerTail[1]);
-            var widthLastDelta = (upperTail[3] - lowerTail[3]) - (upperTail[2] - lowerTail[2]);
-
-            return lowerLastDelta < 0m &&
-                   lowerLastDelta <= lowerPrevDelta &&
-                   midLastDelta <= 0m &&
-                   midLastDelta <= midPrevDelta &&
-                   upperLastDelta >= upperPrevDelta &&
-                   widthLastDelta > 0m &&
-                   widthLastDelta >= widthPrevDelta;
-        }
 
         private static bool IsBellUpPatternReadyNow(
             BellPatternSignal bellPatternSignal,
@@ -1728,11 +1506,11 @@ namespace IbSwingTrader.Application.Candidates
                 bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
                 return true;
 
-            if (ClassifyBellPatternKindForTimeframe(
+            if (BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                     recentSeries.H4BbUpperBandSeries,
                     recentSeries.H4BbMidBandSeries,
                     recentSeries.H4BbLowerBandSeries,
-                    bbState.H4.Direction) == BellPatternKind.BellUp)
+                    ParseDirection(bbState.H4.Direction)) == BellPatternKind.BellUp)
             {
                 return false;
             }
@@ -1797,44 +1575,7 @@ namespace IbSwingTrader.Application.Candidates
                 _ => []
             };
 
-            var count = Math.Min(upper.Count, lower.Count);
-            if (count < 6 || rsi.Count < count || macdHistogram.Count < count)
-                return false;
-
-            var upperDeltas = CalculateDeltas(upper.TakeLast(count).ToList());
-            var width = upper
-                .TakeLast(count)
-                .Zip(lower.TakeLast(count), (u, l) => u - l)
-                .ToList();
-            var widthDeltas = CalculateDeltas(width);
-            var rsiDeltas = CalculateDeltas(rsi.TakeLast(count).ToList());
-            var histogramDeltas = CalculateDeltas(macdHistogram.TakeLast(count).ToList());
-
-            for (var i = 1; i < upperDeltas.Count; i++)
-            {
-                var priorUpperMoveSum = upperDeltas
-                    .Take(i)
-                    .Select(Math.Abs)
-                    .Sum();
-                var priorWidthMoveSum = widthDeltas
-                    .Take(i)
-                    .Select(Math.Abs)
-                    .Sum();
-                var upperJumpDominates =
-                    upperDeltas[i] > 0m &&
-                    upperDeltas[i] > priorUpperMoveSum;
-                var widthJumpDominates =
-                    widthDeltas[i] > 0m &&
-                    widthDeltas[i] > priorWidthMoveSum;
-                var momentumJump =
-                    rsiDeltas[i] > 0m &&
-                    histogramDeltas[i] > 0m;
-
-                if (upperJumpDominates && widthJumpDominates && momentumJump)
-                    return true;
-            }
-
-            return false;
+            return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
         private static bool IsLateBellUpPhase(
@@ -1846,7 +1587,7 @@ namespace IbSwingTrader.Application.Candidates
             if (bellPatternSignal.Timeframe != BellPatternTimeframe.Daily)
                 return false;
 
-            var previousDailyBellUp = ClassifyBellPatternKindForTimeframe(
+            var previousDailyBellUp = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.DailyBbUpperBandSeries.SkipLast(1).ToList(),
                 recentSeries.DailyBbMidBandSeries.SkipLast(1).ToList(),
                 recentSeries.DailyBbLowerBandSeries.SkipLast(1).ToList(),
@@ -1938,19 +1679,19 @@ namespace IbSwingTrader.Application.Candidates
             return false;
         }
 
-        private static string ResolveSeriesDirection(IEnumerable<decimal> midSeries)
+        private static BollingerFigureDirection ResolveSeriesDirection(IEnumerable<decimal> midSeries)
         {
             var values = midSeries.ToList();
             if (values.Count < 2)
-                return nameof(BollingerFigureDirection.Flat);
+                return BollingerFigureDirection.Flat;
 
             if (values[^1] > values[0])
-                return nameof(BollingerFigureDirection.Up);
+                return BollingerFigureDirection.Up;
 
             if (values[^1] < values[0])
-                return nameof(BollingerFigureDirection.Down);
+                return BollingerFigureDirection.Down;
 
-            return nameof(BollingerFigureDirection.Flat);
+            return BollingerFigureDirection.Flat;
         }
 
         private static decimal CalculateTerminalBandOpeningPct(
@@ -2439,16 +2180,9 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private static bool IsBelowPreviousClosedDailyMid(RecentFeatureSeries recentSeries)
-        {
-            if (recentSeries.DailyCloseSeries.Count == 0 ||
-                recentSeries.DailyBbMidBandSeries.Count == 0 ||
-                recentSeries.DailyCloseSeries.Count != recentSeries.DailyBbMidBandSeries.Count)
-            {
-                return false;
-            }
-
-            return recentSeries.DailyCloseSeries[^1] < recentSeries.DailyBbMidBandSeries[^1];
-        }
+            => BellPatternClassifier.IsBelowPreviousClosedDailyMid(
+                recentSeries.DailyCloseSeries,
+                recentSeries.DailyBbMidBandSeries);
 
         private bool IsReversalRecoveryTradeProfile(
             CandidateSignalSnapshot snapshot,
@@ -3456,6 +3190,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 Ticker = stock.Ticker,
                 IsFromWishlist = isFromWishlist,
+                RecentDailyCloseSeries = recentSeries.DailyCloseSeries,
                 RecentDailyBbUpperBandSeries = recentSeries.DailyBbUpperBandSeries,
                 RecentDailyBbMidBandSeries = recentSeries.DailyBbMidBandSeries,
                 RecentDailyBbLowerBandSeries = recentSeries.DailyBbLowerBandSeries,
@@ -4534,32 +4269,7 @@ namespace IbSwingTrader.Application.Candidates
             IReadOnlyList<decimal> mid,
             IReadOnlyList<decimal> lower,
             out RealBollingerEnvelope envelope)
-        {
-            envelope = default;
-
-            if (upper.Count < 4 || mid.Count < 4 || lower.Count < 4)
-                return false;
-
-            var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
-            var upperTail = upper.TakeLast(count).ToArray();
-            var midTail = mid.TakeLast(count).ToArray();
-            var lowerTail = lower.TakeLast(count).ToArray();
-            var baseMid = midTail[0];
-
-            if (baseMid <= 0m)
-                return false;
-
-            var upperMovePct = (upperTail[^1] - upperTail[0]) / baseMid * 100m;
-            var midMovePct = (midTail[^1] - midTail[0]) / baseMid * 100m;
-            var lowerMovePct = (lowerTail[^1] - lowerTail[0]) / baseMid * 100m;
-
-            envelope = new RealBollingerEnvelope(
-                upperMovePct,
-                midMovePct,
-                lowerMovePct,
-                upperMovePct - lowerMovePct);
-            return true;
-        }
+            => BellPatternClassifier.TryCalculateRealBollingerEnvelope(upper, mid, lower, out envelope);
 
         private bool PassFinalAmplitudeProxyGate(
             WishListContext ctx,
@@ -5534,34 +5244,13 @@ namespace IbSwingTrader.Application.Candidates
                series[^1] <= series[^2];
 
         private static decimal CalculateSlope(List<decimal> series)
-            => series.Count >= 2
-                ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero)
-                : 0m;
+            => BellPatternClassifier.CalculateSlope(series);
 
         private static decimal CalculateRelativeSlopePct(List<decimal> series)
-        {
-            if (series.Count < 2)
-                return 0m;
-
-            var first = series[0];
-            if (first == 0m)
-                return CalculateSlope(series);
-
-            return decimal.Round((series[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
-        }
+            => BellPatternClassifier.CalculateRelativeSlopePct(series);
 
         private static decimal CalculateTailRelativeSlopePct(List<decimal> series, int lookback)
-        {
-            if (series.Count < 2)
-                return 0m;
-
-            var tail = series.TakeLast(Math.Max(2, lookback)).ToList();
-            var first = tail[0];
-            if (first == 0m)
-                return CalculateTailSlope(series, lookback);
-
-            return decimal.Round((tail[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
-        }
+            => BellPatternClassifier.CalculateTailRelativeSlopePct(series, lookback);
 
         private static decimal CalculateTailBandWidthDeltaPct(
             List<decimal> upper,
@@ -5586,37 +5275,13 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private static decimal CalculateTailSlope(List<decimal> series, int lookback)
-        {
-            if (series.Count < 2)
-                return 0m;
-
-            var tail = series.TakeLast(Math.Max(2, lookback)).ToList();
-            return decimal.Round(tail[^1] - tail[0], 2, MidpointRounding.AwayFromZero);
-        }
+            => BellPatternClassifier.CalculateTailSlope(series, lookback);
 
         private static decimal CalculateSegmentRelativeSlopePct(
             List<decimal> series,
             int lookback,
             int offsetFromEnd)
-        {
-            var segmentLength = Math.Max(2, lookback);
-            if (series.Count < segmentLength + offsetFromEnd)
-                return 0m;
-
-            var segment = series
-                .Skip(series.Count - offsetFromEnd - segmentLength)
-                .Take(segmentLength)
-                .ToList();
-
-            if (segment.Count < 2)
-                return 0m;
-
-            var first = segment[0];
-            if (first == 0m)
-                return CalculateTailSlope(segment, segmentLength);
-
-            return decimal.Round((segment[^1] - first) / Math.Abs(first) * 100m, 2, MidpointRounding.AwayFromZero);
-        }
+            => BellPatternClassifier.CalculateSegmentRelativeSlopePct(series, lookback, offsetFromEnd);
 
         private static bool IsBullishBandKink(
             decimal priorSlopePct,
@@ -5687,183 +5352,37 @@ namespace IbSwingTrader.Application.Candidates
             RecentFeatureSeries recentSeries,
             out string diagnostics)
         {
-            diagnostics = string.Empty;
-
-            if (!IsBelowPreviousClosedDailyMid(recentSeries))
-            {
-                diagnostics = "Reason=not-below-daily-mid";
-                return false;
-            }
-
             var upper = recentSeries.DailyBbUpperBandSeries;
             var mid = recentSeries.DailyBbMidBandSeries;
             var lower = recentSeries.DailyBbLowerBandSeries;
-            var rsi = recentSeries.DailyRsiSeries;
-            var macdLine = recentSeries.DailyMacdLineSeries;
-            var macdSignal = recentSeries.DailyMacdSignalSeries;
-            var macdHistogram = PreferSeries(
-                recentSeries.DailyMacdHistogramSeries,
-                recentSeries.DailyMacdHistogramSeries);
+            var macdHistogram = recentSeries.DailyMacdHistogramSeries;
 
-            if (upper.Count < 6 ||
-                mid.Count < 6 ||
-                lower.Count < 6 ||
-                macdHistogram.Count < 4)
+            var result = BellPatternClassifier.IsReversalHookPattern(
+                recentSeries.DailyCloseSeries,
+                upper,
+                mid,
+                lower,
+                recentSeries.DailyRsiSeries,
+                recentSeries.DailyMacdLineSeries,
+                recentSeries.DailyMacdSignalSeries,
+                macdHistogram,
+                out diagnostics);
+
+            if (upper.Count >= 6 && mid.Count >= 6 && lower.Count >= 6 && macdHistogram.Count >= 4)
             {
-                diagnostics =
-                    $"Reason=not-enough-daily-rows, " +
-                    $"UpperCount={upper.Count}, MidCount={mid.Count}, LowerCount={lower.Count}, " +
-                    $"MacdHistogramCount={macdHistogram.Count}";
-                return false;
+                diagnostics +=
+                    $", LowerDeltasTail={FormatTail(CalculateDeltas(lower), 4)}, " +
+                    $"MidDeltasTail={FormatTail(CalculateDeltas(mid), 4)}, " +
+                    $"MacdHistogramTail={FormatTail(macdHistogram, 4)}";
             }
 
-            var lowerDeltas = CalculateDeltas(lower);
-            var midDeltas = CalculateDeltas(mid);
-            var histogramDeltas = CalculateDeltas(macdHistogram);
-
-            var lowerRecent = lowerDeltas.TakeLast(3).ToList();
-            var lowerPrior = lowerDeltas.Take(Math.Max(0, lowerDeltas.Count - 2)).TakeLast(5).ToList();
-            var lowerBrokeDown = lowerPrior.Any(x => x < 0m) || lowerDeltas.TakeLast(5).Any(x => x < 0m);
-            var lowerHookStrengthPct = CalculateTailRelativeSlopePct(lower, 3);
-            var lowerHooked =
-                lowerRecent.Count >= 2 &&
-                lowerRecent.Count(x => x >= 0m) >= 2 &&
-                lowerRecent[^1] >= 0m;
-            var lowerHookStrong = lowerHooked && lowerHookStrengthPct >= 0.8m;
-            var lowerHookEmerging =
-                lowerRecent.Count >= 3 &&
-                lowerRecent[^1] < 0m &&
-                lowerRecent[^1] > lowerRecent[^2] &&
-                lowerRecent[^2] > lowerRecent[^3];
-            var lowerHookTurning =
-                lowerRecent.Count >= 3 &&
-                lowerRecent[^1] >= 0m &&
-                lowerRecent[^2] < 0m &&
-                lowerRecent[^2] > lowerRecent[^3];
-            var lowerHookFresh =
-                lowerRecent.Count >= 2 &&
-                lowerRecent.Take(lowerRecent.Count - 1).Any(x => x < 0m);
-
-            var midRecent = midDeltas.TakeLast(3).ToList();
-            var midPrior = midDeltas.Take(Math.Max(0, midDeltas.Count - 2)).TakeLast(5).ToList();
-            var midWorstPrior = midPrior.Count > 0 ? midPrior.Min() : 0m;
-            var midRecentSlopePct = CalculateTailRelativeSlopePct(mid, 3);
-            var midPriorSlopePct = CalculateSegmentRelativeSlopePct(mid, 3, 3);
-            var midDecelerated =
-                midRecentSlopePct >= 0m ||
-                (midPriorSlopePct < 0m &&
-                 midRecentSlopePct < 0m &&
-                 Math.Abs(midRecentSlopePct) <= Math.Abs(midPriorSlopePct) * 0.65m);
-            var midHooked =
-                midRecent.Count >= 2 &&
-                (midRecent[^1] >= 0m ||
-                 midRecent[^1] > midWorstPrior ||
-                 midRecent[^1] >= midRecent[^2]);
-
-            var currentWidth = upper[^1] - lower[^1];
-            var previousWidth = upper[^4] - lower[^4];
-            var bandCompression = currentWidth < previousWidth;
-
-            var histogramRecent = histogramDeltas.TakeLast(3).ToList();
-            var histogramTurnsUp =
-                histogramRecent.Count >= 2 &&
-                histogramRecent.Count(x => x > 0m) >= 2 &&
-                macdHistogram[^1] > macdHistogram[^3];
-
-            var macdConverges = false;
-            if (macdLine.Count >= 4 && macdSignal.Count >= 4)
-            {
-                var pairCount = Math.Min(macdLine.Count, macdSignal.Count);
-                var macdGap = macdLine
-                    .TakeLast(pairCount)
-                    .Zip(macdSignal.TakeLast(pairCount), (line, signal) => line - signal)
-                    .ToList();
-
-                macdConverges =
-                    macdGap.Count >= 3 &&
-                    macdGap[^1] > macdGap[^2] &&
-                    macdGap[^2] >= macdGap[^3];
-            }
-            else
-            {
-                macdConverges = histogramTurnsUp;
-            }
-
-            var rsiTurnsUp =
-                rsi.Count < 4 ||
-                (rsi[^1] > rsi[^2] &&
-                 rsi[^1] > rsi.TakeLast(4).Min());
-            var priceTurnsTowardMid = IsPriceTurningTowardDailyMid(recentSeries);
-            var midContextOk = midHooked && (midDecelerated || lowerHookTurning);
-
-            diagnostics =
-                $"LowerBrokeDown={lowerBrokeDown}, " +
-                $"LowerHooked={lowerHooked}, " +
-                $"LowerHookStrong={lowerHookStrong}, " +
-                $"LowerHookEmerging={lowerHookEmerging}, " +
-                $"LowerHookTurning={lowerHookTurning}, " +
-                $"LowerHookFresh={lowerHookFresh}, " +
-                $"MidHooked={midHooked}, " +
-                $"MidDecelerated={midDecelerated}, " +
-                $"MidContextOk={midContextOk}, " +
-                $"PriceTurnsTowardMid={priceTurnsTowardMid}, " +
-                $"BandCompression={bandCompression}, " +
-                $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
-                $"MacdConverges={macdConverges}, " +
-                $"RsiTurnsUp={rsiTurnsUp}, " +
-                $"LowerHookStrengthPct={lowerHookStrengthPct}, " +
-                $"MidRecentSlopePct={midRecentSlopePct}, " +
-                $"MidPriorSlopePct={midPriorSlopePct}, " +
-                $"LowerDeltasTail={FormatTail(lowerDeltas, 4)}, " +
-                $"MidDeltasTail={FormatTail(midDeltas, 4)}, " +
-                $"MacdHistogramTail={FormatTail(macdHistogram, 4)}";
-
-            return lowerBrokeDown &&
-                   (lowerHookStrong || lowerHookEmerging || lowerHookTurning) &&
-                   lowerHookFresh &&
-                   midContextOk &&
-                   priceTurnsTowardMid &&
-                   bandCompression &&
-                   (histogramTurnsUp || macdConverges || lowerHookEmerging) &&
-                   rsiTurnsUp;
+            return result;
         }
 
         private static bool IsPriceTurningTowardDailyMid(RecentFeatureSeries recentSeries)
-        {
-            var close = recentSeries.DailyCloseSeries;
-            var mid = recentSeries.DailyBbMidBandSeries;
-            var count = Math.Min(close.Count, mid.Count);
-            if (count < 4)
-                return false;
-
-            var alignedClose = close.TakeLast(count).ToList();
-            var alignedMid = mid.TakeLast(count).ToList();
-            if (alignedClose[^1] >= alignedMid[^1])
-                return false;
-
-            var latestClose = alignedClose[^1];
-            var previousClose = alignedClose[^2];
-            var recentLowBeforeLatest = alignedClose
-                .Take(count - 1)
-                .TakeLast(4)
-                .Min();
-            var priceStoppedFalling =
-                latestClose >= previousClose ||
-                latestClose > recentLowBeforeLatest;
-
-            var distances = alignedClose
-                .Zip(alignedMid, (c, m) => m - c)
-                .Where(x => x > 0m)
-                .ToList();
-            if (distances.Count < 3)
-                return false;
-
-            var distanceCompressing =
-                distances[^1] < distances[^2] &&
-                distances[^1] < distances[^3];
-
-            return priceStoppedFalling && distanceCompressing;
-        }
+            => BellPatternClassifier.IsPriceTurningTowardDailyMid(
+                recentSeries.DailyCloseSeries,
+                recentSeries.DailyBbMidBandSeries);
 
         private static bool IsRealBollingerLaunch(
             decimal midSlopePct,
@@ -5875,20 +5394,8 @@ namespace IbSwingTrader.Application.Candidates
                    lowerSlopePct <= midSlopePct;
         }
 
-        private static List<decimal> PreferSeries(List<decimal> preferred, List<decimal> fallback)
-            => preferred.Count > 0 ? preferred : fallback;
-
         private static List<decimal> CalculateDeltas(List<decimal> series)
-        {
-            if (series.Count < 2)
-                return [];
-
-            var deltas = new List<decimal>(series.Count - 1);
-            for (var i = 1; i < series.Count; i++)
-                deltas.Add(series[i] - series[i - 1]);
-
-            return deltas;
-        }
+            => BellPatternClassifier.CalculateDeltas(series);
 
         private static string FormatTail(List<decimal> series, int count)
         {
@@ -7654,30 +7161,12 @@ namespace IbSwingTrader.Application.Candidates
             LowAmplitudeSameDay
         }
 
-        private enum BellPatternKind
-        {
-            None,
-            BellUp,
-            BellDown
-        }
-
-        private enum BellPatternTimeframe
-        {
-            None,
-            H4,
-            Daily
-        }
-
         private enum DailyFamilySplit
         {
             Unknown,
             TodayResearchLike,
             Reversal
         }
-
-        private readonly record struct BellPatternSignal(
-            BellPatternKind Kind,
-            BellPatternTimeframe Timeframe);
 
         private enum TodayResearchLikePatternKind
         {
@@ -7693,12 +7182,6 @@ namespace IbSwingTrader.Application.Candidates
             SeriesTemplateFamily Family,
             decimal AmplitudePct,
             SeriesFeatureSet Features);
-
-        private readonly record struct RealBollingerEnvelope(
-            decimal UpperMovePct,
-            decimal MidMovePct,
-            decimal LowerMovePct,
-            decimal OpenPct);
 
         private readonly record struct DailySplitDiagnostic(
             string Source,

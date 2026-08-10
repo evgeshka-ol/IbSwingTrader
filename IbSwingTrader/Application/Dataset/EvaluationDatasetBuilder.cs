@@ -17,9 +17,9 @@ namespace IbSwingTrader.Application.Dataset
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
         private const int ProgressLogInterval = 250;
-        private const int RecentDailySeriesLength = 12;
-        private const int RecentWeeklySeriesLength = 10;
-        private const int RecentH4SeriesLength = 16;
+        private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
+        private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
+        private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
@@ -471,6 +471,7 @@ namespace IbSwingTrader.Application.Dataset
                 DailyTrendPosition = candidate?.Diagnostics?.DailyTrendPosition,
                 BbMidSignedDistancePct = candidate?.Diagnostics?.BBMidSignedDistancePct,
                 WeeklyMacdHistDelta = candidate?.Diagnostics?.WeeklyMACDHistDelta,
+                RecentDailyCloseSeries = ResolveSeries(candidate?.RecentDailyCloseSeries, evaluation.RecentDailyCloseSeries, recentSeries?.DailyCloseSeries),
                 RecentDailyBbUpperBandSeries = ResolveSeries(candidate?.RecentDailyBbUpperBandSeries, evaluation.RecentDailyBbUpperBandSeries, recentSeries?.DailyBbUpperBandSeries),
                 RecentDailyBbMidBandSeries = ResolveSeries(candidate?.RecentDailyBbMidBandSeries, evaluation.RecentDailyBbMidBandSeries, recentSeries?.DailyBbMidBandSeries),
                 RecentDailyBbLowerBandSeries = ResolveSeries(candidate?.RecentDailyBbLowerBandSeries, evaluation.RecentDailyBbLowerBandSeries, recentSeries?.DailyBbLowerBandSeries),
@@ -713,6 +714,7 @@ namespace IbSwingTrader.Application.Dataset
 
             return new RecentFeatureSeries
             {
+                DailyCloseSeries = BuildRecentDailyCloseSeries(ordered, scanIndex),
                 DailyBbUpperBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerUpperBand),
                 DailyBbMidBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerMidBand),
                 DailyBbLowerBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerLowerBand),
@@ -758,6 +760,28 @@ namespace IbSwingTrader.Application.Dataset
 
             indexes.Reverse();
             return [.. indexes.Select(i => Round(selector(_featureEngine.Calculate(candles, i + 1))))];
+        }
+
+        private List<decimal> BuildRecentDailyCloseSeries(
+            List<Candle> candles,
+            int scanIndex)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => Round(candles[i].Close))];
         }
 
         private List<decimal> BuildRecentWeeklySeries(
@@ -1418,6 +1442,7 @@ namespace IbSwingTrader.Application.Dataset
 
         private sealed class RecentFeatureSeries
         {
+            public List<decimal> DailyCloseSeries { get; init; } = [];
             public List<decimal> DailyBbUpperBandSeries { get; init; } = [];
             public List<decimal> DailyBbMidBandSeries { get; init; } = [];
             public List<decimal> DailyBbLowerBandSeries { get; init; } = [];

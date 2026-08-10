@@ -3,7 +3,15 @@
     "allow": [
       "Bash(python3 *)",
       "Bash(dotnet build *)",
-      "Bash(git -C /mnt/c/Git_Home/IbSwingTrader diff --stat -- docs/)"
+      "Bash(git -C /mnt/c/Git_Home/IbSwingTrader diff --stat -- docs/)",
+      "Bash(xargs -I{} sh -c 'echo \"{}\"; ls -la \"{}\"; head -2 \"{}\" | cut -c1-500; echo')",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(grep -n '\": {$' /mnt/c/Git_Home/IbSwingTrader/IbSwingTrader/agentsettings.json)",
+      "Bash(awk -F'\"' '{print $0}')",
+      "Bash(awk 'NR==1||/private \\(static \\)?\\(bool|decimal|string|void|TodayResearchLikePatternKind|SeriesEntryProfileDecision|BellPatternSignal|BellPatternKind\\)/{print NR\": \"$0}' IbSwingTrader/Application/Candidates/CandidateFinder.cs)",
+      "Bash(awk -F: '$1<7300 && $1>1000')",
+      "Bash(sort -t'|' -k2 -rn)",
+      "Bash(git config *)"
     ]
   }
 }

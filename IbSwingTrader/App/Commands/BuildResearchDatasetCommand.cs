@@ -40,9 +40,9 @@ namespace IbSwingTrader.App.Commands
         private readonly IFailedHistoryRequestTableFormatter _failedHistoryRequestTableFormatter = failedHistoryRequestTableFormatter;
 
         private readonly ConcurrentBag<FailedHistoryRequest> _failedRequests = [];
-        private const int RecentDailySeriesLength = 12;
-        private const int RecentWeeklySeriesLength = 10;
-        private const int RecentH4SeriesLength = 16;
+        private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
+        private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
+        private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
 
         public async Task RunAsync()
         {

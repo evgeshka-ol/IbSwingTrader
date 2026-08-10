@@ -64,6 +64,7 @@ namespace IbSwingTrader.App.Bootstrap
 
             // dataset / analysis
             services.AddSingleton<ICsvTradeReader, CsvTradeReader>();
+            services.AddSingleton<ITradePositionMerger, TradePositionMerger>();
             services.AddSingleton<IFeatureEngine, FeatureEngine>();
             services.AddSingleton<ICsvWriter, CsvDatasetWriter>();
             services.AddSingleton<IEvaluationDatasetCsvService, EvaluationDatasetCsvService>();

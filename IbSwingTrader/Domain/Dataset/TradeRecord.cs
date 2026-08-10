@@ -6,9 +6,11 @@ namespace IbSwingTrader.Domain.Dataset
 
         public DateTime EntryTimeMarket { get; set; }
         public decimal EntryPrice { get; set; }
+        public int EntryQuantity { get; set; }
 
         public DateTime ExitTimeMarket { get; set; }
         public decimal ExitPrice { get; set; }
+        public int ExitQuantity { get; set; }
 
         public decimal ProfitPercent { get; set; }
 

@@ -12,6 +12,7 @@ namespace IbSwingTrader.Domain.Candidates
         public string DetectedPattern { get; set; } = string.Empty;
         public string PatternVerdict { get; set; } = string.Empty;
         public string PatternVerdictReason { get; set; } = string.Empty;
+        public List<decimal> RecentDailyCloseSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbLowerBandSeries { get; set; } = [];
