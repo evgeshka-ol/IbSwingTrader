@@ -35,6 +35,17 @@ namespace IbSwingTrader.Application.Market
                 {
                     if (IsExpectedWeekendTransition(previousLocal, currentLocal))
                         return true;
+
+                    if (await IsExpectedDailyScheduleGapAsync(
+                            contract,
+                            previousBarUtc,
+                            currentBarUtc,
+                            previousLocal,
+                            currentLocal,
+                            cancellationToken))
+                    {
+                        return true;
+                    }
                 }
 
                 var nextExpectedNonIntraday = previousBarUtc + timeframe.ToTimeSpan();
@@ -376,6 +387,38 @@ namespace IbSwingTrader.Application.Market
 
             return previousLocal.DayOfWeek == DayOfWeek.Friday &&
                    (currentLocal.DayOfWeek == DayOfWeek.Monday || currentLocal.DayOfWeek == DayOfWeek.Sunday);
+        }
+
+        // A D1 gap is expected whenever every calendar day strictly between the two bars was a
+        // non-trading day (weekend or configured holiday) — not only the plain Friday->Monday case.
+        // This covers holidays that fall mid-week (e.g. a Monday holiday makes the prior bar Friday
+        // and the next bar Tuesday, which IsExpectedWeekendTransition does not recognize).
+        private async Task<bool> IsExpectedDailyScheduleGapAsync(
+            Contract contract,
+            DateTime previousBarUtc,
+            DateTime currentBarUtc,
+            DateTime previousLocal,
+            DateTime currentLocal,
+            CancellationToken cancellationToken)
+        {
+            var previousDate = DateOnly.FromDateTime(previousLocal.Date);
+            var currentDate = DateOnly.FromDateTime(currentLocal.Date);
+
+            if (currentDate <= previousDate)
+                return false;
+
+            var schedule = await _marketScheduleResolver.GetScheduleAsync(
+                contract,
+                previousBarUtc,
+                currentBarUtc,
+                cancellationToken);
+
+            var skippedTradingDay = schedule.Days.Any(x =>
+                x.Date > previousDate &&
+                x.Date < currentDate &&
+                x.IsTradingDay);
+
+            return !skippedTradingDay;
         }
 
         private static bool IsWithinAllowedSessions(
