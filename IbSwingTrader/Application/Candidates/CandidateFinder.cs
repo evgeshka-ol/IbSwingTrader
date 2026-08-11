@@ -1592,6 +1592,24 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.DailyBbMidBandSeries.SkipLast(1).ToList(),
                 recentSeries.DailyBbLowerBandSeries.SkipLast(1).ToList(),
                 ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries.SkipLast(1)));
+
+            // Validated 2026-08-11 against evaluation-dataset.csv (AUC=0.61 for Runaway Win/Loss,
+            // n=285): a Daily RSI rollover from its own recent peak is a real signal on its own,
+            // independent of the H4-based checks below and of whether H4 bands are still expanding.
+            // The band-slope deceleration itself tested weak (AUC=0.54) - RSI is what carries this.
+            var dailyRsi = recentSeries.DailyRsiSeries;
+            if (dailyRsi.Count >= 2)
+            {
+                var recentDailyRsiPeak = dailyRsi.TakeLast(Math.Min(4, dailyRsi.Count)).Max();
+                var dailyRsiRollingOver = dailyRsi[^1] < dailyRsi[^2];
+
+                if (recentDailyRsiPeak >= 70m && dailyRsiRollingOver)
+                {
+                    reason = "Daily RSI has already rolled over from a recent peak";
+                    return true;
+                }
+            }
+
             var h4Rsi = recentSeries.H4RsiSeries;
             var h4Histogram = recentSeries.H4MacdHistogramSeries;
             if (h4Rsi.Count < 2 || h4Histogram.Count < 2)

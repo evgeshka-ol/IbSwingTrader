@@ -16,7 +16,8 @@
       "Bash(git check-ignore *)",
       "Bash(find / -iname \"evaluation-dataset*.csv*\")",
       "Bash(grep -v \"^/mnt/c/Git_Home/IbSwingTrader/Data/datasets/evaluation-dataset.csv$\")",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(xxd)"
     ]
   }
 }
