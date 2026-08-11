@@ -123,7 +123,24 @@ Performance lever for research generation.
 
 ### `BuildEvaluationDataset.RecentScanDays`
 
-Limits active rebuild window.
+Limits active rebuild window, applied in `EvaluationDatasetBuilder.UpsertAsync`
+(the path used by `evaluate-candidates`).
+
+Since 2026-08-11 the cutoff is anchored to the latest `ScanTime` already
+present in `evaluation-dataset.csv` before the run, not to wall-clock "now".
+A gap between runs longer than `RecentScanDays` must not retroactively prune
+already-saved history that was inside the window when it was last written —
+the window only advances with actual run activity, as if the gap had not
+happened. (Previously it used `Now()`, so a long gap between runs silently
+dropped an entire block of older history in one run instead of aging it out
+gradually; this cost a month of `evaluation-dataset.csv` history on
+2026-08-11, recovered from a stale `Data/evaluation-dataset.xlsx` export.)
+
+`EvaluationDatasetBuilder.RunAsync` (used by the currently-unreachable
+`NormalizeEvaluationsCommand`, not wired to any CLI command in `Program.cs`)
+has its own, different `RecentScanDays` filter on the raw evaluations input
+and was not touched by this fix — it isn't reachable today, so it isn't an
+active risk, but revisit it if that command ever gets wired up.
 
 ### `BuildEvaluationDataset.BackfillLegacyNoEntryZeroAmplitudeDays`
 

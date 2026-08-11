@@ -11,7 +11,12 @@
       "Bash(awk 'NR==1||/private \\(static \\)?\\(bool|decimal|string|void|TodayResearchLikePatternKind|SeriesEntryProfileDecision|BellPatternSignal|BellPatternKind\\)/{print NR\": \"$0}' IbSwingTrader/Application/Candidates/CandidateFinder.cs)",
       "Bash(awk -F: '$1<7300 && $1>1000')",
       "Bash(sort -t'|' -k2 -rn)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(xargs cat)",
+      "Bash(git check-ignore *)",
+      "Bash(find / -iname \"evaluation-dataset*.csv*\")",
+      "Bash(grep -v \"^/mnt/c/Git_Home/IbSwingTrader/Data/datasets/evaluation-dataset.csv$\")",
+      "Bash(pip install *)"
     ]
   }
 }
