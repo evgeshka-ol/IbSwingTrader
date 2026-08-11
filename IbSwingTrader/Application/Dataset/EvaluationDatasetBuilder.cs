@@ -100,7 +100,14 @@ namespace IbSwingTrader.Application.Dataset
 
             if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
             {
-                var recentCutoff = MarketTime.Now().Date.AddDays(-settings.RecentScanDays.Value);
+                // Anchor the rolling window to the dataset's own prior coverage, not wall-clock
+                // "now". A long gap between runs must not retroactively prune history that was
+                // already inside the window when it was last saved; the window only advances
+                // with actual run activity, same as if the gap had not happened.
+                var priorReferenceDate = existingRows.Count > 0
+                    ? existingRows.Max(x => x.ScanTime.Date)
+                    : MarketTime.Now().Date;
+                var recentCutoff = priorReferenceDate.AddDays(-settings.RecentScanDays.Value);
                 mergedRows = [.. mergedRows.Where(x => x.ScanTime >= recentCutoff)];
             }
 
