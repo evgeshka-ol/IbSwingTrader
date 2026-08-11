@@ -221,34 +221,41 @@ but the trade decision changes with timeframe. Use the real band series
 (`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
 shape, then use timeframe context to decide ranking strength and trade profile.
 
-### Open direction (2026-08-10, unvalidated): band-kink as a general reversal precursor
+### Band-kink direction: validated in part, implemented (2026-08-11)
 
-The user's working heuristic from live chart reading: a band's slope
-decelerating/kinking — not yet reversing outright, just losing its prior
-acceleration — is an early reversal warning, symmetric on the upper and lower
-bands, with a kink/break of the **mid** band treated as the more decisive of
-the two. Two same-day grounding examples:
+Origin: the user's working heuristic from live chart reading on 2026-08-10 —
+a band's slope decelerating/kinking is an early reversal warning, symmetric on
+the upper and lower bands, with a kink/break of the **mid** band treated as
+the more decisive of the two. Two grounding examples: `HELP` (Daily upper-band
+delta decelerated +0.58→+0.66→+0.71→+0.55 alongside Daily RSI rolling from a
+peak of 86.26 to 83.52, a full day before price cracked) and `DKNG` (H4, two
+successive lower-band deceleration kinks preceding a mid-band break — working
+name `ChannelReclaim`, never formalized past a draft).
 
-- `HELP` (Daily): upper-band day-over-day delta went +0.58 → +0.66 → +0.71 →
-  +0.55 (three days accelerating, then decelerating on the latest closed bar)
-  together with Daily RSI rolling from a peak of 86.26 to 83.52 — classic
-  blow-off-top geometry visible a full day before price actually cracked.
-  `IsLateBellUpPhase` missed this: it only ever checks H4 RSI/histogram, never
-  Daily, and even its H4 branch requires bands still violently widening
-  (`CalculateTerminalBandOpeningPct >= 4m`), so it structurally can't see an
-  orderly kink, only a violent blow-off.
-- `DKNG` (H4): after a flush through the lower band, two successive
-  deceleration kinks in the lower band (each on a small green candle,
-  each followed by a bigger bounce) preceded a mid-band break that flipped the
-  mid band's slope from falling to flat. Working name `ChannelReclaim`, not
-  yet formalized into a precise multi-candle criterion.
+Validated against `evaluation-dataset.csv` on 2026-08-11 (285 decided Runaway
+Win/Loss rows) by decomposing the heuristic into independent pieces:
 
-This is a felt/experiential heuristic, not yet validated against
-`evaluation-dataset.csv` — treat "did any Daily/H4 band's bar-over-bar delta
-shrink relative to its own recent trend, especially the mid band" as a
-candidate general-purpose reversal-risk feature worth testing on its own once
-there is enough evaluation history, not something to wire into admission or
-ranking before that check comes back.
+- **Daily RSI rolled over from its own recent peak: AUC=0.61** — real,
+  comparable in strength to the Daily/H4 slope features already driving
+  `RankingQualityScore`. **Implemented**: `IsLateBellUpPhase` now checks this
+  directly (`recentDailyRsiPeak >= 70m && dailyRsi[^1] < dailyRsi[^2]`),
+  independent of the H4-based branches and of whether H4 bands are still
+  expanding — this is exactly the HELP gap, closed.
+- Band-slope deceleration alone (the "kink" itself, independent of RSI):
+  AUC=0.54 — essentially no signal on its own. Not implemented.
+- The `DKNG`/`ChannelReclaim` side (H4, on the Runaway family — DKNG was
+  Runaway, not Reversal, despite reading like a reversal pattern):
+  lower-band "un-kink" alone AUC=0.48 (no signal), H4 RSI turning up alone
+  AUC=0.575 (weak). The full multi-candle criterion (double kink + mid-band
+  break) could not be tested — `evaluation-dataset.csv` stores only Bollinger/
+  MACD/RSI series, no raw H4 OHLC, and the pattern needs candle-level detail.
+  Not implemented; would need raw candle history to properly test.
+
+**How to apply:** the RSI-rollover piece is real and now live in
+`IsLateBellUpPhase`. Do not also add a standalone "any band slope kink" filter
+— that piece tested at chance level on its own. If `ChannelReclaim` comes up
+again, it still needs raw H4 candle data before it can be tested, not just
+more evaluation-dataset rows.
 
 Canonical Bell pattern pair:
 
