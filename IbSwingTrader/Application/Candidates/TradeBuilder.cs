@@ -97,7 +97,15 @@ namespace IbSwingTrader.Application.Candidates
             var risk = entry - stop;
             var rawExit = entry + risk * settings.RiskRewardRatio;
             var cappedExit = entry * (1m + targetProfitPct);
-            var exit = Math.Min(rawExit, cappedExit);
+
+            // A tight, well-placed stop (small risk) is a sign of a precise entry, not a reason to
+            // shrink the target. When a pattern-driven profile already set an explicit profit target
+            // (defaultProfitPctOverride), use it directly instead of also capping it to a multiple of
+            // risk - otherwise the tighter the stop, the more the RiskRewardRatio floor undercuts the
+            // profile's own target, which defeats profiles built to capture a bigger explosive move.
+            var exit = defaultProfitPctOverride.HasValue
+                ? cappedExit
+                : Math.Min(rawExit, cappedExit);
 
             var momentumSettings = settings.MomentumExit;
             var isMomentumExit = defaultProfitPctOverride.HasValue;
