@@ -229,9 +229,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal TrendPositionThreshold { get; set; } = 6m;
         public decimal DailyTrendPositionThreshold { get; set; } = 3m;
         public decimal AtrRatioThreshold { get; set; } = 2.8m;
-        public decimal DefaultProfitPct { get; set; } = 0.06m;
-        public decimal MinProfitPct { get; set; } = 0.04m;
-        public decimal MaxProfitPct { get; set; } = 0.09m;
+        public decimal DefaultProfitPct { get; set; } = 0.09m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.13m;
         public decimal EntryDiscountPct { get; set; } = 0m;
         public decimal ExitPriceBufferPct { get; set; } = 0.001m;
     }
@@ -243,9 +243,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal TrendPositionThreshold { get; set; } = 4m;
         public decimal MaxAtrRatio { get; set; } = 3m;
         public decimal MaxDistanceTo20dHigh { get; set; } = -5m;
-        public decimal DefaultProfitPct { get; set; } = 0.07m;
-        public decimal MinProfitPct { get; set; } = 0.05m;
-        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.15m;
     }
 
     public class ExplosiveMinFirstExitSettings
@@ -256,9 +256,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinAtrRatio { get; set; } = 3m;
         public decimal MinDailyRsi14 { get; set; } = 55m;
         public decimal MaxDistanceTo20dHigh { get; set; } = -3m;
-        public decimal DefaultProfitPct { get; set; } = 0.085m;
-        public decimal MinProfitPct { get; set; } = 0.06m;
-        public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal DefaultProfitPct { get; set; } = 0.13m;
+        public decimal MinProfitPct { get; set; } = 0.09m;
+        public decimal MaxProfitPct { get; set; } = 0.20m;
         public decimal EntryDiscountPct { get; set; } = 0m;
         public decimal MaxEntryDiscountPct { get; set; } = 0.012m;
     }
@@ -273,9 +273,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal EntryDiscountPct { get; set; } = 0.05m;
         public decimal HighAtrEntryDiscountPct { get; set; } = 0.06m;
         public decimal HighAtrRatioThreshold { get; set; } = 4m;
-        public decimal DefaultProfitPct { get; set; } = 0.06m;
-        public decimal MinProfitPct { get; set; } = 0.04m;
-        public decimal MaxProfitPct { get; set; } = 0.10m;
+        public decimal DefaultProfitPct { get; set; } = 0.09m;
+        public decimal MinProfitPct { get; set; } = 0.06m;
+        public decimal MaxProfitPct { get; set; } = 0.12m;
     }
 
     public class WeakDeepPullbackExitSettings
@@ -286,10 +286,10 @@ namespace IbSwingTrader.Domain.Settings
         public decimal EntryDiscountPct { get; set; } = 0.06m;
         public decimal HighAtrEntryDiscountPct { get; set; } = 0.07m;
         public decimal HighAtrRatioThreshold { get; set; } = 4m;
-        public decimal DefaultProfitPct { get; set; } = 0.04m;
-        public decimal MinProfitPct { get; set; } = 0.03m;
-        public decimal MaxProfitPct { get; set; } = 0.05m;
-        public decimal MaxLossPct { get; set; } = 0.05m;
+        public decimal DefaultProfitPct { get; set; } = 0.08m;
+        public decimal MinProfitPct { get; set; } = 0.05m;
+        public decimal MaxProfitPct { get; set; } = 0.10m;
+        public decimal MaxLossPct { get; set; } = 0.06m;
     }
 
     public class ReversalRecoveryExitSettings
@@ -323,9 +323,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal NearTermMinH4WidthExpansionPct { get; set; } = 2.0m;
         public decimal NearTermMinH4RsiTailSlope { get; set; } = 6.0m;
         public decimal NearTermMinH4MacdTailSlope { get; set; } = 0.05m;
-        public decimal DefaultProfitPct { get; set; } = 0.08m;
-        public decimal MinProfitPct { get; set; } = 0.06m;
-        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
         public decimal MaxLossPct { get; set; } = 0.05m;
     }
 
@@ -335,9 +335,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinDailyRsi14 { get; set; } = 60m;
         public decimal MinAtrRatio { get; set; } = 3.5m;
         public decimal MaxVolumeRatio20 { get; set; } = 0.35m;
-        public decimal DefaultProfitPct { get; set; } = 0.08m;
-        public decimal MinProfitPct { get; set; } = 0.06m;
-        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
         public decimal MaxLossPct { get; set; } = 0.05m;
     }
 
@@ -350,9 +350,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinDailyRsi14 { get; set; } = 65m;
         public decimal MaxDistanceTo20dHigh { get; set; } = -15m;
         public decimal MinVolumeRatio20 { get; set; } = 0.8m;
-        public decimal DefaultProfitPct { get; set; } = 0.10m;
-        public decimal MinProfitPct { get; set; } = 0.08m;
-        public decimal MaxProfitPct { get; set; } = 0.18m;
+        public decimal DefaultProfitPct { get; set; } = 0.12m;
+        public decimal MinProfitPct { get; set; } = 0.09m;
+        public decimal MaxProfitPct { get; set; } = 0.20m;
         public decimal EntryDiscountPct { get; set; } = 0m;
         public decimal MaxLossPct { get; set; } = 0.05m;
     }
@@ -365,9 +365,9 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinAtrRatio { get; set; } = 4m;
         public decimal MinDailyRsi14 { get; set; } = 60m;
         public decimal MinVolumeRatio20 { get; set; } = 0.8m;
-        public decimal DefaultProfitPct { get; set; } = 0.08m;
-        public decimal MinProfitPct { get; set; } = 0.06m;
-        public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.16m;
         public decimal EntryDiscountPct { get; set; } = 0.02m;
         public decimal MaxLossPct { get; set; } = 0.06m;
     }
@@ -377,9 +377,9 @@ namespace IbSwingTrader.Domain.Settings
         public bool Enabled { get; set; } = true;
         public decimal EntryDiscountPct { get; set; } = 0.01m;
         public decimal EarlyEntryDiscountPct { get; set; } = 0.025m;
-        public decimal DefaultProfitPct { get; set; } = 0.08m;
-        public decimal MinProfitPct { get; set; } = 0.06m;
-        public decimal MaxProfitPct { get; set; } = 0.12m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.14m;
         public decimal MinDailyRsiSlope { get; set; } = 18m;
         public decimal MinDailyMacdSlope { get; set; } = 0.18m;
         public decimal MinH4RsiSlope { get; set; } = 30m;
@@ -391,9 +391,9 @@ namespace IbSwingTrader.Domain.Settings
     {
         public bool Enabled { get; set; } = true;
         public decimal EntryDiscountPct { get; set; } = 0.02m;
-        public decimal DefaultProfitPct { get; set; } = 0.075m;
-        public decimal MinProfitPct { get; set; } = 0.055m;
-        public decimal MaxProfitPct { get; set; } = 0.14m;
+        public decimal DefaultProfitPct { get; set; } = 0.10m;
+        public decimal MinProfitPct { get; set; } = 0.07m;
+        public decimal MaxProfitPct { get; set; } = 0.16m;
     }
 
     public class NextDayRankingSettings

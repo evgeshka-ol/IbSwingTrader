@@ -370,9 +370,9 @@
                 "TrendPositionThreshold": 6.0,
                 "DailyTrendPositionThreshold": 3.0,
                 "AtrRatioThreshold": 2.8,
-                "DefaultProfitPct": 0.07,
-                "MinProfitPct": 0.05,
-                "MaxProfitPct": 0.10,
+                "DefaultProfitPct": 0.09,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.13,
                 "EntryDiscountPct": 0.0,
                 "ExitPriceBufferPct": 0.001
             },
@@ -382,9 +382,9 @@
                 "TrendPositionThreshold": 4.0,
                 "MaxAtrRatio": 3.0,
                 "MaxDistanceTo20dHigh": -5.0,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.13
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.15
             },
             "ExplosiveMinFirstExit": {
                 "Enabled": true,
@@ -393,9 +393,9 @@
                 "MinAtrRatio": 3.0,
                 "MinDailyRsi14": 55.0,
                 "MaxDistanceTo20dHigh": -3.0,
-                "DefaultProfitPct": 0.12,
-                "MinProfitPct": 0.07,
-                "MaxProfitPct": 0.18,
+                "DefaultProfitPct": 0.13,
+                "MinProfitPct": 0.09,
+                "MaxProfitPct": 0.20,
                 "EntryDiscountPct": 0.0,
                 "MaxEntryDiscountPct": 0.012
             },
@@ -408,9 +408,9 @@
                 "EntryDiscountPct": 0.05,
                 "HighAtrEntryDiscountPct": 0.06,
                 "HighAtrRatioThreshold": 4.0,
-                "DefaultProfitPct": 0.06,
-                "MinProfitPct": 0.04,
-                "MaxProfitPct": 0.10
+                "DefaultProfitPct": 0.09,
+                "MinProfitPct": 0.06,
+                "MaxProfitPct": 0.12
             },
             "WeakDeepPullbackExit": {
                 "Enabled": true,
@@ -419,10 +419,10 @@
                 "EntryDiscountPct": 0.06,
                 "HighAtrEntryDiscountPct": 0.07,
                 "HighAtrRatioThreshold": 4.0,
-                "DefaultProfitPct": 0.04,
-                "MinProfitPct": 0.03,
-                "MaxProfitPct": 0.05,
-                "MaxLossPct": 0.05
+                "DefaultProfitPct": 0.08,
+                "MinProfitPct": 0.05,
+                "MaxProfitPct": 0.10,
+                "MaxLossPct": 0.06
             },
             "ReversalRecoveryExit": {
                 "Enabled": true,
@@ -454,9 +454,9 @@
                 "NearTermMinH4WidthExpansionPct": 2.0,
                 "NearTermMinH4RsiTailSlope": 6.0,
                 "NearTermMinH4MacdTailSlope": 0.05,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.12,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.14,
                 "MaxLossPct": 0.05
             },
             "ExplosiveMaxFirstExit": {
@@ -464,9 +464,9 @@
                 "MinDailyRsi14": 60.0,
                 "MinAtrRatio": 3.5,
                 "MaxVolumeRatio20": 0.35,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.12,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.14,
                 "MaxLossPct": 0.05
             },
             "ParabolicExpansionExit": {
@@ -477,9 +477,9 @@
                 "MinDailyRsi14": 65.0,
                 "MaxDistanceTo20dHigh": -15.0,
                 "MinVolumeRatio20": 0.28,
-                "DefaultProfitPct": 0.10,
-                "MinProfitPct": 0.08,
-                "MaxProfitPct": 0.18,
+                "DefaultProfitPct": 0.12,
+                "MinProfitPct": 0.09,
+                "MaxProfitPct": 0.20,
                 "EntryDiscountPct": 0.0,
                 "MaxLossPct": 0.05
             },
@@ -490,9 +490,9 @@
                 "MinAtrRatio": 4.0,
                 "MinDailyRsi14": 60.0,
                 "MinVolumeRatio20": 0.28,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.14,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.16,
                 "EntryDiscountPct": 0.02,
                 "MaxLossPct": 0.06
             },
@@ -500,9 +500,9 @@
                 "Enabled": true,
                 "EntryDiscountPct": 0.01,
                 "EarlyEntryDiscountPct": 0.025,
-                "DefaultProfitPct": 0.08,
-                "MinProfitPct": 0.06,
-                "MaxProfitPct": 0.12,
+                "DefaultProfitPct": 0.10,
+                "MinProfitPct": 0.07,
+                "MaxProfitPct": 0.14,
                 "MinDailyRsiSlope": 18.0,
                 "MinDailyMacdSlope": 0.18,
                 "MinH4RsiSlope": 30.0,
