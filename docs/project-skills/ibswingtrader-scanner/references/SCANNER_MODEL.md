@@ -287,3 +287,36 @@ in `CandidateFinder.cs`.
 If extending ranking further, validate a candidate feature's AUC against
 realized `AmplitudePct` before wiring it into a quality-score function —
 that discipline is what caught the 2026-07-11 approach not working.
+
+## Known unvalidated gap: intraday reversion while still top-ranked (2026-08-10)
+
+`RankingQualityScore` is computed from completed Daily bars plus the current
+H4 bar's tail slope only, so it cannot see a same-day intraday reversal
+happening *within* the still-forming H4 bar. `AXTI` was the #1 admitted
+`Runaway` in two same-day scans with an *identical* quality score even
+though live price had already fallen 8.6% between the scans (and kept
+falling, -13.6% from the day's open by the time it was checked); `HELP` and
+`CRSR` showed the same mid-reversion pattern at smaller magnitude the same
+day. The existing safety net, `IsLiveRunawayStructureInvalidated`
+(`CandidateFinder.cs` — M15 price crossing below the H4 mid), did not fire in
+this case because the H4 mid was itself still rising fast and hadn't been
+dragged down enough yet to cross.
+
+Tried to validate "does post-scan price weakness predict `Loss`" against
+`evaluation-dataset.csv` before touching any code, and got genuinely
+inconclusive results both ways: bucketing by the `MinPct` field looked like a
+dramatic gradient, but `MinPct` is computed from candles *after* entry, so a
+deep `MinPct` is close to a restatement of "the stop got hit" — circular.
+Re-bucketing by the non-circular `MinPctBeforeEntry` (drawdown between scan
+and actual entry) instead gave a noisier signal on too few rows (n=7 in the
+deepest bucket) to trust. Neither field actually measures the AXTI phenomenon
+precisely anyway (reversion toward the mean *while still top-ranked live*,
+before any entry/exit window exists) — that would need a purpose-built
+feature such as price drift between two same-day scans of the same admitted
+ticker.
+
+**Do not add an intraday-drawdown invalidation check on the strength of this
+alone** — it is genuinely unvalidated, not "probably fine." Re-run the
+`MinPctBeforeEntry` bucket check with a larger sample once more multi-scan
+same-day evaluation history accumulates, and specifically re-check what
+happened to AXTI/HELP/CRSR.

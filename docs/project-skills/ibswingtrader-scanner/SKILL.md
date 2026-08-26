@@ -102,6 +102,14 @@ Good `ReversalHook` examples include POET, ASM, SSRM, CDE, and SVM from the
 2026-06-15 evaluation set. The ideal entry is usually the first or second daily
 bar after the lower-band hook; later scans may still work but are less clean.
 
+`Reversal` is the user's own years-proven manual trading edge (this app's job
+is to remove emotion and scale past the broker scan API limit, not to
+discover the pattern) and should get more attention than `Runaway` tuning
+when both need work — see `references/REVERSAL_EDGE.md` for why, the precise
+"mid band bends like a hypotenuse" trigger definition, the signal hierarchy,
+a full worked example, and open items that were investigated but
+deliberately left unimplemented pending more evaluation data.
+
 ## Series-template direction
 
 When improving scanner recall, promotion, or ranking, prefer a literal series
@@ -348,6 +356,7 @@ MACD aliases, weighted timeframe totals, or stored slope summaries.
 - `references/SCANNER_MODEL.md`
 - `references/SERIES_PLAYBOOK.md`
 - `references/SETTINGS_MAP.md`
+- `references/REVERSAL_EDGE.md`
 
 ## Practical workflow
 
