@@ -18,11 +18,8 @@ namespace IbSwingTrader.Application.Candidates
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
-        IAgentPathService pathService,
         IMarketSettingsProvider marketSettingsProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
-        ICandidateFileService candidateFileService,
-        IEvaluationDatasetCsvService evaluationDatasetCsvService,
         INumberTextFormatter fmt,
         ITextLogger logger) : ICandidateFinder
     {
@@ -38,11 +35,8 @@ namespace IbSwingTrader.Application.Candidates
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
-        private readonly IAgentPathService _pathService = pathService;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
-        private readonly ICandidateFileService _candidateFileService = candidateFileService;
-        private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
         private readonly NextDayRankingSettings _nextDayRankingSettings = getCandidatesSettingsProvider.Get().NextDayRanking;
@@ -61,8 +55,6 @@ namespace IbSwingTrader.Application.Candidates
 
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
-            var seriesSimilarityTemplates = await LoadSeriesSimilarityTemplatesAsync(
-                getCandidatesSettings.NextDayRanking.SeriesSimilarity);
 
             _logger.Info(
                 $"CandidateFinder settings: " +
@@ -311,9 +303,7 @@ namespace IbSwingTrader.Application.Candidates
                         bucketName: dailyFamilySplit == DailyFamilySplit.Reversal
                             ? "reversal candidates"
                             : "runaway candidates",
-                        rejectionLogPrefix: "Pattern rejected",
-                        seriesSimilarityTemplates,
-                        enforceLowAmplitudeVeto: true);
+                        rejectionLogPrefix: "Pattern rejected");
                 }
                 finally
                 {
@@ -346,15 +336,11 @@ namespace IbSwingTrader.Application.Candidates
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
-                _nextDayRankingSettings,
-                seriesSimilarityTemplates,
                 SeriesTemplateFamily.TodayResearchLike);
 
             var finalCandidates = ReRankCandidates(
                 candidateResults.Values
                     .ToList(),
-                _nextDayRankingSettings,
-                seriesSimilarityTemplates,
                 SeriesTemplateFamily.Reversal);
 
             if (emitAllSeenCandidates)
@@ -437,8 +423,7 @@ namespace IbSwingTrader.Application.Candidates
             Dictionary<string, WishListContext> scannedWishListContexts,
             HashSet<string> promotedTickers,
             DateTime marketNow,
-            string marketTimezone,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates)
+            string marketTimezone)
         {
             var settings = _getCandidatesSettingsProvider.Get().PremarketSummary;
             if (!settings.Enabled || settings.MaxItems <= 0)
@@ -474,9 +459,7 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore,
                     recentSeries,
                     bbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit,
-                    enforceLowAmplitudeVeto: true);
+                    dailyFamilySplit);
 
                 if (!isTodayResearchLikeCandidate)
                     continue;
@@ -689,9 +672,7 @@ namespace IbSwingTrader.Application.Candidates
             bool isFromWishlist,
             string marketTimezone,
             string bucketName,
-            string rejectionLogPrefix,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
-            bool enforceLowAmplitudeVeto)
+            string rejectionLogPrefix)
         {
             var dailyFamilySplit = ClassifyDailyFamily(ctx, log: true);
             var diagnostics = BuildDiagnostics(ctx.Snapshot, ctx.Candles);
@@ -759,9 +740,7 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore,
                     recentSeries,
                     bbState,
-                    seriesSimilarityTemplates,
-                    dailyFamilySplit,
-                    enforceLowAmplitudeVeto);
+                    dailyFamilySplit);
 
             if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
@@ -818,27 +797,8 @@ namespace IbSwingTrader.Application.Candidates
                     return;
                 }
 
-                var reversalSimilaritySeries = BuildReversalSimilaritySeries(
-                    recentSeries,
-                    reversalPatternSeries!);
-                var reversalTemplates = seriesSimilarityTemplates
-                    .Where(x =>
-                        x.Family == SeriesTemplateFamily.Reversal &&
-                        !string.Equals(x.Ticker, ctx.Stock.Ticker, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                var reversalTemplateMatch = CalculateSeriesSimilarityMatch(
-                    reversalSimilaritySeries,
-                    reversalTemplates,
-                    SeriesTemplateFamily.Reversal,
-                    _nextDayRankingSettings.SeriesSimilarity);
-
                 _logger.Info(
-                    $"ReversalHook confirmed for {ctx.Stock.Ticker} on {reversalPatternSource}. " +
-                    $"Template={reversalTemplateMatch.TemplateTicker ?? "none"}, " +
-                    $"AmplitudePct={_fmt.Generic(reversalTemplateMatch.TemplateAmplitudePct ?? 0m)}, " +
-                    $"MatchedTimeframe={GetBestTimeframeName(reversalTemplateMatch)}, " +
-                    $"DailyDistance={_fmt.Generic(reversalTemplateMatch.DailyDistance ?? 0m)}, " +
-                    $"H4Distance={_fmt.Generic(reversalTemplateMatch.H4Distance ?? 0m)}");
+                    $"ReversalHook confirmed for {ctx.Stock.Ticker} on {reversalPatternSource}.");
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
@@ -918,36 +878,6 @@ namespace IbSwingTrader.Application.Candidates
             return 1;
         }
 
-        private static RecentFeatureSeries BuildReversalSimilaritySeries(
-            RecentFeatureSeries scannerSeries,
-            RecentFeatureSeries realDailySeries)
-        {
-            return new RecentFeatureSeries
-            {
-                DailyBbUpperBandSeries = [.. realDailySeries.DailyBbUpperBandSeries],
-                DailyBbMidBandSeries = [.. realDailySeries.DailyBbMidBandSeries],
-                DailyBbLowerBandSeries = [.. realDailySeries.DailyBbLowerBandSeries],
-                DailyRsiSeries = [.. realDailySeries.DailyRsiSeries],
-                DailyMacdLineSeries = [.. realDailySeries.DailyMacdLineSeries],
-                DailyMacdSignalSeries = [.. realDailySeries.DailyMacdSignalSeries],
-                DailyMacdHistogramSeries = [.. realDailySeries.DailyMacdHistogramSeries],
-                WeeklyBbUpperBandSeries = [.. scannerSeries.WeeklyBbUpperBandSeries],
-                WeeklyBbMidBandSeries = [.. scannerSeries.WeeklyBbMidBandSeries],
-                WeeklyBbLowerBandSeries = [.. scannerSeries.WeeklyBbLowerBandSeries],
-                WeeklyRsiSeries = [.. scannerSeries.WeeklyRsiSeries],
-                WeeklyMacdLineSeries = [.. scannerSeries.WeeklyMacdLineSeries],
-                WeeklyMacdSignalSeries = [.. scannerSeries.WeeklyMacdSignalSeries],
-                WeeklyMacdHistogramSeries = [.. scannerSeries.WeeklyMacdHistogramSeries],
-                H4BbUpperBandSeries = [.. scannerSeries.H4BbUpperBandSeries],
-                H4BbMidBandSeries = [.. scannerSeries.H4BbMidBandSeries],
-                H4BbLowerBandSeries = [.. scannerSeries.H4BbLowerBandSeries],
-                H4RsiSeries = [.. scannerSeries.H4RsiSeries],
-                H4MacdLineSeries = [.. scannerSeries.H4MacdLineSeries],
-                H4MacdSignalSeries = [.. scannerSeries.H4MacdSignalSeries],
-                H4MacdHistogramSeries = [.. scannerSeries.H4MacdHistogramSeries]
-            };
-        }
-
         private bool IsTodayResearchLikeCandidate(
             WishListItem mergedWishItem,
             WishListContext ctx,
@@ -955,9 +885,7 @@ namespace IbSwingTrader.Application.Candidates
             decimal entryScore,
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
-            DailyFamilySplit dailyFamilySplit,
-            bool enforceLowAmplitudeVeto)
+            DailyFamilySplit dailyFamilySplit)
         {
             if (dailyFamilySplit == DailyFamilySplit.Unknown)
             {
@@ -1037,47 +965,6 @@ namespace IbSwingTrader.Application.Candidates
                     $"H4RsiTail={_fmt.Generic(CalculateTailSlope(recentSeries.H4RsiSeries, 4))}, " +
                     $"BellPattern={bellPatternSignal.Kind}, " +
                     $"BellTimeframe={bellPatternSignal.Timeframe}");
-                return false;
-            }
-
-            var runawayTemplates = seriesSimilarityTemplates
-                .Where(x =>
-                    x.Family == SeriesTemplateFamily.TodayResearchLike &&
-                    !string.Equals(x.Ticker, ctx.Stock.Ticker, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            var runawayTemplateMatch = CalculateSeriesSimilarityMatch(
-                recentSeries,
-                runawayTemplates,
-                SeriesTemplateFamily.TodayResearchLike,
-                _nextDayRankingSettings.SeriesSimilarity);
-
-            _logger.Info(
-                $"Runaway BellUp confirmed for {ctx.Stock.Ticker}. " +
-                $"Template={runawayTemplateMatch.TemplateTicker ?? "none"}, " +
-                $"AmplitudePct={_fmt.Generic(runawayTemplateMatch.TemplateAmplitudePct ?? 0m)}, " +
-                $"MatchedTimeframe={GetBestTimeframeName(runawayTemplateMatch)}, " +
-                $"DailyDistance={_fmt.Generic(runawayTemplateMatch.DailyDistance ?? 0m)}, " +
-                $"H4Distance={_fmt.Generic(runawayTemplateMatch.H4Distance ?? 0m)}");
-
-            var lowAmplitudeBellMatch = CalculateSeriesSimilarityMatch(
-                recentSeries,
-                seriesSimilarityTemplates,
-                SeriesTemplateFamily.LowAmplitudeSameDay,
-                _nextDayRankingSettings.SeriesSimilarity);
-            if (enforceLowAmplitudeVeto &&
-                lowAmplitudeBellMatch.TemplateTicker != null &&
-                (runawayTemplateMatch.TemplateTicker == null ||
-                 GetBestTimeframeDistance(lowAmplitudeBellMatch) <=
-                 GetBestTimeframeDistance(runawayTemplateMatch)))
-            {
-                _logger.Info(
-                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
-                    "Rows match a low-amplitude BellUp template at least as closely as the winner template. " +
-                    $"LowAmplitudeTemplate={lowAmplitudeBellMatch.TemplateTicker}, " +
-                    $"LowAmplitudePct={_fmt.Generic(lowAmplitudeBellMatch.TemplateAmplitudePct ?? 0m)}, " +
-                    $"LowAmplitudeTimeframe={GetBestTimeframeName(lowAmplitudeBellMatch)}, " +
-                    $"WinnerTemplate={runawayTemplateMatch.TemplateTicker}, " +
-                    $"WinnerTimeframe={GetBestTimeframeName(runawayTemplateMatch)}");
                 return false;
             }
 
@@ -4126,17 +4013,8 @@ namespace IbSwingTrader.Application.Candidates
         // Validated 2026-07-13 against evaluation-dataset.csv: Daily/H4 Bollinger mid+upper slope predicts Runaway amplitude (AUC ~0.84 on extreme groups); Daily band compression + lower-band hook slope predicts Reversal amplitude (AUC ~0.63). Series-template distance-matching (below) showed no such signal and no longer drives ranking; it stays for its diagnostics only.
         private const decimal QualityScoreRankWeight = 50m;
 
-        private enum SeriesTemplateRankTier
-        {
-            None = 0,
-            Weak = 1,
-            Confirmed = 2
-        }
-
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
-            NextDayRankingSettings settings,
-            IReadOnlyList<SeriesSimilarityTemplate> seriesSimilarityTemplates,
             SeriesTemplateFamily family)
         {
             if (candidates.Count <= 1)
@@ -4151,37 +4029,6 @@ namespace IbSwingTrader.Application.Candidates
             var ranked = ordered
                 .Select(x =>
                 {
-                    var seriesSimilarityMatch = CalculateSeriesSimilarityMatch(
-                        x,
-                        seriesSimilarityTemplates,
-                        family,
-                        settings.SeriesSimilarity);
-                    if (IsSelfSeriesTemplateMatch(x.Ticker, seriesSimilarityMatch))
-                        seriesSimilarityMatch = SeriesSimilarityMatch.Empty;
-
-                    var lowAmplitudeMatch = family == SeriesTemplateFamily.TodayResearchLike
-                        ? CalculateSeriesSimilarityMatch(
-                            x,
-                            seriesSimilarityTemplates,
-                            SeriesTemplateFamily.LowAmplitudeSameDay,
-                            settings.SeriesSimilarity)
-                        : SeriesSimilarityMatch.Empty;
-                    if (IsSelfSeriesTemplateMatch(x.Ticker, lowAmplitudeMatch))
-                        lowAmplitudeMatch = SeriesSimilarityMatch.Empty;
-
-                    var tier = ResolveTemplateRankTier(
-                        seriesSimilarityMatch,
-                        lowAmplitudeMatch,
-                        family,
-                        settings.SeriesSimilarity);
-
-                    ApplySeriesSimilarityDiagnostics(
-                        x,
-                        seriesSimilarityMatch,
-                        lowAmplitudeMatch,
-                        tier,
-                        settings.SeriesSimilarity);
-
                     var qualityScore = family == SeriesTemplateFamily.TodayResearchLike
                         ? CalculateRunawayLaunchQualityScore(x)
                         : CalculateReversalHookQualityScore(x);
@@ -4216,29 +4063,6 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return ranked.Select(x => x.Candidate).ToList();
-        }
-
-        private static SeriesTemplateRankTier ResolveTemplateRankTier(
-            SeriesSimilarityMatch match,
-            SeriesSimilarityMatch lowAmplitudeMatch,
-            SeriesTemplateFamily family,
-            SeriesSimilaritySettings settings)
-        {
-            if (match.Bonus <= 0m)
-                return SeriesTemplateRankTier.None;
-
-            // A low-amplitude match at least as close as the winner match vetoes promotion to Confirmed/Weak.
-            var isVetoedByLowAmplitudeMatch =
-                family == SeriesTemplateFamily.TodayResearchLike &&
-                lowAmplitudeMatch.Bonus > 0m &&
-                GetBestTimeframeDistance(lowAmplitudeMatch) <= GetBestTimeframeDistance(match);
-
-            if (isVetoedByLowAmplitudeMatch)
-                return SeriesTemplateRankTier.None;
-
-            return GetBestTimeframeDistance(match) <= settings.FullMatchDistance
-                ? SeriesTemplateRankTier.Confirmed
-                : SeriesTemplateRankTier.Weak;
         }
 
         private static decimal CalculateRunawayLaunchQualityScore(CandidateDetails candidate)
@@ -4361,464 +4185,6 @@ namespace IbSwingTrader.Application.Candidates
 
             reason = "Final amplitude proxy rejected: no row-based envelope expansion on daily/weekly/H4.";
             return false;
-        }
-
-        private async Task<IReadOnlyList<SeriesSimilarityTemplate>> LoadSeriesSimilarityTemplatesAsync(
-            SeriesSimilaritySettings settings)
-        {
-            if (!settings.Enabled)
-                return [];
-
-            var templates = new List<SeriesSimilarityTemplate>();
-            var evaluationPath = Path.GetFullPath(
-                Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
-            var evaluationRows = await _evaluationDatasetCsvService.ReadAsync(evaluationPath);
-            var candidateDocument = await _candidateFileService.ReadAsync(_pathService.GetCandidatesFile());
-            var candidateSnapshots = candidateDocument.SameDayCandidates
-                .Concat(candidateDocument.Candidates)
-                .GroupBy(BuildCandidateScanKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    x => x.Key,
-                    x => x
-                        .OrderByDescending(candidate => candidate.Score.NextDayRank ?? decimal.MinValue)
-                        .ThenByDescending(candidate => candidate.Score.Score)
-                        .First(),
-                    StringComparer.OrdinalIgnoreCase);
-            var latestLowAmplitudeScanDate = settings.LowAmplitudeUseLatestScanDateOnly
-                ? evaluationRows
-                    .Where(x =>
-                        x.HasActiveCandidateSnapshot &&
-                        x.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                        x.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
-                        x.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
-                    .Select(x => x.ScanTime.Date)
-                    .DefaultIfEmpty(DateTime.MinValue)
-                    .Max()
-                : DateTime.MinValue;
-
-            foreach (var row in evaluationRows)
-            {
-                if (!row.HasActiveCandidateSnapshot)
-                    continue;
-
-                if (!candidateSnapshots.TryGetValue(BuildCandidateScanKey(row), out var snapshot))
-                    continue;
-
-                if (settings.EnableLowAmplitudePenalty &&
-                    row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase) &&
-                    (!settings.LowAmplitudeUseLatestScanDateOnly ||
-                     row.ScanTime.Date == latestLowAmplitudeScanDate) &&
-                    row.AmplitudePct >= settings.LowAmplitudeMinTemplateAmplitudePct &&
-                    row.AmplitudePct < settings.LowAmplitudeMaxTemplateAmplitudePct)
-                {
-                    var lowAmplitudeFeatures = BuildTemplateFeatures(
-                        snapshot.RecentDailyBbMidBandSeries,
-                        snapshot.RecentDailyBbUpperBandSeries,
-                        snapshot.RecentDailyBbLowerBandSeries,
-                        snapshot.RecentDailyRsiSeries,
-                        snapshot.RecentDailyMacdHistogramSeries,
-                        snapshot.RecentH4BbMidBandSeries,
-                        snapshot.RecentH4BbUpperBandSeries,
-                        snapshot.RecentH4BbLowerBandSeries,
-                        snapshot.RecentH4RsiSeries,
-                        snapshot.RecentH4MacdHistogramSeries,
-                        dailyMacdLine: snapshot.RecentDailyMacdLineSeries,
-                        dailyMacdSignal: snapshot.RecentDailyMacdSignalSeries,
-                        h4MacdLine: snapshot.RecentH4MacdLineSeries,
-                        h4MacdSignal: snapshot.RecentH4MacdSignalSeries);
-
-                    if (lowAmplitudeFeatures.HasUsefulSeries)
-                    {
-                        templates.Add(new SeriesSimilarityTemplate(
-                            row.Ticker,
-                            SeriesTemplateFamily.LowAmplitudeSameDay,
-                            row.AmplitudePct,
-                            lowAmplitudeFeatures));
-                    }
-                }
-
-                if (row.AmplitudePct < settings.MinTemplateAmplitudePct ||
-                    row.AmplitudePct > settings.MaxTemplateAmplitudePct)
-                    continue;
-
-                var family = row.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase)
-                    ? SeriesTemplateFamily.TodayResearchLike
-                    : SeriesTemplateFamily.Reversal;
-
-                var features = BuildTemplateFeatures(
-                    snapshot.RecentDailyBbMidBandSeries,
-                    snapshot.RecentDailyBbUpperBandSeries,
-                    snapshot.RecentDailyBbLowerBandSeries,
-                    snapshot.RecentDailyRsiSeries,
-                    snapshot.RecentDailyMacdHistogramSeries,
-                    snapshot.RecentH4BbMidBandSeries,
-                    snapshot.RecentH4BbUpperBandSeries,
-                    snapshot.RecentH4BbLowerBandSeries,
-                    snapshot.RecentH4RsiSeries,
-                    snapshot.RecentH4MacdHistogramSeries,
-                    dailyMacdLine: snapshot.RecentDailyMacdLineSeries,
-                    dailyMacdSignal: snapshot.RecentDailyMacdSignalSeries,
-                    h4MacdLine: snapshot.RecentH4MacdLineSeries,
-                    h4MacdSignal: snapshot.RecentH4MacdSignalSeries);
-
-                if (features.HasUsefulSeries)
-                    templates.Add(new SeriesSimilarityTemplate(row.Ticker, family, row.AmplitudePct, features));
-            }
-
-            var selected = templates
-                .GroupBy(x => x.Family)
-                .SelectMany(x => x
-                    .OrderByDescending(y => y.AmplitudePct)
-                    .ThenBy(y => y.Ticker, StringComparer.OrdinalIgnoreCase)
-                    .Take(settings.MaxTemplatesPerFamily))
-                .ToList();
-
-            _logger.Info(
-                $"Series similarity templates loaded: Total={selected.Count}, " +
-                $"TodayResearchLike={selected.Count(x => x.Family == SeriesTemplateFamily.TodayResearchLike)}, " +
-                $"Reversal={selected.Count(x => x.Family == SeriesTemplateFamily.Reversal)}, " +
-                $"LowAmplitudeSameDay={selected.Count(x => x.Family == SeriesTemplateFamily.LowAmplitudeSameDay)}, " +
-                $"LowAmplitudeScanDate={(latestLowAmplitudeScanDate == DateTime.MinValue ? "all" : latestLowAmplitudeScanDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
-
-            return selected;
-        }
-
-        private static string BuildCandidateScanKey(CandidateDetails candidate)
-            => BuildCandidateScanKey(
-                candidate.Ticker,
-                candidate.Scan.PresetScanCode,
-                candidate.Scan.ScanTime);
-
-        private static string BuildCandidateScanKey(EvaluationDatasetRow row)
-            => BuildCandidateScanKey(row.Ticker, row.PresetScanCode, row.ScanTime);
-
-        private static string BuildCandidateScanKey(
-            string ticker,
-            string presetScanCode,
-            DateTime scanTime)
-            => $"{ticker}|{presetScanCode}|{scanTime:yyyy-MM-dd HH:mm:ss}";
-
-        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
-            CandidateDetails candidate,
-            IReadOnlyList<SeriesSimilarityTemplate> templates,
-            SeriesTemplateFamily family,
-            SeriesSimilaritySettings settings)
-        {
-            if (!settings.Enabled || templates.Count == 0)
-                return SeriesSimilarityMatch.Empty;
-
-            var candidateFeatures = BuildTemplateFeatures(
-                candidate.RecentDailyBbMidBandSeries,
-                candidate.RecentDailyBbUpperBandSeries,
-                candidate.RecentDailyBbLowerBandSeries,
-                candidate.RecentDailyRsiSeries,
-                candidate.RecentDailyMacdHistogramSeries,
-                candidate.RecentH4BbMidBandSeries,
-                candidate.RecentH4BbUpperBandSeries,
-                candidate.RecentH4BbLowerBandSeries,
-                candidate.RecentH4RsiSeries,
-                candidate.RecentH4MacdHistogramSeries,
-                dailyMacdLine: candidate.RecentDailyMacdLineSeries,
-                dailyMacdSignal: candidate.RecentDailyMacdSignalSeries,
-                h4MacdLine: candidate.RecentH4MacdLineSeries,
-                h4MacdSignal: candidate.RecentH4MacdSignalSeries);
-
-            return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
-        }
-
-        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
-            RecentFeatureSeries recentSeries,
-            IReadOnlyList<SeriesSimilarityTemplate> templates,
-            SeriesTemplateFamily family,
-            SeriesSimilaritySettings settings)
-        {
-            var candidateFeatures = BuildTemplateFeatures(
-                recentSeries.DailyBbMidBandSeries,
-                recentSeries.DailyBbUpperBandSeries,
-                recentSeries.DailyBbLowerBandSeries,
-                recentSeries.DailyRsiSeries,
-                recentSeries.DailyMacdHistogramSeries,
-                recentSeries.H4BbMidBandSeries,
-                recentSeries.H4BbUpperBandSeries,
-                recentSeries.H4BbLowerBandSeries,
-                recentSeries.H4RsiSeries,
-                recentSeries.H4MacdHistogramSeries,
-                dailyMacdLine: recentSeries.DailyMacdLineSeries,
-                dailyMacdSignal: recentSeries.DailyMacdSignalSeries,
-                h4MacdLine: recentSeries.H4MacdLineSeries,
-                h4MacdSignal: recentSeries.H4MacdSignalSeries);
-
-            return CalculateSeriesSimilarityMatch(candidateFeatures, templates, family, settings);
-        }
-
-        private static SeriesSimilarityMatch CalculateSeriesSimilarityMatch(
-            SeriesFeatureSet candidateFeatures,
-            IReadOnlyList<SeriesSimilarityTemplate> templates,
-            SeriesTemplateFamily family,
-            SeriesSimilaritySettings settings)
-        {
-            if (!settings.Enabled || templates.Count == 0)
-                return SeriesSimilarityMatch.Empty;
-
-            if (!candidateFeatures.HasUsefulSeries)
-                return SeriesSimilarityMatch.Empty;
-
-            var bestMatch = templates
-                .Where(x => x.Family == family)
-                .Select(x => new
-                {
-                    Template = x,
-                    Distance = CalculateSeriesDistance(candidateFeatures, x.Features, settings)
-                })
-                .Where(x =>
-                    x.Distance.HasValue &&
-                    GetBestTimeframeDistance(x.Distance.Value) <= settings.WeakMatchDistance)
-                .OrderBy(x => GetBestTimeframeDistance(x.Distance!.Value))
-                .FirstOrDefault();
-
-            if (bestMatch == null)
-                return SeriesSimilarityMatch.Empty;
-
-            var bestDistance = bestMatch.Distance.GetValueOrDefault();
-            var bestTimeframeDistance = GetBestTimeframeDistance(bestDistance);
-            decimal bonus;
-
-            if (bestTimeframeDistance <= settings.FullMatchDistance)
-            {
-                bonus = settings.FullMatchBonus;
-            }
-            else
-            {
-                var range = settings.WeakMatchDistance - settings.FullMatchDistance;
-                if (range <= 0m)
-                {
-                    bonus = settings.WeakMatchBonus;
-                }
-                else
-                {
-                    var closeness = (settings.WeakMatchDistance - bestTimeframeDistance) / range;
-                    bonus = settings.WeakMatchBonus +
-                            closeness * (settings.FullMatchBonus - settings.WeakMatchBonus);
-                }
-            }
-
-            bonus += CalculateTemplateAmplitudeBonus(bestMatch.Template.AmplitudePct);
-
-            return new SeriesSimilarityMatch(
-                bestMatch.Template.Ticker,
-                bestMatch.Template.Family.ToString(),
-                bestMatch.Template.AmplitudePct,
-                bestDistance.Daily,
-                bestDistance.H4,
-                bonus);
-        }
-
-        private static decimal GetBestTimeframeDistance(SeriesDistance distance)
-        {
-            var available = new[]
-            {
-                distance.Daily,
-                distance.H4
-            }
-            .Where(x => x.HasValue)
-            .Select(x => x.GetValueOrDefault())
-            .ToList();
-
-            return available.Count > 0
-                ? available.Min()
-                : decimal.MaxValue;
-        }
-
-        private static string GetBestTimeframeName(SeriesSimilarityMatch match)
-        {
-            var available = new[]
-            {
-                (Name: "Daily", Distance: match.DailyDistance),
-                (Name: "H4", Distance: match.H4Distance)
-            }
-            .Where(x => x.Distance.HasValue)
-            .OrderBy(x => x.Distance!.Value)
-            .FirstOrDefault();
-
-            return available.Name ?? "none";
-        }
-
-        private static decimal GetBestTimeframeDistance(SeriesSimilarityMatch match)
-        {
-            var available = new[]
-            {
-                match.DailyDistance,
-                match.H4Distance
-            }
-            .Where(x => x.HasValue)
-            .Select(x => x.GetValueOrDefault())
-            .ToList();
-
-            return available.Count > 0
-                ? available.Min()
-                : decimal.MaxValue;
-        }
-
-        private static decimal CalculateTemplateAmplitudeBonus(decimal amplitudePct)
-        {
-            if (amplitudePct >= 25m)
-                return 0.18m;
-
-            if (amplitudePct >= 20m)
-                return 0.12m;
-
-            if (amplitudePct >= 15m)
-                return 0.08m;
-
-            if (amplitudePct >= 12m)
-                return 0.05m;
-
-            if (amplitudePct >= 10m)
-                return 0.03m;
-
-            return 0m;
-        }
-
-        private static bool IsSelfSeriesTemplateMatch(string ticker, SeriesSimilarityMatch match) =>
-            !string.IsNullOrWhiteSpace(ticker) &&
-            !string.IsNullOrWhiteSpace(match.TemplateTicker) &&
-            string.Equals(ticker, match.TemplateTicker, StringComparison.OrdinalIgnoreCase);
-
-        private static void ApplySeriesSimilarityDiagnostics(
-            CandidateDetails candidate,
-            SeriesSimilarityMatch match,
-            SeriesSimilarityMatch lowAmplitudeMatch,
-            SeriesTemplateRankTier tier,
-            SeriesSimilaritySettings settings)
-        {
-            if (candidate.Diagnostics == null)
-                return;
-
-            candidate.Diagnostics.SeriesSimilarityTemplateTicker = match.TemplateTicker;
-            candidate.Diagnostics.SeriesSimilarityTemplateFamily = match.TemplateFamily;
-            candidate.Diagnostics.SeriesSimilarityBonus = match.Bonus > 0m ? match.Bonus : null;
-            candidate.Diagnostics.LowAmplitudeTemplateTicker = lowAmplitudeMatch.TemplateTicker;
-            candidate.Diagnostics.LowAmplitudePenalty = lowAmplitudeMatch.Bonus > 0m
-                ? lowAmplitudeMatch.Bonus * settings.LowAmplitudePenaltyWeight
-                : null;
-            candidate.Diagnostics.TemplateRankTier = tier.ToString();
-        }
-
-
-        private static SeriesFeatureSet BuildTemplateFeatures(
-            List<decimal> dailyBbMid,
-            List<decimal> dailyBbUpper,
-            List<decimal> dailyBbLower,
-            List<decimal> dailyRsi,
-            List<decimal> dailyMacd,
-            List<decimal> h4BbMid,
-            List<decimal> h4BbUpper,
-            List<decimal> h4BbLower,
-            List<decimal> h4Rsi,
-            List<decimal> h4Macd,
-            List<decimal>? dailyMacdLine = null,
-            List<decimal>? dailyMacdSignal = null,
-            List<decimal>? h4MacdLine = null,
-            List<decimal>? h4MacdSignal = null)
-        {
-            return new SeriesFeatureSet(
-                Daily: [
-                    dailyBbMid,
-                    dailyBbUpper,
-                    dailyBbLower,
-                    dailyMacdLine ?? [],
-                    dailyMacdSignal ?? [],
-                    dailyMacd,
-                    dailyRsi
-                ],
-                H4: [
-                    h4BbMid,
-                    h4BbUpper,
-                    h4BbLower,
-                    h4MacdLine ?? [],
-                    h4MacdSignal ?? [],
-                    h4Macd,
-                    h4Rsi
-                ]);
-        }
-
-        private static SeriesDistance? CalculateSeriesDistance(
-            SeriesFeatureSet candidate,
-            SeriesFeatureSet template,
-            SeriesSimilaritySettings settings)
-        {
-            var daily = CalculateGroupDistance(candidate.Daily, template.Daily, settings);
-            var h4 = CalculateGroupDistance(candidate.H4, template.H4, settings);
-
-            return daily.HasValue || h4.HasValue
-                ? new SeriesDistance(daily, h4)
-                : null;
-        }
-
-        private static decimal? CalculateGroupDistance(
-            IReadOnlyList<List<decimal>> candidate,
-            IReadOnlyList<List<decimal>> template,
-            SeriesSimilaritySettings settings)
-        {
-            var pointTolerances = new[]
-            {
-                settings.BbMidPointTolerance,
-                settings.BbUpperPointTolerance,
-                settings.BbLowerPointTolerance,
-                settings.MacdPointTolerance,
-                settings.MacdPointTolerance,
-                settings.MacdPointTolerance,
-                settings.RsiPointTolerance
-            };
-            var distances = new List<decimal>();
-
-            for (var i = 0; i < Math.Min(candidate.Count, template.Count); i++)
-            {
-                var distance = CalculateNormalizedPointDistance(
-                    candidate[i],
-                    template[i],
-                    pointTolerances[i],
-                    settings.RelativePointTolerance);
-                if (!distance.HasValue)
-                    continue;
-
-                distances.Add(distance.Value);
-            }
-
-            return distances.Count > 0
-                ? distances.Max()
-                : null;
-        }
-
-        private static decimal? CalculateNormalizedPointDistance(
-            List<decimal> left,
-            List<decimal> right,
-            decimal baseTolerance,
-            decimal relativeTolerance)
-        {
-            var count = Math.Min(left.Count, right.Count);
-            if (count < 3)
-                return null;
-
-            var leftTail = left.TakeLast(count).ToArray();
-            var rightTail = right.TakeLast(count).ToArray();
-            var leftBase = leftTail[0];
-            var rightBase = rightTail[0];
-            var worstPointDistance = 0m;
-
-            for (var i = 0; i < count; i++)
-            {
-                var leftDelta = leftTail[i] - leftBase;
-                var rightDelta = rightTail[i] - rightBase;
-                var diff = Math.Abs(leftDelta - rightDelta);
-                var tolerance = Math.Max(baseTolerance, Math.Abs(rightDelta) * relativeTolerance);
-
-                worstPointDistance = Math.Max(
-                    worstPointDistance,
-                    Positive(diff - tolerance));
-            }
-
-            return worstPointDistance;
         }
 
         private decimal CalculatePatternSeriesAdjustment(
@@ -7263,8 +6629,7 @@ namespace IbSwingTrader.Application.Candidates
         private enum SeriesTemplateFamily
         {
             TodayResearchLike,
-            Reversal,
-            LowAmplitudeSameDay
+            Reversal
         }
 
         private enum DailyFamilySplit
@@ -7283,12 +6648,6 @@ namespace IbSwingTrader.Application.Candidates
             PullbackContinuation
         }
 
-        private sealed record SeriesSimilarityTemplate(
-            string Ticker,
-            SeriesTemplateFamily Family,
-            decimal AmplitudePct,
-            SeriesFeatureSet Features);
-
         private readonly record struct DailySplitDiagnostic(
             string Source,
             int DailyBarsCount,
@@ -7303,22 +6662,6 @@ namespace IbSwingTrader.Application.Candidates
         private sealed record CandidateGroupItem(
             CandidateDetails Candidate,
             bool IsSameDay);
-
-        private sealed record SeriesSimilarityMatch(
-            string? TemplateTicker,
-            string? TemplateFamily,
-            decimal? TemplateAmplitudePct,
-            decimal? DailyDistance,
-            decimal? H4Distance,
-            decimal Bonus)
-        {
-            public static SeriesSimilarityMatch Empty { get; } =
-                new(null, null, null, null, null, 0m);
-        }
-
-        private readonly record struct SeriesDistance(
-            decimal? Daily,
-            decimal? H4);
 
         private sealed class ScanPerformanceSummary
         {
@@ -7405,15 +6748,6 @@ namespace IbSwingTrader.Application.Candidates
                 _stopwatch.Stop();
                 Elapsed = _stopwatch.Elapsed;
             }
-        }
-
-        private sealed record SeriesFeatureSet(
-            IReadOnlyList<List<decimal>> Daily,
-            IReadOnlyList<List<decimal>> H4)
-        {
-            public bool HasUsefulSeries =>
-                Daily.Any(x => x.Count >= 3) ||
-                H4.Any(x => x.Count >= 3);
         }
 
         private sealed class WishListContext

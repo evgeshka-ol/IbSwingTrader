@@ -18,18 +18,6 @@ namespace IbSwingTrader.Domain.Candidates
 
         public decimal? WeeklyMACDHistDelta { get; set; }
 
-        public string? SeriesSimilarityTemplateTicker { get; set; }
-
-        public string? SeriesSimilarityTemplateFamily { get; set; }
-
-        public decimal? SeriesSimilarityBonus { get; set; }
-
-        public string? LowAmplitudeTemplateTicker { get; set; }
-
-        public decimal? LowAmplitudePenalty { get; set; }
-
-        public string? TemplateRankTier { get; set; }
-
         public decimal? RankingQualityScore { get; set; }
 
         public decimal? EstimatedHitRatePct { get; set; }

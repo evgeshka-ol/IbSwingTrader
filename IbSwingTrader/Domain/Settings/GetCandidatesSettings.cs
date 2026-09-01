@@ -563,7 +563,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ExplosiveBellUpAnomalyMinTrendPosition { get; set; } = 30.0m;
         public decimal ExplosiveBellUpAnomalyMaxDailyRsi14 { get; set; } = 75.0m;
         public decimal ExplosiveBellUpAnomalyMaxDistanceTo20dHigh { get; set; } = -15.0m;
-        public SeriesSimilaritySettings SeriesSimilarity { get; set; } = new();
 
         public decimal HotByVolumePresetBonus { get; set; } = 1.0m;
         public decimal MostActivePresetBonus { get; set; } = 0.9m;
@@ -572,29 +571,6 @@ namespace IbSwingTrader.Domain.Settings
         public decimal TopOpenPercGainPresetBonus { get; set; } = 0.2m;
         public decimal TopOpenPercLosePresetBonus { get; set; } = 0.1m;
         public decimal DefaultPresetBonus { get; set; } = 0m;
-    }
-
-    public class SeriesSimilaritySettings
-    {
-        public bool Enabled { get; set; } = true;
-        public decimal MinTemplateAmplitudePct { get; set; } = 10m;
-        public decimal MaxTemplateAmplitudePct { get; set; } = 50m;
-        public int MaxTemplatesPerFamily { get; set; } = 160;
-        public decimal FullMatchDistance { get; set; } = 1.20m;
-        public decimal WeakMatchDistance { get; set; } = 2.20m;
-        public decimal FullMatchBonus { get; set; } = 1.20m;
-        public decimal WeakMatchBonus { get; set; } = 0.35m;
-        public bool EnableLowAmplitudePenalty { get; set; } = true;
-        public bool LowAmplitudeUseLatestScanDateOnly { get; set; } = true;
-        public decimal LowAmplitudeMinTemplateAmplitudePct { get; set; } = 0m;
-        public decimal LowAmplitudeMaxTemplateAmplitudePct { get; set; } = 10m;
-        public decimal LowAmplitudePenaltyWeight { get; set; } = 1.15m;
-        public decimal RelativePointTolerance { get; set; } = 0.06m;
-        public decimal BbMidPointTolerance { get; set; } = 0.25m;
-        public decimal BbUpperPointTolerance { get; set; } = 0.35m;
-        public decimal BbLowerPointTolerance { get; set; } = 0.60m;
-        public decimal RsiPointTolerance { get; set; } = 1.20m;
-        public decimal MacdPointTolerance { get; set; } = 0.03m;
     }
 
     public class CandidateFilterSettings

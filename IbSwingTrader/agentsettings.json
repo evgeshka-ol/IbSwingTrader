@@ -744,28 +744,6 @@
                 "MinProfitPct": 0.055,
                 "MaxProfitPct": 0.14
             },
-            "SeriesSimilarity": {
-                "Enabled": true,
-                "MinTemplateAmplitudePct": 10.0,
-                "MaxTemplateAmplitudePct": 50.0,
-                "MaxTemplatesPerFamily": 160,
-                "FullMatchDistance": 1.20,
-                "WeakMatchDistance": 2.20,
-                "FullMatchBonus": 1.20,
-                "WeakMatchBonus": 0.35,
-                "EnableLowAmplitudePenalty": true,
-                "LowAmplitudeUseLatestScanDateOnly": true,
-                "LowAmplitudeMinTemplateAmplitudePct": 0.0,
-                "LowAmplitudeMaxTemplateAmplitudePct": 10.0,
-                "LowAmplitudePenaltyWeight": 1.15,
-                "RelativePointTolerance": 0.06,
-                "BbMidPointTolerance": 0.25,
-                "BbUpperPointTolerance": 0.35,
-                "BbLowerPointTolerance": 0.60,
-                "RsiPointTolerance": 1.20,
-                "MacdPointTolerance": 0.03
-            },
-
             "HotByVolumePresetBonus": 1.0,
             "MostActivePresetBonus": 0.9,
             "TopPercGainPresetBonus": 0.7,
