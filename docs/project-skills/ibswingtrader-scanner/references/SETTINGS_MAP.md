@@ -31,11 +31,36 @@ Useful when too many names are seen but not promoted.
 
 ### `GetCandidates.Finder`
 
-- `EmitAllSeenCandidates`: temporary recall/ranking diagnostic mode. When
-  `true`, the scanner writes seen-but-rejected tickers into the normal
-  `candidates.csv` sections so the evaluator can score the full scanner input.
-  Use this to judge whether high-amplitude names rank above weak names before
-  re-enabling stricter final filters.
+- `EmitAllSeenCandidates`: **deliberately `true`, not a bug.** When `true`,
+  `CandidateResultWriter` writes and displays every seen candidate — including
+  ones the admission gate rejected (`CandidateSource=DiagnosticRejected`,
+  `BellUp`/`ReversalHook` not confirmed) — ranked together with genuinely
+  admitted ones (`Primary`/`SameDayContinuation`) by the same quality score, in
+  the same console output and `candidates.csv` sections, with no source marker
+  visible in the console.
+  - Origin: earlier rounds of tightening the admission filter kept collapsing
+    the visible list to empty or 1-2 tickers, while the broker and outside
+    sites (e.g. Yahoo Finance) kept showing real high-amplitude movers on the
+    same days — a sign the filter was cutting recall, not just noise. The user
+    made this deliberate: return every ticker, ranked best-to-worst by the
+    scanner's own quality opinion, rather than let a filter silently hide
+    winners.
+  - **Do not treat "rank #1 is sometimes a rejected candidate" as something to
+    fix by adding a filter here.** The condition for turning this back to
+    `false` (i.e. letting the admission gate decide what's shown, not just
+    ranking) is empirical and set by the user: only once the top of the list
+    is *consistently* landing on `AmplitudePct >= 10%` winners. Until then,
+    ranking quality (`RankingQualityScore` / `AdjustedRank`) is the lever to
+    improve, not admission strictness.
+  - Analysis on 2026-09-01 against `evaluation-dataset.csv` (23 scans): current
+    rank-1 already hits `AmplitudePct >= 10%` in at least one of
+    Runaway/Reversal on 20/23 scans (87%) — Runaway rank-1 alone 74%, Reversal
+    rank-1 alone 52%, both categories together only 9/23 (39%). The properly
+    *admitted*-only pool performs worse in this sample (Runaway admitted-only
+    top pick 52% vs 71% for the rejected-but-top-scored pool; Reversal
+    `Primary` admissions exist in only 6/23 scans and never cleared 12%
+    amplitude) — another reason not to re-enable the gate as a shortcut fix
+    right now.
 
 ### `GetCandidates.NextDayRanking`
 

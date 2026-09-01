@@ -125,7 +125,25 @@ None of the below has cleared that bar yet.
   principled starting point than an arbitrary before/after percentage
   threshold — repeated attempts at fixed numeric thresholds (Weekly, Daily,
   H4) kept producing samples too small or mismatched in scale to draw a
-  conclusion.
+  conclusion. Note: `IsBellDownCurveTurn` itself is not directly reusable
+  as-is — it detects the down-*launch* acceleration turn (squeeze-to-expansion,
+  mid still steepening), the mirror opposite of the exhaustion/flattening bend
+  this section describes.
+  - **Tested 2026-09-01** on `RecentDailyBbMidBandSeries` (daily, 30-point
+    snapshot) against 260 decided Reversal Win/Loss rows in
+    `evaluation-dataset.csv`, target = `AmplitudePct >= 10%`: a windowed
+    prior-slope-vs-recent-slope-pct feature scored AUC 0.33-0.48 depending on
+    how strict a prior-steep-decline gate was applied (worse than chance as
+    the gate tightened); a discrete boolean version (steep decline a few bars
+    back, gated at <= -0.3%/bar, then last delta closer to zero) scored
+    AUC 0.48 raw / 0.478 as a magnitude. **No exploitable signal at daily-bar
+    granularity in either formulation** — consistent with the AUC=0.54
+    "band-slope deceleration alone" result already recorded in
+    `SCANNER_MODEL.md`, and with the suspicion above that this needs
+    candle-level detail. Do not retest yet another windowed-average or
+    threshold variant of this same daily-bar-delta idea without raw OHLC —
+    the daily/H4 stored series appear to be the wrong granularity for this
+    signal, not the specific formula.
 
 See `SCANNER_MODEL.md` for a related open item on the `Runaway` side
 (intraday reversion while a candidate is still top-ranked live).
