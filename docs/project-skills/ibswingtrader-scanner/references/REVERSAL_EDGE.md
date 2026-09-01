@@ -145,5 +145,50 @@ None of the below has cleared that bar yet.
     the daily/H4 stored series appear to be the wrong granularity for this
     signal, not the specific formula.
 
+- **The admission gate and ranking score themselves, not just the mid-band-bend
+  idea, carry no signal (tested 2026-09-01).** `IsReversalHookPattern`
+  (`BellPatternClassifier.cs`) — the compound gate actually deciding
+  `Reversal` admission today — was tested against 194-260 decided Win/Loss
+  `DiagnosticRejected` Reversal rows (available because `EmitAllSeenCandidates`
+  logs rejects with real outcomes; see `SETTINGS_MAP.md`). Every one of its 14
+  boolean sub-flags (`LowerBrokeDown`, `LowerHooked`, `MidDecelerated`,
+  `PriceTurnsTowardMid`, `RsiTurnsUp`, etc.) scored AUC 0.43-0.54 individually
+  — noise. The compound gate's pass/fail count (0 of 8 top-level terms failing
+  vs. 7 of 8) has no monotonic relationship with outcome either — win rate
+  stays flat around 33-42% regardless. `CalculateReversalHookQualityScore`
+  (the ranking score used for `Reversal`) scored AUC 0.51 on the same
+  population — also no signal. A further sweep of continuous features not
+  already covered above (Daily RSI rise-from-trough, MACD line/signal gap and
+  its delta, MACD histogram level/delta, mid- and lower-band "bend magnitude"
+  as a raw sum-of-deltas rather than a windowed slope-pct, Daily/H4 band-width
+  ratio, H4 RSI level) topped out at AUC 0.57 (`H4RsiLast`, the single best),
+  still short of this project's own ~0.60 real-signal bar. One concrete
+  false-negative from the same data: `INHD` was a real `Win` outcome but was
+  rejected by the gate on four of its eight top-level terms
+  (`LowerBrokeDown=False, MidContextOk=False, PriceTurnsTowardMid=False,
+  RsiTurnsUp=False`) — exactly the kind of case the flat win-rate-by-failure-
+  count result predicts should be common, not rare.
+  - **Do not retune `IsReversalHookPattern`'s thresholds or
+    `CalculateReversalHookQualityScore`'s weights on the strength of this** —
+    per the discipline at the top of this section, nothing here has been shown
+    to carry signal to retune in the first place; tightening or loosening
+    numeric bars on a feature set that scores at chance just moves noise
+    around. Per the user's explicit decision (2026-09-01), the next step
+    instead is capturing raw candle data (see below) so the actual
+    candle-level mechanics this section's `NAT` example describes can be
+    tested directly, rather than continuing to iterate on aggregate tail-slope
+    features that keep testing at chance.
+- **Raw OHLC capture added 2026-09-01.** `RecentDailyOpenSeries/HighSeries/
+  LowSeries` (Daily already had `RecentDailyCloseSeries`) and
+  `RecentH4OpenSeries/HighSeries/LowSeries/CloseSeries` (H4 previously had no
+  raw price series at all, only Bollinger/MACD/RSI aggregates) are now written
+  to both `candidates.csv` and `evaluation-dataset.csv`, index-aligned with
+  each timeframe's existing Bollinger series. This is purely additive — no
+  admission/ranking logic changed. Purpose: directly enables testing the `NAT`
+  worked example above (which specific candle's wick crosses which band) once
+  enough scans accumulate with this data present; every scan going forward
+  captures it, but historical rows before this date do not have it
+  backfilled.
+
 See `SCANNER_MODEL.md` for a related open item on the `Runaway` side
 (intraday reversion while a candidate is still top-ranked live).

@@ -50,9 +50,9 @@ below-mid split. The pattern is daily-row based:
 - MACD line and signal converge
 - RSI recovers from the recent low
 
-After the hook passes, literal series similarity to a high-amplitude reversal
-template on real closed D1 or saved H4 rows is supporting evidence, not a hard
-admission requirement. Weekly rows remain context only.
+Weekly rows remain context only. (Literal series-similarity template matching
+that used to sit after the hook was removed 2026-09-01 — see "Ranking
+implementation status" below.)
 
 
 Use POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set as the
@@ -149,67 +149,27 @@ The current direction is:
 4. require `Reversal` to produce meaningful amplitude too
 5. only then tune `TradePlan`
 
-## Series-template matching
+## Series-template matching — attempted, disproven, removed (2026-09-01)
 
-The scanner should move toward literal row-shape matching.
+This section used to prescribe a literal row-shape template-matching design
+(positive/negative templates loaded from historical `candidates.csv`
+snapshots, per-point distance comparison, a low-amplitude veto). That design
+was built (2026-07-11), empirically disproven as a ranking driver two days
+later (2026-07-13 — see "Ranking implementation status" below), kept only as
+an audit-only diagnostic after that, and finally deleted from the codebase
+entirely on 2026-09-01 once the audit data itself was shown to be
+uninformative: across the diagnostic column's entire lifetime in
+`candidates.csv` (2306+ rows), it recorded a real match on **zero** of them.
+The low-amplitude admission veto that depended on the same matching code was
+removed alongside it — it could structurally never have fired. `BellUp`
+final `Runaway` promotion now requires only the pattern confirmation itself
+(no template veto); `Reversal` promotion is `ReversalHook` only. Bell pattern
+pair (`BellUp`/`BellDown`, matched on H4/Daily only): full geometry,
+counter-examples, and the `ReadyNow`/`NotReady`/`Neutral` phase split are
+canonical in `SERIES_PLAYBOOK.md` — not restated here.
 
-For `Runaway`:
-
-- use evaluation rows only to identify historical scan keys that produced
-  confirmed `BellUp` and high amplitude
-- load the actual positive template series from the matching historical
-  `candidates.csv` scan snapshot
-- compare against scan snapshots whose later evaluation had low amplitude as
-  negative templates;
-  candidates whose rows look like the low-amplitude third should be demoted or
-  filtered before they occupy the top of the list
-- treat the TE-style fresh expansion as a high-priority winner pattern:
-  - weekly MA row recovers from negative/below-mean history into positive territory
-  - daily MA, daily Bollinger width, and daily RSI expand together
-  - H4 MA, H4 Bollinger width, and H4 RSI also expand and hold
-  - weekly/daily/H4 MACD are recovering or positive
-  - this pattern can outrank a conflicting low-amplitude template match because
-    the row structure matches a practical next-day winner
-- treat real Bollinger band curve launches as scalable patterns:
-  - use `*BbUpperBandSeries`, `*BbMidBandSeries`, and `*BbLowerBandSeries`
-    alongside width and upper-distance confirmation
-  - the same squeeze/launch shape can matter on Weekly, Daily, or H4
-  - Daily launch is stronger next-day research evidence; H4 launch is often an
-    earlier intraday/next-day trigger; Weekly launch is broad swing background
-  - do not discard a candidate only because the pattern appears on H4 rather
-    than Daily; adjust ranking/trade profile by timeframe instead
-
-For `Reversal`:
-
-- use confirmed high-amplitude `ReversalHook` evaluation labels, then load the
-  feature rows from the matching historical scanner snapshots
-- do not let above-mean continuation templates promote reversal candidates
-
-Comparison principle:
-
-- evaluation provides labels, never template feature values
-- compare each series point-by-point with modest tolerance
-- normalize each compared series from its first point
-- calculate a separate distance for Daily and H4; matching either timeframe is
-  sufficient, and the weighted average must not decide admission
-- keep Weekly rows as context only; a Weekly-only match must not promote a
-  candidate into today's final list
-- avoid replacing this with only slope/aggregate statistics
-- split templates by outcome role: high-amplitude rows are positive scanner
-  templates; low-amplitude rows are rejection templates
-
-Bell pattern pair (`BellUp`/`BellDown`, matched on H4/Daily only): full
-geometry, counter-examples, and the `ReadyNow`/`NotReady`/`Neutral` phase
-split are canonical in `SERIES_PLAYBOOK.md` — not restated here.
-
-For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
-real Bollinger rows in `H4` or `Daily`. Literal Daily/H4 winner similarity
-supports ranking, while a closer low-amplitude BellUp match vetoes promotion.
-Weekly-only Bell and other continuation subtypes remain context.
-
-If strict promotion leaves both final families empty, keep the result empty.
-The low-amplitude template veto represents observed evaluation feedback and
-must not be disabled merely to populate the output.
+If strict promotion leaves both final families empty, keep the result empty
+— that discipline still applies, it just no longer involves a template veto.
 
 ## Shared classifier implementation status (2026-08-10)
 
@@ -248,10 +208,11 @@ slope + H4 mid-band tail slope) for `Runaway`, `CalculateReversalHookQualityScor
 Both were individually validated by AUC against `evaluation-dataset.csv`
 before being wired in — Daily/H4 Bollinger band slope was the strongest
 finding of the investigation (AUC 0.64 mild → 0.84 extreme contrast).
-`ReRankCandidates` sorts by `qualityScore * 50 + legacyNextDayRank`; the
-template tier/distance machinery (`ResolveTemplateRankTier`) still runs and
-still writes `Diagnostics.TemplateRankTier` etc. for audit, but no longer
-affects sort order. Both `Runaway` and `Reversal` still rerank across their
+`ReRankCandidates` sorts by `qualityScore * 50 + legacyNextDayRank`. The
+template tier/distance machinery (`ResolveTemplateRankTier`,
+`Diagnostics.TemplateRankTier`, etc.) that used to run alongside it for audit
+was deleted 2026-09-01 — see "Series-template matching" above; it had never
+once recorded a real match. Both `Runaway` and `Reversal` still rerank across their
 full candidate pool per scan (no top-window cap). See
 `ReRankCandidates`/`CalculateRunawayLaunchQualityScore`/`CalculateReversalHookQualityScore`
 in `CandidateFinder.cs`.
@@ -297,9 +258,12 @@ scale the same day: `>=25 -> 85%` (empirical 88.9%, n=45), `>=10 -> 55%`
 (empirical 53.8%, n=93), else `30%` (empirical ~31%, n=284). The old buckets
 (`>=20 -> 70%`, `>=10 -> 65%`, else `10%`) were calibrated to the pre-change
 score scale and would have under/over-stated confidence against the new
-formula's generally larger scores. Reversal's buckets are untouched and still
-reflect the original 2026-07-14 check (n=19) — recheck those the same way
-before trusting them.
+formula's generally larger scores. Reversal's buckets are still untouched
+(original 2026-07-14 check, n=19) — the recheck this note called for did
+happen the same day this Runaway sweep ran (2026-09-01), and came back null
+(`CalculateReversalHookQualityScore` AUC 0.51 on 260 rows): see
+`REVERSAL_EDGE.md` "Open items" for the full result. Do not recalibrate the
+Reversal buckets on the strength of a score that has no shown signal.
 
 ## Band-kink / RSI-rollover investigation (2026-08-11)
 

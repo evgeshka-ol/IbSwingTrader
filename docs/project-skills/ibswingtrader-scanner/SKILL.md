@@ -54,10 +54,10 @@ Internal `Runaway` subtypes:
 - `PullbackContinuation`: constructive continuation after a pullback
 
 Current final `Runaway` admission is intentionally strict: the candidate must
-confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. A positive
-high-amplitude template match supports ranking and confidence but is not a hard
-admission requirement. A closer low-amplitude BellUp match is a promotion veto.
-Other above-mid continuation subtypes remain diagnostic only.
+confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. (The
+literal-template match/veto mentioned in older notes was removed 2026-09-01 —
+see "Series-template direction" below.) Other above-mid continuation subtypes
+remain diagnostic only.
 
 Do not mix the two mentally or in code. They are opposite regimes and need different ranking logic.
 
@@ -84,11 +84,25 @@ Both families should produce meaningful future amplitude:
 Current final `Reversal` promotion uses the working `ReversalHook` pattern
 after the hard split — the split only decides "below daily mid";
 `ReversalHook` decides trade-readiness and is what actually gates admission.
-A real D1/H4 match to a high-amplitude (`AmplitudePct >= 10%`) reversal
-template supports ranking/confidence but is not a hard requirement. Weekly
-rows remain context only. Full row-shape checklist (incl. the freshness
-requirement on the lower-band turn) and worked examples: `SERIES_PLAYBOOK.md`
-"ReversalHook" — do not restate or fork that checklist here.
+Weekly rows remain context only. Full row-shape checklist (incl. the
+freshness requirement on the lower-band turn) and worked examples:
+`SERIES_PLAYBOOK.md` "ReversalHook" — do not restate or fork that checklist
+here.
+
+**2026-09-01 finding: this gate carries no measurable signal.** Every one of
+`IsReversalHookPattern`'s 14 boolean sub-flags, tested individually against
+194-260 decided Win/Loss `DiagnosticRejected` Reversal rows in
+`evaluation-dataset.csv`, came back AUC 0.43-0.54 (noise); the compound gate's
+pass/fail count has no monotonic relationship with outcome either.
+`CalculateReversalHookQualityScore` itself: AUC 0.51. See
+`references/REVERSAL_EDGE.md` "Open items" for the full result and the
+continuous-feature sweep that followed it. Per the user's explicit choice,
+this is not being fixed by retuning the gate/score (nothing here has been
+shown to carry signal to retune) — instead raw Daily/H4 OHLC candle series
+are now captured (`RecentDailyOpenSeries/HighSeries/LowSeries`,
+`RecentH4OpenSeries/HighSeries/LowSeries/CloseSeries`, added 2026-09-01) so
+the candle-level mechanics described in `REVERSAL_EDGE.md`'s `NAT` example
+can eventually be tested directly, once enough scans accumulate.
 
 `Reversal` is the user's own years-proven manual trading edge (this app's job
 is to remove emotion and scale past the broker scan API limit, not to
@@ -98,28 +112,27 @@ when both need work — see `references/REVERSAL_EDGE.md` for why, the precise
 a full worked example, and open items that were investigated but
 deliberately left unimplemented pending more evaluation data.
 
-## Series-template direction
+## Series-template direction — removed 2026-09-01
 
-Prefer literal series-similarity as **supporting/ranking evidence**, never as
-a hard admission requirement. Full comparison methodology, template sourcing,
-and veto mechanics are canonical in `SERIES_PLAYBOOK.md` ("Template sources",
-"Practical use") — do not restate or fork that checklist here.
-
-Two rules worth keeping at quick-access level, because getting them wrong
-silently corrupts every template built afterward:
-
-- **Never use feature rows from `research_top_gainers.csv` or
-  `evaluation-dataset.csv` as scanner templates** — those rows may include
-  bars observed after the original scan. The feature row must always come
-  from the saved scanner snapshot (`candidates.csv`); evaluation supplies
-  only the outcome label and amplitude.
-- Join evaluation labels back to `candidates.csv` by ticker, preset scan
-  code, and exact scan time.
-
-If strict promotion leaves both final families empty, return an empty
-result — do not disable the low-amplitude template veto to manufacture a
-candidate; that re-admits rows the evaluation feedback already identified as
-weak and damages top-1 quality.
+Literal series-similarity template matching (`ApplySeriesSimilarityDiagnostics`,
+`CalculateSeriesSimilarityMatch`, `LoadSeriesSimilarityTemplatesAsync`,
+`ResolveTemplateRankTier`, the `SeriesTemplateRankTier` enum, and the
+`Diagnostics.SeriesSimilarityTemplateTicker/Family/Bonus`,
+`LowAmplitudeTemplateTicker/Penalty`, `TemplateRankTier` columns in
+`candidates.csv`) has been **deleted from the codebase**, not merely demoted.
+It had already been reduced to an audit-only side-channel on 2026-07-13 (see
+`SCANNER_MODEL.md` "Ranking implementation status") after being disproven as a
+ranking driver; this session found the audit data itself was never
+informative either — across the entire history of `candidates.csv` since that
+diagnostic column started being written (2306+ rows), `TemplateRankTier` was
+`"None"` in 100% of them, meaning the low-amplitude admission veto that used
+to sit inside `IsTodayResearchLikeCandidate` could structurally never have
+fired. Both were removed together. `SeriesTemplateFamily` the enum still
+exists and is still used, but purely as a plain discriminator to pick
+`CalculateRunawayLaunchQualityScore` vs `CalculateReversalHookQualityScore` —
+it no longer drives any template matching. `SERIES_PLAYBOOK.md`'s old
+"Template sources"/"Practical use" sections have been replaced with a pointer
+to this history; do not resurrect that methodology without new evidence.
 
 ### Ranking (current state — see `SCANNER_MODEL.md` for validation history)
 
@@ -137,13 +150,13 @@ in:
   sweep and rejected candidates (Weekly slopes, RSI, MACD histogram all
   tested weaker).
 - `CalculateReversalHookQualityScore` (Reversal): Daily band-width
-  compression + Daily lower-band hook tail slope.
+  compression + Daily lower-band hook tail slope. Re-tested 2026-09-01 against
+  260 decided rows: AUC 0.51, no signal — see `REVERSAL_EDGE.md` "Open items"
+  before extending this formula further.
 - Sort key: `AdjustedRank = qualityScore * 50 + legacy NextDayRank`. The
-  series-template tier/distance machinery (`ResolveTemplateRankTier`,
-  `Diagnostics.TemplateRankTier`, etc.) still runs and writes to
-  `candidates.csv` for audit, but does not affect sort order — check
-  `RankingQualityScore` to explain why one candidate outranks another, not
-  the template tier.
+  series-template tier/distance machinery described in older notes is gone
+  (removed 2026-09-01, see above) — check `RankingQualityScore` to explain
+  why one candidate outranks another.
 
 Bell/ReversalHook classification (envelope math, curve-turn checks,
 vertical-spike detection) lives in one shared place, `BellPatternClassifier`
@@ -198,7 +211,8 @@ migration rule and what `candidates.csv` currently admits.
 ## Main code
 
 - Scanner core: `IbSwingTrader/Application/Candidates/CandidateFinder.cs`
-- Ranking/tiering: `ReRankCandidates` / `ResolveTemplateRankTier` in `CandidateFinder.cs`
+- Ranking: `ReRankCandidates` (quality-score based; no template tiering
+  anymore) in `CandidateFinder.cs`
 - Shared Bell/ReversalHook pattern classifier (used by both the live scan and
   offline evaluation): `IbSwingTrader/Application/Candidates/BellPatternClassifier.cs`
 - Output writer: `IbSwingTrader/Infrastructure/Logging/CandidateResultWriter.cs`
@@ -220,11 +234,10 @@ When scanner quality is weak:
 
 1. Check whether the ticker was missed by the market presets, rejected by the family pattern, or present but ranked too low.
 2. Use the original series in `candidates.csv`; use evaluation only to label those snapshots.
-3. For a ranking question specifically, read `TemplateRankTier`,
-   `SeriesSimilarityTemplateTicker`, and `SeriesSimilarityBonus` on the
-   candidate directly from `candidates.csv` before guessing: `None` means no
-   winner template matched (or a low-amplitude template vetoed it), which
-   points at recall/matching, not at the tier/sort mechanism itself.
+3. For a ranking question specifically, read `RankingQualityScore` and
+   `EstimatedHitRatePct` on the candidate directly from `candidates.csv`
+   before guessing (the old `TemplateRankTier`/`SeriesSimilarity*` diagnostic
+   columns were removed 2026-09-01 along with the feature they described).
 4. Prefer fixing:
    - recall
    - family pattern recognition after the hard daily split
