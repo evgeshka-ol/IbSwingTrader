@@ -154,7 +154,7 @@ foreach ($row in $decided) {
     $visible = $candles[0..$scanIndex]
 
     # Daily bars: proper aggregation across every H4 bar of the day, not a single-bar proxy.
-    $dailyGroups = $visible | Group-Object { $_.Time.Date } | Sort-Object { [datetime]$_.Name }
+    $dailyGroups = $visible | Group-Object { $_.Time.Date } | Sort-Object { $_.Group[0].Time.Date }
     $dailyBars = foreach ($g in $dailyGroups) {
         $ordered = @($g.Group | Sort-Object Time)
         [pscustomobject]@{
