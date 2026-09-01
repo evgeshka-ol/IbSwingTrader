@@ -260,6 +260,47 @@ If extending ranking further, validate a candidate feature's AUC against
 realized `AmplitudePct` before wiring it into a quality-score function —
 that discipline is what caught the 2026-07-11 approach not working.
 
+## Runaway quality-score feature sweep (2026-09-01)
+
+With Runaway top-1 already hitting `AmplitudePct >= 10%` in 74% of scans
+(vs Reversal's 52%), ran a feature sweep to push it further before touching
+`Reversal` — AUC of each candidate feature independently against 422 decided
+Runaway Win/Loss rows in `evaluation-dataset.csv`, target
+`AmplitudePct >= 10%` (replicating `CalculateTailRelativeSlopePct` exactly):
+
+| feature | AUC alone |
+|---|---|
+| current formula (baseline) | 0.620 |
+| **H4 upper-band tail slope (lookback 4)** | **0.673** |
+| H4 mid-band tail slope (lookback 6, vs current lookback 4) | 0.661 |
+| **H4 band-width expansion (lookback 4)** | **0.639** |
+| H4 RSI level (last point) | 0.606 |
+| H4 MACD histogram (last point) | 0.608 |
+| Daily band-width expansion (lookback 4) | 0.615 |
+| Daily upper-band tail slope (lookback 6) | 0.590 |
+| Weekly mid/upper-band tail slope | 0.574 / 0.570 |
+| Daily/H4 RSI slope, Daily MACD histogram slope | 0.556 - 0.607 |
+| Daily RSI level, Weekly MACD histogram (last point) | 0.538 - 0.540 |
+
+H4 upper-band slope was not previously used at all (only H4 mid was). Added
+both H4 upper-band slope (weight `0.75`) and H4 band-width expansion (weight
+`0.25`) to `CalculateRunawayLaunchQualityScore` — combined AUC 0.620 → 0.692
+on the full 422-row sample, and confirmed on a chronological split (first
+half by `ScanTime`: 0.667 → 0.727; second half: 0.565 → 0.654) so the gain
+is not concentrated in one period. Weekly-timeframe features and RSI/MACD
+(second/third priority per the Bollinger>MACD>RSI signal hierarchy) all
+tested weaker than the Bollinger-band features and were not added — matches
+the existing signal-priority rule rather than contradicting it.
+
+`EstimateHitRatePct` Runaway buckets were recalibrated to the new score
+scale the same day: `>=25 -> 85%` (empirical 88.9%, n=45), `>=10 -> 55%`
+(empirical 53.8%, n=93), else `30%` (empirical ~31%, n=284). The old buckets
+(`>=20 -> 70%`, `>=10 -> 65%`, else `10%`) were calibrated to the pre-change
+score scale and would have under/over-stated confidence against the new
+formula's generally larger scores. Reversal's buckets are untouched and still
+reflect the original 2026-07-14 check (n=19) — recheck those the same way
+before trusting them.
+
 ## Band-kink / RSI-rollover investigation (2026-08-11)
 
 Origin: the user's working heuristic from live chart reading on 2026-08-10 —

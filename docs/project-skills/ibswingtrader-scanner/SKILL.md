@@ -130,7 +130,12 @@ score**, validated by AUC against `evaluation-dataset.csv` before being wired
 in:
 
 - `CalculateRunawayLaunchQualityScore` (Runaway): Daily mid/upper-band tail
-  slope + H4 mid-band tail slope.
+  slope + H4 mid-band tail slope + H4 upper-band tail slope (added
+  2026-09-01, AUC 0.673 alone) + H4 band-width expansion (added 2026-09-01,
+  AUC 0.639 alone) — combined AUC 0.62 → 0.69 on 422 decided rows, stable
+  across a chronological split. See `SCANNER_MODEL.md` for the full feature
+  sweep and rejected candidates (Weekly slopes, RSI, MACD histogram all
+  tested weaker).
 - `CalculateReversalHookQualityScore` (Reversal): Daily band-width
   compression + Daily lower-band hook tail slope.
 - Sort key: `AdjustedRank = qualityScore * 50 + legacy NextDayRank`. The
