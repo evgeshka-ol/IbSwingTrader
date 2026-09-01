@@ -4114,10 +4114,13 @@ namespace IbSwingTrader.Application.Candidates
         // H4 width-expansion terms to CalculateRunawayLaunchQualityScore (AUC 0.62 -> 0.69 on that change,
         // stable across a chronological split): >=25 -> 88.9% (n=45), [10,25) -> 53.8% (n=93), else -> ~31%
         // (n=284 combined, 32.8%/29.5% either side of 0) observed AmplitudePct>=10% rate. Reversal buckets
-        // still reflect the original 2026-07-14 check (n=19) - recheck those the same way before trusting
-        // them further. This is a rough historical hit-rate readout, not a statistically calibrated
-        // probability - recheck and adjust these breakpoints/rates as more days of evaluation data
-        // accumulate rather than trusting them as fixed truth.
+        // still reflect the original 2026-07-14 check (n=19) and are left as-is: the called-for recheck
+        // happened 2026-09-01 against 260 decided Win/Loss rows and CalculateReversalHookQualityScore came
+        // back AUC 0.51 (no signal) - see docs/project-skills/ibswingtrader-scanner/references/REVERSAL_EDGE.md
+        // "Open items". Recalibrating these buckets would be tuning noise, not a probability; don't touch
+        // them without a score that has shown real signal first. This is a rough historical hit-rate
+        // readout, not a statistically calibrated probability - recheck and adjust these breakpoints/rates
+        // as more days of evaluation data accumulate rather than trusting them as fixed truth.
         private static decimal EstimateHitRatePct(decimal qualityScore, SeriesTemplateFamily family)
         {
             if (family == SeriesTemplateFamily.TodayResearchLike)

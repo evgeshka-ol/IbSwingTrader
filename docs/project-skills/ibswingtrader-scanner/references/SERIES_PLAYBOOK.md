@@ -251,14 +251,14 @@ Bell pair:
   M15 must not change the D1 family split.
 
 The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
-real Bollinger rows from `H4` or `Daily`. A high-amplitude Runaway template
-match on either timeframe supports ranking but is not mandatory. A
-low-amplitude template that is at least as close as the positive match vetoes
-strict promotion. Weekly-only Bell and non-Bell continuation shapes are
-diagnostic context, not final `Runaway` promotion.
+real Bollinger rows from `H4` or `Daily`. (The template-match ranking support
+and low-amplitude veto mentioned in older notes were removed 2026-09-01 — see
+`SCANNER_MODEL.md` "Series-template matching"; the veto had never actually
+fired in the feature's history.) Weekly-only Bell and non-Bell continuation
+shapes are diagnostic context, not final `Runaway` promotion.
 
 When strict promotion returns no candidates in either family, keep the result
-empty. Never disable the low-amplitude veto simply to fill the list.
+empty.
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:
@@ -277,49 +277,19 @@ pre-move H4 rows:
 When comparing band curves across tickers, compare shape rather than absolute
 price. Normalize by the starting point or compare deltas from the first point.
 
-## Practical use
+## Practical use and template sources — removed 2026-09-01
 
-When comparing scanner output to research winners:
-
-- compare `Daily`
-- then compare `H4`
-- inspect `Weekly` only as background context
-- compare the actual row values point-by-point after normalizing each series from its first point
-- treat Daily and H4 as separate matches; either one is enough, without
-  averaging it with the other timeframe
-- never admit a candidate from a Weekly-only match
-- use modest per-point tolerance, not exact equality; tiny deviations are the
-  same shape, but differences beyond tolerance should reduce the match
-- prefer close literal similarity to winner rows over broad slope-only matches
-
-The question is:
-
-- does the scanner see the same structural regime early enough
-- and if yes, does it rank it high enough
-- close winner-template matches can support `TodayResearchLike` promotion for
-  live movers when rank, ATR, or entry score confirms the setup
-
-## Template sources
-
-Use two positive template families, both sourced from historical
-`candidates.csv` snapshots:
-
-- scan snapshots later confirmed as high-amplitude `Runaway` rows
-- scan snapshots later confirmed as high-amplitude `Reversal` rows
-
-`evaluation-dataset.csv` supplies the amplitude outcome and exact scan key
-only. `research_top_gainers.csv` is an outcome oracle, not a template feature
-source.
-
-Template admission is amplitude-based, not pattern-verdict based. A row that
-later produced high amplitude should become a positive ranking template even
-when the current `PatternVerdict` says `Mismatch/None`. The pattern verdict is
-diagnostic context; the ranking target is whether future high-amplitude names
-rise above weak names.
-
-For `Reversal`, keep templates below-mean and high-amplitude. The goal is
-not just being a pullback, but being a pullback shape that historically produced
-`AmplitudePct > 10%`.
+This section used to describe how to compare scanner output against
+literal-template winner rows (positive/negative template families sourced
+from `candidates.csv`, point-by-point comparison after normalization, etc.).
+That machinery was deleted from the codebase 2026-09-01 after its diagnostic
+output was found to have recorded zero real matches across its entire
+history — see `SCANNER_MODEL.md` "Series-template matching" for the full
+history and `SETTINGS_MAP.md` for the removed settings block. Use
+`RankingQualityScore` (`CalculateRunawayLaunchQualityScore` /
+`CalculateReversalHookQualityScore` in `CandidateFinder.cs`) to compare
+candidates instead — validate any new feature's AUC against
+`evaluation-dataset.csv` before adding it, same discipline as before.
 
 When tuning `TradePlan`, use the same series to predict:
 
@@ -346,19 +316,6 @@ For explosive min-first continuation, H4 BB pullback logic must not push entry
 too far below current price. Cap the entry discount separately, then tune the
 profit target with the setup's default profit percent.
 
-For summary ranking, compare rows in both directions:
-
-- positive templates: original scan snapshots with a later confirmed pattern
-  and high amplitude should lift candidates even when RSI already looks high
-- negative templates: original `Runaway` scan snapshots whose later evaluation
-  had `AmplitudePct < 10%` should push down candidates that look unlikely to
-  clear the 10% amplitude line
-
-Do not use the negative templates as a hard scanner filter — a vetoed
-candidate stays in the list, it does not get removed from admission. Since
-2026-07-11 the veto is a hard rank-tier demotion rather than a subtracted
-score: a candidate whose positive template match would otherwise be
-`Confirmed`/`Weak` drops straight to the same `None` rank tier as a candidate
-with no template match at all, whenever a low-amplitude template matches it at
-least as closely. It is a ranking tool for keeping weak lookalikes out of the
-current top-ranked `Runaway` rows, not an admission filter.
+Summary ranking no longer compares against positive/negative template rows
+(that mechanism is removed — see "Practical use and template sources" above);
+it runs on `RankingQualityScore` alone.

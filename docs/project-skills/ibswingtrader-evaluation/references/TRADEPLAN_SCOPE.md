@@ -59,10 +59,14 @@ The goal is to learn/predict:
 - where exit should be placed for that setup family
 
 Do not tune entry and exit as one global rule for all strong candidates.
-Group high-amplitude rows by literal series similarity first, then tune the
-entry and exit profile per group. A fast continuation group may need a shallow
-entry and earlier exit; a pullback group may need a deeper entry and different
-target logic.
+Group high-amplitude rows by setup shape (fast continuation vs. pullback vs.
+min-first, etc. — see `SERIES_PLAYBOOK.md` "Main interpretations"), then tune
+the entry and exit profile per group. A fast continuation group may need a
+shallow entry and earlier exit; a pullback group may need a deeper entry and
+different target logic. Do not group by literal series-distance/similarity —
+that comparison method was tried for scanner ranking, found not to
+discriminate outcomes (see `ibswingtrader-scanner/references/SCANNER_MODEL.md`
+"Series-template matching"), and the matching code was removed 2026-09-01.
 
 Useful fields include:
 

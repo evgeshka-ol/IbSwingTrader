@@ -71,49 +71,23 @@ Use this when the right names are present but top summary is wrong.
 Since 2026-07-13, final order is driven by a template-free quality score
 (`CalculateRunawayLaunchQualityScore` / `CalculateReversalHookQualityScore` in
 `CandidateFinder.cs`, weighted by the hardcoded `QualityScoreRankWeight = 50`
-constant, not a settings knob), not by `SeriesSimilarity` below. See
-`references/SCANNER_MODEL.md` "Shared classifier implementation status" /
-`SKILL.md` "Current ranking implementation" for what actually decides order
-today.
+constant, not a settings knob). See `references/SCANNER_MODEL.md` "Shared
+classifier implementation status" / `SKILL.md` "Ranking (current state)" for
+what actually decides order today.
 
-### `GetCandidates.NextDayRanking.SeriesSimilarity` (diagnostic-only since 2026-07-13)
+### `GetCandidates.NextDayRanking.SeriesSimilarity` — removed 2026-09-01
 
-Controls literal row-shape matching against winner templates.
-
-**These settings no longer decide final rank order.** They were the ranking
-driver through 2026-07-11 (tiered sort by `Confirmed`/`Weak`/`None` +
-template `AmplitudePct`), but that approach was empirically disproven on
-2026-07-13 (every candidate came back `None` on a real scan despite templates
-loading correctly — no discriminating signal in literal series distance for
-this dataset). The tier/distance machinery below still runs and still writes
-its result to `candidates.csv` for audit, but ranking now comes from the
-quality score above. Do not tune `FullMatchDistance`/`WeakMatchDistance` to
-try to fix a ranking problem — check `RankingQualityScore` instead.
-
-Still-relevant knobs for interpreting the diagnostic columns:
-
-- `MinTemplateAmplitudePct`: minimum amplitude for a row to become a positive template.
-- `FullMatchDistance`: below this distance a match is the `Confirmed` rank tier.
-- `WeakMatchDistance`: below this distance (and above `FullMatchDistance`) a
-  match is the `Weak` rank tier; above it, there is no match at all (`None`).
-- `FullMatchBonus` / `WeakMatchBonus`: only feed the diagnostic
-  `SeriesSimilarityBonus` value written to `candidates.csv`.
-- `EnableLowAmplitudePenalty`: enables negative templates from historical
-  `Runaway` scan snapshots whose evaluation did not reach 10% amplitude. When
-  `false`, no negative templates load and the low-amplitude veto never fires.
-- `LowAmplitudeMinTemplateAmplitudePct` / `LowAmplitudeMaxTemplateAmplitudePct`:
-  amplitude band for negative templates.
-- `LowAmplitudePenaltyWeight`: only feeds the diagnostic `LowAmplitudePenalty`
-  value in `candidates.csv`.
-- `RelativePointTolerance` and `*PointTolerance`: per-point tolerance before a
-  row difference is counted as real distance. Small differences such as `3.8`
-  vs `4.0` should usually be treated as the same shape; larger differences
-  should quickly reduce similarity.
-
-Timeframes and indicator rows are not averaged. Daily and H4 are matched
-independently, and each timeframe uses its worst real-line distance so one good
-line cannot hide a failed Bollinger/MACD/RSI row. Weekly does not participate
-in admission.
+This settings block (`FullMatchDistance`/`WeakMatchDistance`,
+`FullMatchBonus`/`WeakMatchBonus`, `EnableLowAmplitudePenalty` and its
+amplitude-band/weight knobs, point-tolerance settings) controlled literal
+row-shape template matching. It had already been audit-only since 2026-07-13
+(disproven as a ranking driver — see `SCANNER_MODEL.md` "Series-template
+matching"), and was deleted from `agentsettings.json`/`GetCandidatesSettings.cs`
+entirely on 2026-09-01 once the audit trail itself was shown to be
+uninformative: the diagnostic column it fed (`TemplateRankTier`) recorded a
+real match on zero rows across its entire history in `candidates.csv`
+(2306+ rows). If this section is referenced in older notes, it no longer
+exists in code — check `RankingQualityScore` instead.
 
 `FinalTopCandidates`, `SecondPassWindowMultiplier`, and
 `SecondPassMinimumWindow` were removed on 2026-07-11: `Reversal` reranking
