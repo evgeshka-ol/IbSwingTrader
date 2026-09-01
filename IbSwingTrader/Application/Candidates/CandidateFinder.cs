@@ -4239,8 +4239,24 @@ namespace IbSwingTrader.Application.Candidates
             var dailyMidSlope = CalculateTailRelativeSlopePct(candidate.RecentDailyBbMidBandSeries, 4);
             var dailyUpperSlope = CalculateTailRelativeSlopePct(candidate.RecentDailyBbUpperBandSeries, 4);
             var h4MidSlope = CalculateTailRelativeSlopePct(candidate.RecentH4BbMidBandSeries, 4);
+            var h4UpperSlope = CalculateTailRelativeSlopePct(candidate.RecentH4BbUpperBandSeries, 4);
 
-            return dailyMidSlope * 1.0m + dailyUpperSlope * 0.5m + h4MidSlope * 0.5m;
+            var h4Upper = candidate.RecentH4BbUpperBandSeries;
+            var h4Lower = candidate.RecentH4BbLowerBandSeries;
+            var h4WidthExpansionPct = 0m;
+            if (h4Upper.Count >= 4 && h4Lower.Count >= 4)
+            {
+                var currentWidth = h4Upper[^1] - h4Lower[^1];
+                var previousWidth = h4Upper[^4] - h4Lower[^4];
+                if (previousWidth != 0m)
+                    h4WidthExpansionPct = (currentWidth / previousWidth - 1m) * 100m;
+            }
+
+            return dailyMidSlope * 1.0m +
+                   dailyUpperSlope * 0.5m +
+                   h4MidSlope * 0.5m +
+                   h4UpperSlope * 0.75m +
+                   h4WidthExpansionPct * 0.25m;
         }
 
         private static decimal CalculateReversalHookQualityScore(CandidateDetails candidate)
@@ -4262,19 +4278,24 @@ namespace IbSwingTrader.Application.Candidates
             return compressionInverse * 30m + lowerHookSlope * 0.5m;
         }
 
-        // Coarse, honest buckets from a thin historical sample (evaluation-dataset.csv, checked 2026-07-14):
-        // Runaway n=23 scan-days, Reversal n=19. This is a rough historical hit-rate readout, not a
-        // statistically calibrated probability - recheck and adjust these breakpoints/rates as more days
-        // of evaluation data accumulate rather than trusting them as fixed truth.
+        // Coarse, honest buckets from a thin historical sample (evaluation-dataset.csv). Runaway buckets
+        // rechecked 2026-09-01 against 422 decided Win/Loss rows after adding the H4 upper-band slope and
+        // H4 width-expansion terms to CalculateRunawayLaunchQualityScore (AUC 0.62 -> 0.69 on that change,
+        // stable across a chronological split): >=25 -> 88.9% (n=45), [10,25) -> 53.8% (n=93), else -> ~31%
+        // (n=284 combined, 32.8%/29.5% either side of 0) observed AmplitudePct>=10% rate. Reversal buckets
+        // still reflect the original 2026-07-14 check (n=19) - recheck those the same way before trusting
+        // them further. This is a rough historical hit-rate readout, not a statistically calibrated
+        // probability - recheck and adjust these breakpoints/rates as more days of evaluation data
+        // accumulate rather than trusting them as fixed truth.
         private static decimal EstimateHitRatePct(decimal qualityScore, SeriesTemplateFamily family)
         {
             if (family == SeriesTemplateFamily.TodayResearchLike)
             {
-                if (qualityScore >= 20m)
-                    return 70m;
+                if (qualityScore >= 25m)
+                    return 85m;
                 if (qualityScore >= 10m)
-                    return 65m;
-                return 10m;
+                    return 55m;
+                return 30m;
             }
 
             return qualityScore >= 15m
