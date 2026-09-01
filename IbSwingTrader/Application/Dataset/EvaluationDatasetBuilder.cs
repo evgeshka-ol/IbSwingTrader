@@ -810,22 +810,33 @@ namespace IbSwingTrader.Application.Dataset
             int scanIndex,
             Func<Candle, decimal> selector)
         {
-            var indexes = new List<int>();
-            var usedDays = new HashSet<DateTime>();
+            var dailyBars = BuildDailyBars(candles.Take(scanIndex + 1).ToList());
+            return [.. dailyBars
+                .TakeLast(RecentDailySeriesLength)
+                .Select(x => Round(selector(x)))];
+        }
 
-            for (var i = scanIndex; i >= 0; i--)
+        private static List<Candle> BuildDailyBars(List<Candle> candles)
+        {
+            var result = new List<Candle>();
+
+            foreach (var group in candles.GroupBy(x => x.Time.Date).OrderBy(x => x.Key))
             {
-                var day = candles[i].Time.Date;
-                if (!usedDays.Add(day))
-                    continue;
+                var ordered = group.OrderBy(x => x.Time).ToList();
 
-                indexes.Add(i);
-                if (indexes.Count >= RecentDailySeriesLength)
-                    break;
+                result.Add(new Candle
+                {
+                    Timeframe = Timeframe.D1,
+                    Time = group.Key,
+                    Open = ordered[0].Open,
+                    High = ordered.Max(x => x.High),
+                    Low = ordered.Min(x => x.Low),
+                    Close = ordered[^1].Close,
+                    Volume = ordered.Sum(x => x.Volume)
+                });
             }
 
-            indexes.Reverse();
-            return [.. indexes.Select(i => Round(selector(candles[i])))];
+            return result;
         }
 
         private List<decimal> BuildRecentWeeklySeries(

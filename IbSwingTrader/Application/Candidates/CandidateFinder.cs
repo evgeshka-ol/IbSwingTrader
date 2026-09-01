@@ -4441,22 +4441,10 @@ namespace IbSwingTrader.Application.Candidates
             int scanIndex,
             Func<Candle, decimal> selector)
         {
-            var indexes = new List<int>();
-            var usedDays = new HashSet<DateTime>();
-
-            for (var i = scanIndex; i >= 0; i--)
-            {
-                var day = candles[i].Time.Date;
-                if (!usedDays.Add(day))
-                    continue;
-
-                indexes.Add(i);
-                if (indexes.Count >= RecentDailySeriesLength)
-                    break;
-            }
-
-            indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(selector(candles[i]), 2, MidpointRounding.AwayFromZero))];
+            var dailyBars = BuildDailyBars(candles.Take(scanIndex + 1).ToList());
+            return [.. dailyBars
+                .TakeLast(RecentDailySeriesLength)
+                .Select(x => decimal.Round(selector(x), 2, MidpointRounding.AwayFromZero))];
         }
 
         private List<decimal> BuildRecentWeeklySeries(
