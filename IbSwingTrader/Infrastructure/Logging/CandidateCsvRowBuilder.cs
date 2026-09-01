@@ -94,6 +94,9 @@ namespace IbSwingTrader.Infrastructure.Logging
             CandidateDetails candidate)
         {
             Add(row, headers, nameof(candidate.RecentDailyCloseSeries), FormatValue(candidate.RecentDailyCloseSeries));
+            Add(row, headers, nameof(candidate.RecentDailyOpenSeries), FormatValue(candidate.RecentDailyOpenSeries));
+            Add(row, headers, nameof(candidate.RecentDailyHighSeries), FormatValue(candidate.RecentDailyHighSeries));
+            Add(row, headers, nameof(candidate.RecentDailyLowSeries), FormatValue(candidate.RecentDailyLowSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbUpperBandSeries), FormatValue(candidate.RecentDailyBbUpperBandSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbMidBandSeries), FormatValue(candidate.RecentDailyBbMidBandSeries));
             Add(row, headers, nameof(candidate.RecentDailyBbLowerBandSeries), FormatValue(candidate.RecentDailyBbLowerBandSeries));
@@ -110,6 +113,10 @@ namespace IbSwingTrader.Infrastructure.Logging
             Add(row, headers, nameof(candidate.RecentWeeklyMacdHistogramSeries), FormatValue(candidate.RecentWeeklyMacdHistogramSeries));
             Add(row, headers, nameof(candidate.RecentWeeklyRsiSeries), FormatValue(candidate.RecentWeeklyRsiSeries));
 
+            Add(row, headers, nameof(candidate.RecentH4OpenSeries), FormatValue(candidate.RecentH4OpenSeries));
+            Add(row, headers, nameof(candidate.RecentH4HighSeries), FormatValue(candidate.RecentH4HighSeries));
+            Add(row, headers, nameof(candidate.RecentH4LowSeries), FormatValue(candidate.RecentH4LowSeries));
+            Add(row, headers, nameof(candidate.RecentH4CloseSeries), FormatValue(candidate.RecentH4CloseSeries));
             Add(row, headers, nameof(candidate.RecentH4BbUpperBandSeries), FormatValue(candidate.RecentH4BbUpperBandSeries));
             Add(row, headers, nameof(candidate.RecentH4BbMidBandSeries), FormatValue(candidate.RecentH4BbMidBandSeries));
             Add(row, headers, nameof(candidate.RecentH4BbLowerBandSeries), FormatValue(candidate.RecentH4BbLowerBandSeries));

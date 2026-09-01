@@ -9,6 +9,9 @@ namespace IbSwingTrader.Domain.Candidates
         public string CandidateSource { get; set; } = "Primary";
 
         public List<decimal> RecentDailyCloseSeries { get; set; } = [];
+        public List<decimal> RecentDailyOpenSeries { get; set; } = [];
+        public List<decimal> RecentDailyHighSeries { get; set; } = [];
+        public List<decimal> RecentDailyLowSeries { get; set; } = [];
         public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbLowerBandSeries { get; set; } = [];
@@ -27,6 +30,10 @@ namespace IbSwingTrader.Domain.Candidates
         public List<decimal> RecentWeeklyMacdLineSeries { get; set; } = [];
         public List<decimal> RecentWeeklyMacdSignalSeries { get; set; } = [];
         public List<decimal> RecentWeeklyMacdHistogramSeries { get; set; } = [];
+        public List<decimal> RecentH4OpenSeries { get; set; } = [];
+        public List<decimal> RecentH4HighSeries { get; set; } = [];
+        public List<decimal> RecentH4LowSeries { get; set; } = [];
+        public List<decimal> RecentH4CloseSeries { get; set; } = [];
         public List<decimal> RecentH4BbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentH4BbMidBandSeries { get; set; } = [];
         public List<decimal> RecentH4BbLowerBandSeries { get; set; } = [];

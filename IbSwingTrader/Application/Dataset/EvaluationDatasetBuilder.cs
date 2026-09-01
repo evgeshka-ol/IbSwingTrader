@@ -479,6 +479,9 @@ namespace IbSwingTrader.Application.Dataset
                 BbMidSignedDistancePct = candidate?.Diagnostics?.BBMidSignedDistancePct,
                 WeeklyMacdHistDelta = candidate?.Diagnostics?.WeeklyMACDHistDelta,
                 RecentDailyCloseSeries = ResolveSeries(candidate?.RecentDailyCloseSeries, evaluation.RecentDailyCloseSeries, recentSeries?.DailyCloseSeries),
+                RecentDailyOpenSeries = ResolveSeries(candidate?.RecentDailyOpenSeries, evaluation.RecentDailyOpenSeries, recentSeries?.DailyOpenSeries),
+                RecentDailyHighSeries = ResolveSeries(candidate?.RecentDailyHighSeries, evaluation.RecentDailyHighSeries, recentSeries?.DailyHighSeries),
+                RecentDailyLowSeries = ResolveSeries(candidate?.RecentDailyLowSeries, evaluation.RecentDailyLowSeries, recentSeries?.DailyLowSeries),
                 RecentDailyBbUpperBandSeries = ResolveSeries(candidate?.RecentDailyBbUpperBandSeries, evaluation.RecentDailyBbUpperBandSeries, recentSeries?.DailyBbUpperBandSeries),
                 RecentDailyBbMidBandSeries = ResolveSeries(candidate?.RecentDailyBbMidBandSeries, evaluation.RecentDailyBbMidBandSeries, recentSeries?.DailyBbMidBandSeries),
                 RecentDailyBbLowerBandSeries = ResolveSeries(candidate?.RecentDailyBbLowerBandSeries, evaluation.RecentDailyBbLowerBandSeries, recentSeries?.DailyBbLowerBandSeries),
@@ -493,6 +496,10 @@ namespace IbSwingTrader.Application.Dataset
                 RecentWeeklyMacdLineSeries = ResolveSeries(candidate?.RecentWeeklyMacdLineSeries, evaluation.RecentWeeklyMacdLineSeries, recentSeries?.WeeklyMacdLineSeries),
                 RecentWeeklyMacdSignalSeries = ResolveSeries(candidate?.RecentWeeklyMacdSignalSeries, evaluation.RecentWeeklyMacdSignalSeries, recentSeries?.WeeklyMacdSignalSeries),
                 RecentWeeklyMacdHistogramSeries = ResolveSeries(candidate?.RecentWeeklyMacdHistogramSeries, evaluation.RecentWeeklyMacdHistogramSeries, recentSeries?.WeeklyMacdHistogramSeries),
+                RecentH4OpenSeries = ResolveSeries(candidate?.RecentH4OpenSeries, evaluation.RecentH4OpenSeries, recentSeries?.H4OpenSeries),
+                RecentH4HighSeries = ResolveSeries(candidate?.RecentH4HighSeries, evaluation.RecentH4HighSeries, recentSeries?.H4HighSeries),
+                RecentH4LowSeries = ResolveSeries(candidate?.RecentH4LowSeries, evaluation.RecentH4LowSeries, recentSeries?.H4LowSeries),
+                RecentH4CloseSeries = ResolveSeries(candidate?.RecentH4CloseSeries, evaluation.RecentH4CloseSeries, recentSeries?.H4CloseSeries),
                 RecentH4BbUpperBandSeries = ResolveSeries(candidate?.RecentH4BbUpperBandSeries, evaluation.RecentH4BbUpperBandSeries, recentSeries?.H4BbUpperBandSeries),
                 RecentH4BbMidBandSeries = ResolveSeries(candidate?.RecentH4BbMidBandSeries, evaluation.RecentH4BbMidBandSeries, recentSeries?.H4BbMidBandSeries),
                 RecentH4BbLowerBandSeries = ResolveSeries(candidate?.RecentH4BbLowerBandSeries, evaluation.RecentH4BbLowerBandSeries, recentSeries?.H4BbLowerBandSeries),
@@ -722,6 +729,9 @@ namespace IbSwingTrader.Application.Dataset
             return new RecentFeatureSeries
             {
                 DailyCloseSeries = BuildRecentDailyCloseSeries(ordered, scanIndex),
+                DailyOpenSeries = BuildRecentDailyCandleSeries(ordered, scanIndex, x => x.Open),
+                DailyHighSeries = BuildRecentDailyCandleSeries(ordered, scanIndex, x => x.High),
+                DailyLowSeries = BuildRecentDailyCandleSeries(ordered, scanIndex, x => x.Low),
                 DailyBbUpperBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerUpperBand),
                 DailyBbMidBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerMidBand),
                 DailyBbLowerBandSeries = BuildRecentDailySeries(ordered, scanIndex, x => x.DailyBollingerLowerBand),
@@ -736,6 +746,10 @@ namespace IbSwingTrader.Application.Dataset
                 WeeklyMacdLineSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDLine ?? 0m),
                 WeeklyMacdSignalSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDSignal ?? 0m),
                 WeeklyMacdHistogramSeries = BuildRecentWeeklySeries(ordered, scanIndex, x => x.WeeklyMACDHistogram ?? 0m),
+                H4OpenSeries = BuildRecentH4CandleSeries(ordered, scanIndex, x => x.Open),
+                H4HighSeries = BuildRecentH4CandleSeries(ordered, scanIndex, x => x.High),
+                H4LowSeries = BuildRecentH4CandleSeries(ordered, scanIndex, x => x.Low),
+                H4CloseSeries = BuildRecentH4CandleSeries(ordered, scanIndex, x => x.Close),
                 H4BbUpperBandSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerUpperBand),
                 H4BbMidBandSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerMidBand),
                 H4BbLowerBandSeries = BuildRecentH4Series(ordered, scanIndex, x => x.H4BollingerLowerBand),
@@ -791,6 +805,29 @@ namespace IbSwingTrader.Application.Dataset
             return [.. indexes.Select(i => Round(candles[i].Close))];
         }
 
+        private static List<decimal> BuildRecentDailyCandleSeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<Candle, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedDays = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var day = candles[i].Time.Date;
+                if (!usedDays.Add(day))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentDailySeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => Round(selector(candles[i])))];
+        }
+
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
             int scanIndex,
@@ -836,6 +873,29 @@ namespace IbSwingTrader.Application.Dataset
 
             indexes.Reverse();
             return [.. indexes.Select(i => Round(selector(_featureEngine.Calculate(candles, i + 1))))];
+        }
+
+        private static List<decimal> BuildRecentH4CandleSeries(
+            List<Candle> candles,
+            int scanIndex,
+            Func<Candle, decimal> selector)
+        {
+            var indexes = new List<int>();
+            var usedBuckets = new HashSet<DateTime>();
+
+            for (var i = scanIndex; i >= 0; i--)
+            {
+                var bucket = StartOfH4Bucket(candles[i].Time);
+                if (!usedBuckets.Add(bucket))
+                    continue;
+
+                indexes.Add(i);
+                if (indexes.Count >= RecentH4SeriesLength)
+                    break;
+            }
+
+            indexes.Reverse();
+            return [.. indexes.Select(i => Round(selector(candles[i])))];
         }
 
         private static string BuildEvaluationKey(CandidateEvaluationResult row)
@@ -1450,6 +1510,9 @@ namespace IbSwingTrader.Application.Dataset
         private sealed class RecentFeatureSeries
         {
             public List<decimal> DailyCloseSeries { get; init; } = [];
+            public List<decimal> DailyOpenSeries { get; init; } = [];
+            public List<decimal> DailyHighSeries { get; init; } = [];
+            public List<decimal> DailyLowSeries { get; init; } = [];
             public List<decimal> DailyBbUpperBandSeries { get; init; } = [];
             public List<decimal> DailyBbMidBandSeries { get; init; } = [];
             public List<decimal> DailyBbLowerBandSeries { get; init; } = [];
@@ -1464,6 +1527,10 @@ namespace IbSwingTrader.Application.Dataset
             public List<decimal> WeeklyMacdLineSeries { get; init; } = [];
             public List<decimal> WeeklyMacdSignalSeries { get; init; } = [];
             public List<decimal> WeeklyMacdHistogramSeries { get; init; } = [];
+            public List<decimal> H4OpenSeries { get; init; } = [];
+            public List<decimal> H4HighSeries { get; init; } = [];
+            public List<decimal> H4LowSeries { get; init; } = [];
+            public List<decimal> H4CloseSeries { get; init; } = [];
             public List<decimal> H4BbUpperBandSeries { get; init; } = [];
             public List<decimal> H4BbMidBandSeries { get; init; } = [];
             public List<decimal> H4BbLowerBandSeries { get; init; } = [];
