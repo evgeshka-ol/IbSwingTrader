@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Bash(python3 *)",
       "Bash(dotnet build *)",
@@ -18,7 +17,8 @@
       "Bash(find / -iname \"evaluation-dataset*.csv*\")",
       "Bash(grep -v \"^/mnt/c/Git_Home/IbSwingTrader/Data/datasets/evaluation-dataset.csv$\")",
       "Bash(pip install *)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(grep *)"
     ]
   }
 }

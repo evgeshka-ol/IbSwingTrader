@@ -134,6 +134,8 @@ The row shape:
 - daily lower Bollinger band was falling and then hooks upward
 - the lower-band hook is strong enough to show a real turn, not only a small
   horizontal support bounce
+- the lower-band turn must be fresh: the transition from a negative delta to
+  non-negative deltas must still be visible in the last three daily points
 - daily mid band is weak but decelerates or begins to turn
 - upper/lower envelope compresses after the breakdown
 - daily MACD histogram turns upward toward zero
@@ -231,6 +233,22 @@ Bell pair:
 - A Daily `BellUp` or `ReversalHook` still needs H4 not to contradict the setup
   for today's trade-ready list. Weekly can strengthen context, but Weekly must
   not be the reason a candidate is admitted.
+- Reject a Daily `BellUp` as post-factum when its row phase is already late:
+  either the pattern appears only after H4 RSI and MACD histogram have rolled
+  over from a local peak, or the Daily pattern already existed on the previous
+  point while H4 RSI is elevated and the last two H4 rows show terminal band
+  expansion. (This is the Daily-timeframe counterpart to the KMI H4
+  terminal-pullback rejection above.)
+- After loading the current M15 rows, reject a `Runaway` whose latest closed H4
+  close was above the H4 Bollinger mid but whose live M15 price has crossed
+  below that same mid. This is a structural invalidation of the saved setup,
+  not a fixed percentage-move filter.
+- Use M15 only for execution timing after D1/H4 classification. For `Runaway`,
+  a confirmed M15 `BellUp` predicts entry near the rising M15 mid or the latest
+  shallow pullback low. For `Reversal`, a confirmed M15 `ReversalHook` predicts
+  entry near the hooked lower band or the latest local low. If the matching
+  M15 pattern is unavailable, retain the existing entry forecast as fallback;
+  M15 must not change the D1 family split.
 
 The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
 real Bollinger rows from `H4` or `Daily`. A high-amplitude Runaway template

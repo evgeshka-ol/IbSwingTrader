@@ -1,30 +1,13 @@
 # Scanner Model
 
-## Main purpose
+## Main purpose and current priority
 
-The scanner should surface tickers with strong expected amplitude before the main move finishes.
-
-The scanner should not be judged primarily by entry precision. That is `TradePlan`.
-
-## Current top priority
-
-The nearest minimal target is top-1 quality:
-
-- the #1 current `Runaway` row should be stable enough to
-  play
-- it should convert into a practical winner
-- the plan should capture more than 10%
-
-Use this as the first decision point before optimizing broad recall or average
-list quality.
-
-The highest-priority scanner goal is:
-
-- tickers in today's current top-ranked `Runaway`
-- should appear in tomorrow's `research_top_gainers.csv`
-
-This is the main next-day feedback loop. If this relationship is weak, tune
-scanner recall, promotion, and ranking before tuning entries/exits.
+See `SKILL.md` "Core intent" for the canonical, current statement of scanner
+purpose and the top-1-quality priority (`Runaway` #1 row should consistently
+capture >10%, `AmplitudePct` is the scanner-quality oracle, next-day
+`research_top_gainers.csv` coverage is the main feedback loop). Not restated
+here to avoid drift between two copies — this file covers model detail,
+failure modes, and implementation/validation history instead.
 
 ## Two candidate families
 
@@ -215,20 +198,9 @@ Comparison principle:
 - split templates by outcome role: high-amplitude rows are positive scanner
   templates; low-amplitude rows are rejection templates
 
-Bell pattern pair:
-
-- `BellUp` is the direct squeeze-to-launch form. It requires a prior
-  compressed/flat phase and a recent phase with clear expansion; it belongs on
-  the above-mid / continuation side.
-- `BellDown` is the vertical mirror with the same prior-compression /
-  recent-expansion requirement. It belongs on the below-mid / reversal side.
-- Use the same real Bollinger upper/mid/lower rows to recognize both forms;
-  only the direction changes.
-- The scanner matches Bell only on H4 and Daily. One clean matching timeframe
-  is enough. The source timeframe controls timing:
-  - `H4` means the setup can be played today and may enter final `Runaway`
-  - `Daily` means the setup is for tomorrow and may enter final `Runaway`
-  - `Weekly` remains background context and is not passed to the Bell matcher
+Bell pattern pair (`BellUp`/`BellDown`, matched on H4/Daily only): full
+geometry, counter-examples, and the `ReadyNow`/`NotReady`/`Neutral` phase
+split are canonical in `SERIES_PLAYBOOK.md` — not restated here.
 
 For the current strict `Runaway` pipeline, final promotion requires `BellUp` on
 real Bollinger rows in `H4` or `Daily`. Literal Daily/H4 winner similarity
@@ -287,6 +259,49 @@ in `CandidateFinder.cs`.
 If extending ranking further, validate a candidate feature's AUC against
 realized `AmplitudePct` before wiring it into a quality-score function —
 that discipline is what caught the 2026-07-11 approach not working.
+
+## Band-kink / RSI-rollover investigation (2026-08-11)
+
+Origin: the user's working heuristic from live chart reading on 2026-08-10 —
+a band's slope decelerating/kinking is an early reversal warning, symmetric on
+the upper and lower bands, with a kink/break of the **mid** band treated as
+the more decisive of the two. Two grounding examples: `HELP` (Daily upper-band
+delta decelerated +0.58→+0.66→+0.71→+0.55 alongside Daily RSI rolling from a
+peak of 86.26 to 83.52, a full day before price cracked) and `DKNG` (H4, two
+successive lower-band deceleration kinks preceding a mid-band break — working
+name `ChannelReclaim`, never formalized past a draft).
+
+Validated against `evaluation-dataset.csv` on 2026-08-11 (285 decided Runaway
+Win/Loss rows) by decomposing the heuristic into independent pieces:
+
+- **Daily RSI rolled over from its own recent peak: AUC=0.61** — real,
+  comparable in strength to the Daily/H4 slope features already driving
+  `RankingQualityScore`. **Implemented**: `IsLateBellUpPhase` now checks this
+  directly (`recentDailyRsiPeak >= 70m && dailyRsi[^1] < dailyRsi[^2]`),
+  independent of the H4-based branches and of whether H4 bands are still
+  expanding — this is exactly the HELP gap, closed.
+- Band-slope deceleration alone (the "kink" itself, independent of RSI):
+  AUC=0.54 — essentially no signal on its own. Not implemented.
+- The `DKNG`/`ChannelReclaim` side (H4, on the Runaway family — DKNG was
+  Runaway, not Reversal, despite reading like a reversal pattern):
+  lower-band "un-kink" alone AUC=0.48 (no signal), H4 RSI turning up alone
+  AUC=0.575 (weak). The full multi-candle criterion (double kink + mid-band
+  break) could not be tested — `evaluation-dataset.csv` stores only Bollinger/
+  MACD/RSI series, no raw H4 OHLC, and the pattern needs candle-level detail.
+  Not implemented; would need raw candle history to properly test.
+
+**How to apply:** the RSI-rollover piece is real and now live in
+`IsLateBellUpPhase`. Do not also add a standalone "any band slope kink" filter
+— that piece tested at chance level on its own. If `ChannelReclaim` comes up
+again, it still needs raw H4 candle data before it can be tested, not just
+more evaluation-dataset rows.
+
+A related but distinct daily-bar mid-band feature — the `REVERSAL_EDGE.md`
+"mid-band bend" trigger for `Reversal` — was tested the same way on
+2026-09-01 (see that file's "Open items") and also came back at chance
+(AUC 0.33-0.53 across several formulations). Same conclusion as above: no
+signal at daily-bar granularity for a windowed/discrete slope-delta version
+of this idea; candle-level data would be needed to test it properly.
 
 ## Known unvalidated gap: intraday reversion while still top-ranked (2026-08-10)
 

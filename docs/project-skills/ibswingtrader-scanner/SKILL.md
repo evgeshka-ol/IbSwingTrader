@@ -82,25 +82,13 @@ Both families should produce meaningful future amplitude:
 - If `Reversal` amplitude is below 10%, treat that as scanner failure, not a trade-plan issue.
 
 Current final `Reversal` promotion uses the working `ReversalHook` pattern
-after the hard split. The split only decides that the ticker is below the daily
-Bollinger mid; `ReversalHook` decides whether it is a trade-ready return setup.
-The hook decides admission. A real D1 or H4 match to a high-amplitude
-(`AmplitudePct >= 10%`) reversal template supports ranking and confidence but
-is not a hard admission requirement. Weekly rows remain context only.
-The hook is detected on real daily rows:
-
-- lower Bollinger band broke down and then hooks upward
-- the lower-band turn must be fresh: the transition from a negative delta to
-  non-negative deltas must still be visible in the last three daily points
-- daily mid is still weak but the downward move is decelerating or turning
-- band width is compressing after the breakdown
-- MACD histogram is still weak/negative but turns upward toward zero
-- MACD line and signal are converging
-- RSI is recovering from the recent low
-
-Good `ReversalHook` examples include POET, ASM, SSRM, CDE, and SVM from the
-2026-06-15 evaluation set. The ideal entry is usually the first or second daily
-bar after the lower-band hook; later scans may still work but are less clean.
+after the hard split — the split only decides "below daily mid";
+`ReversalHook` decides trade-readiness and is what actually gates admission.
+A real D1/H4 match to a high-amplitude (`AmplitudePct >= 10%`) reversal
+template supports ranking/confidence but is not a hard requirement. Weekly
+rows remain context only. Full row-shape checklist (incl. the freshness
+requirement on the lower-band turn) and worked examples: `SERIES_PLAYBOOK.md`
+"ReversalHook" — do not restate or fork that checklist here.
 
 `Reversal` is the user's own years-proven manual trading edge (this app's job
 is to remove emotion and scale past the broker scan API limit, not to
@@ -112,232 +100,95 @@ deliberately left unimplemented pending more evaluation data.
 
 ## Series-template direction
 
-When improving scanner recall, promotion, or ranking, prefer a literal series
-similarity signal before adding more derived heuristics.
+Prefer literal series-similarity as **supporting/ranking evidence**, never as
+a hard admission requirement. Full comparison methodology, template sourcing,
+and veto mechanics are canonical in `SERIES_PLAYBOOK.md` ("Template sources",
+"Practical use") — do not restate or fork that checklist here.
 
-- Compare rows point-by-point with small tolerance, not only by computed slopes.
-- Normalize comparable series from their first point so shape matters more than absolute level.
-- Calculate Daily and H4 similarity independently. A match on either timeframe
-  is sufficient; do not average their distances. Weekly rows are context only
-  and must not decide template admission or final promotion.
-- Never use feature rows from `research_top_gainers.csv` or `evaluation-dataset.csv` as scanner templates; those rows may include bars observed after the original scan.
-- Join evaluation labels back to `candidates.csv` by ticker, preset scan code, and exact scan time.
-- Use `AmplitudePct >= 10%` plus the confirmed family pattern as the positive label.
-- Use the matching low-amplitude range plus the confirmed family pattern as the negative label.
-- Trade-plan outcome is not part of this template label.
-- Give extra weight to higher-amplitude template matches when the geometry is otherwise similar.
-- For `Reversal`, use only high-amplitude reversal rows from the evaluation dataset.
-- A candidate close to historical winner templates should get promotion/ranking support.
-- A candidate matching a low-amplitude BellUp template at least as closely as
-  its positive winner template must be rejected during promotion.
-- If a scan has many candidates above `AmplitudePct >= 10%`, treat them as
-  the playable pool and learn low-amplitude rejection from rows below 10%.
-  The goal is to remove the low-amplitude third by similarity to today's
-  low-amplitude report rows, not by broad one-size-fits-all thresholds.
-- If you need to reject weak candidates before evaluation knows the true
-  `AmplitudePct`, do it late and only through row-based envelope expansion
-  proxies. Do not hard-cut the family split or Bell classification.
-- If strict promotion leaves both final families empty, return an empty result.
-  Do not disable the low-amplitude template veto to manufacture a candidate:
-  that re-admits rows which the evaluation feedback has already identified as
-  weak and damages top-1 quality.
+Two rules worth keeping at quick-access level, because getting them wrong
+silently corrupts every template built afterward:
 
-### Shared Bell/ReversalHook classifier (2026-08-10)
+- **Never use feature rows from `research_top_gainers.csv` or
+  `evaluation-dataset.csv` as scanner templates** — those rows may include
+  bars observed after the original scan. The feature row must always come
+  from the saved scanner snapshot (`candidates.csv`); evaluation supplies
+  only the outcome label and amplitude.
+- Join evaluation labels back to `candidates.csv` by ticker, preset scan
+  code, and exact scan time.
 
-Bell/ReversalHook pattern classification (envelope math, curve-turn checks,
-vertical-spike detection, and the slope/delta helpers they depend on) now
-lives in one place: `BellPatternClassifier` (static class in
-`Application/Candidates/BellPatternClassifier.cs`). Both the live scan path
-(`CandidateFinder.cs`) and the offline evaluation path
-(`CandidatePatternVerdictService.cs`) call into this shared class instead of
-keeping their own copies.
+If strict promotion leaves both final families empty, return an empty
+result — do not disable the low-amplitude template veto to manufacture a
+candidate; that re-admits rows the evaluation feedback already identified as
+weak and damages top-1 quality.
 
-- Before this extraction the two copies had already drifted apart (the live
-  scanner's `IsReversalHookPattern` required `lowerHookFresh` and
-  `priceTurnsTowardMid`; the offline copy silently skipped both). The shared
-  class uses the live (stricter) version as canonical, so a scanner decision
-  and its later offline evaluation now agree by construction.
-- If a Bell/ReversalHook rule needs to change, change it once in
-  `BellPatternClassifier.cs`. Do not reintroduce a local copy in
-  `CandidateFinder.cs` or `CandidatePatternVerdictService.cs` — that is exactly
-  the drift this extraction closed.
-- `CandidateFinder.cs` still keeps a few thin wrappers around the shared
-  methods (e.g. selecting which timeframe's series to pass in) — those are
-  convenience shims, not duplicate logic, and are fine to keep.
+### Ranking (current state — see `SCANNER_MODEL.md` for validation history)
 
-### Superseded: series-template tiered sort (2026-07-11)
+`ReRankCandidates` in `CandidateFinder.cs` ranks each family's **full**
+candidate pool (admitted and `DiagnosticRejected` together — see
+`SETTINGS_MAP.md` `EmitAllSeenCandidates`) by a **template-free quality
+score**, validated by AUC against `evaluation-dataset.csv` before being wired
+in:
 
-`ReRankCandidates` briefly sorted by a strict series-template tier
-(`Confirmed`/`Weak`/`None`) with the matched template's realized
-`AmplitudePct` as the primary sort key inside a tier. **This was empirically
-disproven on 2026-07-13**: on a real scan, all candidates came back
-`TemplateRankTier=None` even with hundreds of templates loaded correctly —
-literal point/curve comparison of historical Bollinger/MACD/RSI series did not
-discriminate future high-amplitude winners from losers in this dataset. Do not
-resurrect distance-threshold tuning (`FullMatchDistance`/`WeakMatchDistance`)
-as a way to fix ranking; there was no signal there to threshold on. The
-general lesson: validate that a signal actually predicts the outcome before
-retuning its thresholds.
+- `CalculateRunawayLaunchQualityScore` (Runaway): Daily mid/upper-band tail
+  slope + H4 mid-band tail slope.
+- `CalculateReversalHookQualityScore` (Reversal): Daily band-width
+  compression + Daily lower-band hook tail slope.
+- Sort key: `AdjustedRank = qualityScore * 50 + legacy NextDayRank`. The
+  series-template tier/distance machinery (`ResolveTemplateRankTier`,
+  `Diagnostics.TemplateRankTier`, etc.) still runs and writes to
+  `candidates.csv` for audit, but does not affect sort order — check
+  `RankingQualityScore` to explain why one candidate outranks another, not
+  the template tier.
 
-### Current ranking implementation: validated quality score (2026-07-13)
+Bell/ReversalHook classification (envelope math, curve-turn checks,
+vertical-spike detection) lives in one shared place, `BellPatternClassifier`
+(`Application/Candidates/BellPatternClassifier.cs`), used by both the live
+scan (`CandidateFinder.cs`) and offline evaluation
+(`CandidatePatternVerdictService.cs`). Change a rule there once, not in
+either caller — the two paths silently drifted apart before this
+consolidation.
 
-`ReRankCandidates` in `CandidateFinder.cs` now ranks by a **template-free
-quality score** validated by AUC against `evaluation-dataset.csv` history
-(Daily/H4 Bollinger band slope was the strongest individual finding, AUC 0.64
-mild → 0.84 extreme contrast for Runaway; band-width compression + lower-band
-hook slope for Reversal, AUC 0.60 → 0.63, weaker but real):
-
-- `CalculateRunawayLaunchQualityScore` (Runaway/`TodayResearchLike`): weighted
-  sum of Daily mid-band tail slope, Daily upper-band tail slope, and H4
-  mid-band tail slope.
-- `CalculateReversalHookQualityScore` (Reversal): weighted sum of Daily
-  band-width compression (inverse of current/previous width ratio) and the
-  Daily lower-band hook tail slope.
-- Final sort key is `AdjustedRank = qualityScore * QualityScoreRankWeight (50)
-  + legacy heuristic NextDayRank`. The quality score dominates; the old
-  heuristic score only nudges within that.
-- `Diagnostics.RankingQualityScore` and `Diagnostics.EstimatedHitRatePct`
-  (coarse historical buckets, checked 2026-07-14 on a thin sample — recheck
-  as more evaluation days accumulate) are written per candidate in
-  `candidates.csv`.
-- The series-template tier/distance machinery above (`ResolveTemplateRankTier`,
-  `Diagnostics.TemplateRankTier`, `SeriesSimilarityTemplateTicker/Family/Bonus`,
-  `LowAmplitudeTemplateTicker/Penalty`) is **still computed and still written
-  to `candidates.csv` for audit**, but as of this rework it no longer affects
-  sort order at all — do not expect it to explain why one candidate outranks
-  another; check `RankingQualityScore` for that instead.
-- Both `Runaway` and `Reversal` still rerank across their entire candidate
-  pool per scan (no capped top window).
-
-If you need to improve ranking further, validate a new candidate feature's
-AUC against realized `AmplitudePct` in `evaluation-dataset.csv` before wiring
-it into either quality-score function — that discipline is exactly what
-caught the 2026-07-11 approach not working.
+**Before adding or reweighting any ranking feature, validate its AUC against
+realized `AmplitudePct` in `evaluation-dataset.csv` first.** This is exactly
+the discipline that caught the 2026-07-11 series-template tiered-sort attempt
+not working — see `SCANNER_MODEL.md` "Ranking implementation status" for
+that history and the current AUC numbers per feature; don't re-run that
+experiment.
 
 ## Bollinger pattern direction
 
-Bollinger band shape patterns are timeframe-scalable. Do not treat them as
-daily-only signals.
+Bollinger band shape patterns are timeframe-scalable (Weekly = broad
+background, Daily = main swing/next-day, H4 = early trigger/intraday) — do
+not treat them as daily-only signals. Use the real band series
+(`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`); full
+per-timeframe interpretation and worked examples (TE, ONDS) are in
+`SERIES_PLAYBOOK.md` "Bollinger Squeeze Launch".
 
-- `Weekly` Bollinger launch: broad background and rare large swing potential.
-- `Daily` Bollinger launch: main swing/next-day potential, as in TE-style moves.
-- `H4` Bollinger launch: early trigger, intraday capture, or next-day
-  continuation, as in ONDS-style moves.
+### Band-kink / RSI-rollover (2026-08-11) — operative summary
 
-The same upper/mid/lower band pattern can be useful on any available timeframe,
-but the trade decision changes with timeframe. Use the real band series
-(`*BbUpperBandSeries`, `*BbMidBandSeries`, `*BbLowerBandSeries`) to detect the
-shape, then use timeframe context to decide ranking strength and trade profile.
+`IsLateBellUpPhase` includes a Daily-RSI-rollover-from-peak check
+(`recentDailyRsiPeak >= 70m && dailyRsi[^1] < dailyRsi[^2]`, validated
+AUC=0.61 — comparable to the slope features already driving
+`RankingQualityScore`). **Do not add a standalone "any band slope kink"
+filter on top of this** — tested independently of RSI, that piece came back
+at chance (AUC=0.54 on the upper/mid kink itself, AUC=0.48 on the
+`DKNG`/`ChannelReclaim` lower-band variant). Full investigation, the
+HELP/DKNG grounding examples, and why `ChannelReclaim` still needs raw H4
+candle data before it can be tested are in `SCANNER_MODEL.md`.
 
-### Band-kink direction: validated in part, implemented (2026-08-11)
+`BellUp` (bullish squeeze→launch) and `BellDown` (mirrored bearish form) are
+recognized from real Bollinger upper/mid/lower rows on H4 or Daily only
+(Weekly is context, never passed to the Bell matcher). Full geometry,
+counter-examples, the `ReadyNow`/`NotReady`/`Neutral` phase split, the
+Daily-post-factum rejection rule, and the M15 structural-invalidation /
+execution-timing rules are all canonical in `SERIES_PLAYBOOK.md` — do not
+restate or fork that checklist here.
 
-Origin: the user's working heuristic from live chart reading on 2026-08-10 —
-a band's slope decelerating/kinking is an early reversal warning, symmetric on
-the upper and lower bands, with a kink/break of the **mid** band treated as
-the more decisive of the two. Two grounding examples: `HELP` (Daily upper-band
-delta decelerated +0.58→+0.66→+0.71→+0.55 alongside Daily RSI rolling from a
-peak of 86.26 to 83.52, a full day before price cracked) and `DKNG` (H4, two
-successive lower-band deceleration kinks preceding a mid-band break — working
-name `ChannelReclaim`, never formalized past a draft).
-
-Validated against `evaluation-dataset.csv` on 2026-08-11 (285 decided Runaway
-Win/Loss rows) by decomposing the heuristic into independent pieces:
-
-- **Daily RSI rolled over from its own recent peak: AUC=0.61** — real,
-  comparable in strength to the Daily/H4 slope features already driving
-  `RankingQualityScore`. **Implemented**: `IsLateBellUpPhase` now checks this
-  directly (`recentDailyRsiPeak >= 70m && dailyRsi[^1] < dailyRsi[^2]`),
-  independent of the H4-based branches and of whether H4 bands are still
-  expanding — this is exactly the HELP gap, closed.
-- Band-slope deceleration alone (the "kink" itself, independent of RSI):
-  AUC=0.54 — essentially no signal on its own. Not implemented.
-- The `DKNG`/`ChannelReclaim` side (H4, on the Runaway family — DKNG was
-  Runaway, not Reversal, despite reading like a reversal pattern):
-  lower-band "un-kink" alone AUC=0.48 (no signal), H4 RSI turning up alone
-  AUC=0.575 (weak). The full multi-candle criterion (double kink + mid-band
-  break) could not be tested — `evaluation-dataset.csv` stores only Bollinger/
-  MACD/RSI series, no raw H4 OHLC, and the pattern needs candle-level detail.
-  Not implemented; would need raw candle history to properly test.
-
-**How to apply:** the RSI-rollover piece is real and now live in
-`IsLateBellUpPhase`. Do not also add a standalone "any band slope kink" filter
-— that piece tested at chance level on its own. If `ChannelReclaim` comes up
-again, it still needs raw H4 candle data before it can be tested, not just
-more evaluation-dataset rows.
-
-Canonical Bell pattern pair:
-
-- `BellUp`: squeeze, launch, then late flattening/mean-reversion warning on the direct bullish form
-- `BellDown`: mirrored squeeze, launch down, then late flattening/mean-reversion warning on the bearish form
-
-`BellUp` belongs to the above-mid continuation side and should be promoted when
-the rows show a squeeze-to-expansion launch. In code, that can be recognized
-either by a broader phase comparison or by a short local turn where the upper
-and mid Bollinger rows bend up together and band width starts opening again.
-The opening must be material, not a nearly parallel upward translation of all
-three bands. Self-matching against the same ticker is not valid positive
-template evidence.
-`BellDown` is the mirrored form used on the below-mid reversal side.
-
-The scanner matches Bell only on H4 and Daily. One clean matching timeframe is
-enough:
-
-- `H4`: eligible for final `Runaway`, play it today
-- `Daily`: eligible for final `Runaway`, play it for tomorrow
-- `Weekly`: background context only; it is not passed to the Bell matcher
-
-The source timeframe changes urgency and trade-plan depth, not the family split.
-
-When the same runway pattern appears, split it by phase using only the saved
-pre-move rows:
-
-- `ReadyNow`: H4 real Bollinger trigger confirms the launch. The upper band
-  expands upward, mid is not falling, lower band is not simply being dragged
-  upward, and H4 RSI/MACD do not contradict the trigger. These candidates can
-  be promoted to `Runaway`.
-- `NotReady`: Daily/weekly runway shape exists, but H4/Daily trigger is not
-  trade-ready. Reject it from the current final list. Do not force it into
-  `Reversal`.
-- `Neutral`: the saved rows do not confirm a trade-ready runway phase. Do not
-  let legacy live-mover/template/bypass branches promote it into
-  `Runaway`.
-- Reject a Daily `BellUp` as post-factum when its row phase is already late:
-  either the pattern appears only after H4 RSI and MACD histogram have rolled
-  over from a local peak, or the Daily pattern already existed on the previous
-  point while H4 RSI is elevated and the last two H4 rows show terminal band
-  expansion.
-- After loading the current M15 rows, reject a `Runaway` whose latest closed H4
-  close was above the H4 Bollinger mid but whose live M15 price has crossed
-  below that same mid. This is a structural invalidation of the saved setup,
-  not a fixed percentage-move filter.
-- Use M15 only for execution timing after D1/H4 classification. For `Runaway`,
-  a confirmed M15 `BellUp` predicts entry near the rising M15 mid or the latest
-  shallow pullback low. For `Reversal`, a confirmed M15 `ReversalHook` predicts
-  entry near the hooked lower band or the latest local low. If the matching
-  M15 pattern is unavailable, retain the existing entry forecast as fallback;
-  M15 must not change the D1 family split.
-
-This split is important for same-pattern candidates: UMAC/ONDS-like rows are
-ready for immediate `Runaway` admission, while SHLS-like rows with only a
-higher-frame setup are rejected until a future scan finds a trade-ready
-H4/Daily pattern.
-
-Broader series direction: move pattern logic toward the visual indicators the
-user actually relies on: Bollinger, MACD, and RSI. The priority order for
-scanner prediction, filters, promotion, and ranking is:
-
-1. real Bollinger upper/mid/lower curves
-2. real MACD line, signal line, and histogram
-3. real RSI as a confidence/ambiguity correction
-
-MA rows and older distance/width rows are legacy/context. Do not base new
-prediction logic on them unless a concrete analysis proves they add value
-beyond the real Bollinger/MACD/RSI rows.
-
-Current cleanup rule is stricter: scanner similarity and generated candidate
-series output contain only the real Bollinger upper/mid/lower, MACD
-line/signal/histogram, and RSI rows. Do not reintroduce MA, distance, width,
-MACD aliases, weighted timeframe totals, or stored slope summaries.
+Signal priority for scanner prediction/filters/promotion/ranking: real
+Bollinger upper/mid/lower curves first, real MACD line/signal/histogram
+second, real RSI third as a confidence correction. MA and width/distance rows
+are legacy context only — see `SERIES_PLAYBOOK.md` "Primary series" for the
+migration rule and what `candidates.csv` currently admits.
 
 ## Main code
 
