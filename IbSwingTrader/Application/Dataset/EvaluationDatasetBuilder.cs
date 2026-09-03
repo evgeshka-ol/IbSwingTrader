@@ -940,7 +940,14 @@ namespace IbSwingTrader.Application.Dataset
 
         private static bool HasEvaluationSeries(CandidateEvaluationResult evaluation)
         {
-            return (evaluation.RecentDailyBbUpperBandSeries?.Count ?? 0) > 0 ||
+            return (evaluation.RecentDailyOpenSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentDailyHighSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentDailyLowSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentH4OpenSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentH4HighSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentH4LowSeries?.Count ?? 0) > 0 &&
+                   (evaluation.RecentH4CloseSeries?.Count ?? 0) > 0 &&
+                   ((evaluation.RecentDailyBbUpperBandSeries?.Count ?? 0) > 0 ||
                    (evaluation.RecentDailyBbMidBandSeries?.Count ?? 0) > 0 ||
                    (evaluation.RecentDailyBbLowerBandSeries?.Count ?? 0) > 0 ||
                    (evaluation.RecentDailyRsiSeries?.Count ?? 0) > 0 ||
@@ -960,7 +967,7 @@ namespace IbSwingTrader.Application.Dataset
                    (evaluation.RecentH4RsiSeries?.Count ?? 0) > 0 ||
                    (evaluation.RecentH4MacdLineSeries?.Count ?? 0) > 0 ||
                    (evaluation.RecentH4MacdSignalSeries?.Count ?? 0) > 0 ||
-                   (evaluation.RecentH4MacdHistogramSeries?.Count ?? 0) > 0;
+                   (evaluation.RecentH4MacdHistogramSeries?.Count ?? 0) > 0);
         }
 
         private static bool HasEvaluationCacheMetrics(CandidateEvaluationResult evaluation)
