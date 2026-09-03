@@ -307,10 +307,17 @@ namespace IbSwingTrader.Application.Dataset
                     }
 
                     return x;
-                });
+                })
+                .ToList();
 
-            var snapshots = BuildRankedCandidateSnapshots("Runaway", sameDayCandidates)
-                .Concat(BuildRankedCandidateSnapshots("Reversal", primaryCandidates));
+            var otherCandidates = sameDayCandidates
+                .Where(x => x.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase));
+            var runawayCandidates = sameDayCandidates
+                .Where(x => !x.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase));
+
+            var snapshots = BuildRankedCandidateSnapshots("Runaway", runawayCandidates)
+                .Concat(BuildRankedCandidateSnapshots("Reversal", primaryCandidates))
+                .Concat(BuildRankedCandidateSnapshots("Other", otherCandidates));
 
             return snapshots
                 .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)

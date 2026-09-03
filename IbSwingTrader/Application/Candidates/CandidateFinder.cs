@@ -329,7 +329,8 @@ namespace IbSwingTrader.Application.Candidates
                 : sameDayPromotedResults.Values
                     .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x
-                        .OrderByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
+                        .OrderByDescending(y => GetCandidateSourcePriority(y))
+                        .ThenByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
                         .ThenByDescending(y => y.Score.Score)
                         .First())
                     .ToList();
@@ -684,10 +685,16 @@ namespace IbSwingTrader.Application.Candidates
 
             async Task EmitDiagnosticRejectedCandidateAsync(string reason)
             {
-                if (!emitAllSeenCandidates)
+                var isTodayResearchLikeBucket = bucketName == "runaway candidates";
+                if (!emitAllSeenCandidates && !isTodayResearchLikeBucket)
                     return;
 
-                var trade = ctx.Trade ??= await BuildTradePlan(ctx);
+                // TodayResearchLike (Runaway/BellUp) rejects are captured unconditionally as
+                // "Other" for historical evaluation, using a cheap price snapshot instead of a
+                // full IB contract resolve + M15 fetch, since no trade will ever be placed on them.
+                var trade = isTodayResearchLikeBucket
+                    ? new TradePlanInfo { LiveReferencePrice = ResolveScanPrice(ctx.Snapshot) }
+                    : ctx.Trade ??= await BuildTradePlan(ctx);
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
@@ -715,7 +722,7 @@ namespace IbSwingTrader.Application.Candidates
                     todayResearchLikePatternKind,
                     todayResearchLikeSeriesScore);
 
-                candidateItem.CandidateSource = "DiagnosticRejected";
+                candidateItem.CandidateSource = isTodayResearchLikeBucket ? "Other" : "DiagnosticRejected";
                 candidateItem.Context.Notes = AppendDiagnosticNote(candidateItem.Context.Notes, reason);
 
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
