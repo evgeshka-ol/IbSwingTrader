@@ -99,10 +99,37 @@ pass/fail count has no monotonic relationship with outcome either.
 continuous-feature sweep that followed it. Per the user's explicit choice,
 this is not being fixed by retuning the gate/score (nothing here has been
 shown to carry signal to retune) — instead raw Daily/H4 OHLC candle series
-are now captured (`RecentDailyOpenSeries/HighSeries/LowSeries`,
+are meant to be captured (`RecentDailyOpenSeries/HighSeries/LowSeries`,
 `RecentH4OpenSeries/HighSeries/LowSeries/CloseSeries`, added 2026-09-01) so
 the candle-level mechanics described in `REVERSAL_EDGE.md`'s `NAT` example
-can eventually be tested directly, once enough scans accumulate.
+can eventually be tested directly. **Correction (2026-09-03): this capture is
+not actually happening in `evaluation-dataset.csv` in practice** — checked
+across all 2925 rows, these OHLC fields are non-empty in only ~4.8% (140
+rows), all sharing one single `ScanTime` batch, not the normal per-scan flow;
+everywhere else only the derived Bollinger/MACD/RSI series are present. Do
+not assume raw candles are available from this CSV — reconstruct them from
+`Data/cache/<TICKER>.json` instead (see `REVERSAL_EDGE.md` and
+`tools/Backfill-ReversalCandles.ps1`) until the write-path gap is actually
+fixed.
+
+**2026-09-03 architecture decision:** the binary `IsReversalHookPattern` gate
+is being replaced, not retuned — see `references/REVERSAL_EDGE.md` "Open
+items" for the full reasoning, the `NAT` case that motivated it (a real
+intraday capitulation-drop entry the daily-mid gate structurally cannot see),
+and how this differs from the already-disproven July series-similarity
+approach. Two pieces, both still unimplemented/unvalidated:
+
+1. A layered timeframe funnel, in this exact role order: **Weekly** = macro
+   risk gate only ("safe to hold overnight" — not a pattern check). **Daily**
+   = confirm or defer the setup ("play it" vs "not today"). **H4** = same-day
+   vs today-into-tomorrow timing. **M15** = pure execution (entry/exit/stop
+   numbers), never a go/no-go layer.
+2. Admission scored as **graded similarity to a small, hand-curated exemplar
+   chart library**, validated by AUC against `evaluation-dataset.csv` before
+   being wired in — not a binary threshold/gate.
+
+Apply the same rigor as everywhere else in this file: nothing here gets
+wired into admission or ranking until it clears an AUC/holdout/asymmetry bar.
 
 `Reversal` is the user's own years-proven manual trading edge (this app's job
 is to remove emotion and scale past the broker scan API limit, not to

@@ -110,6 +110,29 @@ read a near-zero `MidPriorSlopePct → MidRecentSlopePct` pair as "just
 flattened from a steep decline" — that pattern requires the *prior* value to
 be clearly, steeply negative first.
 
+**Follow-up (2026-09-03) — why the daily-mid gate structurally cannot see
+this trade even in principle.** Reconstructed this exact `NAT` H4 window
+straight from `Data/cache/NAT.json` (dates line up exactly with a chart the
+user drew this box on: `08-05 12:00 C=6.12` low, `08-06 08:00 C=6.42` the
+bounce candle). The system's own `evaluation-dataset.csv` has **no candidate
+row for `NAT` anywhere near 08-05/08-06** — that bounce never got logged, the
+ticker simply wasn't surfaced that day. The only `Reversal` row for `NAT` is
+five days later, `ScanTime=2026-08-11 11:34:32`, triggered by a *new, deeper*
+intraday low (`08-11 08:00 L=6.03`, below the 08-05 low of 6.12) — and even
+that admitted row came back `PatternVerdictReason=not-below-daily-mid`
+(Mismatch). Why: the gate checks the close of the *previous completed* daily
+bar against the daily mid — but the actual capitulation to 6.03 happened
+*intraday, same-day* (08-11), so no completed daily close was ever below mid
+by the time the gate ran (the prior day, 08-10, closed at 6.43, still above
+a 6.36 mid). **This is a structural blind spot, not a threshold-tuning
+problem**: a same-day V-shaped intraday drop-and-bounce can never satisfy a
+"previous day's close below mid" rule, no matter how the threshold is tuned,
+because the rule can only ever look at bars that have already fully closed.
+This is the concrete case motivating the 2026-09-03 architecture decision
+below (layered W→D→H4→M15 funnel + graded exemplar similarity) — a Daily-
+scale gate checking only completed-bar closes will keep missing exactly this
+shape of trade.
+
 ## Open, deliberately-unimplemented items
 
 Same discipline as the rest of this skill's ranking work: validate a signal
@@ -178,17 +201,64 @@ None of the below has cleared that bar yet.
     candle-level mechanics this section's `NAT` example describes can be
     tested directly, rather than continuing to iterate on aggregate tail-slope
     features that keep testing at chance.
-- **Raw OHLC capture added 2026-09-01.** `RecentDailyOpenSeries/HighSeries/
-  LowSeries` (Daily already had `RecentDailyCloseSeries`) and
-  `RecentH4OpenSeries/HighSeries/LowSeries/CloseSeries` (H4 previously had no
-  raw price series at all, only Bollinger/MACD/RSI aggregates) are now written
-  to both `candidates.csv` and `evaluation-dataset.csv`, index-aligned with
-  each timeframe's existing Bollinger series. This is purely additive — no
-  admission/ranking logic changed. Purpose: directly enables testing the `NAT`
-  worked example above (which specific candle's wick crosses which band) once
-  enough scans accumulate with this data present; every scan going forward
-  captures it, but historical rows before this date do not have it
-  backfilled.
+- **Raw OHLC capture added 2026-09-01, but not actually landing in
+  `evaluation-dataset.csv` (checked 2026-09-03).** `RecentDailyOpenSeries/
+  HighSeries/LowSeries` and `RecentH4OpenSeries/HighSeries/LowSeries/
+  CloseSeries` were added as fields and the code path exists
+  (`CandidateFinder.BuildRecentFeatureSeries`, ~line 4224), but across all
+  2925 rows of `evaluation-dataset.csv` these fields are non-empty in only
+  ~4.8% (140 rows) — all sharing one single `ScanTime` batch
+  (`2026-09-01 08:53:57`), not the normal per-scan write path. Root cause:
+  the `Reversal`-specific series builder, `BuildReversalPatternSeries`
+  (~line 4262), only ever sets `DailyCloseSeries` + Daily BB/RSI/MACD — it
+  never sets Daily Open/High/Low and never touches H4 raw candles at all
+  (H4 indicators for `Reversal` come from a separate remap,
+  `BuildH4ReversalPatternSeries`, that copies H4 BB/RSI/MACD into the same
+  object's "Daily-named" fields but still no H4 OHLC). `Runaway` rows show
+  the same near-total gap too, so this isn't `Reversal`-only. **Until this
+  write-path gap is fixed, do not rely on the CSV for raw candles** —
+  reconstruct them directly from `Data/cache/<TICKER>.json` filtered to
+  `<= ScanTime` instead, the way `tools/Backfill-ReversalCandles.ps1` and the
+  `NAT` reconstruction above do. The Bollinger/MACD/RSI derived series, by
+  contrast, are reliably present in every row.
+
+## Architecture decision (2026-09-03): layered funnel + graded exemplar similarity
+
+Agreed direction to replace `IsReversalHookPattern`'s binary gate (which the
+`NAT` case above proves is structurally blind to same-day intraday
+capitulation drops, not just under-tuned). Two pieces, both still
+unimplemented and unvalidated — neither gets wired into admission/ranking
+before clearing the same AUC/holdout/asymmetry bar as every other feature in
+this project:
+
+1. **Layered timeframe funnel**, in this exact role order (the user's own
+   years-long manual method, pre-dating the app):
+   - **Weekly** — macro risk gate only, not a pattern check. Down trend =>
+     don't enter regardless of pattern (dangerous to hold overnight). Up
+     trend => safe to enter and wait if today's target isn't hit.
+   - **Daily** — confirms or defers the setup ("play this" vs "not today").
+     This is where a real multi-day shape search belongs, not a single
+     completed-bar threshold like the current `not-below-daily-mid` check.
+   - **H4** — same-day timing decision: can this finish today, or is it
+     today-into-tomorrow.
+   - **M15** — pure execution: exact entry/exit/stop numbers. Never a
+     go/no-go decision layer.
+2. **Graded shape-similarity to a small, hand-curated exemplar chart
+   library** (currently DKNG, IBM, TSN, EPAM, PYPL, PSQL — expected to grow
+   over time) instead of a binary threshold/gate. Must be scored as a
+   continuous similarity measure and validated via AUC against real
+   outcomes — never as pass/fail template matching.
+
+**Why this differs from July's already-disproven series-similarity
+approach** (`CalculateNormalizedPointDistance`/`CalculateGroupDistance`,
+removed 2026-09-01, see `SKILL.md` "Series-template direction" — 0/355
+templates ever matched across 7 tests): that approach already normalized for
+price/scale, so lack of normalization isn't why it failed. The difference
+this time is (a) a small human-verified exemplar set instead of 355
+auto-generated, uncurated historical windows, and (b) treating similarity as
+a graded score to validate via AUC rather than a binary matched/didn't-match
+gate. If this new attempt degrades back into a strict template-match
+boolean, expect the same failure mode as July.
 
 See `SCANNER_MODEL.md` for a related open item on the `Runaway` side
 (intraday reversion while a candidate is still top-ranked live).
