@@ -45,6 +45,7 @@ namespace IbSwingTrader.Application.Candidates
         private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
         private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
         private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
+        private static readonly TimeSpan PreMarketSessionStart = new(4, 0, 0);
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -1480,14 +1481,17 @@ namespace IbSwingTrader.Application.Candidates
         // If T-1 already closed above its own upper band, the burst already happened and today's entry
         // would be chasing into the sideways/pullback phase - the candidate should stay in the list
         // (it may become ready on a later scan) but not be entered or ranked as ready-now.
-        private static bool IsBellUpPhaseReadyToday(RecentFeatureSeries recentSeries)
+        private static bool IsBellUpPhaseReadyToday(RecentFeatureSeries recentSeries) =>
+            IsBellUpPhaseReadyToday(recentSeries.DailyCloseSeries, recentSeries.DailyBbUpperBandSeries);
+
+        private static bool IsBellUpPhaseReadyToday(
+            IReadOnlyList<decimal> dailyCloseSeries,
+            IReadOnlyList<decimal> dailyBbUpperBandSeries)
         {
-            var close = recentSeries.DailyCloseSeries;
-            var upper = recentSeries.DailyBbUpperBandSeries;
-            if (close.Count == 0 || upper.Count == 0)
+            if (dailyCloseSeries.Count == 0 || dailyBbUpperBandSeries.Count == 0)
                 return true;
 
-            return close[^1] <= upper[^1];
+            return dailyCloseSeries[^1] <= dailyBbUpperBandSeries[^1];
         }
 
         private static bool IsLateBellUpPhase(
@@ -3182,6 +3186,7 @@ namespace IbSwingTrader.Application.Candidates
                 H4BbRegime = bbState.H4.Regime,
                 NeedsDeeperEntry = needsDeeperEntry,
                 NeedsMomentumExit = needsMomentumExit,
+                IsBellUpPattern = todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp,
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,
@@ -4074,6 +4079,17 @@ namespace IbSwingTrader.Application.Candidates
         // Validated 2026-07-13 against evaluation-dataset.csv: Daily/H4 Bollinger mid+upper slope predicts Runaway amplitude (AUC ~0.84 on extreme groups); Daily band compression + lower-band hook slope predicts Reversal amplitude (AUC ~0.63). Series-template distance-matching (below) showed no such signal and no longer drives ranking; it stays for its diagnostics only.
         private const decimal QualityScoreRankWeight = 50m;
 
+        // A BellUp candidate whose T-1 close already closed above its own T-1 upper Bollinger band burst
+        // yesterday - today would be chasing the post-burst sideways/pullback phase, not the launch. This
+        // condition alone is sufficient to decide "don't play today" regardless of launch-quality score
+        // (band slope/expansion is naturally highest right after the burst, so left unchecked it would
+        // outrank the exact candidates that already fired). Offset must exceed any realistic
+        // qualityScore * QualityScoreRankWeight so the not-ready partition always sorts below the ready
+        // one, while still ordering by AdjustedRank *within* the not-ready partition. Scoped to BellUp
+        // only - Runaway/LaunchContinuation/PullbackContinuation candidates can legitimately ride the
+        // upper band across multiple days and are not covered by this gate.
+        private const decimal LateBellUpPhaseRankOffset = -1_000_000m;
+
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
             SeriesTemplateFamily family)
@@ -4100,9 +4116,15 @@ namespace IbSwingTrader.Application.Candidates
                         x.Diagnostics.EstimatedHitRatePct = EstimateHitRatePct(qualityScore, family);
                     }
 
+                    var isLateBellUpPhase =
+                        family == SeriesTemplateFamily.TodayResearchLike &&
+                        x.IsBellUpPattern &&
+                        !IsBellUpPhaseReadyToday(x.RecentDailyCloseSeries, x.RecentDailyBbUpperBandSeries);
+
                     var adjustedRank =
                         qualityScore * QualityScoreRankWeight +
-                        (x.Score.NextDayRank ?? 0m);
+                        (x.Score.NextDayRank ?? 0m) +
+                        (isLateBellUpPhase ? LateBellUpPhaseRankOffset : 0m);
 
                     return new
                     {
@@ -4600,7 +4622,8 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
 
             var dailyBars = BuildDailyBars(candles);
-            var expectedLatestClosedDailyDate = GetExpectedLatestClosedDailyDate(MarketTime.Now().Date);
+            var marketNow = MarketTime.Now();
+            var expectedLatestClosedDailyDate = GetExpectedLatestClosedDailyDate(marketNow.Date);
             var latestDailyDate = dailyBars.Count > 0
                 ? dailyBars[^1].Time.Date
                 : DateTime.MinValue;
@@ -4611,6 +4634,24 @@ namespace IbSwingTrader.Application.Candidates
                     $"Historical cache stale for scanner: {ticker}. " +
                     $"LatestDailyDate={latestDailyDate:yyyy-MM-dd}, " +
                     $"ExpectedLatestClosedDailyDate={expectedLatestClosedDailyDate:yyyy-MM-dd}. " +
+                    "Reloading history.");
+                return false;
+            }
+
+            // "Latest closed daily bar is yesterday" only proves the cache is fresh once trading
+            // for today is done. If today's session (pre-market onward) has already started and the
+            // cache still has no bar dated today, today's forming H4 bars (pre-market/regular-hours
+            // burst included) are missing - exactly what let a same-day BellUp burst slip past the
+            // phase-readiness check. Reload instead of trusting a daily-only staleness signal.
+            var todaysSessionHasStarted =
+                marketNow.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) &&
+                marketNow.TimeOfDay >= PreMarketSessionStart;
+
+            if (todaysSessionHasStarted && latestDailyDate < marketNow.Date)
+            {
+                _logger.Info(
+                    $"Historical cache missing today's session for scanner: {ticker}. " +
+                    $"LatestDailyDate={latestDailyDate:yyyy-MM-dd}, MarketToday={marketNow.Date:yyyy-MM-dd}. " +
                     "Reloading history.");
                 return false;
             }

@@ -58,6 +58,8 @@ namespace IbSwingTrader.Domain.Candidates
 
         public bool NeedsMomentumExit { get; set; }
 
+        public bool IsBellUpPattern { get; set; }
+
         public required ScoreInfo Score { get; set; }
 
         public required MarketContextInfo Context { get; set; }
