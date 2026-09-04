@@ -20,6 +20,7 @@ namespace IbSwingTrader.Application.Dataset
         private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
         private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
         private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
+        private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
 
         private readonly ICandidateEvaluationCsvService _evaluationCsvService = evaluationCsvService;
         private readonly IEvaluationDatasetCsvService _evaluationDatasetCsvService = evaluationDatasetCsvService;
@@ -799,6 +800,11 @@ namespace IbSwingTrader.Application.Dataset
 
             for (var i = scanIndex; i >= 0; i--)
             {
+                // Skip after-hours bars so the day's close reflects the 16:00 ET regular-session
+                // close, not a thinly-traded post-market print.
+                if (candles[i].Time.TimeOfDay >= RegularSessionEnd)
+                    continue;
+
                 var day = candles[i].Time.Date;
                 if (!usedDays.Add(day))
                     continue;
@@ -831,6 +837,12 @@ namespace IbSwingTrader.Application.Dataset
             {
                 var ordered = group.OrderBy(x => x.Time).ToList();
 
+                // Close from the last regular-session bar, not the last bar of the calendar day
+                // (which would be an after-hours print when extended hours are cached).
+                var sessionBars = ordered.Where(x => x.Time.TimeOfDay < RegularSessionEnd).ToList();
+                if (sessionBars.Count == 0)
+                    sessionBars = ordered;
+
                 result.Add(new Candle
                 {
                     Timeframe = Timeframe.D1,
@@ -838,7 +850,7 @@ namespace IbSwingTrader.Application.Dataset
                     Open = ordered[0].Open,
                     High = ordered.Max(x => x.High),
                     Low = ordered.Min(x => x.Low),
-                    Close = ordered[^1].Close,
+                    Close = sessionBars[^1].Close,
                     Volume = ordered.Sum(x => x.Volume)
                 });
             }

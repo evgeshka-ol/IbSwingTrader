@@ -25,6 +25,12 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             var candidates = OrderPrimaryForDisplay(result.Candidates);
             var sameDayCandidates = OrderSameDayForDisplay(result.SameDayCandidates);
+            var admittedSameDayCandidates = sameDayCandidates
+                .Where(x => !string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var otherCandidates = sameDayCandidates
+                .Where(x => string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             var folder = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(folder))
@@ -33,10 +39,21 @@ namespace IbSwingTrader.Infrastructure.Logging
             var marketSettings = _marketSettingsProvider.Get();
             var scanTime = GetMarketNow(marketSettings.Timezone);
 
-            if (sameDayCandidates.Count > 0)
+            if (admittedSameDayCandidates.Count > 0)
                 WriteConsoleSectionHeader("Runaway");
 
-            foreach (var candidate in sameDayCandidates)
+            foreach (var candidate in admittedSameDayCandidates)
+            {
+                candidate.Scan.ScanTime = scanTime;
+                candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+
+                WriteCandidateToConsole(candidate);
+            }
+
+            if (otherCandidates.Count > 0)
+                WriteConsoleSectionHeader("Other");
+
+            foreach (var candidate in otherCandidates)
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
@@ -59,7 +76,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .Where(x => !mergedSameDay.Any(y =>
                     string.Equals(BuildCandidateScanKey(y), BuildCandidateScanKey(x), StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-            var summary = BuildSummary(candidates, sameDayCandidates);
+            var summary = BuildSummary(candidates, admittedSameDayCandidates);
             await _candidateFileService.WriteAsync(
                 filePath,
                 new CandidateFileDocument

@@ -44,6 +44,7 @@ namespace IbSwingTrader.Application.Candidates
         private const int RecentDailySeriesLength = RecentSeriesWindow.Daily;
         private const int RecentWeeklySeriesLength = RecentSeriesWindow.Weekly;
         private const int RecentH4SeriesLength = RecentSeriesWindow.H4;
+        private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
 
         public async Task<CandidateSearchResult> FindAsync()
         {
@@ -1472,6 +1473,23 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
+        // Validated 2026-09-04 against ASST/SRPT/SMMT (3/3 match to manual chart review, cross-checked
+        // against native IB daily bars): a BellUp candidate cycles burst candle -> sideways/pullback
+        // consolidation -> next burst candle. If T-1's daily close is still inside/below T-1's own
+        // upper Bollinger band, the burst hasn't fired yet and today is the day to enter at scan price.
+        // If T-1 already closed above its own upper band, the burst already happened and today's entry
+        // would be chasing into the sideways/pullback phase - the candidate should stay in the list
+        // (it may become ready on a later scan) but not be entered or ranked as ready-now.
+        private static bool IsBellUpPhaseReadyToday(RecentFeatureSeries recentSeries)
+        {
+            var close = recentSeries.DailyCloseSeries;
+            var upper = recentSeries.DailyBbUpperBandSeries;
+            if (close.Count == 0 || upper.Count == 0)
+                return true;
+
+            return close[^1] <= upper[^1];
+        }
+
         private static bool IsLateBellUpPhase(
             BellPatternSignal bellPatternSignal,
             RecentFeatureSeries recentSeries,
@@ -2418,6 +2436,10 @@ namespace IbSwingTrader.Application.Candidates
             var bbState = BuildBollingerStateSet(recentSeries);
             var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
+            var isBellUpPhaseReadyToday =
+                ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
+                todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
+                IsBellUpPhaseReadyToday(recentSeries);
             var scanPrice = ResolveScanPrice(ctx.Snapshot);
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
@@ -2460,7 +2482,27 @@ namespace IbSwingTrader.Application.Candidates
             decimal? maxProfitPctOverride = momentumExit?.MaxProfitPct;
             decimal? maxLossPctOverride = null;
 
-            if (isParabolicExpansion)
+            if (isBellUpPhaseReadyToday)
+            {
+                var readyProfitProfile = ResolveAmplitudeAwareResearchLikeProfitProfile(
+                    todayResearchLikePatternKind,
+                    todayResearchLikeSeriesScore,
+                    diagnostics.ATRRatio,
+                    tradeSettings.ResearchLikeExit.DefaultProfitPct,
+                    tradeSettings.ResearchLikeExit.MinProfitPct,
+                    tradeSettings.ResearchLikeExit.MaxProfitPct);
+                defaultProfitPctOverride = readyProfitProfile.DefaultProfitPct;
+                minProfitPctOverride = readyProfitProfile.MinProfitPct;
+                maxProfitPctOverride = readyProfitProfile.MaxProfitPct;
+
+                _logger.Info(
+                    $"Trade plan BellUp phase-ready profile applied for {ctx.Stock.Ticker}. " +
+                    $"T-1 daily close has not closed above its own upper Bollinger band yet, entering at scan price. " +
+                    $"DefaultProfitPct={_fmt.Percent(readyProfitProfile.DefaultProfitPct)}, " +
+                    $"MinProfitPct={_fmt.Percent(readyProfitProfile.MinProfitPct)}, " +
+                    $"MaxProfitPct={_fmt.Percent(readyProfitProfile.MaxProfitPct)}");
+            }
+            else if (isParabolicExpansion)
             {
                 var parabolicSettings = tradeSettings.ParabolicExpansionExit;
                 defaultProfitPctOverride = parabolicSettings.DefaultProfitPct;
@@ -2806,7 +2848,8 @@ namespace IbSwingTrader.Application.Candidates
                 defaultProfitPctOverride,
                 minProfitPctOverride,
                 maxProfitPctOverride,
-                maxLossPctOverride);
+                maxLossPctOverride,
+                isBellUpPhaseReadyToday);
 
             return new TradePlanInfo
             {
@@ -3673,6 +3716,17 @@ namespace IbSwingTrader.Application.Candidates
                 presetScanCode,
                 snapshot,
                 recentSeries);
+
+            if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
+                todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
+                !IsBellUpPhaseReadyToday(recentSeries))
+            {
+                // T-1 already closed above its own upper Bollinger band - the burst already fired
+                // and today would be chasing into the post-burst sideways/pullback phase. Demote
+                // instead of rejecting: the candidate stays in the list and may become ready on a
+                // later scan once the sideways phase completes.
+                score -= s.BellUpPhaseNotReadyPenalty;
+            }
 
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
@@ -6326,6 +6380,12 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var ordered = group.OrderBy(x => x.Time).ToList();
 
+                // Close from the last regular-session bar, not the last bar of the calendar day
+                // (which would be an after-hours print when extended hours are cached).
+                var sessionBars = ordered.Where(x => x.Time.TimeOfDay < RegularSessionEnd).ToList();
+                if (sessionBars.Count == 0)
+                    sessionBars = ordered;
+
                 result.Add(new Candle
                 {
                     Timeframe = Timeframe.D1,
@@ -6333,7 +6393,7 @@ namespace IbSwingTrader.Application.Candidates
                     Open = ordered[0].Open,
                     High = ordered.Max(x => x.High),
                     Low = ordered.Min(x => x.Low),
-                    Close = ordered[^1].Close,
+                    Close = sessionBars[^1].Close,
                     Volume = ordered.Sum(x => x.Volume)
                 });
             }

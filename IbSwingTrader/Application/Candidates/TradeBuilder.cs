@@ -19,7 +19,8 @@ namespace IbSwingTrader.Application.Candidates
             decimal? defaultProfitPctOverride = null,
             decimal? minProfitPctOverride = null,
             decimal? maxProfitPctOverride = null,
-            decimal? maxLossPctOverride = null)
+            decimal? maxLossPctOverride = null,
+            bool useScanPriceEntry = false)
         {
             var settings = _settingsProvider.Get().TradePlan;
 
@@ -32,14 +33,16 @@ namespace IbSwingTrader.Application.Candidates
                 .Skip(Math.Max(0, candles.Count - settings.StopLookbackBars))
                 .Min(x => x.Low);
 
-            var entry = BuildEntryPrice(
-                last.Close,
-                entryCandles,
-                settings,
-                scanPriceOverride,
-                scanPriceFloorOverride,
-                entryDiscountOverridePct,
-                entryPatternFamily);
+            var entry = useScanPriceEntry
+                ? ResolveScanPriceEntry(last.Close, scanPriceOverride)
+                : BuildEntryPrice(
+                    last.Close,
+                    entryCandles,
+                    settings,
+                    scanPriceOverride,
+                    scanPriceFloorOverride,
+                    entryDiscountOverridePct,
+                    entryPatternFamily);
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -134,6 +137,19 @@ namespace IbSwingTrader.Application.Candidates
                 Exit = exit,
                 ExitProfile = defaultProfitPctOverride.HasValue ? "momentum" : "standard"
             };
+        }
+
+        private decimal ResolveScanPriceEntry(decimal fallbackEntry, decimal? scanPriceOverride)
+        {
+            var scanPrice = scanPriceOverride.GetValueOrDefault();
+            var entry = scanPrice > 0m ? scanPrice : fallbackEntry;
+
+            _logger.Info(
+                $"Trade entry forced to scan price. " +
+                $"Reason=BellUp phase ready today (T-1 close not yet above its own upper Bollinger band), entering without discount or pattern pullback. " +
+                $"Entry={_fmt.Price(entry)}");
+
+            return entry;
         }
 
         private decimal BuildEntryPrice(

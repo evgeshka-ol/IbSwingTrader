@@ -534,6 +534,7 @@ namespace IbSwingTrader.Domain.Settings
         public decimal ResearchLikeStrongPatternBonus { get; set; } = 0.16m;
         public decimal ResearchLikeDailyMacdSlopeThreshold { get; set; } = 0.08m;
         public decimal ResearchLikeExtraBonus { get; set; } = 0.12m;
+        public decimal BellUpPhaseNotReadyPenalty { get; set; } = 1.0m;
         public decimal OverextendedTrendPositionThreshold { get; set; } = 8.0m;
         public decimal OverextendedDailyRsi14Threshold { get; set; } = 66.0m;
         public decimal OverextendedBbMidThreshold { get; set; } = 5.0m;

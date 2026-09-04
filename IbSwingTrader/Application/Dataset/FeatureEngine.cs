@@ -3,6 +3,8 @@ namespace IbSwingTrader.Application.Dataset
 {
     public class FeatureEngine : IFeatureEngine
     {
+        private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
+
         public FeatureSet Calculate(List<Candle> candles, int index)
         {
             ArgumentNullException.ThrowIfNull(candles);
@@ -469,19 +471,31 @@ namespace IbSwingTrader.Application.Dataset
         {
             var result = new List<decimal>();
             DateTime? currentDay = null;
+            decimal? lastRthClose = null;
 
             for (int k = 0; k < i; k++)
             {
                 var candle = candles[k];
                 var day = candle.Time.Date;
+                var isRth = candle.Time.TimeOfDay < RegularSessionEnd;
 
                 if (currentDay == null || currentDay.Value != day)
                 {
                     result.Add(candle.Close);
                     currentDay = day;
+                    lastRthClose = isRth ? candle.Close : null;
                 }
-                else
+                else if (isRth)
                 {
+                    // Keep advancing to the latest regular-session close for the day, not a
+                    // later after-hours print.
+                    result[^1] = candle.Close;
+                    lastRthClose = candle.Close;
+                }
+                else if (lastRthClose == null)
+                {
+                    // No regular-session bar seen yet for this day - fall back to whatever is
+                    // available so the day isn't silently dropped.
                     result[^1] = candle.Close;
                 }
             }
