@@ -1474,24 +1474,47 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
-        // Validated 2026-09-04 against ASST/SRPT/SMMT (3/3 match to manual chart review, cross-checked
-        // against native IB daily bars): a BellUp candidate cycles burst candle -> sideways/pullback
-        // consolidation -> next burst candle. If T-1's daily close is still inside/below T-1's own
-        // upper Bollinger band, the burst hasn't fired yet and today is the day to enter at scan price.
-        // If T-1 already closed above its own upper band, the burst already happened and today's entry
-        // would be chasing into the sideways/pullback phase - the candidate should stay in the list
-        // (it may become ready on a later scan) but not be entered or ranked as ready-now.
+        // Revised 2026-09-04 (third pass): tried defining a burst as a single candle's own body
+        // (Close-Open) compared to its neighbors, per the user's SRPT reasoning - but that missed ASST,
+        // whose 9/3 move was mostly an overnight gap (close 9/2=24.32 -> open 9/3=25.63, +5.4%) with a
+        // modest +4.6% intraday body, smaller than the body-only threshold could catch. The user's call:
+        // a gap is part of the burst too, so go back to a plain close-vs-close jump (captures gap + body
+        // together) - this version already matched all 7 known-boosted tickers from the 09-04 scan
+        // (CHPT/HOOD/CRCL/MSTR/ASST/SPCX/ABTC) plus left MT ready. Checked 2 candles deep (T-1 vs T-2,
+        // then T-2 vs T-3): a burst 2 candles back can still mean today is a chase, but one further back
+        // (SRPT's real burst was 3-4 candles back) is read as "due for a new burst soon" instead of
+        // "still not ready", per the user's explicit correction - so the lookback is intentionally
+        // shallow, not a compromise. 5% threshold from the observed gap between confirmed bursts (SPCX
+        // +6.4%, the smallest) and confirmed non-bursts (SRPT +2.0%, MT +1.2%, ASST -1.5% on 09-03) -
+        // not AUC-validated, see [[feedback_rigor_before_recalibrating]] if revisited later.
+        private const decimal BellUpBurstJumpThreshold = 0.05m;
+
         private static bool IsBellUpPhaseReadyToday(RecentFeatureSeries recentSeries) =>
-            IsBellUpPhaseReadyToday(recentSeries.DailyCloseSeries, recentSeries.DailyBbUpperBandSeries);
+            IsBellUpPhaseReadyToday(recentSeries.DailyCloseSeries);
 
-        private static bool IsBellUpPhaseReadyToday(
-            IReadOnlyList<decimal> dailyCloseSeries,
-            IReadOnlyList<decimal> dailyBbUpperBandSeries)
+        private static bool IsBellUpPhaseReadyToday(IReadOnlyList<decimal> dailyCloseSeries) =>
+            !HasRecentBellUpBurst(dailyCloseSeries, lookback: 2);
+
+        private static bool HasRecentBellUpBurst(IReadOnlyList<decimal> dailyCloseSeries, int lookback)
         {
-            if (dailyCloseSeries.Count == 0 || dailyBbUpperBandSeries.Count == 0)
-                return true;
+            var count = dailyCloseSeries.Count;
+            for (var i = 0; i < lookback; i++)
+            {
+                var currentIndex = count - 1 - i;
+                var previousIndex = currentIndex - 1;
+                if (previousIndex < 0)
+                    break;
 
-            return dailyCloseSeries[^1] <= dailyBbUpperBandSeries[^1];
+                var previousClose = dailyCloseSeries[previousIndex];
+                if (previousClose == 0m)
+                    continue;
+
+                var jump = (dailyCloseSeries[currentIndex] - previousClose) / previousClose;
+                if (jump >= BellUpBurstJumpThreshold)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool IsLateBellUpPhase(
@@ -4119,7 +4142,7 @@ namespace IbSwingTrader.Application.Candidates
                     var isLateBellUpPhase =
                         family == SeriesTemplateFamily.TodayResearchLike &&
                         x.IsBellUpPattern &&
-                        !IsBellUpPhaseReadyToday(x.RecentDailyCloseSeries, x.RecentDailyBbUpperBandSeries);
+                        !IsBellUpPhaseReadyToday(x.RecentDailyCloseSeries);
 
                     var adjustedRank =
                         qualityScore * QualityScoreRankWeight +
@@ -4435,12 +4458,7 @@ namespace IbSwingTrader.Application.Candidates
             if (dailyBars.Count == 0)
                 return [];
 
-            var completedDailyBars = dailyBars.Count > 1
-                ? dailyBars.Take(dailyBars.Count - 1).ToList()
-                : dailyBars;
-
-            if (completedDailyBars.Count == 0)
-                completedDailyBars = dailyBars;
+            var completedDailyBars = TakeCompletedDailyBars(dailyBars);
 
             return [.. completedDailyBars
                 .TakeLast(RecentDailySeriesLength)
@@ -4519,16 +4537,26 @@ namespace IbSwingTrader.Application.Candidates
             return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
 
+        // Must drop the same still-forming last bar that BuildRecentDailyCloseSeries drops below -
+        // otherwise Open/High/Low's "last" element is today's in-progress bar while Close's "last"
+        // element is T-1's completed close, silently pairing two different calendar days together.
+        // Found 2026-09-04 via CHPT: DailyOpenSeries[^1]=9.31 (today's open) was being paired with
+        // DailyCloseSeries[^1]=9.07 (T-1's close) to compute a candle body, producing a nonsense
+        // negative/tiny body instead of T-1's real +31% burst candle (O=6.90 -> C=9.08).
         private static List<decimal> BuildRecentDailyCandleSeries(
             List<Candle> candles,
             int scanIndex,
             Func<Candle, decimal> selector)
         {
             var dailyBars = BuildDailyBars(candles.Take(scanIndex + 1).ToList());
-            return [.. dailyBars
+            var completedDailyBars = TakeCompletedDailyBars(dailyBars);
+            return [.. completedDailyBars
                 .TakeLast(RecentDailySeriesLength)
                 .Select(x => decimal.Round(selector(x), 2, MidpointRounding.AwayFromZero))];
         }
+
+        private static List<Candle> TakeCompletedDailyBars(List<Candle> dailyBars) =>
+            dailyBars.Count > 1 ? dailyBars.Take(dailyBars.Count - 1).ToList() : dailyBars;
 
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
