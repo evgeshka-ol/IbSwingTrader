@@ -1338,12 +1338,14 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.DailyBbUpperBandSeries,
                 recentSeries.DailyBbMidBandSeries,
                 recentSeries.DailyBbLowerBandSeries,
-                ParseDirection(bbState.Daily.Direction));
+                ParseDirection(bbState.Daily.Direction),
+                BellPatternTimeframe.Daily);
             var h4Kind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.H4BbUpperBandSeries,
                 recentSeries.H4BbMidBandSeries,
                 recentSeries.H4BbLowerBandSeries,
-                ParseDirection(bbState.H4.Direction));
+                ParseDirection(bbState.H4.Direction),
+                BellPatternTimeframe.H4);
 
             if (dailyKind == BellPatternKind.BellUp &&
                 h4Kind == BellPatternKind.BellUp &&
@@ -1406,7 +1408,8 @@ namespace IbSwingTrader.Application.Candidates
                     recentSeries.H4BbUpperBandSeries,
                     recentSeries.H4BbMidBandSeries,
                     recentSeries.H4BbLowerBandSeries,
-                    ParseDirection(bbState.H4.Direction)) == BellPatternKind.BellUp)
+                    ParseDirection(bbState.H4.Direction),
+                    BellPatternTimeframe.H4) == BellPatternKind.BellUp)
             {
                 return false;
             }
@@ -1530,7 +1533,8 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.DailyBbUpperBandSeries.SkipLast(1).ToList(),
                 recentSeries.DailyBbMidBandSeries.SkipLast(1).ToList(),
                 recentSeries.DailyBbLowerBandSeries.SkipLast(1).ToList(),
-                ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries.SkipLast(1)));
+                ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries.SkipLast(1)),
+                BellPatternTimeframe.Daily);
 
             // Validated 2026-08-11 against evaluation-dataset.csv (AUC=0.61 for Runaway Win/Loss,
             // n=285): a Daily RSI rollover from its own recent peak is a real signal on its own,

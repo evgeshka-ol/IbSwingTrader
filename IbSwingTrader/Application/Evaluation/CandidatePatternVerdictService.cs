@@ -182,8 +182,8 @@ namespace IbSwingTrader.Application.Evaluation
             BollingerFigureDirection dailyDirection,
             BollingerFigureDirection h4Direction)
         {
-            var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(dailyUpper, dailyMid, dailyLower, dailyDirection);
-            var h4Kind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(h4Upper, h4Mid, h4Lower, h4Direction);
+            var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(dailyUpper, dailyMid, dailyLower, dailyDirection, BellPatternTimeframe.Daily);
+            var h4Kind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(h4Upper, h4Mid, h4Lower, h4Direction, BellPatternTimeframe.H4);
 
             if (dailyKind == BellPatternKind.BellUp &&
                 h4Kind == BellPatternKind.BellUp &&
@@ -231,7 +231,8 @@ namespace IbSwingTrader.Application.Evaluation
                     series.H4BbUpperBandSeries,
                     series.H4BbMidBandSeries,
                     series.H4BbLowerBandSeries,
-                    h4State.Direction) == BellPatternKind.BellUp)
+                    h4State.Direction,
+                    BellPatternTimeframe.H4) == BellPatternKind.BellUp)
             {
                 return false;
             }

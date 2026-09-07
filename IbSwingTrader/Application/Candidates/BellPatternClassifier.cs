@@ -38,6 +38,18 @@ namespace IbSwingTrader.Application.Candidates
     //     class uses the live version as canonical.
     public static class BellPatternClassifier
     {
+        // Floors on the mid-band's own tail slope for IsGradualBellUpLaunch, separate per
+        // timeframe since a 4-bar H4 window (~16-20h) and a 4-bar Daily window (4 sessions)
+        // move on very different scales. Picked from real 2026-09-04 data: NVDA (confirmed
+        // false positive - no real BellUp shape, just an ordinary choppy uptrend) had
+        // midTailSlope 0.19%(H4)/0.5%(Daily), while the weakest genuine BellUp case that day
+        // (CMBT, H4-only) had 0.43%(H4); the weakest genuine Daily case (HAFN) had 2.8%(Daily).
+        // A plain ">0m" check let NVDA's near-flat mid band through on both timeframes. Not
+        // AUC-validated, just an eyeballed cutoff between the false positive and the weakest
+        // true positive on each timeframe - see feedback_rigor_before_recalibrating memory.
+        private const decimal MinGradualLaunchMidTailSlopePctH4 = 0.3m;
+        private const decimal MinGradualLaunchMidTailSlopePctDaily = 1.0m;
+
         public static List<decimal> CalculateDeltas(List<decimal> series)
         {
             if (series.Count < 2)
@@ -209,7 +221,8 @@ namespace IbSwingTrader.Application.Candidates
         public static bool IsGradualBellUpLaunch(
             IReadOnlyList<decimal> upper,
             IReadOnlyList<decimal> mid,
-            IReadOnlyList<decimal> lower)
+            IReadOnlyList<decimal> lower,
+            BellPatternTimeframe timeframe)
         {
             var count = Math.Min(upper.Count, Math.Min(mid.Count, lower.Count));
             if (count < 6)
@@ -223,8 +236,11 @@ namespace IbSwingTrader.Application.Candidates
                 .Zip(lower.TakeLast(count), (u, l) => u - l)
                 .ToList();
             var widthTailSlope = CalculateTailRelativeSlopePct(width, 4);
+            var minMidTailSlope = timeframe == BellPatternTimeframe.H4
+                ? MinGradualLaunchMidTailSlopePctH4
+                : MinGradualLaunchMidTailSlopePctDaily;
 
-            return midTailSlope > 0m &&
+            return midTailSlope >= minMidTailSlope &&
                    upperTailSlope >= midTailSlope + 0.5m &&
                    IsLowerBandLaggingForBellUp(new RealBollingerEnvelope(
                        upperTailSlope,
@@ -326,14 +342,15 @@ namespace IbSwingTrader.Application.Candidates
             IReadOnlyList<decimal> upper,
             IReadOnlyList<decimal> mid,
             IReadOnlyList<decimal> lower,
-            BollingerFigureDirection direction)
+            BollingerFigureDirection direction,
+            BellPatternTimeframe timeframe)
         {
             if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
                 return BellPatternKind.None;
 
             if (((IsBellUpEnvelope(prior, recent) &&
                   IsBellUpCurveTurn(upper, mid, lower)) ||
-                 IsGradualBellUpLaunch(upper, mid, lower) ||
+                 IsGradualBellUpLaunch(upper, mid, lower, timeframe) ||
                  IsExplosiveBellUpExpansion(upper, mid, lower)) &&
                 direction != BollingerFigureDirection.Down)
             {
