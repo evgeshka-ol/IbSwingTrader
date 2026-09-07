@@ -196,6 +196,19 @@ namespace IbSwingTrader.Application.Candidates
                     out var patternEntry,
                     out var patternDiagnostics))
             {
+                if (entryDiscountOverridePct.HasValue && entryDiscountOverridePct.Value >= 0m)
+                {
+                    var maxDiscountFloor = referencePrice * (1m - entryDiscountOverridePct.Value);
+                    if (patternEntry < maxDiscountFloor)
+                    {
+                        _logger.Info(
+                            $"Trade entry from M15 {entryPatternFamily} capped to profile max discount. " +
+                            $"PatternEntry={_fmt.Price(patternEntry)}, MaxDiscountPct={_fmt.Percent(entryDiscountOverridePct.Value)}, " +
+                            $"CappedEntry={_fmt.Price(maxDiscountFloor)}");
+                        patternEntry = maxDiscountFloor;
+                    }
+                }
+
                 _logger.Info(
                     $"Trade entry predicted from M15 {entryPatternFamily}. " +
                     $"Current={_fmt.Price(current)}, Entry={_fmt.Price(patternEntry)}, " +
