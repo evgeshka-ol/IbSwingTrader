@@ -1498,6 +1498,54 @@ namespace IbSwingTrader.Application.Candidates
         private static bool IsBellUpPhaseReadyToday(IReadOnlyList<decimal> dailyCloseSeries) =>
             !HasRecentBellUpBurst(dailyCloseSeries, lookback: 2);
 
+        // Added 2026-09-08, per the user's own H4 chart read (BE case): the Daily-only jump test
+        // above is structurally blind to a burst that already happened on H4 but hasn't yet shown up
+        // as a completed-daily-close jump (see [[project_bellup_phase_readiness]]). When BellUp is
+        // itself detected on the H4 timeframe (ClassifyBellPatternSignal), readiness is judged on H4
+        // candle bodies instead: user's own rule - compare the last *completed* H4 candle's body
+        // (Close-Open) against the one before it; if the completed candle is green and its body is at
+        // least 2x the length (absolute value) of the prior candle's body, that completed candle was
+        // the burst, so today's still-forming candle is a chase, not an entry. Eyeballed 2x multiplier
+        // per the user's explicit spec, not AUC-validated - see [[feedback_rigor_before_recalibrating]].
+        private const decimal H4BurstBodyMultiplier = 2m;
+
+        private static bool IsH4BellUpPhaseReadyToday(RecentFeatureSeries recentSeries) =>
+            IsH4BellUpPhaseReadyToday(recentSeries.H4OpenSeries, recentSeries.H4CloseSeries);
+
+        private static bool IsH4BellUpPhaseReadyToday(
+            IReadOnlyList<decimal> h4OpenSeries,
+            IReadOnlyList<decimal> h4CloseSeries) =>
+            !HasRecentH4BellUpBurst(h4OpenSeries, h4CloseSeries);
+
+        private static bool HasRecentH4BellUpBurst(
+            IReadOnlyList<decimal> h4OpenSeries,
+            IReadOnlyList<decimal> h4CloseSeries)
+        {
+            // [^1] is today's still-forming H4 candle (not yet closed), so the burst check looks at
+            // [^2] (last completed candle) against [^3] (the one before it).
+            if (h4OpenSeries.Count < 3 || h4CloseSeries.Count < 3)
+                return false;
+
+            var previousBody = h4CloseSeries[^2] - h4OpenSeries[^2];
+            if (previousBody <= 0m)
+                return false;
+
+            var beforePreviousBody = h4CloseSeries[^3] - h4OpenSeries[^3];
+            var beforePreviousLength = Math.Abs(beforePreviousBody);
+
+            return previousBody >= beforePreviousLength * H4BurstBodyMultiplier;
+        }
+
+        private static bool IsBellUpPatternPhaseReadyToday(
+            BellPatternSignal bellPatternSignal,
+            RecentFeatureSeries recentSeries) =>
+            bellPatternSignal.Timeframe switch
+            {
+                BellPatternTimeframe.H4 => IsH4BellUpPhaseReadyToday(recentSeries),
+                BellPatternTimeframe.Daily => IsBellUpPhaseReadyToday(recentSeries),
+                _ => true
+            };
+
         private static bool HasRecentBellUpBurst(IReadOnlyList<decimal> dailyCloseSeries, int lookback)
         {
             var count = dailyCloseSeries.Count;
@@ -2467,10 +2515,11 @@ namespace IbSwingTrader.Application.Candidates
             var bbState = BuildBollingerStateSet(recentSeries);
             var todayResearchLikePatternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
             var isBellUpPhaseReadyToday =
                 ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
                 todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
-                IsBellUpPhaseReadyToday(recentSeries);
+                IsBellUpPatternPhaseReadyToday(bellPatternSignal, recentSeries);
             var scanPrice = ResolveScanPrice(ctx.Snapshot);
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
@@ -4117,6 +4166,42 @@ namespace IbSwingTrader.Application.Candidates
         // upper band across multiple days and are not covered by this gate.
         private const decimal LateBellUpPhaseRankOffset = -1_000_000m;
 
+        // Rebuilds a RecentFeatureSeries from a CandidateDetails' own stored series so
+        // ClassifyBellPatternSignal/BuildBollingerStateSet can be re-run at ranking time (H4 vs Daily
+        // BellUp timeframe isn't itself persisted on CandidateDetails - only IsBellUpPattern is).
+        private static RecentFeatureSeries ToRecentFeatureSeries(CandidateDetails candidate) => new()
+        {
+            DailyCloseSeries = candidate.RecentDailyCloseSeries,
+            DailyOpenSeries = candidate.RecentDailyOpenSeries,
+            DailyHighSeries = candidate.RecentDailyHighSeries,
+            DailyLowSeries = candidate.RecentDailyLowSeries,
+            DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries,
+            DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries,
+            DailyBbLowerBandSeries = candidate.RecentDailyBbLowerBandSeries,
+            DailyRsiSeries = candidate.RecentDailyRsiSeries,
+            DailyMacdLineSeries = candidate.RecentDailyMacdLineSeries,
+            DailyMacdSignalSeries = candidate.RecentDailyMacdSignalSeries,
+            DailyMacdHistogramSeries = candidate.RecentDailyMacdHistogramSeries,
+            WeeklyBbUpperBandSeries = candidate.RecentWeeklyBbUpperBandSeries,
+            WeeklyBbMidBandSeries = candidate.RecentWeeklyBbMidBandSeries,
+            WeeklyBbLowerBandSeries = candidate.RecentWeeklyBbLowerBandSeries,
+            WeeklyRsiSeries = candidate.RecentWeeklyRsiSeries,
+            WeeklyMacdLineSeries = candidate.RecentWeeklyMacdLineSeries,
+            WeeklyMacdSignalSeries = candidate.RecentWeeklyMacdSignalSeries,
+            WeeklyMacdHistogramSeries = candidate.RecentWeeklyMacdHistogramSeries,
+            H4OpenSeries = candidate.RecentH4OpenSeries,
+            H4HighSeries = candidate.RecentH4HighSeries,
+            H4LowSeries = candidate.RecentH4LowSeries,
+            H4CloseSeries = candidate.RecentH4CloseSeries,
+            H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries,
+            H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries,
+            H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries,
+            H4RsiSeries = candidate.RecentH4RsiSeries,
+            H4MacdLineSeries = candidate.RecentH4MacdLineSeries,
+            H4MacdSignalSeries = candidate.RecentH4MacdSignalSeries,
+            H4MacdHistogramSeries = candidate.RecentH4MacdHistogramSeries
+        };
+
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
             SeriesTemplateFamily family)
@@ -4143,10 +4228,17 @@ namespace IbSwingTrader.Application.Candidates
                         x.Diagnostics.EstimatedHitRatePct = EstimateHitRatePct(qualityScore, family);
                     }
 
-                    var isLateBellUpPhase =
-                        family == SeriesTemplateFamily.TodayResearchLike &&
-                        x.IsBellUpPattern &&
-                        !IsBellUpPhaseReadyToday(x.RecentDailyCloseSeries);
+                    var isLateBellUpPhase = false;
+                    if (family == SeriesTemplateFamily.TodayResearchLike && x.IsBellUpPattern)
+                    {
+                        var candidateRecentSeries = ToRecentFeatureSeries(x);
+                        var candidateBellPatternSignal = ClassifyBellPatternSignal(
+                            BuildBollingerStateSet(candidateRecentSeries),
+                            candidateRecentSeries);
+                        isLateBellUpPhase = !IsBellUpPatternPhaseReadyToday(
+                            candidateBellPatternSignal,
+                            candidateRecentSeries);
+                    }
 
                     var adjustedRank =
                         qualityScore * QualityScoreRankWeight +
@@ -4559,8 +4651,23 @@ namespace IbSwingTrader.Application.Candidates
                 .Select(x => decimal.Round(selector(x), 2, MidpointRounding.AwayFromZero))];
         }
 
-        private static List<Candle> TakeCompletedDailyBars(List<Candle> dailyBars) =>
-            dailyBars.Count > 1 ? dailyBars.Take(dailyBars.Count - 1).ToList() : dailyBars;
+        // Only drop the last daily bar when it actually IS today's still-forming bar - assuming it
+        // always is (by position alone) breaks right after a market holiday: if today's first H4 bar
+        // hasn't posted yet at scan time, the candle series' last entry is really the prior *completed*
+        // session (e.g. Friday's close after a Monday holiday), and blindly dropping it silently loses
+        // that whole day from every Daily-based series (close/open/high/low, and everything derived
+        // from them - Bollinger regime, quality score, the burst/readiness checks). Found 2026-09-08 on
+        // HAFN the morning after Labor Day: RecentDailyCloseSeries ended on Thursday's close, entirely
+        // missing Friday's real (and, per the user's chart read, boost-sized) candle.
+        private static List<Candle> TakeCompletedDailyBars(List<Candle> dailyBars)
+        {
+            if (dailyBars.Count <= 1)
+                return dailyBars;
+
+            return dailyBars[^1].Time.Date == MarketTime.Now().Date
+                ? dailyBars.Take(dailyBars.Count - 1).ToList()
+                : dailyBars;
+        }
 
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
