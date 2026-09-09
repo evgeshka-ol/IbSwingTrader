@@ -30,7 +30,10 @@ For scanner quality, the key metric is `AmplitudePct`.
 `Other` holds nonmatching setups. In the September 8 snapshots, a row can
 still have `CandidateGroup=Runaway` in `candidates.csv` but
 `CandidateSource=Other`, a zero trade plan, and `CandidateGroup=Other` in
-evaluation. Match by ticker/ScanTime and inspect source before identifying
+evaluation. The September 9 code change aligns output groups on the next
+write, including legacy `DiagnosticRejected` rows under `Other`, and preserves
+the source when loading candidates for evaluation. Existing CSV files have
+not been regenerated. Match by ticker/ScanTime and inspect source before identifying
 the playable top-1. `NoEntry` with a zero plan on an `Other` row is not
 evidence of a mistimed/deep entry price. Current output details are in
 `../ibswingtrader-scanner/references/SETTINGS_MAP.md`.

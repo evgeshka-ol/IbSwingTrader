@@ -15,6 +15,31 @@ strong amplitude but captures less than 10%, the exit model is too conservative
 or the entry is too late. If top-1 has weak or negative amplitude, scanner
 ranking selected the wrong leader.
 
+## Concrete top-1 target: SECZ (2026-09-08 scan)
+
+The user identified SECZ as the ideal minimum-goal example on 2026-09-09:
+regularly put one such playable winner at rank 1; one is enough. A long list
+or high amplitude alone does not satisfy this goal.
+
+Saved scan: `2026-09-08 07:51:20 America/New_York`. Evaluation on September 9:
+
+- `PatternVerdict=Match`, `DetectedPattern=BellUp`, confirmed on H4.
+- Entry `7.41` at `2026-09-08 09:50:00`; exit `8.22` at `14:35:00`.
+- `Outcome=Win`, `PlannedProfitPct=10.93`, consistent with the entry/exit
+  prices; this is an evaluated plan outcome, not evidence of a broker fill.
+- `AmplitudePct=13.52`; `MinFirst`; observed minimum `7.40`, only `0.01`
+  below the planned entry.
+- `CandidateDisplayRank=4` among admitted Runaway. The original candidate
+  CSV has `DisplayRank=11` because it still mixed Other into that pool.
+- Saved `DiagnosticsRankingQualityScore=15.08`, estimated hit rate `55%`.
+
+Use this as a positive case of recognition, entry timing and profit capture
+working together. Compare its original scanner snapshot with higher-ranked
+setups when investigating ranking. Do not hardcode SECZ or promote a shape
+from this single outcome without validation across scans. The newer body
+timing gate has not been replayed on this snapshot; this example documents
+the historical outcome, not a verified pass under the changed code.
+
 ## Fix the scanner first when:
 
 - many top candidates have low amplitude

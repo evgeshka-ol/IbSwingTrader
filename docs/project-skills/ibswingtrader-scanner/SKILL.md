@@ -25,12 +25,17 @@ default instructions to prioritize Reversal work. There are now three output
 categories: `Runaway`, `Reversal`, and `Other`; `Other` is the destination for
 setups that match neither playable category, not a third trading pattern.
 See `references/SERIES_PLAYBOOK.md` "BellUp entry timing" for the user's
-exact candle-body rule and the verified implementation gaps. See
-`references/SETTINGS_MAP.md` for current console/CSV category differences.
+exact candle-body rule and its implementation. See
+`references/SETTINGS_MAP.md` for output categories and legacy CSV caveats.
 
 - Minimal near-term goal: the #1 current `Runaway` row should
   consistently become a practical winning idea and capture more than 10%.
   Optimize top-1 quality before widening attention to the rest of the list.
+  The user's concrete success example is SECZ from the September 8 scan:
+  H4 BellUp, evaluated Win +10.93%, currently rank 4 among admitted Runaway.
+  One such winner regularly at rank 1 is sufficient for the minimum goal.
+  See `../ibswingtrader-evaluation/references/TRADEPLAN_SCOPE.md` for the
+  saved entry/exit details and the distinction from amplitude alone.
 - For scanner quality, the main oracle is `AmplitudePct`, not `Win/Loss/NoEntry`.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.

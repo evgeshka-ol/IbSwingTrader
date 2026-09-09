@@ -35,18 +35,21 @@ Useful when too many names are seen but not promoted.
   are `Runaway` (BellUp only), `Reversal`, and `Other` (matches neither
   playable category). Preserve rejected rows for analysis without treating
   `Other` as a playable Runaway recommendation.
-  - Verified current implementation: `CandidateResultWriter.WriteAsync`
-    separates `CandidateSource=Other` from the same-day pool into an `Other`
-    console section and excludes it from the Runaway summary. The finder
-    stores Runaway rejects this way with a price snapshot and zero plan.
-  - CSV compatibility caveat: the 2026-09-08 `candidates.csv` still labels
+  - Current implementation: rejects from either family are stored with
+    `CandidateSource=Other`, a price snapshot, a rejection reason, and a zero
+    plan. `CandidateGroups.IsOther` also recognizes legacy
+    `DiagnosticRejected` sources. Console, CSV and evaluation separate these
+    from playable Runaway/Reversal and rank each output group independently.
+    All newly rejected setups are retained regardless of `EmitAllSeenCandidates`.
+    The setting still affects scan-context breadth and deduplication.
+  - CSV compatibility caveat: the original 2026-09-08 `candidates.csv` labels
     these rows `CandidateGroup=Runaway`, whereas evaluation labels them
     `Other`. Join by ticker and scan timestamp, and inspect source as well
     as group before computing playable Runaway top-1 results. A rank-1
     `Other` row in that CSV is not the console's first playable Runaway.
-  - Reversal rejects are still present as `DiagnosticRejected` in the
-    Reversal pool. The desired "neither pattern -> Other" rule is not yet
-    applied uniformly to both families in the inspected implementation.
+    On the next application write, legacy `Other`/`DiagnosticRejected` rows
+    are exported under `Other` too, retaining their source, snapshots and
+    historical plans. Existing files were not rewritten during this change.
 
 - `EmitAllSeenCandidates`: **deliberately `true`, not a bug.** Historical
   behavior before the `Other` separation described above: when `true`,

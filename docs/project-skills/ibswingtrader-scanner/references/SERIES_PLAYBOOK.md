@@ -302,30 +302,38 @@ Three completed candles are needed to check both positions. Determine
 completion from candle timestamps; Daily series may already exclude the
 forming candle while H4 series may include it. Do not blindly use identical
 array offsets for both timeframes. Missing history cannot establish that
-both checks passed; a missing-data policy was not specified in this rule.
+both checks passed; the implementation sends such a setup to `Other` with
+an insufficient-history reason.
 
 This is the user's requested behavior, not a claim of AUC/holdout validation.
 It supersedes the older Daily 5% close-to-close definition in code comments.
 
-### Verified implementation gaps (2026-09-09)
+### Implementation (2026-09-09)
 
-Inspection of `Application/Candidates/CandidateFinder.cs` found only a partial
-implementation of the requested behavior:
+`Application/Candidates/BellUpEntryTiming.cs` implements the shared body
+rule on both Daily and H4. `CandidateFinder.TryAddCandidate` applies it to
+otherwise eligible BellUp candidates before building a trade plan. A boost
+on either timeframe sends the row to `Other`, with a zero plan and a reason
+identifying the timeframe and T-1/T-2 candle. No boost means this timing gate
+passes, not that unrelated eligibility checks are bypassed.
 
-- `HasRecentBellUpBurst` still checks two Daily close-to-close gains against
-  `BellUpBurstJumpThreshold = 0.05m`; it does not compare Daily candle bodies.
-- `HasRecentH4BellUpBurst` implements the green-body / 2x-absolute-body rule
-  only for `[^2]` versus `[^3]`, assuming `[^1]` is forming. It does not
-  also check the preceding completed candle against `[^4]`.
-- `IsBellUpPatternPhaseReadyToday` selects H4 or Daily according to the
-  detected BellUp timeframe; it does not check both timeframes together.
-- This readiness result shapes the trade-plan profile and adds
-  `LateBellUpPhaseRankOffset` during reranking. It is not itself a hard
-  no-entry admission gate. Separate late-phase/terminal-pullback checks do
-  exist, but are not the two-candle body rule above.
+The check uses raw candles without rounding the bodies, preferring the
+context's D1 candles and falling back to the existing H4-to-Daily aggregation
+only when D1 candles are unavailable. Times are market-local as prepared by
+the existing data pipeline. Daily completion uses the regular 16:00 session
+close; H4 completion uses candle start plus four hours. A green candle after
+a zero-body candle satisfies the literal 2x rule; two zero bodies do not.
 
-These gaps were documented without changing application code. Do not report
-the requested two-position body rule as fully implemented.
+The trade-plan readiness profile uses the same predicate. The old Daily
+5% close-to-close test, H4 single-position check, and late-phase ranking
+offset/penalty application were removed; the rule now controls admission.
+Existing BellUp geometry and other late-phase checks remain in effect.
+
+Focused checks are in `tests/ScannerTimingChecks`, with no broker or NuGet
+dependencies. User-run command:
+`dotnet run --project tests/ScannerTimingChecks/ScannerTimingChecks.csproj`.
+These checks were added but not executed by Codex, following the project's
+execution boundary. Live scanner/evaluation behavior still needs a user run.
 
 ## Practical use and template sources — removed 2026-09-01
 
