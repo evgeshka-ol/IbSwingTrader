@@ -26,6 +26,15 @@ Do not mix them.
 
 For scanner quality, the key metric is `AmplitudePct`.
 
+**Category caveat (2026-09-09):** playable `Runaway` now focuses on BellUp;
+`Other` holds nonmatching setups. In the September 8 snapshots, a row can
+still have `CandidateGroup=Runaway` in `candidates.csv` but
+`CandidateSource=Other`, a zero trade plan, and `CandidateGroup=Other` in
+evaluation. Match by ticker/ScanTime and inspect source before identifying
+the playable top-1. `NoEntry` with a zero plan on an `Other` row is not
+evidence of a mistimed/deep entry price. Current output details are in
+`../ibswingtrader-scanner/references/SETTINGS_MAP.md`.
+
 - High amplitude + `NoEntry` means scanner may be right and `TradePlan` may be wrong.
 - Low amplitude means the scanner likely surfaced a weak ticker.
 - The count of `Win` rows measures `TradePlan` conversion, not scanner recall.

@@ -277,6 +277,56 @@ pre-move H4 rows:
 When comparing band curves across tickers, compare shape rather than absolute
 price. Normalize by the starting point or compare deltas from the first point.
 
+## BellUp entry timing (user clarification, 2026-09-09)
+
+The active objective is a playable `Runaway` list containing only BellUp,
+at the right moment before the boost. Recognizing the BellUp shape and
+deciding whether entry is already late are separate checks. Setups matching
+neither playable family belong in `Other`.
+
+Apply the following timing rule on Daily and H4 using aligned Open/Close
+candles and signed body `B = Close - Open`. Let T-1 be the previous completed
+candle, T-2 the completed candle before it, and T-3 the one before that:
+
+1. If `B(T-1) > 0` and `B(T-1) >= 2 * abs(B(T-2))`, the boost happened on
+   T-1: do not enter.
+2. Otherwise, if `B(T-2) > 0` and `B(T-2) >= 2 * abs(B(T-3))`, the boost
+   happened on T-2: do not enter.
+3. Otherwise, retain the ticker as a playable candidate, provided its BellUp
+   and other eligibility checks pass.
+
+The boost candle must be green; its predecessor can be either color, since
+the comparison uses the predecessor's absolute body length. This is a
+body-size comparison, not a wick/range or close-to-close percentage test.
+Three completed candles are needed to check both positions. Determine
+completion from candle timestamps; Daily series may already exclude the
+forming candle while H4 series may include it. Do not blindly use identical
+array offsets for both timeframes. Missing history cannot establish that
+both checks passed; a missing-data policy was not specified in this rule.
+
+This is the user's requested behavior, not a claim of AUC/holdout validation.
+It supersedes the older Daily 5% close-to-close definition in code comments.
+
+### Verified implementation gaps (2026-09-09)
+
+Inspection of `Application/Candidates/CandidateFinder.cs` found only a partial
+implementation of the requested behavior:
+
+- `HasRecentBellUpBurst` still checks two Daily close-to-close gains against
+  `BellUpBurstJumpThreshold = 0.05m`; it does not compare Daily candle bodies.
+- `HasRecentH4BellUpBurst` implements the green-body / 2x-absolute-body rule
+  only for `[^2]` versus `[^3]`, assuming `[^1]` is forming. It does not
+  also check the preceding completed candle against `[^4]`.
+- `IsBellUpPatternPhaseReadyToday` selects H4 or Daily according to the
+  detected BellUp timeframe; it does not check both timeframes together.
+- This readiness result shapes the trade-plan profile and adds
+  `LateBellUpPhaseRankOffset` during reranking. It is not itself a hard
+  no-entry admission gate. Separate late-phase/terminal-pullback checks do
+  exist, but are not the two-candle body rule above.
+
+These gaps were documented without changing application code. Do not report
+the requested two-position body rule as fully implemented.
+
 ## Practical use and template sources — removed 2026-09-01
 
 This section used to describe how to compare scanner output against

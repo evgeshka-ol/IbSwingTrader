@@ -17,6 +17,17 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 The scanner's job is to find future fat moves early.
 
+**Current focus (user clarification, 2026-09-09):** keep only `BellUp` in
+the playable `Runaway` group and detect it before its boost has already
+happened. The user considers BellUp recognition reasonably effective,
+unlike other patterns, especially Reversal. This focus supersedes older
+default instructions to prioritize Reversal work. There are now three output
+categories: `Runaway`, `Reversal`, and `Other`; `Other` is the destination for
+setups that match neither playable category, not a third trading pattern.
+See `references/SERIES_PLAYBOOK.md` "BellUp entry timing" for the user's
+exact candle-body rule and the verified implementation gaps. See
+`references/SETTINGS_MAP.md` for current console/CSV category differences.
+
 - Minimal near-term goal: the #1 current `Runaway` row should
   consistently become a practical winning idea and capture more than 10%.
   Optimize top-1 quality before widening attention to the rest of the list.
