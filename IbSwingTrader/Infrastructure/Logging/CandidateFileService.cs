@@ -142,6 +142,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                     .ToDictionary(x => x.header, x => x.value, StringComparer.OrdinalIgnoreCase);
                 var candidate = BuildCandidate(row);
                 var group = row.GetValueOrDefault("CandidateGroup") ?? string.Empty;
+                if (group.Equals("Other", StringComparison.OrdinalIgnoreCase) && !CandidateGroups.IsOther(candidate))
+                    candidate.CandidateSource = "Other";
                 var isCurrentScanOutput =
                     row.TryGetValue("IsCurrentScanOutput", out var currentRaw) &&
                     bool.TryParse(currentRaw, out var current) &&

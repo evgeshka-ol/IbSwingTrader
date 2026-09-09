@@ -24,8 +24,11 @@ namespace IbSwingTrader.Infrastructure.Logging
             var headers = new List<string>();
             var rows = new List<Dictionary<string, string>>();
 
-            AddGroupRows("Runaway", sameDayCandidates, currentOperationKeys, headers, rows);
-            AddGroupRows("Reversal", candidates, currentOperationKeys, headers, rows);
+            var primary = candidates.ToList();
+            var sameDay = sameDayCandidates.ToList();
+            AddGroupRows("Runaway", sameDay.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
+            AddGroupRows("Reversal", primary.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
+            AddGroupRows("Other", sameDay.Concat(primary).Where(CandidateGroups.IsOther), currentOperationKeys, headers, rows);
 
             return new CandidateCsvTable
             {
@@ -43,7 +46,7 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             return candidateGroup?.Equals("Runaway", StringComparison.OrdinalIgnoreCase) == true
                 ? 0
-                : 1;
+                : candidateGroup?.Equals("Reversal", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
         }
 
         private void AddGroupRows(

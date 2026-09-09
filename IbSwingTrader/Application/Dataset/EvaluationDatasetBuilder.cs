@@ -296,7 +296,8 @@ namespace IbSwingTrader.Application.Dataset
                 {
                     x.CandidateSource = string.IsNullOrWhiteSpace(x.CandidateSource) ? "Primary" : x.CandidateSource;
                     return x;
-                });
+                })
+                .ToList();
 
             var sameDayCandidates = document.SameDayCandidates
                 .Select(x =>
@@ -311,13 +312,15 @@ namespace IbSwingTrader.Application.Dataset
                 })
                 .ToList();
 
-            var otherCandidates = sameDayCandidates
-                .Where(x => x.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase));
+            var otherCandidates = sameDayCandidates.Concat(primaryCandidates)
+                .Where(CandidateGroups.IsOther);
             var runawayCandidates = sameDayCandidates
-                .Where(x => !x.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase));
+                .Where(x => !CandidateGroups.IsOther(x));
+            var reversalCandidates = primaryCandidates
+                .Where(x => !CandidateGroups.IsOther(x));
 
             var snapshots = BuildRankedCandidateSnapshots("Runaway", runawayCandidates)
-                .Concat(BuildRankedCandidateSnapshots("Reversal", primaryCandidates))
+                .Concat(BuildRankedCandidateSnapshots("Reversal", reversalCandidates))
                 .Concat(BuildRankedCandidateSnapshots("Other", otherCandidates));
 
             return snapshots
@@ -1220,7 +1223,8 @@ namespace IbSwingTrader.Application.Dataset
                         groupName,
                         (groupName.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
                          groupName.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
-                         groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase)) ? 0 : 1,
+                         groupName.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase)) ? 0 :
+                            groupName.Equals("Other", StringComparison.OrdinalIgnoreCase) ? 2 : 1,
                         index + 1)))];
         }
 

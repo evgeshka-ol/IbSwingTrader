@@ -34,14 +34,15 @@ namespace IbSwingTrader.App.Commands
 
             await _candidateWriter.WriteAsync(candidatesPath, result);
 
-            var otherRankingRows = result.SameDayCandidates.Count(x =>
-                string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase));
+            var reversalRankingRows = result.Candidates.Count(x => !CandidateGroups.IsOther(x));
+            var runawayRankingRows = result.SameDayCandidates.Count(x => !CandidateGroups.IsOther(x));
+            var otherRankingRows = result.Candidates.Concat(result.SameDayCandidates).Count(CandidateGroups.IsOther);
 
             _logger.Info($"Candidates saved: {candidatesPath}");
             _logger.Info(
                 $"GetCandidates completed. " +
-                $"Reversal ranking rows: {result.Candidates.Count}, " +
-                $"Runaway ranking rows: {result.SameDayCandidates.Count - otherRankingRows}, " +
+                $"Reversal ranking rows: {reversalRankingRows}, " +
+                $"Runaway ranking rows: {runawayRankingRows}, " +
                 $"Other ranking rows: {otherRankingRows}, " +
                 $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }

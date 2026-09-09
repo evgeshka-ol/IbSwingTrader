@@ -24,13 +24,14 @@ namespace IbSwingTrader.Infrastructure.Logging
             ArgumentNullException.ThrowIfNull(result);
 
             var candidates = OrderPrimaryForDisplay(result.Candidates);
+            var admittedCandidates = candidates.Where(x => !CandidateGroups.IsOther(x)).ToList();
             var sameDayCandidates = OrderSameDayForDisplay(result.SameDayCandidates);
             var admittedSameDayCandidates = sameDayCandidates
-                .Where(x => !string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase))
+                .Where(x => !CandidateGroups.IsOther(x))
                 .ToList();
-            var otherCandidates = sameDayCandidates
-                .Where(x => string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var otherCandidates = OrderSameDayForDisplay(sameDayCandidates
+                .Concat(candidates)
+                .Where(CandidateGroups.IsOther));
 
             var folder = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(folder))
@@ -62,7 +63,7 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             WriteConsoleSectionHeader("Reversal");
-            foreach (var candidate in candidates)
+            foreach (var candidate in admittedCandidates)
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
@@ -76,7 +77,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 .Where(x => !mergedSameDay.Any(y =>
                     string.Equals(BuildCandidateScanKey(y), BuildCandidateScanKey(x), StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-            var summary = BuildSummary(candidates, admittedSameDayCandidates);
+            var summary = BuildSummary(admittedCandidates, admittedSameDayCandidates);
             await _candidateFileService.WriteAsync(
                 filePath,
                 new CandidateFileDocument

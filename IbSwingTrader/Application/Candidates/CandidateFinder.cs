@@ -464,7 +464,7 @@ namespace IbSwingTrader.Application.Candidates
                     bbState,
                     dailyFamilySplit);
 
-                if (!isTodayResearchLikeCandidate)
+                if (!isTodayResearchLikeCandidate || !IsBellUpPhaseReadyToday(ctx, out _))
                     continue;
 
                 if (entryScore < settings.MinEntryScore && !isTodayResearchLikeCandidate)
@@ -683,20 +683,10 @@ namespace IbSwingTrader.Application.Candidates
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
-            var emitAllSeenCandidates = _getCandidatesSettingsProvider.Get().Finder.EmitAllSeenCandidates;
-
-            async Task EmitDiagnosticRejectedCandidateAsync(string reason)
+            void EmitOtherCandidate(string reason)
             {
-                var isTodayResearchLikeBucket = bucketName == "runaway candidates";
-                if (!emitAllSeenCandidates && !isTodayResearchLikeBucket)
-                    return;
-
-                // TodayResearchLike (Runaway/BellUp) rejects are captured unconditionally as
-                // "Other" for historical evaluation, using a cheap price snapshot instead of a
-                // full IB contract resolve + M15 fetch, since no trade will ever be placed on them.
-                var trade = isTodayResearchLikeBucket
-                    ? new TradePlanInfo { LiveReferencePrice = ResolveScanPrice(ctx.Snapshot) }
-                    : ctx.Trade ??= await BuildTradePlan(ctx);
+                // Keep rejected setups for evaluation without constructing an executable plan.
+                var trade = new TradePlanInfo { LiveReferencePrice = ResolveScanPrice(ctx.Snapshot) };
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
@@ -724,7 +714,7 @@ namespace IbSwingTrader.Application.Candidates
                     todayResearchLikePatternKind,
                     todayResearchLikeSeriesScore);
 
-                candidateItem.CandidateSource = isTodayResearchLikeBucket ? "Other" : "DiagnosticRejected";
+                candidateItem.CandidateSource = "Other";
                 candidateItem.Context.Notes = AppendDiagnosticNote(candidateItem.Context.Notes, reason);
 
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
@@ -735,7 +725,7 @@ namespace IbSwingTrader.Application.Candidates
                 _logger.Info(
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     "Daily family split is unknown.");
-                await EmitDiagnosticRejectedCandidateAsync(
+                EmitOtherCandidate(
                     "Rejected: daily family split is unknown");
                 return;
             }
@@ -755,9 +745,16 @@ namespace IbSwingTrader.Application.Candidates
             {
                 _logger.Info(
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    "Runaway candidate rejected because BellUp pattern was not confirmed on H4/Daily.");
-                await EmitDiagnosticRejectedCandidateAsync(
-                    "Rejected: Runaway BellUp pattern was not confirmed on H4/Daily");
+                    "Runaway candidate rejected because BellUp eligibility was not confirmed on H4/Daily.");
+                EmitOtherCandidate(
+                    "Rejected: Runaway BellUp eligibility was not confirmed on H4/Daily");
+                return;
+            }
+
+            if (isTodayResearchLikeCandidate && !IsBellUpPhaseReadyToday(ctx, out var burstReason))
+            {
+                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {burstReason}");
+                EmitOtherCandidate($"Rejected: {burstReason}");
                 return;
             }
 
@@ -779,7 +776,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not confirmed. " +
                         "Reason=reliable D1 and H4 pattern rows unavailable");
-                    await EmitDiagnosticRejectedCandidateAsync(
+                    EmitOtherCandidate(
                         "Rejected: ReversalHook reliable D1 and H4 pattern rows unavailable");
                     return;
                 }
@@ -790,7 +787,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
                         $"{reversalHookDiagnostics}");
-                    await EmitDiagnosticRejectedCandidateAsync(
+                    EmitOtherCandidate(
                         $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}");
                     return;
                 }
@@ -801,7 +798,7 @@ namespace IbSwingTrader.Application.Candidates
                     _logger.Info(
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not trade-ready. {h4ReversalDiagnostics}");
-                    await EmitDiagnosticRejectedCandidateAsync(
+                    EmitOtherCandidate(
                         $"Rejected: ReversalHook not trade-ready. {h4ReversalDiagnostics}");
                     return;
                 }
@@ -822,7 +819,7 @@ namespace IbSwingTrader.Application.Candidates
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     $"Runaway candidate rejected because the live price invalidated the saved H4 structure. " +
                     liveInvalidationReason);
-                await EmitDiagnosticRejectedCandidateAsync(
+                EmitOtherCandidate(
                     $"Rejected: Runaway live price invalidated saved H4 structure. {liveInvalidationReason}");
                 return;
             }
@@ -877,7 +874,7 @@ namespace IbSwingTrader.Application.Candidates
 
         private static int GetCandidateSourcePriority(CandidateDetails candidate)
         {
-            if (string.Equals(candidate.CandidateSource, "DiagnosticRejected", StringComparison.OrdinalIgnoreCase))
+            if (CandidateGroups.IsOther(candidate))
                 return 0;
 
             if (string.Equals(candidate.CandidateSource, "Primary", StringComparison.OrdinalIgnoreCase) ||
@@ -1477,96 +1474,12 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
-        // Revised 2026-09-04 (third pass): tried defining a burst as a single candle's own body
-        // (Close-Open) compared to its neighbors, per the user's SRPT reasoning - but that missed ASST,
-        // whose 9/3 move was mostly an overnight gap (close 9/2=24.32 -> open 9/3=25.63, +5.4%) with a
-        // modest +4.6% intraday body, smaller than the body-only threshold could catch. The user's call:
-        // a gap is part of the burst too, so go back to a plain close-vs-close jump (captures gap + body
-        // together) - this version already matched all 7 known-boosted tickers from the 09-04 scan
-        // (CHPT/HOOD/CRCL/MSTR/ASST/SPCX/ABTC) plus left MT ready. Checked 2 candles deep (T-1 vs T-2,
-        // then T-2 vs T-3): a burst 2 candles back can still mean today is a chase, but one further back
-        // (SRPT's real burst was 3-4 candles back) is read as "due for a new burst soon" instead of
-        // "still not ready", per the user's explicit correction - so the lookback is intentionally
-        // shallow, not a compromise. 5% threshold from the observed gap between confirmed bursts (SPCX
-        // +6.4%, the smallest) and confirmed non-bursts (SRPT +2.0%, MT +1.2%, ASST -1.5% on 09-03) -
-        // not AUC-validated, see [[feedback_rigor_before_recalibrating]] if revisited later.
-        private const decimal BellUpBurstJumpThreshold = 0.05m;
-
-        private static bool IsBellUpPhaseReadyToday(RecentFeatureSeries recentSeries) =>
-            IsBellUpPhaseReadyToday(recentSeries.DailyCloseSeries);
-
-        private static bool IsBellUpPhaseReadyToday(IReadOnlyList<decimal> dailyCloseSeries) =>
-            !HasRecentBellUpBurst(dailyCloseSeries, lookback: 2);
-
-        // Added 2026-09-08, per the user's own H4 chart read (BE case): the Daily-only jump test
-        // above is structurally blind to a burst that already happened on H4 but hasn't yet shown up
-        // as a completed-daily-close jump (see [[project_bellup_phase_readiness]]). When BellUp is
-        // itself detected on the H4 timeframe (ClassifyBellPatternSignal), readiness is judged on H4
-        // candle bodies instead: user's own rule - compare the last *completed* H4 candle's body
-        // (Close-Open) against the one before it; if the completed candle is green and its body is at
-        // least 2x the length (absolute value) of the prior candle's body, that completed candle was
-        // the burst, so today's still-forming candle is a chase, not an entry. Eyeballed 2x multiplier
-        // per the user's explicit spec, not AUC-validated - see [[feedback_rigor_before_recalibrating]].
-        private const decimal H4BurstBodyMultiplier = 2m;
-
-        private static bool IsH4BellUpPhaseReadyToday(RecentFeatureSeries recentSeries) =>
-            IsH4BellUpPhaseReadyToday(recentSeries.H4OpenSeries, recentSeries.H4CloseSeries);
-
-        private static bool IsH4BellUpPhaseReadyToday(
-            IReadOnlyList<decimal> h4OpenSeries,
-            IReadOnlyList<decimal> h4CloseSeries) =>
-            !HasRecentH4BellUpBurst(h4OpenSeries, h4CloseSeries);
-
-        private static bool HasRecentH4BellUpBurst(
-            IReadOnlyList<decimal> h4OpenSeries,
-            IReadOnlyList<decimal> h4CloseSeries)
-        {
-            // [^1] is today's still-forming H4 candle (not yet closed), so the burst check looks at
-            // [^2] (last completed candle) against [^3] (the one before it).
-            if (h4OpenSeries.Count < 3 || h4CloseSeries.Count < 3)
-                return false;
-
-            var previousBody = h4CloseSeries[^2] - h4OpenSeries[^2];
-            if (previousBody <= 0m)
-                return false;
-
-            var beforePreviousBody = h4CloseSeries[^3] - h4OpenSeries[^3];
-            var beforePreviousLength = Math.Abs(beforePreviousBody);
-
-            return previousBody >= beforePreviousLength * H4BurstBodyMultiplier;
-        }
-
-        private static bool IsBellUpPatternPhaseReadyToday(
-            BellPatternSignal bellPatternSignal,
-            RecentFeatureSeries recentSeries) =>
-            bellPatternSignal.Timeframe switch
-            {
-                BellPatternTimeframe.H4 => IsH4BellUpPhaseReadyToday(recentSeries),
-                BellPatternTimeframe.Daily => IsBellUpPhaseReadyToday(recentSeries),
-                _ => true
-            };
-
-        private static bool HasRecentBellUpBurst(IReadOnlyList<decimal> dailyCloseSeries, int lookback)
-        {
-            var count = dailyCloseSeries.Count;
-            for (var i = 0; i < lookback; i++)
-            {
-                var currentIndex = count - 1 - i;
-                var previousIndex = currentIndex - 1;
-                if (previousIndex < 0)
-                    break;
-
-                var previousClose = dailyCloseSeries[previousIndex];
-                if (previousClose == 0m)
-                    continue;
-
-                var jump = (dailyCloseSeries[currentIndex] - previousClose) / previousClose;
-                if (jump >= BellUpBurstJumpThreshold)
-                    return true;
-            }
-
-            return false;
-        }
+        private static bool IsBellUpPhaseReadyToday(WishListContext ctx, out string reason) =>
+            BellUpEntryTiming.IsReady(
+                ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
+                ctx.Candles,
+                ctx.ScanTimeMarket,
+                out reason);
 
         private static bool IsLateBellUpPhase(
             BellPatternSignal bellPatternSignal,
@@ -2519,7 +2432,7 @@ namespace IbSwingTrader.Application.Candidates
             var isBellUpPhaseReadyToday =
                 ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
                 todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
-                IsBellUpPatternPhaseReadyToday(bellPatternSignal, recentSeries);
+                IsBellUpPhaseReadyToday(ctx, out _);
             var scanPrice = ResolveScanPrice(ctx.Snapshot);
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
@@ -3798,17 +3711,6 @@ namespace IbSwingTrader.Application.Candidates
                 snapshot,
                 recentSeries);
 
-            if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
-                todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
-                !IsBellUpPhaseReadyToday(recentSeries))
-            {
-                // T-1 already closed above its own upper Bollinger band - the burst already fired
-                // and today would be chasing into the post-burst sideways/pullback phase. Demote
-                // instead of rejecting: the candidate stays in the list and may become ready on a
-                // later scan once the sideways phase completes.
-                score -= s.BellUpPhaseNotReadyPenalty;
-            }
-
             return decimal.Round(score, 4, MidpointRounding.AwayFromZero);
         }
 
@@ -4155,53 +4057,6 @@ namespace IbSwingTrader.Application.Candidates
         // Validated 2026-07-13 against evaluation-dataset.csv: Daily/H4 Bollinger mid+upper slope predicts Runaway amplitude (AUC ~0.84 on extreme groups); Daily band compression + lower-band hook slope predicts Reversal amplitude (AUC ~0.63). Series-template distance-matching (below) showed no such signal and no longer drives ranking; it stays for its diagnostics only.
         private const decimal QualityScoreRankWeight = 50m;
 
-        // A BellUp candidate whose T-1 close already closed above its own T-1 upper Bollinger band burst
-        // yesterday - today would be chasing the post-burst sideways/pullback phase, not the launch. This
-        // condition alone is sufficient to decide "don't play today" regardless of launch-quality score
-        // (band slope/expansion is naturally highest right after the burst, so left unchecked it would
-        // outrank the exact candidates that already fired). Offset must exceed any realistic
-        // qualityScore * QualityScoreRankWeight so the not-ready partition always sorts below the ready
-        // one, while still ordering by AdjustedRank *within* the not-ready partition. Scoped to BellUp
-        // only - Runaway/LaunchContinuation/PullbackContinuation candidates can legitimately ride the
-        // upper band across multiple days and are not covered by this gate.
-        private const decimal LateBellUpPhaseRankOffset = -1_000_000m;
-
-        // Rebuilds a RecentFeatureSeries from a CandidateDetails' own stored series so
-        // ClassifyBellPatternSignal/BuildBollingerStateSet can be re-run at ranking time (H4 vs Daily
-        // BellUp timeframe isn't itself persisted on CandidateDetails - only IsBellUpPattern is).
-        private static RecentFeatureSeries ToRecentFeatureSeries(CandidateDetails candidate) => new()
-        {
-            DailyCloseSeries = candidate.RecentDailyCloseSeries,
-            DailyOpenSeries = candidate.RecentDailyOpenSeries,
-            DailyHighSeries = candidate.RecentDailyHighSeries,
-            DailyLowSeries = candidate.RecentDailyLowSeries,
-            DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries,
-            DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries,
-            DailyBbLowerBandSeries = candidate.RecentDailyBbLowerBandSeries,
-            DailyRsiSeries = candidate.RecentDailyRsiSeries,
-            DailyMacdLineSeries = candidate.RecentDailyMacdLineSeries,
-            DailyMacdSignalSeries = candidate.RecentDailyMacdSignalSeries,
-            DailyMacdHistogramSeries = candidate.RecentDailyMacdHistogramSeries,
-            WeeklyBbUpperBandSeries = candidate.RecentWeeklyBbUpperBandSeries,
-            WeeklyBbMidBandSeries = candidate.RecentWeeklyBbMidBandSeries,
-            WeeklyBbLowerBandSeries = candidate.RecentWeeklyBbLowerBandSeries,
-            WeeklyRsiSeries = candidate.RecentWeeklyRsiSeries,
-            WeeklyMacdLineSeries = candidate.RecentWeeklyMacdLineSeries,
-            WeeklyMacdSignalSeries = candidate.RecentWeeklyMacdSignalSeries,
-            WeeklyMacdHistogramSeries = candidate.RecentWeeklyMacdHistogramSeries,
-            H4OpenSeries = candidate.RecentH4OpenSeries,
-            H4HighSeries = candidate.RecentH4HighSeries,
-            H4LowSeries = candidate.RecentH4LowSeries,
-            H4CloseSeries = candidate.RecentH4CloseSeries,
-            H4BbUpperBandSeries = candidate.RecentH4BbUpperBandSeries,
-            H4BbMidBandSeries = candidate.RecentH4BbMidBandSeries,
-            H4BbLowerBandSeries = candidate.RecentH4BbLowerBandSeries,
-            H4RsiSeries = candidate.RecentH4RsiSeries,
-            H4MacdLineSeries = candidate.RecentH4MacdLineSeries,
-            H4MacdSignalSeries = candidate.RecentH4MacdSignalSeries,
-            H4MacdHistogramSeries = candidate.RecentH4MacdHistogramSeries
-        };
-
         private List<CandidateDetails> ReRankCandidates(
             List<CandidateDetails> candidates,
             SeriesTemplateFamily family)
@@ -4228,22 +4083,9 @@ namespace IbSwingTrader.Application.Candidates
                         x.Diagnostics.EstimatedHitRatePct = EstimateHitRatePct(qualityScore, family);
                     }
 
-                    var isLateBellUpPhase = false;
-                    if (family == SeriesTemplateFamily.TodayResearchLike && x.IsBellUpPattern)
-                    {
-                        var candidateRecentSeries = ToRecentFeatureSeries(x);
-                        var candidateBellPatternSignal = ClassifyBellPatternSignal(
-                            BuildBollingerStateSet(candidateRecentSeries),
-                            candidateRecentSeries);
-                        isLateBellUpPhase = !IsBellUpPatternPhaseReadyToday(
-                            candidateBellPatternSignal,
-                            candidateRecentSeries);
-                    }
-
                     var adjustedRank =
                         qualityScore * QualityScoreRankWeight +
-                        (x.Score.NextDayRank ?? 0m) +
-                        (isLateBellUpPhase ? LateBellUpPhaseRankOffset : 0m);
+                        (x.Score.NextDayRank ?? 0m);
 
                     return new
                     {

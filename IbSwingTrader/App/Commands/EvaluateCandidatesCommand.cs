@@ -325,7 +325,9 @@ namespace IbSwingTrader.App.Commands
             var sameDayCandidates = document.SameDayCandidates
                 .Select(x =>
                 {
-                    x.CandidateSource = "SameDayContinuation";
+                    if (string.IsNullOrWhiteSpace(x.CandidateSource) ||
+                        x.CandidateSource.Equals("Primary", StringComparison.OrdinalIgnoreCase))
+                        x.CandidateSource = "SameDayContinuation";
                     return x;
                 });
 
