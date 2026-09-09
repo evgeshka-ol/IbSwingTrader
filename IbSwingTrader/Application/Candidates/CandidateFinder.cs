@@ -237,6 +237,7 @@ namespace IbSwingTrader.Application.Candidates
                             Snapshot = snapshot,
                             Candles = candles,
                             DailyCandles = dailyCandles,
+                            ChartH4Candles = TryLoadSessionAlignedH4Candles(stock.Ticker, marketNow),
                             ScanTimeMarket = marketNow,
                             AvgDollarVolumeDaily = avgDollarVolume,
                             WishListItem = wishListItem
@@ -464,7 +465,8 @@ namespace IbSwingTrader.Application.Candidates
                     bbState,
                     dailyFamilySplit);
 
-                if (!isTodayResearchLikeCandidate || !IsBellUpPhaseReadyToday(ctx, out _))
+                if (!isTodayResearchLikeCandidate ||
+                    !IsBellUpPhaseReadyToday(ctx, ClassifyBellPatternSignal(bbState, recentSeries), out _))
                     continue;
 
                 if (entryScore < settings.MinEntryScore && !isTodayResearchLikeCandidate)
@@ -751,7 +753,8 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (isTodayResearchLikeCandidate && !IsBellUpPhaseReadyToday(ctx, out var burstReason))
+            if (isTodayResearchLikeCandidate &&
+                !IsBellUpPhaseReadyToday(ctx, ClassifyBellPatternSignal(bbState, recentSeries), out var burstReason))
             {
                 _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {burstReason}");
                 EmitOtherCandidate($"Rejected: {burstReason}");
@@ -1474,12 +1477,24 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
-        private static bool IsBellUpPhaseReadyToday(WishListContext ctx, out string reason) =>
-            BellUpEntryTiming.IsReady(
+        private static bool IsBellUpPhaseReadyToday(
+            WishListContext ctx,
+            BellPatternSignal pattern,
+            out string reason)
+        {
+            if (!IsRunawayBellUpPattern(pattern))
+            {
+                reason = "BellUp entry timing requires a confirmed Daily or H4 pattern";
+                return false;
+            }
+
+            return BellUpEntryTiming.IsReady(
                 ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
-                ctx.Candles,
+                ctx.ChartH4Candles ?? ctx.Candles,
+                pattern.Timeframe == BellPatternTimeframe.Daily ? Timeframe.D1 : Timeframe.H4,
                 ctx.ScanTimeMarket,
                 out reason);
+        }
 
         private static bool IsLateBellUpPhase(
             BellPatternSignal bellPatternSignal,
@@ -2365,6 +2380,7 @@ namespace IbSwingTrader.Application.Candidates
                 Snapshot = snapshot,
                 Candles = candles,
                 DailyCandles = dailyCandles,
+                ChartH4Candles = TryLoadSessionAlignedH4Candles(item.Ticker, marketNow),
                 ScanTimeMarket = marketNow,
                 AvgDollarVolumeDaily = avgDollarVolume,
                 WishListItem = item
@@ -2432,7 +2448,7 @@ namespace IbSwingTrader.Application.Candidates
             var isBellUpPhaseReadyToday =
                 ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
                 todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
-                IsBellUpPhaseReadyToday(ctx, out _);
+                IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out _);
             var scanPrice = ResolveScanPrice(ctx.Snapshot);
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
@@ -4301,6 +4317,24 @@ namespace IbSwingTrader.Application.Candidates
                 H4MacdSignalSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDSignal),
                 H4MacdHistogramSeries = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram)
             };
+        }
+
+        private List<Candle>? TryLoadSessionAlignedH4Candles(string ticker, DateTime scanTime)
+        {
+            if (!_historicalCache.TryLoad(ticker, Timeframe.M15, out var m15) ||
+                m15 == null ||
+                m15.Count == 0)
+            {
+                return null;
+            }
+
+            var aligned = SessionAlignedH4Builder.Build(m15, scanTime);
+            if (aligned.Count == 0)
+                return null;
+
+            _logger.Debug($"Session-aligned H4 view built: {ticker}, bars={aligned.Count}, " +
+                          $"last={aligned[^1].Time:yyyy-MM-dd HH:mm:ss}");
+            return aligned;
         }
 
         private RecentFeatureSeries? BuildReversalPatternSeries(List<Candle>? dailyCandles)
@@ -6838,6 +6872,7 @@ namespace IbSwingTrader.Application.Candidates
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
             public List<Candle>? DailyCandles { get; init; }
+            public List<Candle>? ChartH4Candles { get; init; }
             public required DateTime ScanTimeMarket { get; init; }
             public required decimal AvgDollarVolumeDaily { get; init; }
             public required WishListItem WishListItem { get; init; }

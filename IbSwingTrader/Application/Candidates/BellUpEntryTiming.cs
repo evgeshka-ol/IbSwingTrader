@@ -1,28 +1,30 @@
 namespace IbSwingTrader.Application.Candidates
 {
-    internal static class BellUpEntryTiming
+    public static class BellUpEntryTiming
     {
         private const decimal BurstBodyMultiplier = 2m;
 
         public static bool IsReady(
             IEnumerable<Candle> dailyCandles,
             IEnumerable<Candle> h4Candles,
+            Timeframe patternTimeframe,
             DateTime scanTime,
             out string reason)
         {
-            var completedDaily = dailyCandles
-                .Where(x => x.Time.Date.AddHours(16) <= scanTime)
-                .OrderBy(x => x.Time)
-                .TakeLast(3)
-                .ToList();
-            var completedH4 = h4Candles
-                .Where(x => x.Time.AddHours(4) <= scanTime)
+            if (patternTimeframe is not (Timeframe.D1 or Timeframe.H4))
+            {
+                reason = "BellUp entry timing requires a confirmed Daily or H4 pattern";
+                return false;
+            }
+
+            var isDaily = patternTimeframe == Timeframe.D1;
+            var completed = (isDaily ? dailyCandles : h4Candles)
+                .Where(x => (isDaily ? x.Time.Date.AddHours(16) : x.Time.AddHours(4)) <= scanTime)
                 .OrderBy(x => x.Time)
                 .TakeLast(3)
                 .ToList();
 
-            return IsTimeframeReady(completedDaily, "Daily", out reason) &&
-                   IsTimeframeReady(completedH4, "H4", out reason);
+            return IsTimeframeReady(completed, isDaily ? "Daily" : "H4", out reason);
         }
 
         private static bool IsTimeframeReady(
