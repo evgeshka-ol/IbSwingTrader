@@ -27,6 +27,11 @@ setups that match neither playable category, not a third trading pattern.
 See `references/SERIES_PLAYBOOK.md` "BellUp entry timing" for the user's
 exact candle-body rule and its implementation. See
 `references/SETTINGS_MAP.md` for output categories and legacy CSV caveats.
+The body-based timing veto applies only to the timeframe of the confirmed
+BellUp, not jointly to Daily and H4. SECZ's annotated Daily/H4 charts explain
+why an H4 continuation can be playable before a Daily BellUp has formed;
+see `SERIES_PLAYBOOK.md` "SECZ chart clarification" for that distinction and
+the remaining chart/cache candle-alignment issue.
 
 - Minimal near-term goal: the #1 current `Runaway` row should
   consistently become a practical winning idea and capture more than 10%.

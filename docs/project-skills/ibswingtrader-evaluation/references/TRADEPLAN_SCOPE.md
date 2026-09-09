@@ -37,8 +37,13 @@ Use this as a positive case of recognition, entry timing and profit capture
 working together. Compare its original scanner snapshot with higher-ranked
 setups when investigating ranking. Do not hardcode SECZ or promote a shape
 from this single outcome without validation across scans. The newer body
-timing gate has not been replayed on this snapshot; this example documents
-the historical outcome, not a verified pass under the changed code.
+timing gate has not been replayed through the full application on this
+snapshot. The user's later annotated charts clarify that only the confirmed
+H4 pattern should control the body-based timing veto; Daily was only starting
+its own pattern that day. Cached H4 small-body ratios still flag a boost,
+so preserving this historical winner under the changed code is unresolved.
+See the scanner's `SERIES_PLAYBOOK.md` "SECZ chart clarification" before
+treating this example as a verified pass under the new gate.
 
 ## Fix the scanner first when:
 

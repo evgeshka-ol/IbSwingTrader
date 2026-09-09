@@ -284,8 +284,10 @@ at the right moment before the boost. Recognizing the BellUp shape and
 deciding whether entry is already late are separate checks. Setups matching
 neither playable family belong in `Other`.
 
-Apply the following timing rule on Daily and H4 using aligned Open/Close
-candles and signed body `B = Close - Open`. Let T-1 be the previous completed
+Apply the following timing rule on the timeframe of the confirmed BellUp
+(Daily or H4), using aligned Open/Close candles and signed body
+`B = Close - Open`. Do not require both timeframes to pass this body test.
+Let T-1 be the previous completed
 candle, T-2 the completed candle before it, and T-3 the one before that:
 
 1. If `B(T-1) > 0` and `B(T-1) >= 2 * abs(B(T-2))`, the boost happened on
@@ -311,9 +313,11 @@ It supersedes the older Daily 5% close-to-close definition in code comments.
 ### Implementation (2026-09-09)
 
 `Application/Candidates/BellUpEntryTiming.cs` implements the shared body
-rule on both Daily and H4. `CandidateFinder.TryAddCandidate` applies it to
+rule for the selected Daily or H4 timeframe. `ClassifyBellPatternSignal`
+selects the pattern's timeframe using the existing classifier policy;
+`CandidateFinder.TryAddCandidate` applies the timing check to
 otherwise eligible BellUp candidates before building a trade plan. A boost
-on either timeframe sends the row to `Other`, with a zero plan and a reason
+on that timeframe sends the row to `Other`, with a zero plan and a reason
 identifying the timeframe and T-1/T-2 candle. No boost means this timing gate
 passes, not that unrelated eligibility checks are bypassed.
 
@@ -328,6 +332,63 @@ The trade-plan readiness profile uses the same predicate. The old Daily
 5% close-to-close test, H4 single-position check, and late-phase ranking
 offset/penalty application were removed; the rule now controls admission.
 Existing BellUp geometry and other late-phase checks remain in effect.
+
+### SECZ chart clarification (2026-09-09)
+
+The user's annotated charts `Data/Charts/SECZ-D.png` and
+`Data/Charts/SECZ-H4.png` distinguish pattern onset from individual boosts:
+
+- Daily: the user identifies the September 8 upper/lower-band bends and
+  beginning expansion as the start of the Daily pattern. That day's later
+  Daily shape was not a completed pattern available to justify or veto the
+  September 8 morning H4 entry.
+- H4: the red arrow marks BellUp onset well before the scan; green arrows
+  mark successive boosts within the same ongoing pattern. The yellow arrow
+  marks the user's scan candle, followed by the profitable boost.
+- A BellUp can contain repeated boosts separated by pauses. An old boost
+  does not invalidate the whole pattern forever. The two-candle timing
+  window is local to the selected pattern timeframe.
+
+The initial September 9 implementation incorrectly required both Daily and
+H4 to pass. That cross-timeframe body veto has been removed. This correction
+does not itself prove that the new filter retains historical SECZ: the
+cached completed H4 candles before the September 8 07:51:20 scan include
+September 4 12:00 `7.38 -> 7.41` and 16:00 `7.42 -> 7.52`. The literal
+2x rule calls the latter's small `+0.10` body a boost against `+0.03`.
+The user's chart does not mark these small steps as boosts, and the yellow
+chart candle is red whereas the cached September 8 04:00 bar is green.
+Align chart/broker candle intervals and session coverage before equating
+those candles or changing boost thresholds. Do not invent a body-size floor
+or claim SECZ is fixed solely from the timeframe correction.
+
+### Canonical H4 and chart-aligned H4 (2026-09-09)
+
+The scanner now keeps two explicitly different intraday views:
+
+- **Canonical H4:** bars returned by IB/TWS (`04:00`, `08:00`, `12:00`,
+  `16:00` in the SECZ cache). Bollinger, MACD, RSI and BellUp classification
+  continue to use this complete, sequential four-hour series.
+- **ChartH4:** a secondary view built from cached M15 bars with session
+  anchors `08:00–09:30`, `09:30–13:30`, and `13:30–16:00`. It exists to
+  compare entry timing with the user's chart and is used by the body timing
+  gate for an H4-confirmed BellUp when M15 history is available. If M15 is
+  absent, the gate falls back to canonical H4.
+
+`SessionAlignedH4Builder` does not replace the canonical series or recalculate
+its indicators. Historical comparison must measure both representations on
+the same snapshots before changing BellUp classification or ranking.
+
+Initial offline comparison (September 9, 2026) found 415 historical BellUp
+rows with both cached H4 and M15 data. The body verdicts differed materially:
+the canonical and chart-aligned views both flagged a recent boost on 107 rows;
+canonical-only flagged 55; chart-only flagged 135. This is a representation
+effect, not enough evidence to choose a threshold. SECZ's historical Win is
+still flagged by both views because its immediately preceding chart-aligned
+bars include an earlier green expansion. The example therefore exposes a
+second unresolved dimension: **boost freshness**. A repeated old boost inside
+an ongoing BellUp does not necessarily mean the next session's entry is late.
+Do not add a numeric age window until the chart labels and outcomes are
+measured together.
 
 Focused checks are in `tests/ScannerTimingChecks`, with no broker or NuGet
 dependencies. User-run command:
