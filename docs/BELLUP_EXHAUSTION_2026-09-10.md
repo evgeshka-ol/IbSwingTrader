@@ -120,3 +120,104 @@ successful continuation pauses at their observable timestamps, retain
 bar timestamps and confirmed timeframe in snapshots, validate price-based
 features on more high-amplitude examples, then evaluate the fixed rule on
 new scan dates. Do not relabel the future plateau as known at its first bar.
+
+## Follow-up: sequential phase prototype on existing data
+
+Implemented an offline hypothesis model in
+`tools/analyze_bellup_phases.py`. Run it with Python from any directory.
+Production scanner behavior remains unchanged. Labels are algorithmic
+hypotheses, not independently expert-labeled BellUp phases.
+
+The fixed initial window is three H4 transitions, with a 0.25 progress
+ratio. These are exploratory definitions, not optimized trading thresholds:
+
+- Expansion: close, upper band and band width all increase on the latest bar.
+- Possible exhaustion: after expansion, close and MACD histogram decline
+  while the upper-band increment decelerates. The warning persists until
+  expansion resumes or a plateau forms.
+- Plateau: the preceding three transitions had positive net close progress
+  and increasing upper band/width; the latest three make at most 25% of
+  that price progress in absolute terms, their candle ranges overlap
+  pairwise, and upper-band growth slows versus the preceding window.
+- Freeze the plateau's high/low box when it forms. A close above that box
+  with expanding bands is renewed expansion; a close below it is breakdown.
+  An upside exit without band confirmation is unclassified, not plateau.
+- Other situations are unclassified; they are not assumed playable.
+
+Process the saved series left to right. No outcome or later candle enters
+the state calculation. The finite snapshot history can truncate an earlier
+phase, and missing bar timestamps prevent a general audit of completion
+times. Indicator arrays must have the same length as OHLC arrays; missing
+history is excluded, not filled from today's cache.
+
+### Primary cohort: admitted Runaway
+
+82 usable ticker/day snapshots on six scan dates (September 1-9), out of
+311 joined admitted ticker/days. Latest evaluated admitted snapshot per
+ticker/day retained. Only nine have amplitude >10%, and only two are Wins.
+
+| State at snapshot end | Rows | Amplitude >10% | Wins | Median amplitude |
+| --- | --- | --- | --- | --- |
+| Expansion | 33 | 6 | 2 | 4.12 |
+| Possible exhaustion | 18 | 2 | 0 | 4.79 |
+| Plateau | 9 | 0 | 0 | 3.37 |
+| Breakdown | 1 | 0 | 0 | 2.48 |
+| Unclassified | 21 | 1 | 0 | 4.46 |
+
+SECZ September 8 is Expansion; September 9 is PossibleExhaustion, not
+Plateau. Both available Wins (SECZ and BE) remain Expansion. A hard warning
+veto would also remove two high-amplitude cases: ASST (11.50%, NoEntry) and
+CIFR (11.98%, Loss). Do not equate amplitude with profitable upward movement.
+
+Plateau examples: OCTV, VRNS, SMR, CNH, FUBO, HOOD, BLSH, ORCL, ZIM.
+Before September 8: five plateaus, none high-amplitude; September 8 onward:
+four, none high-amplitude. Even under independent random sampling, drawing
+zero high-amplitude rows in nine from this imbalanced population has about
+33% probability. This is not compelling evidence by itself, and repeated
+tickers/date effects further weaken independence.
+
+Sensitivity check, not threshold selection: windows 2/3/4 and progress
+ratios 0.15/0.25/0.40 produce 4-32 plateau rows, none high-amplitude in this
+small admitted cohort. Membership changes substantially. The originally
+specified three-bar/0.25 setting is retained only for reporting.
+
+There are no RenewedExpansion states at the end of these 82 snapshots.
+Seventeen snapshots contain a renewal somewhere earlier in their history,
+but their eventual scan evaluation cannot label those earlier events.
+They may also describe duplicate historical episodes.
+
+### Secondary cohort: all candidate groups
+
+To look for counterexamples beyond the admitted selection, repeat the same
+fixed model on all candidate groups, keeping the latest evaluated snapshot
+per ticker/day. This is a separate population, not a BellUp-specific test.
+1069 rows have aligned series, of which 111 (10.38%) have amplitude >10%.
+
+| State | Rows | Amplitude >10% |
+| --- | --- | --- |
+| Expansion | 199 | 28 |
+| Possible exhaustion | 286 | 24 |
+| Plateau | 52 | 5 |
+| Renewed expansion | 2 | 1 |
+| Breakdown | 4 | 0 |
+| Unclassified | 526 | 53 |
+
+The plateau high-amplitude rate is 9.62%, close to the 10.38% population
+baseline. Counterexamples include PSQL on September 1 (37.48%) and 2
+(21.24%), CNXC September 8 (13.01%), CHPT September 8 (12.28%), and CHYM
+September 8 (16.57%). PSQL's two rows are not independent. Many Other rows
+have zero trade plans, so their NoEntry labels cannot measure conversion.
+Only two endpoint renewals exist, insufficient to validate that state.
+
+### Conclusion
+
+Existing data supports implementing and inspecting a sequential phase
+hypothesis, but does not yet support using it as a validated exhaustion
+veto or ranking weight. Plateau is not equivalent to exhausted upside.
+The final September 9 top-1 ALM remains Unclassified; these rules do not
+solve top-1 quality, and no ranking improvement is claimed.
+
+The offline analysis was executed. Application builds, scanner runs and
+project tests were not launched. Next evidence should distinguish genuine
+exhaustion from successful pauses using timestamped phase labels and a
+fixed future horizon; widening a veto based only on SECZ is not warranted.
