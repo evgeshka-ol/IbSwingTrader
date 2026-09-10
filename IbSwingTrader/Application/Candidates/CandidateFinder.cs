@@ -1490,7 +1490,7 @@ namespace IbSwingTrader.Application.Candidates
 
             return BellUpEntryTiming.IsReady(
                 ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
-                ctx.ChartH4Candles ?? ctx.Candles,
+                ctx.Candles,
                 pattern.Timeframe == BellPatternTimeframe.Daily ? Timeframe.D1 : Timeframe.H4,
                 ctx.ScanTimeMarket,
                 out reason);
