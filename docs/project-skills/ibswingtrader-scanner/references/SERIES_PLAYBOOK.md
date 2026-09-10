@@ -368,11 +368,10 @@ The scanner now keeps two explicitly different intraday views:
 - **Canonical H4:** bars returned by IB/TWS (`04:00`, `08:00`, `12:00`,
   `16:00` in the SECZ cache). Bollinger, MACD, RSI and BellUp classification
   continue to use this complete, sequential four-hour series.
-- **ChartH4:** a secondary view built from cached M15 bars with session
-  anchors `08:00–09:30`, `09:30–13:30`, and `13:30–16:00`. It exists to
-  compare entry timing with the user's chart and is used by the body timing
-  gate for an H4-confirmed BellUp when M15 history is available. If M15 is
-  absent, the gate falls back to canonical H4.
+- **ChartH4:** a secondary experimental view built from cached M15 bars with
+  session anchors `08:00–09:30`, `09:30–13:30`, and `13:30–16:00`. It is
+  retained only for comparison and diagnostics. It does not affect admission
+  or body timing; the gate uses canonical TWS H4.
 
 `SessionAlignedH4Builder` does not replace the canonical series or recalculate
 its indicators. Historical comparison must measure both representations on
@@ -388,7 +387,10 @@ bars include an earlier green expansion. The example therefore exposes a
 second unresolved dimension: **boost freshness**. A repeated old boost inside
 an ongoing BellUp does not necessarily mean the next session's entry is late.
 Do not add a numeric age window until the chart labels and outcomes are
-measured together.
+measured together. A later Yahoo chart refresh showed the ordinary H4 grid
+restored (`08:00`, `12:00`, `16:00`), matching TWS. Treat the earlier
+`09:30` alignment as a transient chart display issue; do not optimize scanner
+logic around it.
 
 Focused checks are in `tests/ScannerTimingChecks`, with no broker or NuGet
 dependencies. User-run command:
