@@ -38,6 +38,8 @@ namespace IbSwingTrader.Application.Dataset
                 Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
 
             var rows = await _evaluationDatasetCsvService.ReadAsync(outputPath);
+            foreach (var row in rows)
+                NormalizeAmplitude(row);
             return [.. rows
                 .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -93,7 +95,7 @@ namespace IbSwingTrader.Application.Dataset
                 .Concat(rebuiltRows)
                 .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.AmplitudePct)
+                    .OrderByDescending(r => Math.Abs(r.AmplitudePct))
                     .ThenByDescending(r => r.PositivePotentialPct)
                     .ThenByDescending(r => r.EvaluatedAt)
                     .First())
@@ -119,7 +121,7 @@ namespace IbSwingTrader.Application.Dataset
 
             if (settings.MinAmplitudePct.HasValue)
             {
-                mergedRows = [.. mergedRows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
+                mergedRows = [.. mergedRows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value)];
             }
 
             EnsureDerivedFields(mergedRows);
@@ -258,14 +260,14 @@ namespace IbSwingTrader.Application.Dataset
             rows = [.. rows
                 .GroupBy(x => BuildDatasetKey(x), StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
-                    .OrderByDescending(r => r.AmplitudePct)
+                    .OrderByDescending(r => Math.Abs(r.AmplitudePct))
                     .ThenByDescending(r => r.PositivePotentialPct)
                     .ThenByDescending(r => r.EvaluatedAt)
                     .First())];
 
             if (settings.MinAmplitudePct.HasValue)
             {
-                rows = [.. rows.Where(x => x.AmplitudePct >= settings.MinAmplitudePct.Value)];
+                rows = [.. rows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value)];
             }
 
             EnsureDerivedFields(rows);
@@ -550,12 +552,19 @@ namespace IbSwingTrader.Application.Dataset
         {
             foreach (var row in rows)
             {
+                NormalizeAmplitude(row);
                 var verdict = ResolvePatternVerdict(row);
                 row.DetectedPipeline = verdict.DetectedPipeline;
                 row.DetectedPattern = verdict.DetectedPattern;
                 row.PatternVerdict = verdict.PatternVerdict;
                 row.PatternVerdictReason = verdict.PatternVerdictReason;
             }
+        }
+
+        private static void NormalizeAmplitude(EvaluationDatasetRow row)
+        {
+            row.AmplitudePct = EvaluationAmplitude.WithDirection(row.AmplitudePct, row.MinTime, row.MaxTime);
+            row.GroupLabel = Classify(row.AmplitudePct, row.DaysToMaxUpFromScan);
         }
 
         private CacheMetrics? TryBuildCacheMetrics(
@@ -1308,10 +1317,7 @@ namespace IbSwingTrader.Application.Dataset
                 ? scanPrice * (1m + minPct.Value / 100m)
                 : scanPrice;
 
-            if (maxTime.HasValue && minTime.HasValue && minTime.Value <= maxTime.Value)
-                return Round(CalcPct(lowPrice, highPrice));
-
-            return Round(Math.Abs(CalcPct(lowPrice, highPrice)));
+            return EvaluationAmplitude.WithDirection(Round(CalcPct(lowPrice, highPrice)), minTime, maxTime);
         }
 
         private static string GetMinDepthGroup(decimal? minPct)
