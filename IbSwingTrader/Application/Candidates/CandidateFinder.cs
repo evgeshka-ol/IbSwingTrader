@@ -1477,7 +1477,7 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
-        private static bool IsBellUpPhaseReadyToday(
+        private bool IsBellUpPhaseReadyToday(
             WishListContext ctx,
             BellPatternSignal pattern,
             out string reason)
@@ -1488,12 +1488,26 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            return BellUpEntryTiming.IsReady(
+            if (!BellUpEntryTiming.IsReady(
                 ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
                 ctx.Candles,
                 pattern.Timeframe == BellPatternTimeframe.Daily ? Timeframe.D1 : Timeframe.H4,
                 ctx.ScanTimeMarket,
-                out reason);
+                out reason))
+                return false;
+
+            var history = BuildBellUpHistory(ctx, pattern);
+            if (BellUpLowerBandTurn.TryFindConfirmedTurn(history.Lower, history.Confirmed, out var trough))
+            {
+                reason = $"{pattern.Timeframe}: BellUp lower band turned up after a decline; " +
+                         $"trough={history.Lower[trough]} ({history.Candles[trough].Time:yyyy-MM-dd HH:mm:ss}), " +
+                         $"previous={history.Lower[^2]} ({history.Candles[^2].Time:yyyy-MM-dd HH:mm:ss}), " +
+                         $"latest={history.Lower[^1]} ({history.Candles[^1].Time:yyyy-MM-dd HH:mm:ss}); " +
+                         "both completed points are above the trough; do not enter";
+                return false;
+            }
+
+            return true;
         }
 
         private static bool IsLateBellUpPhase(
@@ -2901,6 +2915,14 @@ namespace IbSwingTrader.Application.Candidates
             out BellUpBoostExitTarget target,
             out string reason)
         {
+            var history = BuildBellUpHistory(ctx, pattern);
+            return BellUpBoostExit.TryCalculate(history.Candles, history.Confirmed, entry, out target, out reason);
+        }
+
+        private (List<Candle> Candles, List<bool> Confirmed, List<decimal> Lower) BuildBellUpHistory(
+            WishListContext ctx,
+            BellPatternSignal pattern)
+        {
             var isDaily = pattern.Timeframe == BellPatternTimeframe.Daily;
             var completed = BellUpEntryTiming.GetCompletedCandles(
                 isDaily ? ctx.DailyCandles ?? BuildDailyBars(ctx.Candles) : ctx.Candles,
@@ -2910,6 +2932,7 @@ namespace IbSwingTrader.Application.Candidates
             var mid = new List<decimal>();
             var lower = new List<decimal>();
             var confirmed = new List<bool>();
+            var lowerHistory = new List<decimal>();
             var lookback = isDaily ? RecentDailySeriesLength : RecentH4SeriesLength;
 
             // Replay the shared classifier on prefixes; never infer an old phase from future bands.
@@ -2919,6 +2942,7 @@ namespace IbSwingTrader.Application.Candidates
                 upper.Add(decimal.Round(isDaily ? features.DailyBollingerUpperBand : features.H4BollingerUpperBand, 2, MidpointRounding.AwayFromZero));
                 mid.Add(decimal.Round(isDaily ? features.DailyBollingerMidBand : features.H4BollingerMidBand, 2, MidpointRounding.AwayFromZero));
                 lower.Add(decimal.Round(isDaily ? features.DailyBollingerLowerBand : features.H4BollingerLowerBand, 2, MidpointRounding.AwayFromZero));
+                lowerHistory.Add(lower[^1]);
                 if (upper.Count > lookback)
                 {
                     upper.RemoveAt(0);
@@ -2930,7 +2954,7 @@ namespace IbSwingTrader.Application.Candidates
                     upper, mid, lower, ResolveSeriesDirection(mid), pattern.Timeframe) == BellPatternKind.BellUp);
             }
 
-            return BellUpBoostExit.TryCalculate(completed, confirmed, entry, out target, out reason);
+            return (completed, confirmed, lowerHistory);
         }
 
         private static decimal ResolveLiveReferencePrice(

@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IbSwingTrader/Application/Candidates/BellUpBoostExit.cs" Link="BellUpBoostExit.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/BellUpLowerBandTurn.cs" Link="BellUpLowerBandTurn.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/BellUpEntryTiming.cs" Link="BellUpEntryTiming.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />

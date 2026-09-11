@@ -47,4 +47,21 @@ Check(completed.Count == 4 && completed[^1] == bars[3], "Exclude forming/future 
 var daily = new[] { new Candle { Time = scanTime.Date.AddDays(-1) }, new Candle { Time = scanTime.Date } };
 Check(BellUpEntryTiming.GetCompletedCandles(daily, Timeframe.D1, scanTime.Date.AddHours(15)).Count == 1, "Exclude unfinished Daily bar");
 Check(BellUpEntryTiming.GetCompletedCandles(daily, Timeframe.D1, scanTime.Date.AddHours(16)).Count == 2, "Include Daily bar at close");
-Console.WriteLine($"Passed {assertions} boost-exit checks.");
+bool Turn(decimal[] lower, out int trough) => BellUpLowerBandTurn.TryFindConfirmedTurn(
+    lower, Enumerable.Repeat(true, lower.Length).ToArray(), out trough);
+Check(Turn([86.10m, 85.83m, 84.77m, 83.35m, 82.63m, 82.34m, 82.85m, 82.93m, 83.20m, 83.80m], out var trough)
+      && trough == 5, "INTC: two completed points above the episode trough");
+Check(!Turn([5m, 4m, 3m, 2m], out _), "Continued decline is not a turn");
+Check(!Turn([5m, 4m, 3m, 3.2m], out _), "One higher point is insufficient");
+Check(Turn([5m, 4m, 3m, 3m, 3.1m, 3.2m], out trough) && trough == 3, "Flat trough uses its final point");
+Check(!Turn([2m, 3m, 4m, 5m], out _), "No preceding decline means no veto");
+Check(!Turn([5m, 4m, 3m, 3.2m, 2.9m], out _), "A new low cancels the old turn");
+Check(!Turn([5m, 4m, 3m, 3.2m, 3m], out _), "Latest point equal to trough is not above it");
+Check(Turn([5m, 4m, 3m, 3.5m, 3.2m], out _), "Both points above trough suffice; consecutive rises are not required");
+Check(!BellUpLowerBandTurn.TryFindConfirmedTurn([5m, 4m, 3m, 3.1m, 3.2m], [true, true, false, true, true], out _),
+      "Do not borrow a trough from an old episode");
+Check(!BellUpLowerBandTurn.TryFindConfirmedTurn([5m, 4m, 3m, 3.1m, 3.2m], [true, true, true, true, false], out _),
+      "No current confirmation means no phase veto");
+Check(!Turn([2m, 1m, 0m, 1m, 2m], out _), "Missing zero-band history is not a turn");
+Check(!BellUpLowerBandTurn.TryFindConfirmedTurn([5m, 4m, 3m, 4m], [true], out _), "Reject unaligned turn inputs");
+Console.WriteLine($"Passed {assertions} BellUp exit and lower-band checks.");
