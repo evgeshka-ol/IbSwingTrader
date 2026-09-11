@@ -32,15 +32,15 @@ namespace IbSwingTrader.App.Commands
 
             EnsureConnected(twsSettings);
 
-            var evaluated = await EvaluateCandidatesAsync(candidatesPath);
+            var (evaluated, datasetMerged) = await EvaluateCandidatesAsync(candidatesPath);
 
             _logger.Info(
-                $"Candidate evaluation completed. " +
-                $"Evaluated={evaluated}, " +
+                $"Candidate evaluation finished. " +
+                $"Evaluated={evaluated}, DatasetMerge={(datasetMerged ? "Completed" : "NotPerformed")}, " +
                 $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }
 
-        private async Task<int> EvaluateCandidatesAsync(
+        private async Task<(int Evaluated, bool DatasetMerged)> EvaluateCandidatesAsync(
             string candidatesPath)
         {
             var candidates = await LoadCandidatesAsync(candidatesPath);
@@ -48,10 +48,17 @@ namespace IbSwingTrader.App.Commands
             var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
             var existingDatasetRows = await _evaluationDatasetBuilder.ReadCurrentAsync();
 
-            var marketToday = MarketTime.Now().Date;
-            var availableNow = MarketTime.Now().AddMinutes(-Math.Max(0, evaluationSettings.FreshDataSafetyLagMinutes));
-            var evaluableScanDates = candidates
-                .Where(x => x.Scan.ScanTime < availableNow)
+            var marketNow = MarketTime.Now();
+            var marketToday = marketNow.Date;
+            var availableNow = marketNow.AddMinutes(-Math.Max(0, evaluationSettings.FreshDataSafetyLagMinutes));
+            var eligibleCandidates = candidates
+                .Where(x => EvaluationScanPolicy.IsEligible(x.Scan.ScanTime, marketNow, availableNow))
+                .ToList();
+            _logger.Info(
+                $"Evaluation eligibility: deferredCurrentDayOrFuture={candidates.Count(x => x.Scan.ScanTime.Date >= marketToday)}, " +
+                $"deferredBySafetyLag={candidates.Count(x => x.Scan.ScanTime.Date < marketToday && x.Scan.ScanTime >= availableNow)}. " +
+                "Current exchange-day scans are evaluated starting the next day.");
+            var evaluableScanDates = eligibleCandidates
                 .Select(x => x.Scan.ScanTime.Date)
                 .Distinct()
                 .OrderByDescending(x => x)
@@ -76,11 +83,11 @@ namespace IbSwingTrader.App.Commands
                     $"availableUntil={availableNow:yyyy-MM-dd HH:mm:ss}, " +
                     $"latestEvaluatedScanDate={FormatDate(latestEvaluatedScanDate)}, " +
                     $"candidates={candidates.Count}");
-                return 0;
+                return (0, false);
             }
 
             var selectedScanDateSet = selectedScanDates.ToHashSet();
-            var selectedScanCandidates = candidates
+            var selectedScanCandidates = eligibleCandidates
                 .Where(x => selectedScanDateSet.Contains(x.Scan.ScanTime.Date))
                 .ToList();
             var newestSelectedScanDate = selectedScanDates.Max();
@@ -137,6 +144,7 @@ namespace IbSwingTrader.App.Commands
                 var openCandidates = existingDatasetRows
                     .Where(x =>
                         string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
+                        EvaluationScanPolicy.IsEligible(x.ScanTime, marketNow, availableNow) &&
                         !x.IsStaleOpen &&
                         x.ScanTime.Date < oldestSelectedDate)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
@@ -153,6 +161,7 @@ namespace IbSwingTrader.App.Commands
             }
 
             var incompleteCandidates = existingDatasetRows
+                .Where(x => EvaluationScanPolicy.IsEligible(x.ScanTime, marketNow, availableNow))
                 .Where(NeedsPostScanMetricsReevaluation)
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -180,10 +189,15 @@ namespace IbSwingTrader.App.Commands
                     $"Nothing to evaluate. Current market date={marketToday:yyyy-MM-dd}, " +
                     $"selected scan dates={string.Join(", ", selectedScanDates.Select(x => x.ToString("yyyy-MM-dd")))}, " +
                     $"candidates={candidates.Count}");
-                return 0;
+                return (0, false);
             }
 
-            var results = await _candidateEvaluator.EvaluateAsync(candidatesToEvaluate.Values.ToList());
+            var orderedCandidates = candidatesToEvaluate.Values
+                .OrderBy(x => selectedScanDateSet.Contains(x.Scan.ScanTime.Date) ? 0 : 1)
+                .ThenBy(x => x.Scan.ScanTime)
+                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var results = await _candidateEvaluator.EvaluateAsync(orderedCandidates);
             _logger.Info($"Evaluation step: candidate evaluator returned {results.Count} results");
 
             foreach (var result in results)
@@ -205,14 +219,14 @@ namespace IbSwingTrader.App.Commands
                     "TWS historical data is likely unavailable or too unstable.");
 
                 LogCandidateSummary(Path.GetFileName(candidatesPath), results);
-                return results.Count;
+                return (results.Count, false);
             }
 
             _logger.Info($"Evaluation step: merging {results.Count} rows directly into evaluation dataset");
             await _evaluationDatasetBuilder.UpsertAsync(results);
             _logger.Info("Evaluation step: evaluation dataset merge completed");
             LogCandidateSummary(Path.GetFileName(candidatesPath), results);
-            return results.Count;
+            return (results.Count, true);
         }
 
         private void EnsureConnected(TwsSettings twsSettings)

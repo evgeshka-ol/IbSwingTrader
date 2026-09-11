@@ -2860,6 +2860,27 @@ namespace IbSwingTrader.Application.Candidates
                 maxLossPctOverride,
                 isBellUpPhaseReadyToday);
 
+            if (isBellUpPhaseReadyToday)
+            {
+                if (TryBuildBellUpBoostExit(ctx, bellPatternSignal, trade.Entry, out var boostTarget, out var boostReason))
+                {
+                    _logger.Info(
+                        $"BellUp two-boost exit applied for {ctx.Stock.Ticker}. Timeframe={bellPatternSignal.Timeframe}, " +
+                        $"LatestBoost={boostTarget.LatestBoost.Time:yyyy-MM-dd HH:mm:ss}, " +
+                        $"LatestBody={boostTarget.LatestBoost.Close - boostTarget.LatestBoost.Open}, " +
+                        $"EarlierBoost={boostTarget.EarlierBoost.Time:yyyy-MM-dd HH:mm:ss}, " +
+                        $"EarlierBody={boostTarget.EarlierBoost.Close - boostTarget.EarlierBoost.Open}, " +
+                        $"AverageBody={boostTarget.AverageBody}, PreviousExit={trade.Exit}, Exit={boostTarget.ExitPrice}. " +
+                        "Entry and stop unchanged.");
+                    trade.Exit = boostTarget.ExitPrice;
+                    trade.ExitProfile = $"bellup-two-boosts-{bellPatternSignal.Timeframe}";
+                }
+                else
+                {
+                    _logger.Info($"BellUp two-boost exit not applied for {ctx.Stock.Ticker}: {boostReason}. Existing exit retained.");
+                }
+            }
+
             return new TradePlanInfo
             {
                 LiveReferencePrice = ResolveLiveReferencePrice(entryCandles, scanPrice),
@@ -2871,6 +2892,45 @@ namespace IbSwingTrader.Application.Candidates
                 LossPercent = CalculatePercent(trade.Entry, trade.Stop),
                 ExitProfile = trade.ExitProfile
             };
+        }
+
+        private bool TryBuildBellUpBoostExit(
+            WishListContext ctx,
+            BellPatternSignal pattern,
+            decimal entry,
+            out BellUpBoostExitTarget target,
+            out string reason)
+        {
+            var isDaily = pattern.Timeframe == BellPatternTimeframe.Daily;
+            var completed = BellUpEntryTiming.GetCompletedCandles(
+                isDaily ? ctx.DailyCandles ?? BuildDailyBars(ctx.Candles) : ctx.Candles,
+                isDaily ? Timeframe.D1 : Timeframe.H4,
+                ctx.ScanTimeMarket);
+            var upper = new List<decimal>();
+            var mid = new List<decimal>();
+            var lower = new List<decimal>();
+            var confirmed = new List<bool>();
+            var lookback = isDaily ? RecentDailySeriesLength : RecentH4SeriesLength;
+
+            // Replay the shared classifier on prefixes; never infer an old phase from future bands.
+            for (var i = 0; i < completed.Count; i++)
+            {
+                var features = _featureEngine.Calculate(completed, i + 1);
+                upper.Add(decimal.Round(isDaily ? features.DailyBollingerUpperBand : features.H4BollingerUpperBand, 2, MidpointRounding.AwayFromZero));
+                mid.Add(decimal.Round(isDaily ? features.DailyBollingerMidBand : features.H4BollingerMidBand, 2, MidpointRounding.AwayFromZero));
+                lower.Add(decimal.Round(isDaily ? features.DailyBollingerLowerBand : features.H4BollingerLowerBand, 2, MidpointRounding.AwayFromZero));
+                if (upper.Count > lookback)
+                {
+                    upper.RemoveAt(0);
+                    mid.RemoveAt(0);
+                    lower.RemoveAt(0);
+                }
+
+                confirmed.Add(BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
+                    upper, mid, lower, ResolveSeriesDirection(mid), pattern.Timeframe) == BellPatternKind.BellUp);
+            }
+
+            return BellUpBoostExit.TryCalculate(completed, confirmed, entry, out target, out reason);
         }
 
         private static decimal ResolveLiveReferencePrice(

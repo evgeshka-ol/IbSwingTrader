@@ -4,6 +4,23 @@ namespace IbSwingTrader.Application.Candidates
     {
         private const decimal BurstBodyMultiplier = 2m;
 
+        public static bool IsBoost(Candle candle, Candle preceding)
+        {
+            var body = candle.Close - candle.Open;
+            return body > 0m && body >= BurstBodyMultiplier * Math.Abs(preceding.Close - preceding.Open);
+        }
+
+        public static List<Candle> GetCompletedCandles(IEnumerable<Candle> candles, Timeframe timeframe, DateTime scanTime)
+        {
+            if (timeframe is not (Timeframe.D1 or Timeframe.H4))
+                return [];
+
+            return candles
+                .Where(x => (timeframe == Timeframe.D1 ? x.Time.Date.AddHours(16) : x.Time.AddHours(4)) <= scanTime)
+                .OrderBy(x => x.Time)
+                .ToList();
+        }
+
         public static bool IsReady(
             IEnumerable<Candle> dailyCandles,
             IEnumerable<Candle> h4Candles,
@@ -18,9 +35,7 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var isDaily = patternTimeframe == Timeframe.D1;
-            var completed = (isDaily ? dailyCandles : h4Candles)
-                .Where(x => (isDaily ? x.Time.Date.AddHours(16) : x.Time.AddHours(4)) <= scanTime)
-                .OrderBy(x => x.Time)
+            var completed = GetCompletedCandles(isDaily ? dailyCandles : h4Candles, patternTimeframe, scanTime)
                 .TakeLast(3)
                 .ToList();
 
@@ -43,9 +58,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var candle = completedCandles[completedCandles.Count - offset];
                 var preceding = completedCandles[completedCandles.Count - offset - 1];
-                var body = candle.Close - candle.Open;
-                var precedingLength = Math.Abs(preceding.Close - preceding.Open);
-                if (body > 0m && body >= BurstBodyMultiplier * precedingLength)
+                if (IsBoost(candle, preceding))
                 {
                     reason = $"{timeframe}: BellUp boost on T-{offset} ({candle.Time:yyyy-MM-dd HH:mm:ss}); " +
                              "green body is at least 2x the preceding body; do not enter";
