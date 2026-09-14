@@ -1,4 +1,4 @@
-# BellUp exit from two previous boosts
+# BellUp exit from previous boosts
 
 Implemented at the user's request; effectiveness has not been validated
 across historical trade outcomes. This changes future scanner trade plans,
@@ -15,18 +15,21 @@ Starting at the most recent completed candle, walk backwards through the
 current confirmed episode. A boost has a positive C-O body at least twice
 the absolute body of its immediately preceding candle. Skip other candles,
 including ordinary green candles. Wicks and distance to a previous boost
-do not define the test. Exactly the two nearest qualifying boosts are used.
+do not define the test. The nearest qualifying boost is used. If two are
+available, both are used; if only one is available, that one is used.
 The shared `BellUpEntryTiming.IsBoost` keeps entry veto and exit selection
 consistent, including the existing green-after-doji behavior.
 
+    exit = round(entry + latestBoostBody, 2, MidpointRounding.AwayFromZero)
+    # when two boosts are available:
     exit = round(entry + (latestBoostBody + earlierBoostBody) / 2, 2,
                  MidpointRounding.AwayFromZero)
 
 This replaces the already-built exit after percentage floors and other
 exit adjustments; those floors must not inflate the target again. Entry,
 stop and stop-limit remain unchanged. ProfitPercent is recalculated from
-the new target. ExitProfile becomes `bellup-two-boosts-H4` or
-`bellup-two-boosts-Daily`; logs include both candle times, bodies, average,
+the new target. ExitProfile becomes `bellup-1-boost-H4`/`Daily` or
+`bellup-2-boost-H4`/`Daily`; logs include the available candle times, bodies, average,
 old exit and new exit. Existing ranking formulas are unchanged, although
 the existing profit-percentage tie-break can reflect the changed plan.
 
@@ -47,9 +50,9 @@ the search. Daily uses the real available D1 stream (existing aggregate
 fallback only when D1 is absent); differing confirmation on this stream
 causes fallback, not an invented historical onset.
 
-Keep the existing exit and log the fallback when fewer than two boosts
-are available, the latest completed prefix is not confirmed, inputs are
-insufficient, or price rounding yields a target no higher than entry.
+Keep the existing exit and log the fallback when no boosts are available,
+the latest completed prefix is not confirmed, inputs are insufficient, or
+price rounding yields a target no higher than entry.
 Two-decimal rounding follows the discussed stock-price output convention;
 no new exchange tick-size or fee model is introduced.
 
@@ -69,8 +72,8 @@ stops without a separately agreed rule.
 
 ## Verification
 
-Added a standalone console check project with 16 assertions: skip ordinary
-candles, select nearest boosts, episode boundary, no current episode,
+Added a standalone console check project covering one- and two-boost exits,
+skip ordinary candles, episode boundary, no current episode,
 invalid inputs, exact 2x comparison, red/doji behavior, VET cached bodies,
 rounding, and completed H4/Daily selection.
 
@@ -81,5 +84,6 @@ User commands:
 
 Build, checks and application runs were not executed by Codex, per project
 instructions. Static diff checks passed. On the next user-run scan inspect
-`BellUp two-boost exit applied` or `BellUp two-boost exit not applied` in
-the log and the saved ExitProfile/ProfitPercent in candidates.csv.
+`BellUp 1-boost exit applied`, `BellUp 2-boost exit applied`, or the
+fallback message in the log, together with the saved
+ExitProfile/ProfitPercent in candidates.csv.
