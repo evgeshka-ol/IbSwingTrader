@@ -64,4 +64,19 @@ Check(!BellUpLowerBandTurn.TryFindConfirmedTurn([5m, 4m, 3m, 3.1m, 3.2m], [true,
       "No current confirmation means no phase veto");
 Check(!Turn([2m, 1m, 0m, 1m, 2m], out _), "Missing zero-band history is not a turn");
 Check(!BellUpLowerBandTurn.TryFindConfirmedTurn([5m, 4m, 3m, 4m], [true], out _), "Reject unaligned turn inputs");
-Console.WriteLine($"Passed {assertions} BellUp exit and lower-band checks.");
+List<Candle> Late(params (decimal Open, decimal High, decimal Low, decimal Close)[] values) => values.Select((v, i) => new Candle
+{
+    Time = new DateTime(2026, 9, 8).AddHours(i * 4), Open = v.Open, High = v.High, Low = v.Low, Close = v.Close
+}).ToList();
+var late = Late((10m, 10.2m, 9.9m, 10.1m), (10m, 10.3m, 9.9m, 10.2m),
+                (10m, 10.4m, 9.9m, 10.1m), (10m, 11m, 9.9m, 11m),
+                (11m, 11.3m, 10.9m, 11.2m), (11.2m, 12m, 11m, 12m));
+Check(BellUpLateEntryPenalty.Calculate(late.Select(x => x.Open).ToList(), late.Select(x => x.High).ToList(),
+      late.Select(x => x.Low).ToList(), late.Select(x => x.Close).ToList()) == 1.5m, "Two comparable prior boosts penalize late peak");
+var one = late.Take(5).Append(new Candle { Open = 11.2m, High = 11.5m, Low = 11.1m, Close = 11.4m }).ToList();
+Check(BellUpLateEntryPenalty.Calculate(one.Select(x => x.Open).ToList(), one.Select(x => x.High).ToList(),
+      one.Select(x => x.Low).ToList(), one.Select(x => x.Close).ToList()) == 0.75m, "One prior boost uses softer penalty");
+var notPeak = one.Select(x => x).ToList(); notPeak[^1].Close = 11.25m;
+Check(BellUpLateEntryPenalty.Calculate(notPeak.Select(x => x.Open).ToList(), notPeak.Select(x => x.High).ToList(),
+      notPeak.Select(x => x.Low).ToList(), notPeak.Select(x => x.Close).ToList()) == 0m, "No penalty away from candle high");
+Console.WriteLine($"Passed {assertions} BellUp exit, lower-band and late-entry checks.");

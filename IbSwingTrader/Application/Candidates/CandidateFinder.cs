@@ -4227,11 +4227,23 @@ namespace IbSwingTrader.Application.Candidates
                     h4WidthExpansionPct = (currentWidth / previousWidth - 1m) * 100m;
             }
 
+            var lateH4Penalty = BellUpLateEntryPenalty.Calculate(
+                candidate.RecentH4OpenSeries,
+                candidate.RecentH4HighSeries,
+                candidate.RecentH4LowSeries,
+                candidate.RecentH4CloseSeries);
+            var lateDailyPenalty = BellUpLateEntryPenalty.Calculate(
+                candidate.RecentDailyOpenSeries,
+                candidate.RecentDailyHighSeries,
+                candidate.RecentDailyLowSeries,
+                candidate.RecentDailyCloseSeries);
+
             return dailyMidSlope * 1.0m +
                    dailyUpperSlope * 0.5m +
                    h4MidSlope * 0.5m +
                    h4UpperSlope * 0.75m +
-                   h4WidthExpansionPct * 0.25m;
+                   h4WidthExpansionPct * 0.25m -
+                   Math.Max(lateH4Penalty, lateDailyPenalty);
         }
 
         private static decimal CalculateReversalHookQualityScore(CandidateDetails candidate)

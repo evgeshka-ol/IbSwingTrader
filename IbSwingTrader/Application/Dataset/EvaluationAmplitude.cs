@@ -2,10 +2,13 @@ namespace IbSwingTrader.Application.Dataset
 {
     public static class EvaluationAmplitude
     {
-        // Amplitude is a directionless range; ExtremumOrder remains the direction field.
+        // Sign describes the order of extrema; magnitude remains the existing range calculation.
         public static decimal WithDirection(decimal amplitude, DateTime? minTime, DateTime? maxTime)
         {
-            return Math.Abs(amplitude);
+            var magnitude = Math.Abs(amplitude);
+            return minTime.HasValue && maxTime.HasValue && maxTime.Value < minTime.Value
+                ? -magnitude
+                : magnitude;
         }
     }
 }
