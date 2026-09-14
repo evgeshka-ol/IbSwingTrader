@@ -68,6 +68,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                     Add(row, headers, "Ticker", candidate.Ticker);
                     Add(row, headers, nameof(candidate.Scan.ScanTime), FormatValue(candidate.Scan.ScanTime));
                     Add(row, headers, "CandidateGroup", groupName);
+                    Add(row, headers, nameof(candidate.PatternVerdictReason), candidate.PatternVerdictReason);
                     FlattenObject(row, headers, "TradePlan", candidate.TradePlan);
                     Add(row, headers, "DisplayRank", rank.ToString(CultureInfo.InvariantCulture));
                     Add(row, headers, "IsCurrentScanOutput", currentOperationKeys.Contains(BuildCandidateOperationKey(candidate)) ? "true" : "false");

@@ -3216,6 +3216,7 @@ namespace IbSwingTrader.Application.Candidates
         {
             var recentSeries = BuildRecentFeatureSeries(candles);
             var bbState = BuildBollingerStateSet(recentSeries);
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
 
             var nextDayRank = CalculateNextDayRank(
                 preset.ScanCode,
@@ -3282,6 +3283,9 @@ namespace IbSwingTrader.Application.Candidates
                 NeedsDeeperEntry = needsDeeperEntry,
                 NeedsMomentumExit = needsMomentumExit,
                 IsBellUpPattern = todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp,
+                PatternVerdictReason = bellPatternSignal.Kind == BellPatternKind.BellUp
+                    ? $"BellUp confirmed on {bellPatternSignal.Timeframe}"
+                    : string.Empty,
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,

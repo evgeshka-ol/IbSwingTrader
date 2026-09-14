@@ -60,6 +60,8 @@ namespace IbSwingTrader.Domain.Candidates
 
         public bool IsBellUpPattern { get; set; }
 
+        public string PatternVerdictReason { get; set; } = string.Empty;
+
         public required ScoreInfo Score { get; set; }
 
         public required MarketContextInfo Context { get; set; }

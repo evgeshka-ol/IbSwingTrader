@@ -472,7 +472,7 @@ namespace IbSwingTrader.Application.Dataset
                 DetectedPipeline = evaluation.DetectedPipeline,
                 DetectedPattern = evaluation.DetectedPattern,
                 PatternVerdict = evaluation.PatternVerdict,
-                PatternVerdictReason = evaluation.PatternVerdictReason,
+                PatternVerdictReason = StripReasonPrefix(evaluation.PatternVerdictReason),
                 CandidateGroup = NormalizeCandidateGroup(candidateSnapshot?.GroupName),
                 CandidateDisplayRank = candidateSnapshot?.DisplayRank,
                 HasActiveCandidateSnapshot = candidate != null,
@@ -526,7 +526,7 @@ namespace IbSwingTrader.Application.Dataset
             row.DetectedPipeline = verdict.DetectedPipeline;
             row.DetectedPattern = verdict.DetectedPattern;
             row.PatternVerdict = verdict.PatternVerdict;
-            row.PatternVerdictReason = verdict.PatternVerdictReason;
+            row.PatternVerdictReason = StripReasonPrefix(verdict.PatternVerdictReason);
 
             return row;
         }
@@ -542,7 +542,7 @@ namespace IbSwingTrader.Application.Dataset
                     row.DetectedPipeline,
                     row.DetectedPattern,
                     row.PatternVerdict,
-                    row.PatternVerdictReason);
+                    StripReasonPrefix(row.PatternVerdictReason));
             }
 
             return _patternVerdictService.Analyze(row);
@@ -557,7 +557,7 @@ namespace IbSwingTrader.Application.Dataset
                 row.DetectedPipeline = verdict.DetectedPipeline;
                 row.DetectedPattern = verdict.DetectedPattern;
                 row.PatternVerdict = verdict.PatternVerdict;
-                row.PatternVerdictReason = verdict.PatternVerdictReason;
+                row.PatternVerdictReason = StripReasonPrefix(verdict.PatternVerdictReason);
             }
         }
 
@@ -565,6 +565,14 @@ namespace IbSwingTrader.Application.Dataset
         {
             row.AmplitudePct = EvaluationAmplitude.WithDirection(row.AmplitudePct, row.MinTime, row.MaxTime);
             row.GroupLabel = Classify(row.AmplitudePct, row.DaysToMaxUpFromScan);
+        }
+
+        private static string StripReasonPrefix(string? value)
+        {
+            const string prefix = "Reason=";
+            return value != null && value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                ? value[prefix.Length..]
+                : value ?? string.Empty;
         }
 
         private CacheMetrics? TryBuildCacheMetrics(

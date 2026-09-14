@@ -31,7 +31,7 @@ namespace IbSwingTrader.Application.Evaluation
                     detectedPipeline,
                     "Unknown",
                     "Unknown",
-                    "Reason=candidate family unavailable");
+                    "candidate family unavailable");
             }
 
             var dailyState = AnalyzeTimeframe(
@@ -71,7 +71,7 @@ namespace IbSwingTrader.Application.Evaluation
                             detectedPipeline,
                             "None",
                             "Mismatch",
-                            $"Reason=BellUp not confirmed on {bellSignal.Timeframe}: isolated terminal spike");
+                            $"BellUp not confirmed on {bellSignal.Timeframe}: isolated terminal spike");
                     }
 
                     if (HasTerminalMomentumRollover(series, bellSignal.Timeframe))
@@ -80,21 +80,21 @@ namespace IbSwingTrader.Application.Evaluation
                             detectedPipeline,
                             "None",
                             "Mismatch",
-                            $"Reason=BellUp not confirmed on {bellSignal.Timeframe}: expansion ended in momentum rollover");
+                            $"BellUp not confirmed on {bellSignal.Timeframe}: expansion ended in momentum rollover");
                     }
 
                     return new CandidatePatternVerdict(
                         detectedPipeline,
                         "BellUp",
                         "Match",
-                        $"Reason=BellUp confirmed on {bellSignal.Timeframe}");
+                        $"BellUp confirmed on {bellSignal.Timeframe}");
                 }
 
                 return new CandidatePatternVerdict(
                     detectedPipeline,
                     bellSignal.Kind.ToString(),
                     "Mismatch",
-                    $"Reason=BellUp not confirmed; detected={bellSignal.Kind}, timeframe={bellSignal.Timeframe}");
+                    $"BellUp not confirmed; detected={bellSignal.Kind}, timeframe={bellSignal.Timeframe}");
             }
 
             if (BellPatternClassifier.IsReversalHookPattern(
@@ -121,7 +121,7 @@ namespace IbSwingTrader.Application.Evaluation
                     detectedPipeline,
                     "ReversalHook",
                     "Match",
-                    "Reason=ReversalHook confirmed");
+                    "ReversalHook confirmed");
             }
 
             return new CandidatePatternVerdict(
@@ -253,7 +253,7 @@ namespace IbSwingTrader.Application.Evaluation
             var h4MacdHistogramTail = BellPatternClassifier.CalculateTailSlope(series.H4MacdHistogramSeries, 4);
 
             diagnostics =
-                $"Reason=H4 does not confirm daily ReversalHook, " +
+                $"H4 does not confirm daily ReversalHook, " +
                 $"H4={h4State.Regime}/{h4State.Direction}, " +
                 $"H4RsiTail={h4RsiTail}, " +
                 $"H4MacdHistogramTail={h4MacdHistogramTail}";
