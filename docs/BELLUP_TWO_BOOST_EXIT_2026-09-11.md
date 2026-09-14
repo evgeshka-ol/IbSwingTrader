@@ -4,6 +4,14 @@ Implemented at the user's request; effectiveness has not been validated
 across historical trade outcomes. This changes future scanner trade plans,
 not existing candidate/evaluation CSV rows.
 
+## H4 exhaustion filter
+
+An H4 BellUp is routed to `Other` when the confirmed H4 lower-band turn is
+present and the relative slope of the Daily Bollinger mid line is flat
+(absolute slope no greater than 1%). This treats the setup as an exhausted
+impulse rather than a trade-ready Runaway. The rejection is logged with the
+reason `H4 BellUp impulse exhausted while Daily Bollinger mid is flat`.
+
 ## Rule
 
 For an admitted, timing-ready Runaway BellUp, use its confirmed timeframe
