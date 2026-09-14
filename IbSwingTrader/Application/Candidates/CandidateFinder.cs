@@ -2878,20 +2878,26 @@ namespace IbSwingTrader.Application.Candidates
             {
                 if (TryBuildBellUpBoostExit(ctx, bellPatternSignal, trade.Entry, out var boostTarget, out var boostReason))
                 {
+                    var earlierBoost = boostTarget.EarlierBoost;
+                    var earlierBoostText = earlierBoost == null
+                        ? "none"
+                        : earlierBoost.Time.ToString("yyyy-MM-dd HH:mm:ss");
+                    var earlierBodyText = earlierBoost == null
+                        ? "none"
+                        : (earlierBoost.Close - earlierBoost.Open).ToString();
                     _logger.Info(
-                        $"BellUp two-boost exit applied for {ctx.Stock.Ticker}. Timeframe={bellPatternSignal.Timeframe}, " +
+                        $"BellUp {boostTarget.BoostCount}-boost exit applied for {ctx.Stock.Ticker}. Timeframe={bellPatternSignal.Timeframe}, " +
                         $"LatestBoost={boostTarget.LatestBoost.Time:yyyy-MM-dd HH:mm:ss}, " +
                         $"LatestBody={boostTarget.LatestBoost.Close - boostTarget.LatestBoost.Open}, " +
-                        $"EarlierBoost={boostTarget.EarlierBoost.Time:yyyy-MM-dd HH:mm:ss}, " +
-                        $"EarlierBody={boostTarget.EarlierBoost.Close - boostTarget.EarlierBoost.Open}, " +
+                        $"EarlierBoost={earlierBoostText}, EarlierBody={earlierBodyText}, " +
                         $"AverageBody={boostTarget.AverageBody}, PreviousExit={trade.Exit}, Exit={boostTarget.ExitPrice}. " +
                         "Entry and stop unchanged.");
                     trade.Exit = boostTarget.ExitPrice;
-                    trade.ExitProfile = $"bellup-two-boosts-{bellPatternSignal.Timeframe}";
+                    trade.ExitProfile = $"bellup-{boostTarget.BoostCount}-boost-{bellPatternSignal.Timeframe}";
                 }
                 else
                 {
-                    _logger.Info($"BellUp two-boost exit not applied for {ctx.Stock.Ticker}: {boostReason}. Existing exit retained.");
+                    _logger.Info($"BellUp boost exit not applied for {ctx.Stock.Ticker}: {boostReason}. Existing exit retained.");
                 }
             }
 

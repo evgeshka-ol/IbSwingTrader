@@ -1,7 +1,7 @@
 namespace IbSwingTrader.Application.Candidates
 {
     public readonly record struct BellUpBoostExitTarget(
-        decimal ExitPrice, Candle LatestBoost, Candle EarlierBoost, decimal AverageBody);
+        decimal ExitPrice, Candle LatestBoost, Candle? EarlierBoost, decimal AverageBody, int BoostCount);
 
     public static class BellUpBoostExit
     {
@@ -14,7 +14,7 @@ namespace IbSwingTrader.Application.Candidates
             out string reason)
         {
             target = default;
-            reason = "Two completed boosts in the current confirmed BellUp episode are required";
+            reason = "No completed boost in the current confirmed BellUp episode";
             if (entry <= 0m || completed.Count < 3 || completed.Count != bellUpAtCandle.Count)
                 return false;
 
@@ -43,7 +43,22 @@ namespace IbSwingTrader.Application.Candidates
                     return false;
                 }
 
-                target = new BellUpBoostExitTarget(exit, latestBoost, earlierBoost, average);
+                target = new BellUpBoostExitTarget(exit, latestBoost, earlierBoost, average, 2);
+                reason = string.Empty;
+                return true;
+            }
+
+            if (latestBoost != null)
+            {
+                var body = latestBoost.Close - latestBoost.Open;
+                var exit = decimal.Round(entry + body, 2, MidpointRounding.AwayFromZero);
+                if (exit <= entry)
+                {
+                    reason = "Boost body does not produce a positive target after price rounding";
+                    return false;
+                }
+
+                target = new BellUpBoostExitTarget(exit, latestBoost, null, body, 1);
                 reason = string.Empty;
                 return true;
             }

@@ -19,6 +19,12 @@ var flags = Enumerable.Repeat(true, bars.Count).ToArray();
 Check(BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out var result, out _), "Two separated boosts found");
 Check(result.AverageBody == 0.135m && result.ExitPrice == 13.51m, "Mean body and away-from-zero price rounding");
 Check(result.LatestBoost == bars[3] && result.EarlierBoost == bars[1], "Skip intervening green/red bars and ignore wicks");
+Check(result.BoostCount == 2, "Record both selected boosts");
+
+var oneBoost = Bodies(0.01m, 0.04m, 0.03m, 0.05m);
+Check(BellUpBoostExit.TryCalculate(oneBoost, Enumerable.Repeat(true, oneBoost.Count).ToArray(), 10m, out result, out _)
+      && result.BoostCount == 1 && result.AverageBody == 0.04m && result.ExitPrice == 10.04m
+      && result.EarlierBoost == null, "Use one qualifying boost when a second is unavailable");
 
 flags[2] = false;
 Check(!BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out _, out _), "Do not cross an episode boundary");
