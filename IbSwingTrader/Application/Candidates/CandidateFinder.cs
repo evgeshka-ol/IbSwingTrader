@@ -743,6 +743,16 @@ namespace IbSwingTrader.Application.Candidates
                     bbState,
                     dailyFamilySplit);
 
+            var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            if (isTodayResearchLikeCandidate &&
+                IsH4BellUpExhaustedWithFlatDaily(bellPatternSignal, ctx, recentSeries))
+            {
+                const string reason = "Rejected: H4 BellUp impulse exhausted while Daily Bollinger mid is flat";
+                _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {reason}");
+                EmitOtherCandidate(reason);
+                return;
+            }
+
             if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
             {
                 _logger.Info(
@@ -754,7 +764,7 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             if (isTodayResearchLikeCandidate &&
-                !IsBellUpPhaseReadyToday(ctx, ClassifyBellPatternSignal(bbState, recentSeries), out var burstReason))
+                !IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out var burstReason))
             {
                 _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {burstReason}");
                 EmitOtherCandidate($"Rejected: {burstReason}");
@@ -1508,6 +1518,50 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return true;
+        }
+
+        private bool IsH4BellUpExhaustedWithFlatDaily(
+            BellPatternSignal pattern,
+            WishListContext ctx,
+            RecentFeatureSeries recentSeries)
+        {
+            if (pattern.Kind != BellPatternKind.BellUp ||
+                pattern.Timeframe != BellPatternTimeframe.H4)
+                return false;
+
+            var dailyMidSlope = CalculateRelativeSlopePct(recentSeries.DailyBbMidBandSeries);
+            if (Math.Abs(dailyMidSlope) > 1m)
+                return false;
+
+            var history = BuildBellUpHistory(ctx, pattern);
+            if (BellUpLowerBandTurn.TryFindConfirmedTurn(
+                    history.Lower,
+                    history.Confirmed,
+                    out _))
+                return true;
+
+            // In combination with a flat Daily mid line, the first completed
+            // point above the H4 trough is sufficient to flag exhaustion.
+            var start = history.Lower.Count - 1;
+            while (start > 0 && history.Confirmed[start - 1])
+                start--;
+
+            if (history.Lower.Count - start < 3)
+                return false;
+
+            var trough = start;
+            for (var i = start; i < history.Lower.Count; i++)
+            {
+                if (history.Lower[i] <= 0m)
+                    return false;
+                if (history.Lower[i] <= history.Lower[trough])
+                    trough = i;
+            }
+
+            return trough < history.Lower.Count - 1 &&
+                   trough > start &&
+                   history.Lower[start] > history.Lower[trough] &&
+                   history.Lower[^1] > history.Lower[trough];
         }
 
         private static bool IsLateBellUpPhase(
