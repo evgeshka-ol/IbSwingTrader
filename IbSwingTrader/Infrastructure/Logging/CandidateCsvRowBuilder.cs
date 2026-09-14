@@ -69,7 +69,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                     Add(row, headers, nameof(candidate.Scan.ScanTime), FormatValue(candidate.Scan.ScanTime));
                     Add(row, headers, "CandidateGroup", groupName);
                     Add(row, headers, nameof(candidate.PatternVerdictReason), candidate.PatternVerdictReason);
-                    FlattenObject(row, headers, "TradePlan", candidate.TradePlan);
+                    AddTradePlanFields(row, headers, candidate);
                     Add(row, headers, "DisplayRank", rank.ToString(CultureInfo.InvariantCulture));
                     Add(row, headers, "IsCurrentScanOutput", currentOperationKeys.Contains(BuildCandidateOperationKey(candidate)) ? "true" : "false");
                     FlattenObject(row, headers, string.Empty, candidate.Scan);
@@ -79,17 +79,35 @@ namespace IbSwingTrader.Infrastructure.Logging
                     Add(row, headers, nameof(candidate.NeedsDeeperEntry), FormatValue(candidate.NeedsDeeperEntry));
                     Add(row, headers, nameof(candidate.NeedsMomentumExit), FormatValue(candidate.NeedsMomentumExit));
 
-                    FlattenSeriesAndRegimeFields(row, headers, candidate);
                     FlattenObject(row, headers, "Score", candidate.Score);
                     FlattenObject(row, headers, "Context", candidate.Context);
 
                     if (candidate.Diagnostics != null)
                         FlattenObject(row, headers, "Diagnostics", candidate.Diagnostics);
 
+                    // Keep long technical arrays at the far right for human-readable CSV review.
+                    FlattenSeriesAndRegimeFields(row, headers, candidate);
+
                     rows.Add(row);
                     rank++;
                 }
             }
+        }
+
+        private void AddTradePlanFields(
+            Dictionary<string, string> row,
+            List<string> headers,
+            CandidateDetails candidate)
+        {
+            var plan = candidate.TradePlan;
+            Add(row, headers, "ScanPrice", FormatValue(plan.LiveReferencePrice));
+            Add(row, headers, "EntryPrice", FormatValue(plan.EntryPrice));
+            Add(row, headers, "ExitPrice", FormatValue(plan.ExitPrice));
+            Add(row, headers, "StopLoss", FormatValue(plan.StopLoss));
+            Add(row, headers, "StopLimitPrice", FormatValue(plan.StopLimitPrice));
+            Add(row, headers, "PlannedProfitPct", FormatValue(plan.ProfitPercent));
+            Add(row, headers, "PlannedLossPct", FormatValue(plan.LossPercent));
+            Add(row, headers, "ExitProfile", FormatValue(plan.ExitProfile));
         }
 
         private void FlattenSeriesAndRegimeFields(

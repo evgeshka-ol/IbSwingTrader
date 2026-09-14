@@ -181,6 +181,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             SetObjectProperties(candidate.Scan, row, string.Empty);
             SetObjectProperties(candidate.TradePlan, row, "TradePlan");
+            SetCandidateTradePlanAliases(candidate.TradePlan, row);
             SetObjectProperties(candidate.Score, row, "Score");
             SetObjectProperties(candidate.Context, row, "Context");
             SetCandidateDirectProperties(candidate, row);
@@ -192,6 +193,35 @@ namespace IbSwingTrader.Infrastructure.Logging
             }
 
             return candidate;
+        }
+
+        private static void SetCandidateTradePlanAliases(
+            TradePlanInfo tradePlan,
+            IReadOnlyDictionary<string, string> row)
+        {
+            if (row.TryGetValue("ScanPrice", out var scanPrice))
+                tradePlan.LiveReferencePrice = ParseDecimal(scanPrice, tradePlan.LiveReferencePrice);
+            if (row.TryGetValue("EntryPrice", out var entryPrice))
+                tradePlan.EntryPrice = ParseDecimal(entryPrice, tradePlan.EntryPrice);
+            if (row.TryGetValue("ExitPrice", out var exitPrice))
+                tradePlan.ExitPrice = ParseDecimal(exitPrice, tradePlan.ExitPrice);
+            if (row.TryGetValue("StopLoss", out var stopLoss))
+                tradePlan.StopLoss = ParseDecimal(stopLoss, tradePlan.StopLoss);
+            if (row.TryGetValue("StopLimitPrice", out var stopLimitPrice))
+                tradePlan.StopLimitPrice = ParseDecimal(stopLimitPrice, tradePlan.StopLimitPrice);
+            if (row.TryGetValue("PlannedProfitPct", out var profit))
+                tradePlan.ProfitPercent = ParseDecimal(profit, tradePlan.ProfitPercent);
+            if (row.TryGetValue("PlannedLossPct", out var loss))
+                tradePlan.LossPercent = ParseDecimal(loss, tradePlan.LossPercent);
+            if (row.TryGetValue("ExitProfile", out var profile))
+                tradePlan.ExitProfile = profile;
+        }
+
+        private static decimal ParseDecimal(string raw, decimal fallback)
+        {
+            return decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : fallback;
         }
 
         private void SetCandidateDirectProperties(CandidateDetails candidate, IReadOnlyDictionary<string, string> row)
