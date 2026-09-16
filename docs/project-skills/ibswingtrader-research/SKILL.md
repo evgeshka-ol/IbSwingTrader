@@ -35,6 +35,12 @@ The nearest minimal target is top-1 quality:
 Treat top-1 misses as the highest-signal feedback. A broad list is useful only
 after rank #1 is consistently good enough to play.
 
+The current scanner contract is BellUp-only for playable `Runaway`. A detected
+post-spike consolidation (`Triangle`) is a separate diagnostic pattern and is
+routed to `Other`; research comparisons must therefore distinguish a genuine
+BellUp miss from a correctly rejected Triangle. Use `PatternVerdictReason` in
+the candidate snapshot to make that distinction explicit.
+
 Tickers that appear in today's `candidates.csv` current scan rows
 `Runaway` should appear in tomorrow's
 `research_top_gainers.csv`.

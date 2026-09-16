@@ -47,6 +47,35 @@ the remaining chart/cache candle-alignment issue.
 - Priority #1: names in today's summary `Runaway` should be confirmed by later evaluation as high-amplitude winners.
 - Series shape is a primary scanner signal. The feature row must always come from the saved scanner snapshot. Evaluation supplies only the outcome label and amplitude.
 
+## Current architecture and output contract (2026-09-16)
+
+- Broker authentication remains entirely inside TWS/IB Gateway. The scanner
+  connects through the local IB API socket and contains no broker credentials
+  in source or settings.
+- TWS is the canonical source for historical bars. The cache stores per-ticker
+  series by timeframe; H4 analysis uses the native TWS grid (normally
+  `04:00`, `08:00`, `12:00`, `16:00` in the exchange timezone), not Yahoo's
+  sometimes irregular session-anchored bars. Missing history is requested from
+  TWS and merged into the cache before feature extraction.
+- `candidates.csv` puts scalar trade fields first (`ScanPrice`, `EntryPrice`,
+  `ExitPrice`, `StopLoss`, `StopLimitPrice`, planned percentages, and
+  `ExitProfile`). `PatternVerdictReason` follows `CandidateGroup` and contains
+  values such as `BellUp confirmed on H4` or `BellUp confirmed on Daily`; the
+  technical OHLC/indicator arrays are intentionally at the end of the row.
+- The playable `Runaway` output is BellUp-only. `Reversal` remains the separate
+  below-mid family, while `Other` is the non-playable output bucket.
+- `Triangle` is now a distinct diagnostic pattern, not a trading category. The
+  experimental scanner heuristic is checked on H4 and Daily: a positive body
+  at least twice the prior body followed by several small, tightly clustered
+  closes is treated as post-spike consolidation and routed to `Other` rather
+  than admitted as BellUp. This is deliberately conservative and must be
+  validated against new scans before thresholds are tightened.
+- BellUp timing still rejects a setup when the latest or preceding qualifying
+  boost has already occurred. H4 lower-band turn with a flat Daily middle band
+  is an exhaustion veto. BellUp exits use the average body of two prior
+  qualifying impulse candles when available, or the single prior impulse when
+  that is all the cache provides.
+
 ## Pipeline
 
 1. `get-candidates`

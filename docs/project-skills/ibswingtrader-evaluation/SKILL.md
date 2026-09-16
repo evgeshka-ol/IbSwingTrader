@@ -44,6 +44,25 @@ evidence of a mistimed/deep entry price. Current output details are in
 - Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude point to `TradePlan` failure.
 - `Reversal` should still clear meaningful amplitude, normally `> 10%`; below that is scanner failure.
 
+## Current data contract and pattern parity (2026-09-16)
+
+- Candidate and evaluation trade columns use the same short names: `ScanPrice`,
+  `EntryPrice`, `ExitPrice`, `StopLoss`, `StopLimitPrice`,
+  `PlannedProfitPct`, `PlannedLossPct`, and `ExitProfile`. Candidate technical
+  series are kept at the right side of the CSV after scalar fields.
+- `PatternVerdictReason` is the explicit pattern/timeframe field. Its values
+  omit the redundant `Reason=` prefix, for example `BellUp confirmed on H4`.
+- The live scanner now has an experimental `Triangle` diagnostic (post-spike
+  small-body consolidation) and routes it to non-playable `Other`. The
+  evaluator's realized-row verdict path still reports BellUp/ReversalHook
+  classifications and has not yet been made fully Triangle-aware; do not use
+  evaluator BellUp output alone to claim scanner/evaluator parity for Triangle
+  rows.
+- Preserve the distinction between pattern discovery and outcome measurement:
+  a Triangle/Other row can have a large later amplitude, but it was not a
+  playable BellUp candidate at scan time. Use the saved candidate snapshot and
+  source fields when comparing such rows.
+
 ## Main code
 
 - evaluator: `IbSwingTrader/Application/Evaluation/CandidateEvaluator.cs`
