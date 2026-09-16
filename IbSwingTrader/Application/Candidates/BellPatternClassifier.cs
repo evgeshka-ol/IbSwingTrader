@@ -4,7 +4,8 @@ namespace IbSwingTrader.Application.Candidates
     {
         None,
         BellUp,
-        BellDown
+        BellDown,
+        Triangle
     }
 
     public enum BellPatternTimeframe

@@ -1344,6 +1344,12 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
+            if (IsPostSpikeConsolidation(recentSeries.H4OpenSeries, recentSeries.H4CloseSeries))
+                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.H4);
+
+            if (IsPostSpikeConsolidation(recentSeries.DailyOpenSeries, recentSeries.DailyCloseSeries))
+                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.Daily);
+
             var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.DailyBbUpperBandSeries,
                 recentSeries.DailyBbMidBandSeries,
@@ -1377,6 +1383,39 @@ namespace IbSwingTrader.Application.Candidates
                 h4Kind,
                 BellPatternKind.BellDown);
             return bellDownSignal;
+        }
+
+        private static bool IsPostSpikeConsolidation(List<decimal> opens, List<decimal> closes)
+        {
+            if (opens.Count != closes.Count || opens.Count < 5)
+                return false;
+
+            for (var spike = opens.Count - 3; spike >= 1; spike--)
+            {
+                var spikeBody = closes[spike] - opens[spike];
+                var previousBody = Math.Abs(closes[spike - 1] - opens[spike - 1]);
+                if (spikeBody <= 0m || spikeBody < previousBody * 2m)
+                    continue;
+
+                var tail = closes.Skip(spike + 1).TakeLast(3).ToList();
+                if (tail.Count < 2)
+                    continue;
+
+                var reference = Math.Abs(closes[spike]);
+                var maxBody = Math.Max(spikeBody * 0.25m, reference * 0.003m);
+                var maxCloseSpread = Math.Max(spikeBody * 0.50m, reference * 0.005m);
+                var closeSpread = tail.Max() - tail.Min();
+                var starts = opens.Skip(spike + 1).TakeLast(tail.Count).ToList();
+
+                if (tail.Zip(starts, (close, open) => Math.Abs(close - open)).All(x => x <= maxBody) &&
+                    closeSpread <= maxCloseSpread &&
+                    tail.Max() <= closes[spike] + maxCloseSpread)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static BellPatternKind ClassifyBellPatternKind(
@@ -3337,9 +3376,12 @@ namespace IbSwingTrader.Application.Candidates
                 NeedsDeeperEntry = needsDeeperEntry,
                 NeedsMomentumExit = needsMomentumExit,
                 IsBellUpPattern = todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp,
-                PatternVerdictReason = bellPatternSignal.Kind == BellPatternKind.BellUp
-                    ? $"BellUp confirmed on {bellPatternSignal.Timeframe}"
-                    : string.Empty,
+                PatternVerdictReason = bellPatternSignal.Kind switch
+                {
+                    BellPatternKind.BellUp => $"BellUp confirmed on {bellPatternSignal.Timeframe}",
+                    BellPatternKind.Triangle => $"Triangle detected on {bellPatternSignal.Timeframe}",
+                    _ => string.Empty
+                },
                 Scan = new ScanInfo
                 {
                     PresetScanCode = preset.ScanCode,
