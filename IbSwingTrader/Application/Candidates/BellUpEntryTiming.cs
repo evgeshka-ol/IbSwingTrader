@@ -27,9 +27,19 @@ namespace IbSwingTrader.Application.Candidates
             Timeframe patternTimeframe,
             DateTime scanTime,
             out string reason)
+            => IsReady(dailyCandles, h4Candles, patternTimeframe, scanTime, out reason, out _);
+
+        public static bool IsReady(
+            IEnumerable<Candle> dailyCandles,
+            IEnumerable<Candle> h4Candles,
+            Timeframe patternTimeframe,
+            DateTime scanTime,
+            out string reason,
+            out string shortReason)
         {
             if (patternTimeframe is not (Timeframe.D1 or Timeframe.H4))
             {
+                shortReason = "Pattern unconfirmed";
                 reason = "BellUp entry timing requires a confirmed Daily or H4 pattern";
                 return false;
             }
@@ -39,16 +49,19 @@ namespace IbSwingTrader.Application.Candidates
                 .TakeLast(3)
                 .ToList();
 
-            return IsTimeframeReady(completed, isDaily ? "Daily" : "H4", out reason);
+            return IsTimeframeReady(completed, isDaily ? "Daily" : "H4", out reason, out shortReason);
         }
 
         private static bool IsTimeframeReady(
             IReadOnlyList<Candle> completedCandles,
             string timeframe,
-            out string reason)
+            out string reason,
+            out string shortReason)
         {
+            shortReason = string.Empty;
             if (completedCandles.Count < 3)
             {
+                shortReason = "Missing candles";
                 reason = $"{timeframe}: three completed candles are required for BellUp entry timing";
                 return false;
             }
@@ -60,6 +73,7 @@ namespace IbSwingTrader.Application.Candidates
                 var preceding = completedCandles[completedCandles.Count - offset - 1];
                 if (IsBoost(candle, preceding))
                 {
+                    shortReason = "Recent boost";
                     reason = $"{timeframe}: BellUp boost on T-{offset} ({candle.Time:yyyy-MM-dd HH:mm:ss}); " +
                              "green body is at least 2x the preceding body; do not enter";
                     return false;

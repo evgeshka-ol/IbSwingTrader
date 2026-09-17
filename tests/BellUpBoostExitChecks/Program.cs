@@ -85,4 +85,13 @@ Check(BellUpLateEntryPenalty.Calculate(one.Select(x => x.Open).ToList(), one.Sel
 var notPeak = one.Select(x => x).ToList(); notPeak[^1].Close = 11.25m;
 Check(BellUpLateEntryPenalty.Calculate(notPeak.Select(x => x.Open).ToList(), notPeak.Select(x => x.High).ToList(),
       notPeak.Select(x => x.Low).ToList(), notPeak.Select(x => x.Close).ToList()) == 0m, "No penalty away from candle high");
+var timingBars = Bodies(0.01m, 0.02m, 0.01m);
+Check(!BellUpEntryTiming.IsReady([], timingBars, Timeframe.H4, timingBars[^1].Time.AddHours(4),
+    out var timingDetail, out var timingLabel) && timingLabel == "Recent boost" && timingDetail.Contains("T-2"),
+    "Short rejection label preserves the actual boost timing reason");
+Check(!BellUpEntryTiming.IsReady([], timingBars.Take(2), Timeframe.H4, timingBars[^1].Time.AddHours(4),
+    out _, out timingLabel) && timingLabel == "Missing candles", "Missing history is not reported as a boost");
+var readyBars = Bodies(0.1m, 0.1m, 0.1m);
+Check(BellUpEntryTiming.IsReady([], readyBars, Timeframe.H4, readyBars[^1].Time.AddHours(4),
+    out _, out timingLabel) && timingLabel == string.Empty, "Ready setups have no rejection label");
 Console.WriteLine($"Passed {assertions} BellUp exit, lower-band and late-entry checks.");

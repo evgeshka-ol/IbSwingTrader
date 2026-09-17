@@ -159,6 +159,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                 var name = string.IsNullOrWhiteSpace(prefix)
                     ? property.Name
                     : $"{prefix}{property.Name}";
+                if (name == "ScoreScore")
+                    name = "TotalScore";
 
                 Add(row, headers, name, FormatValue(property.GetValue(value)));
             }
@@ -167,7 +169,9 @@ namespace IbSwingTrader.Infrastructure.Logging
         private static List<CandidateDetails> OrderForDisplay(IEnumerable<CandidateDetails> candidates)
         {
             return candidates
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
+                .OrderByDescending(x => CandidateGroups.IsOther(x) &&
+                    x.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)
                 .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)

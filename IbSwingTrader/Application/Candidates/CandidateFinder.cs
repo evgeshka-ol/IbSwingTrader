@@ -463,7 +463,8 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore,
                     recentSeries,
                     bbState,
-                    dailyFamilySplit);
+                    dailyFamilySplit,
+                    out _);
 
                 if (!isTodayResearchLikeCandidate ||
                     !IsBellUpPhaseReadyToday(ctx, ClassifyBellPatternSignal(bbState, recentSeries), out _))
@@ -685,7 +686,7 @@ namespace IbSwingTrader.Application.Candidates
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
-            void EmitOtherCandidate(string reason)
+            void EmitOtherCandidate(string reason, string shortReason)
             {
                 // Keep rejected setups for evaluation without constructing an executable plan.
                 var trade = new TradePlanInfo { LiveReferencePrice = ResolveScanPrice(ctx.Snapshot) };
@@ -717,6 +718,8 @@ namespace IbSwingTrader.Application.Candidates
                     todayResearchLikeSeriesScore);
 
                 candidateItem.CandidateSource = "Other";
+                if (candidateItem.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
+                    candidateItem.PatternVerdictReason += $"; {shortReason}";
                 candidateItem.Context.Notes = AppendDiagnosticNote(candidateItem.Context.Notes, reason);
 
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
@@ -728,10 +731,11 @@ namespace IbSwingTrader.Application.Candidates
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     "Daily family split is unknown.");
                 EmitOtherCandidate(
-                    "Rejected: daily family split is unknown");
+                    "Rejected: daily family split is unknown", "Missing data");
                 return;
             }
 
+            var eligibilityReason = string.Empty;
             var isTodayResearchLikeCandidate =
                 dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
                 IsTodayResearchLikeCandidate(
@@ -741,7 +745,8 @@ namespace IbSwingTrader.Application.Candidates
                     entryScore,
                     recentSeries,
                     bbState,
-                    dailyFamilySplit);
+                    dailyFamilySplit,
+                    out eligibilityReason);
 
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
             if (isTodayResearchLikeCandidate &&
@@ -749,7 +754,7 @@ namespace IbSwingTrader.Application.Candidates
             {
                 const string reason = "Rejected: H4 BellUp impulse exhausted while Daily Bollinger mid is flat";
                 _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {reason}");
-                EmitOtherCandidate(reason);
+                EmitOtherCandidate(reason, "Exhausted");
                 return;
             }
 
@@ -759,15 +764,15 @@ namespace IbSwingTrader.Application.Candidates
                     $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                     "Runaway candidate rejected because BellUp eligibility was not confirmed on H4/Daily.");
                 EmitOtherCandidate(
-                    "Rejected: Runaway BellUp eligibility was not confirmed on H4/Daily");
+                    $"Rejected: Runaway BellUp eligibility was not confirmed on H4/Daily. {eligibilityReason}", eligibilityReason);
                 return;
             }
 
             if (isTodayResearchLikeCandidate &&
-                !IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out var burstReason))
+                !IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out var burstReason, out var phaseReason))
             {
                 _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {burstReason}");
-                EmitOtherCandidate($"Rejected: {burstReason}");
+                EmitOtherCandidate($"Rejected: {burstReason}", phaseReason);
                 return;
             }
 
@@ -790,7 +795,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"ReversalHook not confirmed. " +
                         "Reason=reliable D1 and H4 pattern rows unavailable");
                     EmitOtherCandidate(
-                        "Rejected: ReversalHook reliable D1 and H4 pattern rows unavailable");
+                        "Rejected: ReversalHook reliable D1 and H4 pattern rows unavailable", "Missing data");
                     return;
                 }
 
@@ -801,7 +806,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
                         $"{reversalHookDiagnostics}");
                     EmitOtherCandidate(
-                        $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}");
+                        $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}", "Reversal unconfirmed");
                     return;
                 }
 
@@ -812,7 +817,7 @@ namespace IbSwingTrader.Application.Candidates
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not trade-ready. {h4ReversalDiagnostics}");
                     EmitOtherCandidate(
-                        $"Rejected: ReversalHook not trade-ready. {h4ReversalDiagnostics}");
+                        $"Rejected: ReversalHook not trade-ready. {h4ReversalDiagnostics}", "H4 contradiction");
                     return;
                 }
 
@@ -833,7 +838,7 @@ namespace IbSwingTrader.Application.Candidates
                     $"Runaway candidate rejected because the live price invalidated the saved H4 structure. " +
                     liveInvalidationReason);
                 EmitOtherCandidate(
-                    $"Rejected: Runaway live price invalidated saved H4 structure. {liveInvalidationReason}");
+                    $"Rejected: Runaway live price invalidated saved H4 structure. {liveInvalidationReason}", "Structure broken");
                 return;
             }
 
@@ -904,10 +909,13 @@ namespace IbSwingTrader.Application.Candidates
             decimal entryScore,
             RecentFeatureSeries recentSeries,
             BollingerStateSet bbState,
-            DailyFamilySplit dailyFamilySplit)
+            DailyFamilySplit dailyFamilySplit,
+            out string shortReason)
         {
+            shortReason = string.Empty;
             if (dailyFamilySplit == DailyFamilySplit.Unknown)
             {
+                shortReason = "Missing data";
                 _logger.Info(
                     $"TodayResearchLike rejected: {ctx.Stock.Ticker}. " +
                     $"Reason=reliable daily close/mid rows unavailable.");
@@ -916,6 +924,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (dailyFamilySplit == DailyFamilySplit.Reversal)
             {
+                shortReason = "Below mid";
                 _logger.Info(
                     $"TodayResearchLike rejected and rerouted to Reversal: {ctx.Stock.Ticker}. " +
                     $"Reason=previous closed daily close is below previous closed daily Bollinger mid.");
@@ -927,6 +936,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (!IsRunawayBellUpPattern(bellPatternSignal))
             {
+                shortReason = "Pattern unconfirmed";
                 _logger.Info(
                     $"TodayResearchLike pattern not confirmed: {ctx.Stock.Ticker}. " +
                     $"RequiredPattern=BellUp, " +
@@ -948,6 +958,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
             {
+                shortReason = "Late phase";
                 _logger.Info(
                     $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
                     $"Reason={latePhaseReason}, " +
@@ -961,6 +972,7 @@ namespace IbSwingTrader.Application.Candidates
                     ctx.Candles,
                     out var terminalPullbackReason))
             {
+                shortReason = "Terminal pullback";
                 _logger.Info(
                     $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
                     $"Reason={terminalPullbackReason}, " +
@@ -970,6 +982,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (!IsBellUpPatternReadyNow(bellPatternSignal, bbState, recentSeries))
             {
+                shortReason = "Not ready";
                 _logger.Info(
                     $"TodayResearchLike pattern kept out of trade-ready list: {ctx.Stock.Ticker}. " +
                     $"Pattern={patternKind}, " +
@@ -1386,37 +1399,7 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private static bool IsPostSpikeConsolidation(List<decimal> opens, List<decimal> closes)
-        {
-            if (opens.Count != closes.Count || opens.Count < 5)
-                return false;
-
-            for (var spike = opens.Count - 3; spike >= 1; spike--)
-            {
-                var spikeBody = closes[spike] - opens[spike];
-                var previousBody = Math.Abs(closes[spike - 1] - opens[spike - 1]);
-                if (spikeBody <= 0m || spikeBody < previousBody * 2m)
-                    continue;
-
-                var tail = closes.Skip(spike + 1).TakeLast(3).ToList();
-                if (tail.Count < 2)
-                    continue;
-
-                var reference = Math.Abs(closes[spike]);
-                var maxBody = Math.Max(spikeBody * 0.25m, reference * 0.003m);
-                var maxCloseSpread = Math.Max(spikeBody * 0.50m, reference * 0.005m);
-                var closeSpread = tail.Max() - tail.Min();
-                var starts = opens.Skip(spike + 1).TakeLast(tail.Count).ToList();
-
-                if (tail.Zip(starts, (close, open) => Math.Abs(close - open)).All(x => x <= maxBody) &&
-                    closeSpread <= maxCloseSpread &&
-                    tail.Max() <= closes[spike] + maxCloseSpread)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
+            => TrianglePatternClassifier.IsPostSpikeConsolidation(opens, closes);
 
         private static BellPatternKind ClassifyBellPatternKind(
             BollingerStateSet bbState,
@@ -1530,9 +1513,18 @@ namespace IbSwingTrader.Application.Candidates
             WishListContext ctx,
             BellPatternSignal pattern,
             out string reason)
+            => IsBellUpPhaseReadyToday(ctx, pattern, out reason, out _);
+
+        private bool IsBellUpPhaseReadyToday(
+            WishListContext ctx,
+            BellPatternSignal pattern,
+            out string reason,
+            out string shortReason)
         {
+            shortReason = string.Empty;
             if (!IsRunawayBellUpPattern(pattern))
             {
+                shortReason = "Pattern unconfirmed";
                 reason = "BellUp entry timing requires a confirmed Daily or H4 pattern";
                 return false;
             }
@@ -1542,12 +1534,14 @@ namespace IbSwingTrader.Application.Candidates
                 ctx.Candles,
                 pattern.Timeframe == BellPatternTimeframe.Daily ? Timeframe.D1 : Timeframe.H4,
                 ctx.ScanTimeMarket,
-                out reason))
+                out reason,
+                out shortReason))
                 return false;
 
             var history = BuildBellUpHistory(ctx, pattern);
             if (BellUpLowerBandTurn.TryFindConfirmedTurn(history.Lower, history.Confirmed, out var trough))
             {
+                shortReason = "Lower-band turn";
                 reason = $"{pattern.Timeframe}: BellUp lower band turned up after a decline; " +
                          $"trough={history.Lower[trough]} ({history.Candles[trough].Time:yyyy-MM-dd HH:mm:ss}), " +
                          $"previous={history.Lower[^2]} ({history.Candles[^2].Time:yyyy-MM-dd HH:mm:ss}), " +
