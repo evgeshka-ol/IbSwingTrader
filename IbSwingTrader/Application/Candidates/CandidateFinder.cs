@@ -1408,8 +1408,13 @@ namespace IbSwingTrader.Application.Candidates
             return bellDownSignal;
         }
 
-        private static bool IsPostSpikeConsolidation(List<decimal> opens, List<decimal> closes)
-            => TrianglePatternClassifier.IsPostSpikeConsolidation(opens, closes);
+        private static bool IsPostSpikeConsolidation(
+            List<decimal> opens,
+            List<decimal> closes,
+            List<decimal> upper,
+            List<decimal> mid,
+            List<decimal> lower)
+            => TrianglePatternClassifier.IsPostSpikeConsolidation(opens, closes, upper, mid, lower);
 
         private static BellPatternKind ClassifyBellPatternKind(
             BollingerStateSet bbState,
