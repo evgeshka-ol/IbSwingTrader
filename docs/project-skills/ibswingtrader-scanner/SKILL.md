@@ -68,8 +68,11 @@ the remaining chart/cache candle-alignment issue.
   experimental scanner heuristic is checked on H4 and Daily: a positive body
   at least twice the prior body followed by several small, tightly clustered
   closes is treated as post-spike consolidation and routed to `Other` rather
-  than admitted as BellUp. This is deliberately conservative and must be
-  validated against new scans before thresholds are tightened.
+  than admitted as BellUp. It also recognizes a short multi-candle rise when
+  the later plateau is quiet and the Bollinger envelope has contracted from
+  its post-rise maximum; a fresh late expansion remains BellUp-like. This is
+  deliberately experimental and must be validated against new scans before
+  thresholds are tightened.
 - BellUp timing still rejects a setup when the latest or preceding qualifying
   boost has already occurred. H4 lower-band turn with a flat Daily middle band
   is an exhaustion veto. BellUp exits use the average body of two prior

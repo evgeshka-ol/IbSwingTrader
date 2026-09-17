@@ -12,6 +12,11 @@ The same detector is used for the scanner's H4 and Daily OHLC snapshots.
   not just the final three candles.
 - Require small bodies, a narrow close range across the entire plateau,
   and closes near the impulse close on both sides (above and below).
+- A second path also accepts a short multi-candle rise, provided the later
+  plateau remains quiet and the Bollinger envelope has already contracted from
+  its post-rise maximum. A fresh late expansion therefore remains BellUp-like;
+  this distinguishes a transition such as NMAX from an active mixed case such
+  as AUR.
 
 Existing numerical thresholds are unchanged: maximum body is the larger of
 25% of the impulse body and 0.3% of its closing price; maximum close spread
@@ -20,7 +25,8 @@ and distance from the impulse close use 50% and 0.5%, respectively.
 This fixes disconnected historical-spike matches but does not establish
 recognition accuracy. Tiny positive bodies after dojis still qualify under
 the existing impulse rule and may reset the plateau anchor. Gap recognition,
-Bollinger oval geometry, and offline evaluation parity are not added here.
+full Bollinger oval geometry, and offline evaluation parity are not added
+here.
 The detector uses the supplied snapshot as-is, including a forming last bar
 when present; it does not independently determine candle completion.
 
