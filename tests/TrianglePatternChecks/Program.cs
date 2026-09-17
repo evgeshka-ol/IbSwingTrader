@@ -35,4 +35,21 @@ Check(!Match([10m, 10m, 10m, 10m, 10m],
 Check(!Match([10m, 10m, 12m, 12m], [9.9m, 12m, 12m, 12m]), "Keep minimum history requirement");
 Check(!Match([10m, 10m, 12m, 12m, 12m], [9.9m, 12m]), "Reject unaligned series");
 
+var multiRampCloses = new[] { 10m, 10.4m, 11m, 11.7m, 12m, 12.05m, 12.1m, 12.08m, 12.12m, 12.1m };
+var multiRampOpens = new[] { 9.9m, 10m, 10.4m, 11m, 11.7m, 12.05m, 12.1m, 12.05m, 12.08m, 12.12m };
+var widths = new[] { 1m, 1.2m, 1.5m, 2m, 2.4m, 2.2m, 1.9m, 1.6m, 1.3m, 1m };
+var upper = multiRampCloses.Select((x, i) => x + widths[i] / 2m).ToArray();
+var lower = multiRampCloses.Select((x, i) => x - widths[i] / 2m).ToArray();
+var mid = multiRampCloses.ToArray();
+Check(Match(multiRampOpens, multiRampCloses, upper, mid, lower),
+    "Multi-candle rise followed by a contracting plateau");
+
+var activeExpansionCloses = new[] { 10m, 10.4m, 11m, 11.7m, 12m, 12.05m, 12.1m, 12.8m, 13.5m, 14m };
+var activeExpansionOpens = new[] { 9.9m, 10m, 10.4m, 11m, 11.7m, 12.05m, 12.1m, 12.1m, 12.8m, 13.5m };
+var activeWidths = new[] { 1m, 1.2m, 1.5m, 2m, 2.4m, 2.5m, 2.7m, 3m, 3.4m, 3.8m };
+var activeUpper = activeExpansionCloses.Select((x, i) => x + activeWidths[i] / 2m).ToArray();
+var activeLower = activeExpansionCloses.Select((x, i) => x - activeWidths[i] / 2m).ToArray();
+Check(!Match(activeExpansionOpens, activeExpansionCloses, activeUpper, activeExpansionCloses, activeLower),
+    "Active late expansion remains BellUp-like");
+
 Console.WriteLine($"Passed {assertions} triangle pattern checks.");

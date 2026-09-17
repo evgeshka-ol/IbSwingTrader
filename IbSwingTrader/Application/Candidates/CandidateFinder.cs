@@ -1357,10 +1357,20 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            if (IsPostSpikeConsolidation(recentSeries.H4OpenSeries, recentSeries.H4CloseSeries))
+            if (IsPostSpikeConsolidation(
+                    recentSeries.H4OpenSeries,
+                    recentSeries.H4CloseSeries,
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries))
                 return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.H4);
 
-            if (IsPostSpikeConsolidation(recentSeries.DailyOpenSeries, recentSeries.DailyCloseSeries))
+            if (IsPostSpikeConsolidation(
+                    recentSeries.DailyOpenSeries,
+                    recentSeries.DailyCloseSeries,
+                    recentSeries.DailyBbUpperBandSeries,
+                    recentSeries.DailyBbMidBandSeries,
+                    recentSeries.DailyBbLowerBandSeries))
                 return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.Daily);
 
             var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
