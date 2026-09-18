@@ -956,6 +956,32 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
+            // Daily timing is a cross-timeframe veto only when Daily itself
+            // confirms BellUp. A standalone H4 BellUp remains eligible for
+            // early entries such as SECZ, where Daily has not formed yet.
+            var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
+                ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries),
+                BellPatternTimeframe.Daily);
+            if (dailyKind == BellPatternKind.BellUp &&
+                !BellUpEntryTiming.IsReady(
+                    ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
+                    ctx.Candles,
+                    Timeframe.D1,
+                    ctx.ScanTimeMarket,
+                    out var dailyTimingReason,
+                    out var dailyTimingShortReason))
+            {
+                shortReason = $"Daily {dailyTimingShortReason}";
+                _logger.Info(
+                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                    $"Reason=Daily BellUp timing veto. {dailyTimingReason}, " +
+                    $"SelectedBellTimeframe={bellPatternSignal.Timeframe}");
+                return false;
+            }
+
             if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
             {
                 shortReason = "Late phase";
