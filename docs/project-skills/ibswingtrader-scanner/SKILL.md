@@ -73,9 +73,12 @@ the remaining chart/cache candle-alignment issue.
   its post-rise maximum; a fresh late expansion remains BellUp-like. This is
   deliberately experimental and must be validated against new scans before
   thresholds are tightened.
-- BellUp timing still rejects a setup when the latest or preceding qualifying
-  boost has already occurred. H4 lower-band turn with a flat Daily middle band
-  is an exhaustion veto. BellUp exits use the average body of two prior
+- BellUp timing rejects a setup when the latest or preceding qualifying boost
+  has already occurred on the confirmed timeframe. Additionally, when Daily
+  independently confirms BellUp, its timing is a cross-timeframe veto even
+  for an H4-selected signal; an H4-only BellUp is not blocked by absent Daily
+  confirmation. H4 lower-band turn with a flat Daily middle band is an
+  exhaustion veto. BellUp exits use the average body of two prior
   qualifying impulse candles when available, or the single prior impulse when
   that is all the cache provides.
 

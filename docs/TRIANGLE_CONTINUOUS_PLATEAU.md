@@ -34,3 +34,7 @@ Regression checks: `tests/TrianglePatternChecks`. They cover continuous
 plateaus, intervening bodies and excursions, plateaus far from the spike,
 new impulses, insufficient history, and misaligned series. Build and test
 execution remain the user's responsibility.
+
+BellUp timing is evaluated separately: a confirmed Daily BellUp can veto an
+H4-selected entry when its own latest or preceding boost is too recent; an
+H4-only BellUp is not blocked by an unconfirmed Daily pattern.
