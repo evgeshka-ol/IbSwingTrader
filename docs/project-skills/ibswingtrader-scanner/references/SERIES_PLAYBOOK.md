@@ -129,6 +129,15 @@ means the entry was too early and the stop was hit before the real move.
 into `Reversal` by the last closed daily close being below the daily Bollinger
 mid.
 
+Planned architecture change (2026-09-18): this below-mid prerequisite is a
+legacy implementation constraint, not part of the intended pattern
+definition. The target classifier will evaluate ReversalHook independently on
+every broker-returned ticker and use pattern-first groups (`BellUp`,
+`ReversalHook`, `Other`). BBNX is the first transition exemplar: its
+ReversalHook crossed above the Daily mid and later continued strongly. Do not
+implement this migration from BBNX alone; collect cache-confirmed examples and
+validate the independent detector against realized outcomes first.
+
 The row shape:
 
 - daily lower Bollinger band was falling and then hooks upward

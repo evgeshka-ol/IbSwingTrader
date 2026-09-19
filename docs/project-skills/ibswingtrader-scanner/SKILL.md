@@ -82,6 +82,41 @@ the remaining chart/cache candle-alignment issue.
   qualifying impulse candles when available, or the single prior impulse when
   that is all the cache provides.
 
+## Next architecture direction: pattern-first groups (2026-09-18)
+
+The current `Runaway`/`Reversal` split is a legacy regime split and is too
+dependent on the latest Daily Bollinger mid. BBNX demonstrated the failure
+mode: a ReversalHook can begin below the mid, cross above it, and then produce
+a large continuation while the hard split prevents the ReversalHook branch
+from running. The planned user-facing groups are therefore:
+
+- `BellUp`: a confirmed BellUp pattern on H4 or Daily;
+- `ReversalHook`: a confirmed ReversalHook on H4 or Daily;
+- `Other`: neither pattern confirmed or a confirmed pattern rejected as not
+  currently trade-ready.
+
+This is an architecture decision, not yet a code migration. Until the
+migration is implemented, the live CSV still uses `Runaway`, `Reversal`, and
+`Other`. The target migration classifies patterns independently as soon as a
+ticker is received from the broker; Daily mid remains a ranking/context
+feature, not a hard ReversalHook admission gate. BellUp remains the immediate
+production focus, while ReversalHook is first validated as an independent
+diagnostic path.
+
+Pattern episodes should retain timeframe and phase metadata (`Active`,
+`Exhausted`, or `Transition`) and, where available, the previous pattern. A
+useful transition shape is `ReversalHook -> BellUp -> Exhausted`; BBNX is the
+first exemplar for this state model: Daily ReversalHook around Aug 3-7, a
+short H4 ReversalHook around Aug 3-4, H4 BellUp beginning Aug 7 and exhausting
+after the Aug 11 impulse, plus a later Daily ReversalHook beginning Sep 14.
+
+BBNX is an exemplar, not a hard-coded template. Before changing live groups,
+find additional labelled examples in `Data/cache`, reconstruct their OHLC and
+Bollinger rows at scan time, and compare independent ReversalHook matches with
+realized `AmplitudePct`. The existing ReversalHook score/gate has not shown a
+validated edge (see `SCANNER_MODEL.md`); this migration must therefore begin
+in diagnostic/replay mode and not silently widen production admission.
+
 ## Pipeline
 
 1. `get-candidates`
