@@ -306,7 +306,10 @@ namespace IbSwingTrader.Application.Evaluation
                     "SameDayContinuation",
                     StringComparison.OrdinalIgnoreCase)
                     ? "Runaway"
-                    : "Reversal";
+                    : candidate.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase) ||
+                      candidate.CandidateSource.Equals("DiagnosticRejected", StringComparison.OrdinalIgnoreCase)
+                        ? "Other"
+                        : "Reversal";
                 DailyCloseSeries = candidate.RecentDailyCloseSeries;
                 DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries;
                 DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries;

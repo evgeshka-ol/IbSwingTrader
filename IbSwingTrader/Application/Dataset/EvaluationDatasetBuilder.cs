@@ -533,6 +533,15 @@ namespace IbSwingTrader.Application.Dataset
 
         private CandidatePatternVerdict ResolvePatternVerdict(EvaluationDatasetRow row)
         {
+            if (IsOtherBellUpRow(row))
+            {
+                return new CandidatePatternVerdict(
+                    "Runaway",
+                    "BellUp",
+                    "Mismatch",
+                    StripReasonPrefix(row.PatternVerdictReason));
+            }
+
             if (!string.IsNullOrWhiteSpace(row.PatternVerdict) &&
                 !string.IsNullOrWhiteSpace(row.DetectedPipeline) &&
                 !string.IsNullOrWhiteSpace(row.DetectedPattern) &&
@@ -546,6 +555,13 @@ namespace IbSwingTrader.Application.Dataset
             }
 
             return _patternVerdictService.Analyze(row);
+        }
+
+        private static bool IsOtherBellUpRow(EvaluationDatasetRow row)
+        {
+            var reason = StripReasonPrefix(row.PatternVerdictReason);
+            return row.CandidateGroup.Equals("Other", StringComparison.OrdinalIgnoreCase) &&
+                   reason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase);
         }
 
         private void EnsureDerivedFields(IEnumerable<EvaluationDatasetRow> rows)
@@ -1209,6 +1225,28 @@ namespace IbSwingTrader.Application.Dataset
 
             var orderedValues = sortColumn.OrderedValues ?? [];
             var descending = sortColumn.Descending;
+
+            // Keep diagnostic BellUp rows at the top of the Other section. The
+            // remaining Other rows are ordered by signed amplitude, so positive
+            // moves lead the list, values near zero stay in the middle, and
+            // negative moves naturally fall to the bottom.
+            if (sortColumn.Column.Equals(nameof(EvaluationDatasetRow.CandidateGroup), StringComparison.OrdinalIgnoreCase) &&
+                left.CandidateGroup.Equals("Other", StringComparison.OrdinalIgnoreCase) &&
+                right.CandidateGroup.Equals("Other", StringComparison.OrdinalIgnoreCase))
+            {
+                var leftBellUp = IsOtherBellUpRow(left);
+                var rightBellUp = IsOtherBellUpRow(right);
+                var bellUpComparison = rightBellUp.CompareTo(leftBellUp);
+                if (bellUpComparison != 0)
+                    return bellUpComparison;
+
+                var amplitudeComparison = right.AmplitudePct.CompareTo(left.AmplitudePct);
+                if (amplitudeComparison != 0)
+                    return amplitudeComparison;
+
+                return string.Compare(left.Ticker, right.Ticker, StringComparison.OrdinalIgnoreCase);
+            }
+
             var comparison = sortColumn.Column switch
             {
                 nameof(EvaluationDatasetRow.GroupLabel) => CompareString(left.GroupLabel, right.GroupLabel, orderedValues),

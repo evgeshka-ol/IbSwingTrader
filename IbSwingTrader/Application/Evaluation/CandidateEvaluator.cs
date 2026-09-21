@@ -509,11 +509,35 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateEvaluationResult result,
             CandidateDetails candidate)
         {
+            // An Other candidate can still carry a confirmed BellUp signal. It was
+            // deliberately kept out of the trade-ready groups (for example because
+            // it is not ready yet), so running the generic Other/Reversal classifier
+            // here must not erase the scanner's signal and reason.
+            if (IsOtherBellUpCandidate(candidate))
+            {
+                result.DetectedPipeline = "Runaway";
+                result.DetectedPattern = "BellUp";
+                result.PatternVerdict = "Mismatch";
+                result.PatternVerdictReason = candidate.PatternVerdictReason;
+                return;
+            }
+
             var verdict = _patternVerdictService.Analyze(result);
             result.DetectedPipeline = verdict.DetectedPipeline;
             result.DetectedPattern = verdict.DetectedPattern;
             result.PatternVerdict = verdict.PatternVerdict;
             result.PatternVerdictReason = verdict.PatternVerdictReason;
+        }
+
+        private static bool IsOtherBellUpCandidate(CandidateDetails candidate)
+        {
+            var sourceIsOther = candidate.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase) ||
+                                candidate.CandidateSource.Equals("DiagnosticRejected", StringComparison.OrdinalIgnoreCase);
+            var reason = candidate.PatternVerdictReason.StartsWith("Reason=", StringComparison.OrdinalIgnoreCase)
+                ? candidate.PatternVerdictReason["Reason=".Length..]
+                : candidate.PatternVerdictReason;
+            return sourceIsOther &&
+                   reason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TouchesPrice(Candle candle, decimal price)
