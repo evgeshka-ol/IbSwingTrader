@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="checks/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="agentsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

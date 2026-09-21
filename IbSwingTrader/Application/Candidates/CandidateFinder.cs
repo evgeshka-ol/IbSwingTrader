@@ -57,6 +57,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var marketTimezone = _marketSettingsProvider.Get().Timezone;
             var marketNow = GetMarketNow(marketTimezone);
+            var firstSeen = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
             _logger.Info(
                 $"CandidateFinder settings: " +
@@ -76,6 +77,9 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var stageMetric = performance.BeginStage(preset.ScanCode);
                 var stocks = await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
+                var receivedAt = MarketTime.Now();
+                foreach (var stock in stocks)
+                    firstSeen.TryAdd(stock.Ticker, receivedAt);
                 stageMetric.Input = stocks.Count;
 
                 foreach (var stock in stocks)
@@ -238,7 +242,7 @@ namespace IbSwingTrader.Application.Candidates
                             Candles = candles,
                             DailyCandles = dailyCandles,
                             ChartH4Candles = TryLoadSessionAlignedH4Candles(stock.Ticker, marketNow),
-                            ScanTimeMarket = marketNow,
+                            ScanTimeMarket = MarketTime.Now(),
                             AvgDollarVolumeDaily = avgDollarVolume,
                             WishListItem = wishListItem
                         };
@@ -352,6 +356,24 @@ namespace IbSwingTrader.Application.Candidates
                     finalCandidates,
                     sameDayCandidates);
 
+            foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
+            {
+                candidate.Scan.RunStartedAt = marketNow;
+                if (firstSeen.TryGetValue(candidate.Ticker, out var seenAt))
+                    candidate.Scan.FirstSeenAt = seenAt;
+                candidate.Scan.SignalObservedAt = candidate.Scan.ScanTime;
+            }
+
+            // Refresh only the deduplicated, playable BellUp plans. No requests for
+            // hundreds of diagnostic rejects, and no change to Reversal entry policy.
+            foreach (var candidate in sameDayCandidates.Where(x => !CandidateGroups.IsOther(x) && x.IsBellUpPattern).Reverse())
+            {
+                var ctx = contextsForOutput.First(x =>
+                    string.Equals(x.Stock.Ticker, candidate.Ticker, StringComparison.OrdinalIgnoreCase) &&
+                    x.Preset.ScanCode == candidate.Scan.PresetScanCode);
+                await RefreshBellUpForPublication(candidate, ctx);
+            }
+
             LogScanPerformanceSummary(performance);
 
             return new CandidateSearchResult
@@ -360,6 +382,63 @@ namespace IbSwingTrader.Application.Candidates
                 SameDayCandidates = sameDayCandidates,
                 WishList = []
             };
+        }
+
+        private async Task RefreshBellUpForPublication(CandidateDetails candidate, WishListContext ctx)
+        {
+            var initial = candidate.TradePlan;
+            try
+            {
+                if (ctx.Contract == null)
+                    throw new InvalidOperationException("Contract unavailable for fresh price");
+
+                var requestedAt = MarketTime.Now();
+                var start = candidate.Scan.FirstSeenAt ?? requestedAt.AddMinutes(-15);
+                start = start.AddTicks(-(start.Ticks % TimeSpan.FromMinutes(5).Ticks)).AddMinutes(-5);
+                var bars = await _historicalData.GetFreshM5Snapshot(
+                    candidate.Ticker, ctx.Contract, start, requestedAt);
+                var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
+                if (quote == null)
+                    throw new InvalidOperationException("No current or immediately preceding M5 bar");
+
+                var refreshed = await BuildTradePlan(ctx, quote);
+                refreshed.InitialReferencePrice = initial.LiveReferencePrice;
+                refreshed.InitialReferencePriceTime = initial.ReferencePriceTime;
+                refreshed.InitialReferencePriceBarTime = initial.ReferencePriceBarTime;
+                refreshed.InitialReferencePriceObservedAt = initial.ReferencePriceObservedAt;
+                refreshed.InitialEntryPrice = initial.EntryPrice;
+                refreshed.PublicationRefreshStatus = "Refreshed";
+                candidate.TradePlan = refreshed;
+
+                if (IsLiveRunawayStructureInvalidated(quote.Price, ctx.Candles,
+                    BuildRecentFeatureSeries(ctx.Candles), out var reason))
+                    throw new InvalidOperationException($"Live structure invalidated: {reason}");
+
+                _logger.Info($"Publication plan refreshed: {candidate.Ticker}. " +
+                    $"FirstSeenAt={candidate.Scan.FirstSeenAt:O}, PriceTime={quote.PriceTime:O}, " +
+                    $"ObservedAt={quote.ObservedAt:O}, Source={quote.Source}, " +
+                    $"OldEntry={initial.EntryPrice}, Entry={refreshed.EntryPrice}, " +
+                    $"Exit={refreshed.ExitPrice}, Stop={refreshed.StopLoss}, " +
+                    $"ShadowM5Entry={quote.ProjectedEntryPrice}");
+            }
+            catch (Exception ex)
+            {
+                // Preserve diagnostics, but do not publish a stale plan as executable.
+                var plan = candidate.TradePlan;
+                plan.InitialReferencePrice = initial.LiveReferencePrice;
+                plan.InitialReferencePriceTime = initial.ReferencePriceTime;
+                plan.InitialReferencePriceBarTime = initial.ReferencePriceBarTime;
+                plan.InitialReferencePriceObservedAt = initial.ReferencePriceObservedAt;
+                plan.InitialEntryPrice = initial.EntryPrice;
+                plan.PublicationRefreshStatus = "Unavailable";
+                plan.EntryPrice = plan.ExitPrice = plan.StopLoss = plan.StopLimitPrice = 0m;
+                plan.ProfitPercent = plan.LossPercent = 0m;
+                plan.ExitProfile = null;
+                candidate.CandidateSource = "Other";
+                candidate.PatternVerdictReason += "; Publication refresh unavailable";
+                candidate.Context.Notes = AppendDiagnosticNote(candidate.Context.Notes, ex.Message);
+                _logger.Info($"Publication plan rejected: {candidate.Ticker}. {ex.Message}");
+            }
         }
 
         private (List<CandidateDetails> FinalCandidates, List<CandidateDetails> SameDayCandidates)
@@ -2529,11 +2608,12 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx)
+        private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx, ExecutionPriceSnapshot? publicationQuote = null)
         {
             var tradeSettings = _getCandidatesSettingsProvider.Get().TradePlan;
             var finderSettings = _getCandidatesSettingsProvider.Get().Finder;
-            List<Candle>? entryCandles = null;
+            List<Candle>? entryCandles = ctx.EntryCandles;
+            var entryObservedAt = ctx.EntryObservedAt;
 
             if (ctx.Contract == null)
             {
@@ -2550,7 +2630,7 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
-            if (ctx.Contract != null)
+            if (ctx.Contract != null && publicationQuote == null)
             {
                 try
                 {
@@ -2564,6 +2644,9 @@ namespace IbSwingTrader.Application.Candidates
                         Timeframe.M15,
                         start,
                         end);
+                    entryObservedAt = MarketTime.Now();
+                    ctx.EntryCandles = entryCandles;
+                    ctx.EntryObservedAt = entryObservedAt;
                 }
                 catch (Exception ex)
                 {
@@ -2591,7 +2674,12 @@ namespace IbSwingTrader.Application.Candidates
                 ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
                 todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
                 IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out _);
-            var scanPrice = ResolveScanPrice(ctx.Snapshot);
+            if (publicationQuote != null && !isBellUpPhaseReadyToday)
+                throw new InvalidOperationException("BellUp is no longer ready for a publication entry");
+            var historicalPrice = ResolveScanPrice(ctx.Snapshot);
+            var liveReferencePrice = publicationQuote?.Price ??
+                ResolveLiveReferencePrice(entryCandles, historicalPrice);
+            var scanPrice = isBellUpPhaseReadyToday ? liveReferencePrice : historicalPrice;
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
                 recentSeries,
@@ -2648,7 +2736,7 @@ namespace IbSwingTrader.Application.Candidates
 
                 _logger.Info(
                     $"Trade plan BellUp phase-ready profile applied for {ctx.Stock.Ticker}. " +
-                    $"T-1 daily close has not closed above its own upper Bollinger band yet, entering at scan price. " +
+                    $"Confirmed BellUp passed entry timing; entering at reference price {scanPrice}. " +
                     $"DefaultProfitPct={_fmt.Percent(readyProfitProfile.DefaultProfitPct)}, " +
                     $"MinProfitPct={_fmt.Percent(readyProfitProfile.MinProfitPct)}, " +
                     $"MaxProfitPct={_fmt.Percent(readyProfitProfile.MaxProfitPct)}");
@@ -3029,9 +3117,15 @@ namespace IbSwingTrader.Application.Candidates
                 }
             }
 
-            return new TradePlanInfo
+            var plan = new TradePlanInfo
             {
-                LiveReferencePrice = ResolveLiveReferencePrice(entryCandles, scanPrice),
+                LiveReferencePrice = liveReferencePrice,
+                // Ordinary cached history has no receipt/version timestamp per bar.
+                // Preserve its bar start without inventing an exact price-as-of time.
+                ReferencePriceBarTime = entryCandles?.Count > 0 ? entryCandles.Max(x => x.Time) : null,
+                ReferencePriceObservedAt = entryObservedAt,
+                ReferencePriceSource = entryCandles?.Count > 0 ? "M15History" : "IndicatorFallback",
+                PlanBuiltAt = MarketTime.Now(),
                 EntryPrice = trade.Entry,
                 ExitPrice = trade.Exit,
                 StopLoss = trade.Stop,
@@ -3040,6 +3134,8 @@ namespace IbSwingTrader.Application.Candidates
                 LossPercent = CalculatePercent(trade.Entry, trade.Stop),
                 ExitProfile = trade.ExitProfile
             };
+            publicationQuote?.ApplyTo(plan);
+            return plan;
         }
 
         private bool TryBuildBellUpBoostExit(
@@ -7114,6 +7210,8 @@ namespace IbSwingTrader.Application.Candidates
             public required decimal AvgDollarVolumeDaily { get; init; }
             public required WishListItem WishListItem { get; init; }
             public TradePlanInfo? Trade { get; set; }
+            public List<Candle>? EntryCandles { get; set; }
+            public DateTime? EntryObservedAt { get; set; }
             public ScanPerformanceTickerMetric? PerformanceMetric { get; set; }
         }
     }

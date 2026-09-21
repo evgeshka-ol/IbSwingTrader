@@ -108,6 +108,23 @@ namespace IbSwingTrader.Infrastructure.Logging
             Add(row, headers, "PlannedProfitPct", FormatValue(plan.ProfitPercent));
             Add(row, headers, "PlannedLossPct", FormatValue(plan.LossPercent));
             Add(row, headers, "ExitProfile", FormatValue(plan.ExitProfile));
+            // Preserve short legacy trade columns; new snapshot metadata round-trips
+            // via the existing TradePlan-prefixed reader without special aliases.
+            var tradeFields = new HashSet<string>
+            {
+                nameof(plan.LiveReferencePrice), nameof(plan.EntryPrice), nameof(plan.ExitPrice),
+                nameof(plan.StopLoss), nameof(plan.StopLimitPrice), nameof(plan.ProfitPercent),
+                nameof(plan.LossPercent), nameof(plan.ExitProfile)
+            };
+            foreach (var property in _propertyReader.GetOrderedProperties(typeof(TradePlanInfo)))
+            {
+                if (tradeFields.Contains(property.Name))
+                    continue;
+                var value = property.GetValue(plan);
+                Add(row, headers, "TradePlan" + property.Name,
+                    value is DateTime time ? time.ToString("O", CultureInfo.InvariantCulture) :
+                    value is decimal number ? number.ToString("G29", CultureInfo.InvariantCulture) : FormatValue(value));
+            }
         }
 
         private void FlattenSeriesAndRegimeFields(
@@ -162,7 +179,9 @@ namespace IbSwingTrader.Infrastructure.Logging
                 if (name == "ScoreScore")
                     name = "TotalScore";
 
-                Add(row, headers, name, FormatValue(property.GetValue(value)));
+                var field = property.GetValue(value);
+                Add(row, headers, name, value is ScanInfo && name != nameof(ScanInfo.ScanTime) && field is DateTime time
+                    ? time.ToString("O", CultureInfo.InvariantCulture) : FormatValue(field));
             }
         }
 

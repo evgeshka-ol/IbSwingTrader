@@ -136,8 +136,11 @@ namespace IbSwingTrader.Application.Evaluation
             var contract = await _contractResolver.ResolveStockAsync(candidate.Ticker);
             _logger.Info($"Evaluation step: contract resolved for {candidate.Ticker}");
 
-            var start = candidate.Scan.ScanTime;
-            var effectiveWindowStart = ResolveEffectiveEvaluationWindowStart(candidate.Scan.ScanTime);
+            // ScanTime remains the batch identity. A user cannot execute before
+            // this particular row is published; legacy rows retain the old start.
+            var start = candidate.Scan.PublishedAt is DateTime publishedAt && publishedAt > candidate.Scan.ScanTime
+                ? publishedAt : candidate.Scan.ScanTime;
+            var effectiveWindowStart = ResolveEffectiveEvaluationWindowStart(start);
             var requestedEnd = effectiveWindowStart.Add(maxEvaluationWindow);
             var availableNow = MarketTime.Now() - freshDataSafetyLag;
             var end = requestedEnd <= availableNow ? requestedEnd : availableNow;
@@ -182,7 +185,7 @@ namespace IbSwingTrader.Application.Evaluation
             }
 
             var ordered = candles
-                .Where(x => x.Time >= candidate.Scan.ScanTime && x.Time <= end)
+                .Where(x => x.Time >= start && x.Time <= end)
                 .OrderBy(x => x.Time)
                 .ToList();
 

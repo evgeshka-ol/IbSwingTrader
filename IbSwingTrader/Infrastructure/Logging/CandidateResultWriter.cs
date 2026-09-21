@@ -48,7 +48,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
 
-                WriteCandidateToConsole(candidate);
+                PublishCandidate(candidate);
             }
 
             if (otherCandidates.Count > 0)
@@ -59,7 +59,7 @@ namespace IbSwingTrader.Infrastructure.Logging
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
 
-                WriteCandidateToConsole(candidate);
+                PublishCandidate(candidate);
             }
 
             WriteConsoleSectionHeader("Reversal");
@@ -68,8 +68,13 @@ namespace IbSwingTrader.Infrastructure.Logging
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
 
-                WriteCandidateToConsole(candidate);
+                PublishCandidate(candidate);
             }
+
+            var published = admittedCandidates.Concat(admittedSameDayCandidates).ToList();
+            _logger.Info($"Publication timing summary: Playable={published.Count}, " +
+                $"MaxDetectionDelaySeconds={published.Select(x => x.Scan.DetectionToPublicationSeconds).Max()}, " +
+                $"MaxPriceAgeSeconds={published.Select(x => x.Scan.PriceToPublicationSeconds).Max()}");
 
             var existingDocument = await _candidateFileService.ReadAsync(filePath);
             var mergedSameDay = MergeCandidates(existingDocument.SameDayCandidates, sameDayCandidates);
@@ -89,6 +94,23 @@ namespace IbSwingTrader.Infrastructure.Logging
                 candidates.Concat(sameDayCandidates));
 
             _logger.Info($"Candidate results saved: {filePath}");
+        }
+
+        private void PublishCandidate(CandidateDetails candidate)
+        {
+            var publishedAt = GetMarketNow(candidate.Scan.ScanTimeZone);
+            candidate.Scan.PublishedAt = publishedAt;
+            candidate.Scan.DetectionToPublicationSeconds = candidate.Scan.FirstSeenAt.HasValue
+                ? (decimal)(publishedAt - candidate.Scan.FirstSeenAt.Value).TotalSeconds : null;
+            candidate.Scan.PriceToPublicationSeconds = candidate.TradePlan.ReferencePriceTime.HasValue
+                ? (decimal)(publishedAt - candidate.TradePlan.ReferencePriceTime.Value).TotalSeconds : null;
+            WriteCandidateToConsole(candidate);
+            _logger.Info($"Candidate published: {candidate.Ticker}. PublishedAt={publishedAt:O}, " +
+                $"FirstSeenAt={candidate.Scan.FirstSeenAt:O}, " +
+                $"PriceTime={candidate.TradePlan.ReferencePriceTime:O}, " +
+                $"DetectionDelaySeconds={candidate.Scan.DetectionToPublicationSeconds}, " +
+                $"PriceAgeSeconds={candidate.Scan.PriceToPublicationSeconds}, " +
+                $"Refresh={candidate.TradePlan.PublicationRefreshStatus}");
         }
 
         private static List<CandidateDetails> MergeCandidates(

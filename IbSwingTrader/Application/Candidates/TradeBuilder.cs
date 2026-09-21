@@ -146,7 +146,7 @@ namespace IbSwingTrader.Application.Candidates
 
             _logger.Info(
                 $"Trade entry forced to scan price. " +
-                $"Reason=BellUp phase ready today (T-1 close not yet above its own upper Bollinger band), entering without discount or pattern pullback. " +
+                $"Reason=Confirmed BellUp passed entry timing, entering without discount or pattern pullback. " +
                 $"Entry={_fmt.Price(entry)}");
 
             return entry;

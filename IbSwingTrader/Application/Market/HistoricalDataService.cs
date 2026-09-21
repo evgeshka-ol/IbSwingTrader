@@ -20,6 +20,28 @@ namespace IbSwingTrader.Application.Market
         private readonly IMarketGapAnalyzer _marketGapAnalyzer = marketGapAnalyzer;
         private readonly IMarketCoverageService _marketCoverageService = marketCoverageService;
 
+        public async Task<List<Candle>> GetFreshM5Snapshot(
+            string symbol, Contract contract, DateTime start, DateTime requestedAt)
+        {
+            List<Candle> bars;
+            using (await _throttler.AcquireAsync())
+                bars = await _provider.GetHistoricalRange(contract, Timeframe.M5, start, requestedAt);
+
+            bars = MergeCandles(bars.Where(x => x.Time >= start && x.Time <= requestedAt).ToList());
+            // Persist only closed bars. A partial bar belongs to the immutable candidate
+            // snapshot, never to a cache later used as completed historical evidence.
+            var completed = bars.Where(x => x.Time.AddMinutes(5) <= requestedAt).ToList();
+            if (completed.Count > 0)
+            {
+                _cache.TryLoad(symbol, Timeframe.M5, out var existing);
+                _cache.Save(symbol, Timeframe.M5, MergeCandles((existing ?? []).Concat(completed).ToList()));
+            }
+
+            _logger.Info($"Fresh M5 snapshot: {symbol}. RequestedAt={requestedAt:O}, " +
+                $"ReceivedAt={MarketTime.Now():O}, Bars={bars.Count}");
+            return bars;
+        }
+
         public async Task<List<Candle>?> GetCandlesRange(
             string symbol,
             Contract contract,
