@@ -22,6 +22,7 @@ namespace IbSwingTrader.Domain.Candidates
         public DateTime? ReferencePriceBarTime { get; set; }
         public DateTime? ReferencePriceObservedAt { get; set; }
         public string? ReferencePriceSource { get; set; }
+        public string? EntryPriceSource { get; set; }
         public DateTime? PlanBuiltAt { get; set; }
         public decimal? InitialReferencePrice { get; set; }
         public DateTime? InitialReferencePriceTime { get; set; }

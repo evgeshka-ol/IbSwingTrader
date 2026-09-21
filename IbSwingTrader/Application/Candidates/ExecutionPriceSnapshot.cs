@@ -34,6 +34,9 @@ namespace IbSwingTrader.Application.Candidates
             plan.ReferencePriceBarTime = Current?.Time ?? Previous?.Time;
             plan.ReferencePriceObservedAt = ObservedAt;
             plan.ReferencePriceSource = Source;
+            plan.EntryPriceSource = ProjectedEntryPrice.HasValue
+                ? "BellUpM5BodyContinuation"
+                : "BellUpFreshM5PriceFallback";
             plan.M5PreviousBarTime = Previous?.Time;
             plan.M5PreviousOpen = Previous?.Open;
             plan.M5PreviousClose = Previous?.Close;

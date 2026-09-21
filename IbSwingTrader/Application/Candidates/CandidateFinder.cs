@@ -2679,7 +2679,13 @@ namespace IbSwingTrader.Application.Candidates
             var historicalPrice = ResolveScanPrice(ctx.Snapshot);
             var liveReferencePrice = publicationQuote?.Price ??
                 ResolveLiveReferencePrice(entryCandles, historicalPrice);
-            var scanPrice = isBellUpPhaseReadyToday ? liveReferencePrice : historicalPrice;
+            // Publication-only BellUp entry: current M5 open plus the immediately
+            // preceding green M5 body. Fall back to the fresh current price when
+            // the adjacent pair is unavailable. Other families keep their policy.
+            var bellUpPublicationEntry = publicationQuote?.ProjectedEntryPrice ?? publicationQuote?.Price;
+            var scanPrice = isBellUpPhaseReadyToday
+                ? (bellUpPublicationEntry ?? liveReferencePrice)
+                : historicalPrice;
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
                 recentSeries,
@@ -3125,6 +3131,11 @@ namespace IbSwingTrader.Application.Candidates
                 ReferencePriceBarTime = entryCandles?.Count > 0 ? entryCandles.Max(x => x.Time) : null,
                 ReferencePriceObservedAt = entryObservedAt,
                 ReferencePriceSource = entryCandles?.Count > 0 ? "M15History" : "IndicatorFallback",
+                EntryPriceSource = publicationQuote == null
+                    ? (isBellUpPhaseReadyToday ? "BellUpFreshPrice" : "ExistingTradePlan")
+                    : publicationQuote.ProjectedEntryPrice.HasValue
+                        ? "BellUpM5BodyContinuation"
+                        : "BellUpFreshM5PriceFallback",
                 PlanBuiltAt = MarketTime.Now(),
                 EntryPrice = trade.Entry,
                 ExitPrice = trade.Exit,

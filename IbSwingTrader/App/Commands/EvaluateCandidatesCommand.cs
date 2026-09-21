@@ -436,8 +436,7 @@ namespace IbSwingTrader.App.Commands
                 Scan = new ScanInfo
                 {
                     PresetScanCode = evaluation.PresetScanCode,
-                    ScanTime = evaluation.ScanTime,
-                    PublishedAt = evaluation.EvaluationStartTime
+                    ScanTime = evaluation.ScanTime
                 },
                 Score = new ScoreInfo
                 {
