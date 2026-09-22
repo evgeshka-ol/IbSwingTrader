@@ -423,7 +423,44 @@ namespace IbSwingTrader.Application.Candidates
             }
             catch (Exception ex)
             {
-                // Preserve diagnostics, but do not publish a stale plan as executable.
+                if (CanUseBellUpScanPriceFallback(candidate, ex, out var scanPrice))
+                {
+                    try
+                    {
+                        var fallbackQuote = new ExecutionPriceSnapshot(
+                            scanPrice,
+                            candidate.Scan.ScanTime,
+                            MarketTime.Now(),
+                            "BellUpScanPriceFallback",
+                            null,
+                            null);
+                        var fallback = await BuildTradePlan(ctx, fallbackQuote);
+                        fallback.InitialReferencePrice = initial.LiveReferencePrice;
+                        fallback.InitialReferencePriceTime = initial.ReferencePriceTime;
+                        fallback.InitialReferencePriceBarTime = initial.ReferencePriceBarTime;
+                        fallback.InitialReferencePriceObservedAt = initial.ReferencePriceObservedAt;
+                        fallback.InitialEntryPrice = initial.EntryPrice;
+                        fallback.PublicationRefreshStatus = "ScanPriceFallback";
+                        fallback.EntryPriceSource = "BellUpScanPriceFallback";
+                        candidate.TradePlan = fallback;
+                        candidate.Context.Notes = AppendDiagnosticNote(
+                            candidate.Context.Notes,
+                            $"Publication refresh unavailable; BellUp scan-price fallback used. {ex.Message}");
+                        _logger.Info(
+                            $"Publication plan fallback applied: {candidate.Ticker}. " +
+                            $"Reason={ex.Message}, ScanPrice={scanPrice}, Entry={fallback.EntryPrice}, " +
+                            $"Exit={fallback.ExitPrice}, Stop={fallback.StopLoss}");
+                        return;
+                    }
+                    catch (Exception fallbackEx)
+                    {
+                        _logger.Info(
+                            $"Publication scan-price fallback failed: {candidate.Ticker}. {fallbackEx.Message}");
+                    }
+                }
+
+                // Preserve diagnostics, but do not publish an unsafe plan when
+                // neither a fresh M5 quote nor the BellUp scan-price fallback is available.
                 var plan = candidate.TradePlan;
                 plan.InitialReferencePrice = initial.LiveReferencePrice;
                 plan.InitialReferencePriceTime = initial.ReferencePriceTime;
@@ -439,6 +476,26 @@ namespace IbSwingTrader.Application.Candidates
                 candidate.Context.Notes = AppendDiagnosticNote(candidate.Context.Notes, ex.Message);
                 _logger.Info($"Publication plan rejected: {candidate.Ticker}. {ex.Message}");
             }
+        }
+
+        private static bool CanUseBellUpScanPriceFallback(
+            CandidateDetails candidate,
+            Exception error,
+            out decimal scanPrice)
+        {
+            scanPrice = 0m;
+            if (!candidate.IsBellUpPattern ||
+                !candidate.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (error.Message.StartsWith("Live structure invalidated", StringComparison.OrdinalIgnoreCase) ||
+                error.Message.StartsWith("Contract unavailable", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            scanPrice = candidate.TradePlan.LiveReferencePrice > 0m
+                ? candidate.TradePlan.LiveReferencePrice
+                : candidate.TradePlan.InitialReferencePrice ?? 0m;
+            return scanPrice > 0m;
         }
 
         private (List<CandidateDetails> FinalCandidates, List<CandidateDetails> SameDayCandidates)
@@ -1053,12 +1110,31 @@ namespace IbSwingTrader.Application.Candidates
                     out var dailyTimingReason,
                     out var dailyTimingShortReason))
             {
-                shortReason = $"Daily {dailyTimingShortReason}";
-                _logger.Info(
-                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
-                    $"Reason=Daily BellUp timing veto. {dailyTimingReason}, " +
-                    $"SelectedBellTimeframe={bellPatternSignal.Timeframe}");
-                return false;
+                // A large Daily boost is not by itself a reason to discard a
+                // still-fresh H4 continuation. Keep the Daily veto for H4
+                // patterns only when H4 momentum has already weakened or the
+                // H4 structure is no longer constructive.
+                var h4OverrideReason = string.Empty;
+                var h4DailyBoostOverride =
+                    dailyTimingShortReason.Equals("Recent boost", StringComparison.OrdinalIgnoreCase) &&
+                    bellPatternSignal.Timeframe == BellPatternTimeframe.H4 &&
+                    IsFreshH4BellUpContinuation(bbState, recentSeries, ctx, out h4OverrideReason);
+
+                if (h4DailyBoostOverride)
+                {
+                    _logger.Info(
+                        $"TodayResearchLike Daily timing veto relaxed: {ctx.Stock.Ticker}. " +
+                        $"DailyReason={dailyTimingReason}, H4={h4OverrideReason}");
+                }
+                else
+                {
+                    shortReason = $"Daily {dailyTimingShortReason}";
+                    _logger.Info(
+                        $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                        $"Reason=Daily BellUp timing veto. {dailyTimingReason}, " +
+                        $"SelectedBellTimeframe={bellPatternSignal.Timeframe}");
+                    return false;
+                }
             }
 
             if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
@@ -1595,6 +1671,51 @@ namespace IbSwingTrader.Application.Candidates
                 return true;
 
             return false;
+        }
+
+        private bool IsFreshH4BellUpContinuation(
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries,
+            WishListContext ctx,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (bbState.H4.Direction == nameof(BollingerFigureDirection.Down) ||
+                bbState.H4.Regime == nameof(BollingerFigureRegime.Collapse))
+            {
+                reason = $"H4 regime is not constructive: {bbState.H4.Regime}/{bbState.H4.Direction}";
+                return false;
+            }
+
+            var h4Exhausted = IsH4BellUpExhaustedWithFlatDaily(
+                new BellPatternSignal(BellPatternKind.BellUp, BellPatternTimeframe.H4),
+                ctx,
+                recentSeries);
+            var h4TerminalPullback = IsH4BellUpTerminalPullback(
+                new BellPatternSignal(BellPatternKind.BellUp, BellPatternTimeframe.H4),
+                recentSeries,
+                ctx.Candles,
+                out var terminalPullbackReason);
+            if (h4Exhausted || h4TerminalPullback)
+            {
+                reason = string.IsNullOrWhiteSpace(terminalPullbackReason)
+                    ? "H4 momentum exhaustion"
+                    : terminalPullbackReason;
+                return false;
+            }
+
+            var midTail = CalculateTailRelativeSlopePct(recentSeries.H4BbMidBandSeries, 3);
+            var rsiTail = CalculateTailSlope(recentSeries.H4RsiSeries, 3);
+            var macdTail = CalculateTailSlope(recentSeries.H4MacdHistogramSeries, 3);
+            if (midTail <= 0m || (rsiTail < 0m && macdTail < 0m))
+            {
+                reason = $"H4 momentum is not fresh: MidTail={midTail}, RsiTail={rsiTail}, MacdHistogramTail={macdTail}";
+                return false;
+            }
+
+            reason = $"fresh H4 continuation: {bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                     $"MidTail={midTail}, RsiTail={rsiTail}, MacdHistogramTail={macdTail}";
+            return true;
         }
 
         private static bool IsVerticalSpikeExpansion(
