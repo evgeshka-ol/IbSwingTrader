@@ -24,16 +24,6 @@ namespace IbSwingTrader.Application.Evaluation
 
         private CandidatePatternVerdict AnalyzeInternal(PatternSeries series)
         {
-            var detectedPipeline = DeterminePipeline(series);
-            if (detectedPipeline == "Unknown")
-            {
-                return new CandidatePatternVerdict(
-                    detectedPipeline,
-                    "Unknown",
-                    "Unknown",
-                    "candidate family unavailable");
-            }
-
             var dailyState = AnalyzeTimeframe(
                 series.DailyBbMidBandSeries,
                 series.DailyBbUpperBandSeries,
@@ -56,45 +46,27 @@ namespace IbSwingTrader.Application.Evaluation
                 dailyState.Direction,
                 h4State.Direction);
 
-            if (detectedPipeline == "Runaway")
+            // Pattern precedence is independent of the legacy daily family split.
+            if (IsRunawayBellUpPattern(bellSignal, dailyState, h4State) &&
+                !IsH4ContradictingDailyBellUp(series, bellSignal, h4State))
             {
-                if (IsRunawayBellUpPattern(bellSignal, dailyState, h4State) &&
-                    !IsH4ContradictingDailyBellUp(series, bellSignal, h4State))
+                if (BellPatternClassifier.IsVerticalSpikeExpansion(
+                        TimeframeSeries(series, bellSignal.Timeframe, isUpper: true),
+                        TimeframeSeries(series, bellSignal.Timeframe, isUpper: false),
+                        bellSignal.Timeframe == BellPatternTimeframe.H4 ? series.H4RsiSeries : series.DailyRsiSeries,
+                        bellSignal.Timeframe == BellPatternTimeframe.H4 ? series.H4MacdHistogramSeries : series.DailyMacdHistogramSeries))
                 {
-                    if (BellPatternClassifier.IsVerticalSpikeExpansion(
-                            TimeframeSeries(series, bellSignal.Timeframe, isUpper: true),
-                            TimeframeSeries(series, bellSignal.Timeframe, isUpper: false),
-                            bellSignal.Timeframe == BellPatternTimeframe.H4 ? series.H4RsiSeries : series.DailyRsiSeries,
-                            bellSignal.Timeframe == BellPatternTimeframe.H4 ? series.H4MacdHistogramSeries : series.DailyMacdHistogramSeries))
-                    {
-                        return new CandidatePatternVerdict(
-                            detectedPipeline,
-                            "None",
-                            "Mismatch",
-                            $"BellUp not confirmed on {bellSignal.Timeframe}: isolated terminal spike");
-                    }
-
-                    if (HasTerminalMomentumRollover(series, bellSignal.Timeframe))
-                    {
-                        return new CandidatePatternVerdict(
-                            detectedPipeline,
-                            "None",
-                            "Mismatch",
-                            $"BellUp not confirmed on {bellSignal.Timeframe}: expansion ended in momentum rollover");
-                    }
-
                     return new CandidatePatternVerdict(
-                        detectedPipeline,
                         "BellUp",
-                        "Match",
-                        $"BellUp confirmed on {bellSignal.Timeframe}");
+                        "BellUp",
+                        "Mismatch",
+                        $"BellUp not confirmed on {bellSignal.Timeframe}: isolated terminal spike");
                 }
 
-                return new CandidatePatternVerdict(
-                    detectedPipeline,
-                    bellSignal.Kind.ToString(),
-                    "Mismatch",
-                    $"BellUp not confirmed; detected={bellSignal.Kind}, timeframe={bellSignal.Timeframe}");
+                if (HasTerminalMomentumRollover(series, bellSignal.Timeframe))
+                    return new CandidatePatternVerdict("BellUp", "None", "Mismatch", $"BellUp not confirmed on {bellSignal.Timeframe}: expansion ended in momentum rollover");
+
+                return new CandidatePatternVerdict("BellUp", "BellUp", "Match", $"BellUp confirmed on {bellSignal.Timeframe}");
             }
 
             if (BellPatternClassifier.IsReversalHookPattern(
@@ -108,24 +80,15 @@ namespace IbSwingTrader.Application.Evaluation
                     series.DailyMacdHistogramSeries,
                     out var diagnostics))
             {
-                if (IsH4ContradictingDailyReversalHook(series, h4State, out var h4Diagnostics))
-                {
-                    return new CandidatePatternVerdict(
-                        detectedPipeline,
-                        "None",
-                        "Mismatch",
-                        h4Diagnostics);
-                }
-
                 return new CandidatePatternVerdict(
-                    detectedPipeline,
+                    "ReversalHook",
                     "ReversalHook",
                     "Match",
                     "ReversalHook confirmed");
             }
 
             return new CandidatePatternVerdict(
-                detectedPipeline,
+                "Other",
                 "None",
                 "Mismatch",
                 diagnostics);
@@ -155,17 +118,6 @@ namespace IbSwingTrader.Application.Evaluation
                 MidSeries = alignedMid,
                 LowerSeries = alignedLower
             });
-        }
-
-        private static string DeterminePipeline(PatternSeries series)
-        {
-            if (series.CandidateGroup.Equals("Runaway", StringComparison.OrdinalIgnoreCase))
-                return "Runaway";
-
-            if (series.CandidateGroup.Equals("Reversal", StringComparison.OrdinalIgnoreCase))
-                return "Reversal";
-
-            return "Unknown";
         }
 
         private static BellPatternSignal ClassifyBellPatternSignal(
@@ -302,14 +254,14 @@ namespace IbSwingTrader.Application.Evaluation
         {
             public PatternSeries(CandidateEvaluationResult candidate)
             {
-                CandidateGroup = candidate.CandidateSource.Equals(
-                    "SameDayContinuation",
-                    StringComparison.OrdinalIgnoreCase)
-                    ? "Runaway"
+                CandidateGroup = candidate.CandidateSource.Equals("BellUp", StringComparison.OrdinalIgnoreCase)
+                    ? "BellUp"
+                    : candidate.CandidateSource.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase)
+                        ? "ReversalHook"
                     : candidate.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase) ||
                       candidate.CandidateSource.Equals("DiagnosticRejected", StringComparison.OrdinalIgnoreCase)
                         ? "Other"
-                        : "Reversal";
+                        : candidate.CandidateSource;
                 DailyCloseSeries = candidate.RecentDailyCloseSeries;
                 DailyBbUpperBandSeries = candidate.RecentDailyBbUpperBandSeries;
                 DailyBbMidBandSeries = candidate.RecentDailyBbMidBandSeries;

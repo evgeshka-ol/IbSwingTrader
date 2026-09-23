@@ -305,10 +305,9 @@ namespace IbSwingTrader.Application.Dataset
                 .Select(x =>
                 {
                     if (string.IsNullOrWhiteSpace(x.CandidateSource) ||
-                        x.CandidateSource.Equals("Primary", StringComparison.OrdinalIgnoreCase))
-                    {
-                        x.CandidateSource = "SameDayContinuation";
-                    }
+                        x.CandidateSource.Equals("Primary", StringComparison.OrdinalIgnoreCase) ||
+                        x.CandidateSource.Equals("SameDayContinuation", StringComparison.OrdinalIgnoreCase))
+                        x.CandidateSource = "BellUp";
 
                     return x;
                 })
@@ -316,13 +315,14 @@ namespace IbSwingTrader.Application.Dataset
 
             var otherCandidates = sameDayCandidates.Concat(primaryCandidates)
                 .Where(CandidateGroups.IsOther);
-            var runawayCandidates = sameDayCandidates
-                .Where(x => !CandidateGroups.IsOther(x));
-            var reversalCandidates = primaryCandidates
-                .Where(x => !CandidateGroups.IsOther(x));
+            var bellUpCandidates = sameDayCandidates
+                .Where(x => string.Equals(x.CandidateSource, "BellUp", StringComparison.OrdinalIgnoreCase));
+            var reversalHookCandidates = primaryCandidates
+                .Where(x => string.Equals(x.CandidateSource, "ReversalHook", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(x.CandidateSource, "Primary", StringComparison.OrdinalIgnoreCase));
 
-            var snapshots = BuildRankedCandidateSnapshots("Runaway", runawayCandidates)
-                .Concat(BuildRankedCandidateSnapshots("Reversal", reversalCandidates))
+            var snapshots = BuildRankedCandidateSnapshots("BellUp", bellUpCandidates)
+                .Concat(BuildRankedCandidateSnapshots("ReversalHook", reversalHookCandidates))
                 .Concat(BuildRankedCandidateSnapshots("Other", otherCandidates));
 
             return snapshots
@@ -1191,11 +1191,17 @@ namespace IbSwingTrader.Application.Dataset
                 return "Runaway";
             }
 
+            if (groupName.Equals("BellUp", StringComparison.OrdinalIgnoreCase))
+                return "BellUp";
+
             if (groupName.Equals("Reversal", StringComparison.OrdinalIgnoreCase) ||
                 groupName.Equals("ReversalCandidates", StringComparison.OrdinalIgnoreCase))
             {
                 return "Reversal";
             }
+
+            if (groupName.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase))
+                return "ReversalHook";
 
             return groupName;
         }

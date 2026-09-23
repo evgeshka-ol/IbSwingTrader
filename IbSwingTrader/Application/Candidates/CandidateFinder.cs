@@ -282,8 +282,6 @@ namespace IbSwingTrader.Application.Candidates
                 $"EmitAllSeenCandidates={emitAllSeenCandidates}, " +
                 $"ExpectedLatestClosedDailyDate={GetExpectedLatestClosedDailyDate(marketNow.Date):yyyy-MM-dd}");
 
-            var sameDayPromotedResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
-
             var rankingStageMetric = performance.BeginStage("Ranking/Rebuild");
             rankingStageMetric.Input = contextsForOutput.Count;
             foreach (var ctx in contextsForOutput)
@@ -295,9 +293,10 @@ namespace IbSwingTrader.Application.Candidates
                 var scanItem = ctx.WishListItem;
 
                 var dailyFamilySplit = ClassifyDailyFamily(ctx, log: false);
-                var target = dailyFamilySplit == DailyFamilySplit.Reversal
-                    ? candidateResults
-                    : sameDayPromotedResults;
+                // Pattern classification is intentionally independent of the old
+                // DailyFamilySplit.  Keep one pool until BellUp/ReversalHook/Other
+                // has been determined by TryAddCandidate.
+                var target = candidateResults;
                 var countBefore = target.Count;
                 try
                 {
@@ -331,24 +330,28 @@ namespace IbSwingTrader.Application.Candidates
             }
             rankingStageMetric.Stop();
 
-            var sameDayCandidates = emitAllSeenCandidates
-                ? sameDayPromotedResults.Values.ToList()
-                : sameDayPromotedResults.Values
-                    .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                    .Select(x => x
-                        .OrderByDescending(y => GetCandidateSourcePriority(y))
-                        .ThenByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
-                        .ThenByDescending(y => y.Score.Score)
-                        .First())
-                    .ToList();
+            var classified = candidateResults.Values
+                .GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x
+                    .OrderByDescending(y => GetCandidateSourcePriority(y))
+                    .ThenByDescending(y => y.Score.NextDayRank ?? decimal.MinValue)
+                    .ThenByDescending(y => y.Score.Score)
+                    .First())
+                .ToList();
+
+            var sameDayCandidates = classified
+                .Where(x => string.Equals(x.CandidateSource, "BellUp", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var finalCandidatePool = classified
+                .Where(x => !string.Equals(x.CandidateSource, "BellUp", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             sameDayCandidates = ReRankCandidates(
                 sameDayCandidates,
                 SeriesTemplateFamily.TodayResearchLike);
 
             var finalCandidates = ReRankCandidates(
-                candidateResults.Values
-                    .ToList(),
+                finalCandidatePool,
                 SeriesTemplateFamily.Reversal);
 
             if (emitAllSeenCandidates)
@@ -861,20 +864,8 @@ namespace IbSwingTrader.Application.Candidates
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
             }
 
-            if (dailyFamilySplit == DailyFamilySplit.Unknown)
-            {
-                _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    "Daily family split is unknown.");
-                EmitOtherCandidate(
-                    "Rejected: daily family split is unknown", "Missing data");
-                return;
-            }
-
             var eligibilityReason = string.Empty;
-            var isTodayResearchLikeCandidate =
-                dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
-                IsTodayResearchLikeCandidate(
+            var isTodayResearchLikeCandidate = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
                     diagnostics,
@@ -885,22 +876,13 @@ namespace IbSwingTrader.Application.Candidates
                     out eligibilityReason);
 
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
+            var bellUpDetected = IsRunawayBellUpPattern(bellPatternSignal);
             if (isTodayResearchLikeCandidate &&
                 IsH4BellUpExhaustedWithFlatDaily(bellPatternSignal, ctx, recentSeries))
             {
                 const string reason = "Rejected: H4 BellUp impulse exhausted while Daily Bollinger mid is flat";
                 _logger.Info($"{rejectionLogPrefix}: {ctx.Stock.Ticker}. {reason}");
                 EmitOtherCandidate(reason, "Exhausted");
-                return;
-            }
-
-            if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike && !isTodayResearchLikeCandidate)
-            {
-                _logger.Info(
-                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                    "Runaway candidate rejected because BellUp eligibility was not confirmed on H4/Daily.");
-                EmitOtherCandidate(
-                    $"Rejected: Runaway BellUp eligibility was not confirmed on H4/Daily. {eligibilityReason}", eligibilityReason);
                 return;
             }
 
@@ -912,7 +894,19 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
-            if (dailyFamilySplit == DailyFamilySplit.Reversal)
+            // A recognized BellUp remains a BellUp diagnostic even when timing,
+            // freshness, or entry-readiness vetoes making it trade-ready. Do not
+            // relabel that same setup as ReversalHook merely because the BellUp
+            // gate returned false.
+            if (bellUpDetected && !isTodayResearchLikeCandidate)
+            {
+                EmitOtherCandidate(
+                    $"BellUp detected but not trade-ready. {eligibilityReason}",
+                    string.IsNullOrWhiteSpace(eligibilityReason) ? "Not ready" : eligibilityReason);
+                return;
+            }
+
+            if (!isTodayResearchLikeCandidate)
             {
                 var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
                 var reversalPatternSource = "D1";
@@ -943,17 +937,6 @@ namespace IbSwingTrader.Application.Candidates
                         $"{reversalHookDiagnostics}");
                     EmitOtherCandidate(
                         $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}", "Reversal unconfirmed");
-                    return;
-                }
-
-                if (reversalPatternSource == "D1" &&
-                    IsH4ContradictingDailyReversalHook(bbState, recentSeries, out var h4ReversalDiagnostics))
-                {
-                    _logger.Info(
-                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook not trade-ready. {h4ReversalDiagnostics}");
-                    EmitOtherCandidate(
-                        $"Rejected: ReversalHook not trade-ready. {h4ReversalDiagnostics}", "H4 contradiction");
                     return;
                 }
 
@@ -1005,9 +988,9 @@ namespace IbSwingTrader.Application.Candidates
                 finalScore,
                 todayResearchLikePatternKind,
                 todayResearchLikeSeriesScore);
-            candidateItem.CandidateSource = dailyFamilySplit == DailyFamilySplit.TodayResearchLike
-                ? "SameDayContinuation"
-                : "Primary";
+            candidateItem.CandidateSource = isTodayResearchLikeCandidate
+                ? "BellUp"
+                : "ReversalHook";
 
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
@@ -1031,6 +1014,9 @@ namespace IbSwingTrader.Application.Candidates
             if (CandidateGroups.IsOther(candidate))
                 return 0;
 
+            if (string.Equals(candidate.CandidateSource, "BellUp", StringComparison.OrdinalIgnoreCase))
+                return 3;
+
             if (string.Equals(candidate.CandidateSource, "Primary", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(candidate.CandidateSource, "SameDayContinuation", StringComparison.OrdinalIgnoreCase))
                 return 2;
@@ -1049,24 +1035,6 @@ namespace IbSwingTrader.Application.Candidates
             out string shortReason)
         {
             shortReason = string.Empty;
-            if (dailyFamilySplit == DailyFamilySplit.Unknown)
-            {
-                shortReason = "Missing data";
-                _logger.Info(
-                    $"TodayResearchLike rejected: {ctx.Stock.Ticker}. " +
-                    $"Reason=reliable daily close/mid rows unavailable.");
-                return false;
-            }
-
-            if (dailyFamilySplit == DailyFamilySplit.Reversal)
-            {
-                shortReason = "Below mid";
-                _logger.Info(
-                    $"TodayResearchLike rejected and rerouted to Reversal: {ctx.Stock.Ticker}. " +
-                    $"Reason=previous closed daily close is below previous closed daily Bollinger mid.");
-                return false;
-            }
-
             var patternKind = ClassifyTodayResearchLikePatternKind(bbState, recentSeries);
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
 

@@ -87,11 +87,17 @@ namespace IbSwingTrader.Application.Dataset
                 return "Runaway";
             }
 
+            if (groupName.Equals("BellUp", StringComparison.OrdinalIgnoreCase))
+                return "BellUp";
+
             if (groupName.Equals("Reversal", StringComparison.OrdinalIgnoreCase) ||
                 groupName.Equals("ReversalCandidates", StringComparison.OrdinalIgnoreCase))
             {
                 return "Reversal";
             }
+
+            if (groupName.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase))
+                return "ReversalHook";
 
             return groupName;
         }

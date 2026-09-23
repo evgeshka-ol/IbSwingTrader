@@ -41,8 +41,8 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Candidates saved: {candidatesPath}");
             _logger.Info(
                 $"GetCandidates completed. " +
-                $"Reversal ranking rows: {reversalRankingRows}, " +
-                $"Runaway ranking rows: {runawayRankingRows}, " +
+                $"ReversalHook ranking rows: {reversalRankingRows}, " +
+                $"BellUp ranking rows: {runawayRankingRows}, " +
                 $"Other ranking rows: {otherRankingRows}, " +
                 $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
         }

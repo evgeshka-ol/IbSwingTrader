@@ -515,7 +515,7 @@ namespace IbSwingTrader.Application.Evaluation
             // here must not erase the scanner's signal and reason.
             if (IsOtherBellUpCandidate(candidate))
             {
-                result.DetectedPipeline = "Runaway";
+                result.DetectedPipeline = "BellUp";
                 result.DetectedPattern = "BellUp";
                 result.PatternVerdict = "Mismatch";
                 result.PatternVerdictReason = candidate.PatternVerdictReason;

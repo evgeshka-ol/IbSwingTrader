@@ -26,16 +26,16 @@ namespace IbSwingTrader.Infrastructure.Logging
 
             var primary = candidates.ToList();
             var sameDay = sameDayCandidates.ToList();
-            AddGroupRows("Runaway", sameDay.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
-            AddGroupRows("Reversal", primary.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
+            AddGroupRows("BellUp", sameDay.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
+            AddGroupRows("ReversalHook", primary.Where(x => !CandidateGroups.IsOther(x)), currentOperationKeys, headers, rows);
             AddGroupRows("Other", sameDay.Concat(primary).Where(CandidateGroups.IsOther), currentOperationKeys, headers, rows);
 
             return new CandidateCsvTable
             {
                 Headers = headers,
                 Rows = rows
-                    .OrderByDescending(x => ParseDateTime(x.GetValueOrDefault("ScanTime")))
-                    .ThenBy(x => GetCandidateGroupOrder(x.GetValueOrDefault("CandidateGroup")))
+                    .OrderBy(x => GetCandidateGroupOrder(x.GetValueOrDefault("CandidateGroup")))
+                    .ThenByDescending(x => ParseDateTime(x.GetValueOrDefault("ScanTime")))
                     .ThenBy(x => ParseInt(x.GetValueOrDefault("DisplayRank")) ?? int.MaxValue)
                     .ThenBy(x => x.GetValueOrDefault("Ticker"), StringComparer.OrdinalIgnoreCase)
                     .ToList()
@@ -44,9 +44,9 @@ namespace IbSwingTrader.Infrastructure.Logging
 
         private static int GetCandidateGroupOrder(string? candidateGroup)
         {
-            return candidateGroup?.Equals("Runaway", StringComparison.OrdinalIgnoreCase) == true
+            return candidateGroup?.Equals("BellUp", StringComparison.OrdinalIgnoreCase) == true
                 ? 0
-                : candidateGroup?.Equals("Reversal", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
+                : candidateGroup?.Equals("ReversalHook", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
         }
 
         private void AddGroupRows(

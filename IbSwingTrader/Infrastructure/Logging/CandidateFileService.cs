@@ -149,7 +149,8 @@ namespace IbSwingTrader.Infrastructure.Logging
                     bool.TryParse(currentRaw, out var current) &&
                     current;
 
-                if (group.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
+                if (group.Equals("BellUp", StringComparison.OrdinalIgnoreCase) ||
+                    group.Equals("Runaway", StringComparison.OrdinalIgnoreCase) ||
                     group.Equals("RunawayCandidates", StringComparison.OrdinalIgnoreCase) ||
                     group.Equals("TodayResearchLikeCandidates", StringComparison.OrdinalIgnoreCase))
                 {

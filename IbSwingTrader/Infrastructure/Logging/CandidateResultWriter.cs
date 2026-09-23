@@ -41,9 +41,20 @@ namespace IbSwingTrader.Infrastructure.Logging
             var scanTime = GetMarketNow(marketSettings.Timezone);
 
             if (admittedSameDayCandidates.Count > 0)
-                WriteConsoleSectionHeader("Runaway");
+                WriteConsoleSectionHeader("BellUp");
 
             foreach (var candidate in admittedSameDayCandidates)
+            {
+                candidate.Scan.ScanTime = scanTime;
+                candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+
+                PublishCandidate(candidate);
+            }
+
+            if (admittedCandidates.Count > 0)
+                WriteConsoleSectionHeader("ReversalHook");
+
+            foreach (var candidate in admittedCandidates)
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
@@ -55,15 +66,6 @@ namespace IbSwingTrader.Infrastructure.Logging
                 WriteConsoleSectionHeader("Other");
 
             foreach (var candidate in otherCandidates)
-            {
-                candidate.Scan.ScanTime = scanTime;
-                candidate.Scan.ScanTimeZone = marketSettings.Timezone;
-
-                PublishCandidate(candidate);
-            }
-
-            WriteConsoleSectionHeader("Reversal");
-            foreach (var candidate in admittedCandidates)
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
