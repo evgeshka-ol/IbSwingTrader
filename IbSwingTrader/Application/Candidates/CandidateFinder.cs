@@ -828,7 +828,17 @@ namespace IbSwingTrader.Application.Candidates
             void EmitOtherCandidate(string reason, string shortReason)
             {
                 // Keep rejected setups for evaluation without constructing an executable plan.
-                var trade = new TradePlanInfo { LiveReferencePrice = ResolveScanPrice(ctx.Snapshot) };
+                var referenceBarTime = ctx.EntryCandles?.Count > 0
+                    ? ctx.EntryCandles.Max(x => x.Time)
+                    : (DateTime?)null;
+                var trade = new TradePlanInfo
+                {
+                    LiveReferencePrice = ResolveScanPrice(ctx.Snapshot),
+                    ReferencePriceTime = referenceBarTime ?? ctx.ScanTimeMarket,
+                    ReferencePriceBarTime = referenceBarTime,
+                    ReferencePriceObservedAt = ctx.EntryObservedAt ?? ctx.ScanTimeMarket,
+                    ReferencePriceSource = referenceBarTime.HasValue ? "M15History" : "ScanSnapshot"
+                };
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
@@ -3216,7 +3226,9 @@ namespace IbSwingTrader.Application.Candidates
             {
                 LiveReferencePrice = liveReferencePrice,
                 // Ordinary cached history has no receipt/version timestamp per bar.
-                // Preserve its bar start without inventing an exact price-as-of time.
+                // Use the latest source bar start as the price time and keep the
+                // fetch timestamp separately as the observation time.
+                ReferencePriceTime = entryCandles?.Count > 0 ? entryCandles.Max(x => x.Time) : null,
                 ReferencePriceBarTime = entryCandles?.Count > 0 ? entryCandles.Max(x => x.Time) : null,
                 ReferencePriceObservedAt = entryObservedAt,
                 ReferencePriceSource = entryCandles?.Count > 0 ? "M15History" : "IndicatorFallback",
