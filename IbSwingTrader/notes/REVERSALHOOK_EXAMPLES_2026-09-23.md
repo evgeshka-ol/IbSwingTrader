@@ -27,3 +27,14 @@ ReversalHook reversals often produce a strong impulse immediately after confirma
 impulse may occur in one candle or develop over several consecutive candles. Evaluation
 should therefore retain both the confirmation timeframe and the first-impulse timing,
 without requiring identical classifications on all timeframes.
+
+## Data audit
+
+The examples are present in the local candle cache and in `candidates.csv`, but their current labels are not a reliable ground-truth set:
+
+- VKTX has D1/H4 data through 2026-09-22. The 2026-09-22 scanner log rejected the D1 hook because the pattern had already moved into the impulse (`LowerHooked=False`, `MidContextOk=False`, `BandCompression=False`). This is a timing miss, not evidence that the chart formation was absent.
+- BBNX has D1/H4 data through 2026-09-18 and is present in candidates/evaluation, but the relevant rows are mostly classified as Other/BellUp or generic reversal diagnostics.
+- COIN has complete D1/H4 data through 2026-09-22. Its H4 ReversalHook-to-BellUp example is not representable by the current D1-only ReversalHook check; scanner logs show D1 rejections while the H4 formation is a separate signal.
+- DJT and IBM are present in cache/candidates, but the cached coverage ends before the chart examples' later dates (DJT 2026-09-10; IBM 2026-07-16), and no clean evaluation row exists for IBM.
+
+The first criteria proposal is therefore a two-stage label: detect a hook on each timeframe independently, then record the subsequent impulse separately. A timeframe mismatch (for example, D1 ReversalHook + H4 Triangle) must not erase the positive D1 label.
