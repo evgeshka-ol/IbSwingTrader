@@ -1117,12 +1117,33 @@ namespace IbSwingTrader.Application.Candidates
 
             if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
             {
-                shortReason = "Late phase";
-                _logger.Info(
-                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
-                    $"Reason={latePhaseReason}, " +
-                    $"BellTimeframe={bellPatternSignal.Timeframe}");
-                return false;
+                var h4RsiRolloverOverrideReason = string.Empty;
+                var h4RsiRolloverOverride =
+                    latePhaseReason.Equals(
+                        "Daily RSI has already rolled over from a recent peak",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    bellPatternSignal.Timeframe == BellPatternTimeframe.Daily &&
+                    IsFreshH4BellUpContinuation(
+                        bbState,
+                        recentSeries,
+                        ctx,
+                        out h4RsiRolloverOverrideReason);
+
+                if (h4RsiRolloverOverride)
+                {
+                    _logger.Info(
+                        $"TodayResearchLike Daily RSI rollover veto relaxed: {ctx.Stock.Ticker}. " +
+                        $"DailyReason={latePhaseReason}, H4={h4RsiRolloverOverrideReason}");
+                }
+                else
+                {
+                    shortReason = "Late phase";
+                    _logger.Info(
+                        $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                        $"Reason={latePhaseReason}, " +
+                        $"BellTimeframe={bellPatternSignal.Timeframe}");
+                    return false;
+                }
             }
 
             if (IsH4BellUpTerminalPullback(
