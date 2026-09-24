@@ -84,7 +84,7 @@ namespace IbSwingTrader.Application.Evaluation
                     "ReversalHook",
                     "ReversalHook",
                     "Match",
-                    "ReversalHook confirmed");
+                    "ReversalHook confirmed on D1");
             }
 
             return new CandidatePatternVerdict(

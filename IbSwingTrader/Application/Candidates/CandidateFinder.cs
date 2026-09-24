@@ -875,6 +875,7 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var eligibilityReason = string.Empty;
+            var confirmedReversalTimeframe = string.Empty;
             var isTodayResearchLikeCandidate = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
@@ -952,6 +953,9 @@ namespace IbSwingTrader.Application.Candidates
 
                 _logger.Info(
                     $"ReversalHook confirmed for {ctx.Stock.Ticker} on {reversalPatternSource}.");
+                confirmedReversalTimeframe = reversalPatternSource.StartsWith("H4", StringComparison.OrdinalIgnoreCase)
+                    ? "H4"
+                    : "D1";
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
@@ -1001,6 +1005,8 @@ namespace IbSwingTrader.Application.Candidates
             candidateItem.CandidateSource = isTodayResearchLikeCandidate
                 ? "BellUp"
                 : "ReversalHook";
+            if (!isTodayResearchLikeCandidate && !string.IsNullOrWhiteSpace(confirmedReversalTimeframe))
+                candidateItem.PatternVerdictReason = $"ReversalHook confirmed on {confirmedReversalTimeframe}";
 
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
