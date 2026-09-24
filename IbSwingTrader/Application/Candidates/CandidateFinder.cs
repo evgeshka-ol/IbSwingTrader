@@ -956,6 +956,22 @@ namespace IbSwingTrader.Application.Candidates
                 confirmedReversalTimeframe = reversalPatternSource.StartsWith("H4", StringComparison.OrdinalIgnoreCase)
                     ? "H4"
                     : "D1";
+
+                if (!IsReversalHookHigherTimeframeSupportive(
+                        confirmedReversalTimeframe,
+                        bbState,
+                        recentSeries,
+                        ResolveScanPrice(ctx.Snapshot),
+                        out var higherTimeframeReason))
+                {
+                    _logger.Info(
+                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                        $"ReversalHook is not trade-ready: {higherTimeframeReason}");
+                    EmitOtherCandidate(
+                        $"Rejected: ReversalHook higher timeframe is not supportive. {higherTimeframeReason}",
+                        "Higher timeframe not supportive");
+                    return;
+                }
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
@@ -1015,6 +1031,73 @@ namespace IbSwingTrader.Application.Candidates
                 $"H4={candidateItem.H4BbRegime}/{candidateItem.H4BbDirection}");
 
             AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
+        }
+
+        private static bool IsReversalHookHigherTimeframeSupportive(
+            string reversalTimeframe,
+            BollingerStateSet bbState,
+            RecentFeatureSeries recentSeries,
+            decimal currentPrice,
+            out string reason)
+        {
+            var isH4Hook = reversalTimeframe.Equals("H4", StringComparison.OrdinalIgnoreCase);
+            var timeframeName = isH4Hook ? "D1" : "W1";
+            var upper = isH4Hook ? recentSeries.DailyBbUpperBandSeries : recentSeries.WeeklyBbUpperBandSeries;
+            var mid = isH4Hook ? recentSeries.DailyBbMidBandSeries : recentSeries.WeeklyBbMidBandSeries;
+            var lower = isH4Hook ? recentSeries.DailyBbLowerBandSeries : recentSeries.WeeklyBbLowerBandSeries;
+            var rsi = isH4Hook ? recentSeries.DailyRsiSeries : recentSeries.WeeklyRsiSeries;
+            var histogram = isH4Hook ? recentSeries.DailyMacdHistogramSeries : recentSeries.WeeklyMacdHistogramSeries;
+            var state = isH4Hook ? bbState.Daily : bbState.Weekly;
+
+            if (state.Direction == nameof(BollingerFigureDirection.Down) ||
+                state.Regime == nameof(BollingerFigureRegime.Collapse))
+            {
+                reason = $"{timeframeName} regime is {state.Regime}/{state.Direction}";
+                return false;
+            }
+
+            if (upper.Count >= 6 && mid.Count >= 6 && lower.Count >= 6 &&
+                BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
+                    upper,
+                    mid,
+                    lower,
+                    ParseDirection(state.Direction),
+                    isH4Hook ? BellPatternTimeframe.Daily : BellPatternTimeframe.Daily) == BellPatternKind.BellUp)
+            {
+                reason = $"{timeframeName} BellUp support";
+                return true;
+            }
+
+            if (currentPrice <= 0m || mid.Count < 3 || histogram.Count < 2)
+            {
+                reason = $"{timeframeName} support data unavailable";
+                return false;
+            }
+
+            var currentMid = mid[^1];
+            var roomToMidPct = currentMid > 0m
+                ? (currentMid - currentPrice) / currentPrice * 100m
+                : 0m;
+            var midSlope = CalculateTailRelativeSlopePct(mid, Math.Min(3, mid.Count));
+            var histogramTurnsUp = histogram[^1] > histogram[^2] && histogram[^1] >= 0m;
+            var earlyReversal = currentPrice < currentMid &&
+                                roomToMidPct >= 2m &&
+                                midSlope >= -0.20m &&
+                                histogramTurnsUp;
+
+            if (earlyReversal)
+            {
+                reason = $"early {timeframeName} ReversalHook support: " +
+                         $"RoomToMidPct={roomToMidPct:0.##}, MidSlopePct={midSlope:0.##}, " +
+                         $"MacdHistogram={histogram[^1]:0.##}";
+                return true;
+            }
+
+            reason = $"{timeframeName} has no BellUp or early ReversalHook support: " +
+                     $"Price={currentPrice:0.##}, Mid={currentMid:0.##}, " +
+                     $"RoomToMidPct={roomToMidPct:0.##}, MidSlopePct={midSlope:0.##}, " +
+                     $"MacdHistogram={histogram[^1]:0.##}";
+            return false;
         }
 
         private static string AppendDiagnosticNote(string? notes, string diagnostic)
