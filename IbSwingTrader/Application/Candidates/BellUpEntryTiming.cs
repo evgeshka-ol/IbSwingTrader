@@ -66,18 +66,17 @@ namespace IbSwingTrader.Application.Candidates
                 return false;
             }
 
-            // Check T-1 first, then T-2; each green body is compared with its predecessor.
-            for (var offset = 1; offset <= 2; offset++)
+            // Only the immediately preceding completed candle (T-1) blocks entry.
+            // A one-day consolidation after a T-2 impulse is a valid continuation
+            // setup, especially when H4 remains constructive.
+            var candle = completedCandles[^1];
+            var preceding = completedCandles[^2];
+            if (IsBoost(candle, preceding))
             {
-                var candle = completedCandles[completedCandles.Count - offset];
-                var preceding = completedCandles[completedCandles.Count - offset - 1];
-                if (IsBoost(candle, preceding))
-                {
-                    shortReason = "Recent boost";
-                    reason = $"{timeframe}: BellUp boost on T-{offset} ({candle.Time:yyyy-MM-dd HH:mm:ss}); " +
-                             "green body is at least 2x the preceding body; do not enter";
-                    return false;
-                }
+                shortReason = "Recent boost";
+                reason = $"{timeframe}: BellUp boost on T-1 ({candle.Time:yyyy-MM-dd HH:mm:ss}); " +
+                         "green body is at least 2x the preceding body; do not enter";
+                return false;
             }
 
             reason = string.Empty;
