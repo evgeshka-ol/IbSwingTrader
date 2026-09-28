@@ -869,6 +869,9 @@ namespace IbSwingTrader.Application.Candidates
                 candidateItem.CandidateSource = "Other";
                 if (candidateItem.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
                     candidateItem.PatternVerdictReason += $"; {shortReason}";
+                else if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
+                         shortReason.Equals("Reversal unconfirmed", StringComparison.OrdinalIgnoreCase))
+                    candidateItem.PatternVerdictReason = "BellUp unconfirmed on H4/Daily";
                 candidateItem.Context.Notes = AppendDiagnosticNote(candidateItem.Context.Notes, reason);
 
                 AddOrReplaceHigherScore(candidateResults, candidateItem, bucketName);
