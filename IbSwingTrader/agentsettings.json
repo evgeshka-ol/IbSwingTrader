@@ -764,7 +764,7 @@
     "CandidateEvaluation": {
         "SearchPattern": "candidates_*.json",
         "ForwardEvaluationDays": 1,
-        "ReevaluateOpenCandidates": false,
+        "ReevaluateOpenCandidates": true,
         "ReevaluateAllCandidatesWithSeries": false,
         "FreshDataSafetyLagMinutes": 10,
         "DefaultTargetPct": 10.0,
