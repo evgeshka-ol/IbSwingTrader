@@ -73,8 +73,9 @@ the remaining chart/cache candle-alignment issue.
   its post-rise maximum; a fresh late expansion remains BellUp-like. This is
   deliberately experimental and must be validated against new scans before
   thresholds are tightened.
-- BellUp timing rejects a setup when the latest or preceding qualifying boost
-  has already occurred on the confirmed timeframe. Additionally, when Daily
+- BellUp timing rejects a setup only when the latest qualifying boost has
+  occurred on the confirmed timeframe. A T-2 impulse followed by a completed
+  consolidation candle remains eligible. Additionally, when Daily
   independently confirms BellUp, its timing is a cross-timeframe veto even
   for an H4-selected signal; an H4-only BellUp is not blocked by absent Daily
   confirmation. H4 lower-band turn with a flat Daily middle band is an

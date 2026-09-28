@@ -296,20 +296,20 @@ neither playable family belong in `Other`.
 Apply the following timing rule on the timeframe of the confirmed BellUp
 (Daily or H4), using aligned Open/Close candles and signed body
 `B = Close - Open`. Do not require both timeframes to pass this body test.
-Let T-1 be the previous completed
-candle, T-2 the completed candle before it, and T-3 the one before that:
+Let T-1 be the latest completed candle and T-2 the completed candle before it:
 
 1. If `B(T-1) > 0` and `B(T-1) >= 2 * abs(B(T-2))`, the boost happened on
    T-1: do not enter.
-2. Otherwise, if `B(T-2) > 0` and `B(T-2) >= 2 * abs(B(T-3))`, the boost
-   happened on T-2: do not enter.
+2. A T-2 boost does not veto entry by itself: one completed consolidation
+   candle after an impulse is a valid continuation setup.
 3. Otherwise, retain the ticker as a playable candidate, provided its BellUp
    and other eligibility checks pass.
 
 The boost candle must be green; its predecessor can be either color, since
 the comparison uses the predecessor's absolute body length. This is a
 body-size comparison, not a wick/range or close-to-close percentage test.
-Three completed candles are needed to check both positions. Determine
+Three completed candles are still required as the conservative minimum history
+for the timing check. Determine
 completion from candle timestamps; Daily series may already exclude the
 forming candle while H4 series may include it. Do not blindly use identical
 array offsets for both timeframes. Missing history cannot establish that
@@ -327,7 +327,7 @@ selects the pattern's timeframe using the existing classifier policy;
 `CandidateFinder.TryAddCandidate` applies the timing check to
 otherwise eligible BellUp candidates before building a trade plan. A boost
 on that timeframe sends the row to `Other`, with a zero plan and a reason
-identifying the timeframe and T-1/T-2 candle. No boost means this timing gate
+identifying the timeframe and T-1 candle. No boost means this timing gate
 passes, not that unrelated eligibility checks are bypassed.
 
 The check uses raw candles without rounding the bodies, preferring the
@@ -395,8 +395,8 @@ still flagged by both views because its immediately preceding chart-aligned
 bars include an earlier green expansion. The example therefore exposes a
 second unresolved dimension: **boost freshness**. A repeated old boost inside
 an ongoing BellUp does not necessarily mean the next session's entry is late.
-Do not add a numeric age window until the chart labels and outcomes are
-measured together. A later Yahoo chart refresh showed the ordinary H4 grid
+The active timing rule therefore vetoes T-1 only; do not add a numeric age
+window until the chart labels and outcomes are measured together. A later Yahoo chart refresh showed the ordinary H4 grid
 restored (`08:00`, `12:00`, `16:00`), matching TWS. Treat the earlier
 `09:30` alignment as a transient chart display issue; do not optimize scanner
 logic around it.
