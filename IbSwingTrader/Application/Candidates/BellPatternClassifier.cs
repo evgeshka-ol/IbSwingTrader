@@ -5,7 +5,8 @@ namespace IbSwingTrader.Application.Candidates
         None,
         BellUp,
         BellDown,
-        Triangle
+        Triangle,
+        DailyTransitionBellUp
     }
 
     public enum BellPatternTimeframe
@@ -349,10 +350,7 @@ namespace IbSwingTrader.Application.Candidates
             if (!TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
                 return BellPatternKind.None;
 
-            if (((IsBellUpEnvelope(prior, recent) &&
-                  IsBellUpCurveTurn(upper, mid, lower)) ||
-                 IsGradualBellUpLaunch(upper, mid, lower, timeframe) ||
-                 IsExplosiveBellUpExpansion(upper, mid, lower)) &&
+            if (HasBellUpGeometry(upper, mid, lower, timeframe, prior, recent) &&
                 direction != BollingerFigureDirection.Down)
             {
                 return BellPatternKind.BellUp;
@@ -366,6 +364,39 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             return BellPatternKind.None;
+        }
+
+        // This is intentionally diagnostic-only. A Daily envelope may already form a
+        // strong BellUp shape while its longer lookback mid-band direction still says
+        // Down. Keep that early transition observable without weakening the BellUp
+        // admission guard for every down-directed Daily series.
+        public static bool IsDailyTransitionBellUp(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower,
+            BollingerFigureDirection direction)
+        {
+            if (direction != BollingerFigureDirection.Down ||
+                !TryCalculateBellPhaseEnvelopes(upper, mid, lower, out var prior, out var recent))
+            {
+                return false;
+            }
+
+            return HasBellUpGeometry(upper, mid, lower, BellPatternTimeframe.Daily, prior, recent);
+        }
+
+        private static bool HasBellUpGeometry(
+            IReadOnlyList<decimal> upper,
+            IReadOnlyList<decimal> mid,
+            IReadOnlyList<decimal> lower,
+            BellPatternTimeframe timeframe,
+            RealBollingerEnvelope prior,
+            RealBollingerEnvelope recent)
+        {
+            return (IsBellUpEnvelope(prior, recent) &&
+                    IsBellUpCurveTurn(upper, mid, lower)) ||
+                   IsGradualBellUpLaunch(upper, mid, lower, timeframe) ||
+                   IsExplosiveBellUpExpansion(upper, mid, lower);
         }
 
         public static BellPatternSignal SelectBellPatternSignal(

@@ -920,6 +920,17 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             }
 
+            if (bellPatternSignal.Kind == BellPatternKind.DailyTransitionBellUp)
+            {
+                _logger.Info(
+                    $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                    "DailyTransitionBellUp detected: Daily geometry is strong while the long Daily mid remains down.");
+                EmitOtherCandidate(
+                    "DailyTransitionBellUp detected: Daily geometry is strong while the long Daily mid remains down.",
+                    "Transition");
+                return;
+            }
+
             if (!isTodayResearchLikeCandidate)
             {
                 var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
@@ -1672,6 +1683,17 @@ namespace IbSwingTrader.Application.Candidates
                 BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
                 return bellUpSignal;
+
+            if (BellPatternClassifier.IsDailyTransitionBellUp(
+                    recentSeries.DailyBbUpperBandSeries,
+                    recentSeries.DailyBbMidBandSeries,
+                    recentSeries.DailyBbLowerBandSeries,
+                    ParseDirection(bbState.Daily.Direction)))
+            {
+                return new BellPatternSignal(
+                    BellPatternKind.DailyTransitionBellUp,
+                    BellPatternTimeframe.Daily);
+            }
 
             var bellDownSignal = BellPatternClassifier.SelectBellPatternSignal(
                 dailyKind,
@@ -3736,6 +3758,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     BellPatternKind.BellUp => $"BellUp confirmed on {bellPatternSignal.Timeframe}",
                     BellPatternKind.Triangle => $"Triangle detected on {bellPatternSignal.Timeframe}",
+                    BellPatternKind.DailyTransitionBellUp => "DailyTransitionBellUp detected on Daily",
                     _ => string.Empty
                 },
                 Scan = new ScanInfo

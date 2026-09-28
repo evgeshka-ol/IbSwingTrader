@@ -189,7 +189,8 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             return candidates
                 .OrderByDescending(x => CandidateGroups.IsOther(x) &&
-                    x.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
+                    (x.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase) ||
+                     x.PatternVerdictReason.StartsWith("DailyTransitionBellUp detected on Daily", StringComparison.OrdinalIgnoreCase)))
                 .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
                 .ThenByDescending(x => x.TradePlan.ProfitPercent)
                 .ThenByDescending(x => x.Score.Score)

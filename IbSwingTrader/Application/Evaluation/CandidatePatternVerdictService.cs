@@ -69,6 +69,15 @@ namespace IbSwingTrader.Application.Evaluation
                 return new CandidatePatternVerdict("BellUp", "BellUp", "Match", $"BellUp confirmed on {bellSignal.Timeframe}");
             }
 
+            if (bellSignal.Kind == BellPatternKind.DailyTransitionBellUp)
+            {
+                return new CandidatePatternVerdict(
+                    "DailyTransitionBellUp",
+                    "DailyTransitionBellUp",
+                    "Match",
+                    "DailyTransitionBellUp detected on Daily");
+            }
+
             if (BellPatternClassifier.IsReversalHookPattern(
                     series.DailyCloseSeries,
                     series.DailyBbUpperBandSeries,
@@ -148,6 +157,9 @@ namespace IbSwingTrader.Application.Evaluation
             var bellUpSignal = BellPatternClassifier.SelectBellPatternSignal(dailyKind, h4Kind, BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
                 return bellUpSignal;
+
+            if (BellPatternClassifier.IsDailyTransitionBellUp(dailyUpper, dailyMid, dailyLower, dailyDirection))
+                return new BellPatternSignal(BellPatternKind.DailyTransitionBellUp, BellPatternTimeframe.Daily);
 
             return BellPatternClassifier.SelectBellPatternSignal(dailyKind, h4Kind, BellPatternKind.BellDown);
         }
