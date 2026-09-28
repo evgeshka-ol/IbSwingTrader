@@ -73,6 +73,10 @@ the remaining chart/cache candle-alignment issue.
   its post-rise maximum; a fresh late expansion remains BellUp-like. This is
   deliberately experimental and must be validated against new scans before
   thresholds are tightened.
+- `DailyTransitionBellUp` is a separate diagnostic state: the Daily BellUp
+  geometry is strong but the longer Daily-mid direction remains `Down`. It is
+  emitted to `Other`, never admitted or ranked as `Runaway`; collect its
+  realized outcomes before considering a production admission rule.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
   consolidation candle remains eligible. Additionally, when Daily

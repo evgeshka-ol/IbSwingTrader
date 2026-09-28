@@ -242,6 +242,10 @@ Bell pair:
 - A Daily `BellUp` or `ReversalHook` still needs H4 not to contradict the setup
   for today's trade-ready list. Weekly can strengthen context, but Weekly must
   not be the reason a candidate is admitted.
+- When the Daily BellUp geometry is strong but the long-lookback Daily mid is
+  still descending, classify it as `DailyTransitionBellUp`. This is a
+  diagnostic `Other` state, not a relaxed BellUp: retain it for outcome
+  measurement and do not create a trade plan from it.
 - Reject a Daily `BellUp` as post-factum when its row phase is already late:
   either the pattern appears only after H4 RSI and MACD histogram have rolled
   over from a local peak, or the Daily pattern already existed on the previous
