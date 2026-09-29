@@ -1655,22 +1655,6 @@ namespace IbSwingTrader.Application.Candidates
             BollingerStateSet bbState,
             RecentFeatureSeries recentSeries)
         {
-            if (IsPostSpikeConsolidation(
-                    recentSeries.H4OpenSeries,
-                    recentSeries.H4CloseSeries,
-                    recentSeries.H4BbUpperBandSeries,
-                    recentSeries.H4BbMidBandSeries,
-                    recentSeries.H4BbLowerBandSeries))
-                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.H4);
-
-            if (IsPostSpikeConsolidation(
-                    recentSeries.DailyOpenSeries,
-                    recentSeries.DailyCloseSeries,
-                    recentSeries.DailyBbUpperBandSeries,
-                    recentSeries.DailyBbMidBandSeries,
-                    recentSeries.DailyBbLowerBandSeries))
-                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.Daily);
-
             var dailyKind = BellPatternClassifier.ClassifyBellPatternKindForTimeframe(
                 recentSeries.DailyBbUpperBandSeries,
                 recentSeries.DailyBbMidBandSeries,
@@ -1698,6 +1682,29 @@ namespace IbSwingTrader.Application.Candidates
                 BellPatternKind.BellUp);
             if (bellUpSignal.Kind != BellPatternKind.None)
                 return bellUpSignal;
+
+            // Triangle is diagnostic, not a veto over a confirmed BellUp on the
+            // other timeframe. Evaluate both BellUp geometries first, then use
+            // Triangle only when neither timeframe confirmed the playable shape.
+            if (IsPostSpikeConsolidation(
+                    recentSeries.H4OpenSeries,
+                    recentSeries.H4CloseSeries,
+                    recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries,
+                    recentSeries.H4BbLowerBandSeries))
+            {
+                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.H4);
+            }
+
+            if (IsPostSpikeConsolidation(
+                    recentSeries.DailyOpenSeries,
+                    recentSeries.DailyCloseSeries,
+                    recentSeries.DailyBbUpperBandSeries,
+                    recentSeries.DailyBbMidBandSeries,
+                    recentSeries.DailyBbLowerBandSeries))
+            {
+                return new BellPatternSignal(BellPatternKind.Triangle, BellPatternTimeframe.Daily);
+            }
 
             if (BellPatternClassifier.IsDailyTransitionBellUp(
                     recentSeries.DailyBbUpperBandSeries,

@@ -533,6 +533,15 @@ namespace IbSwingTrader.Application.Dataset
 
         private CandidatePatternVerdict ResolvePatternVerdict(EvaluationDatasetRow row)
         {
+            if (IsOtherTriangleRow(row))
+            {
+                return new CandidatePatternVerdict(
+                    "Triangle",
+                    "Triangle",
+                    "Match",
+                    StripReasonPrefix(row.PatternVerdictReason));
+            }
+
             if (IsOtherBellUpRow(row))
             {
                 return new CandidatePatternVerdict(
@@ -562,6 +571,13 @@ namespace IbSwingTrader.Application.Dataset
             var reason = StripReasonPrefix(row.PatternVerdictReason);
             return row.CandidateGroup.Equals("Other", StringComparison.OrdinalIgnoreCase) &&
                    reason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsOtherTriangleRow(EvaluationDatasetRow row)
+        {
+            var reason = StripReasonPrefix(row.PatternVerdictReason);
+            return row.CandidateGroup.Equals("Other", StringComparison.OrdinalIgnoreCase) &&
+                   reason.StartsWith("Triangle detected on ", StringComparison.OrdinalIgnoreCase);
         }
 
         private void EnsureDerivedFields(IEnumerable<EvaluationDatasetRow> rows)
