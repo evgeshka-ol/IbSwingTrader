@@ -124,11 +124,13 @@ means the entry was too early and the stop was hit before the real move.
 
 ### ReversalHook
 
-`ReversalHookPreparing` is the diagnostic phase immediately before a confirmed
-Daily hook: price is still below the latest closed Daily mid, the lower band
-is still falling but its decline has decelerated, and at least two of the
-Daily mid, MACD histogram, and RSI are improving. It belongs in `Other` with
-no trade plan. This does not weaken the confirmed ReversalHook rules.
+`ReversalHookPreparing` is the diagnostic phase before a confirmed Daily hook:
+price is still below the latest closed Daily mid but turns toward it, while the
+MACD histogram turns up and the MACD line closes its gap to the signal line.
+The lower band may still be falling and BB width may still be expanding after
+an impulsive reversal; neither is a prerequisite for this diagnostic. It
+belongs in `Other` with no trade plan. This does not weaken the confirmed
+ReversalHook rules.
 
 `ReversalHook` is the current working daily return-to-mid pattern for the final
 `Reversal` path. It is evaluated only after the ticker has already been split
