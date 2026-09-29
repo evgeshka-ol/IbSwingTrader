@@ -209,6 +209,10 @@
                 "Description": "Top percentage losers. Better for watch list after sharp selloff."
             },
             {
+                "Code": "TOP_VOLUME_RATE",
+                "Description": "Highest relative-volume stocks; diagnostic coverage for an emerging reversal."
+            },
+            {
                 "Code": "HOT_BY_VOLUME",
                 "Description": "Most active by volume."
             },

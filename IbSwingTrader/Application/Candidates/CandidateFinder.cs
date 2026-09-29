@@ -825,7 +825,7 @@ namespace IbSwingTrader.Application.Candidates
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
-            void EmitOtherCandidate(string reason, string shortReason)
+            void EmitOtherCandidate(string reason, string shortReason, string? patternVerdictReason = null)
             {
                 // Keep rejected setups for evaluation without constructing an executable plan.
                 var referenceBarTime = ctx.EntryCandles?.Count > 0
@@ -867,7 +867,9 @@ namespace IbSwingTrader.Application.Candidates
                     todayResearchLikeSeriesScore);
 
                 candidateItem.CandidateSource = "Other";
-                if (candidateItem.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(patternVerdictReason))
+                    candidateItem.PatternVerdictReason = patternVerdictReason;
+                else if (candidateItem.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase))
                     candidateItem.PatternVerdictReason += $"; {shortReason}";
                 else if (dailyFamilySplit == DailyFamilySplit.TodayResearchLike &&
                          shortReason.Equals("Reversal unconfirmed", StringComparison.OrdinalIgnoreCase))
@@ -956,6 +958,19 @@ namespace IbSwingTrader.Application.Candidates
 
                 if (!IsReversalHookPattern(reversalPatternSeries!, out var reversalHookDiagnostics))
                 {
+                    if (reversalPatternSource == "D1" &&
+                        IsReversalHookPreparing(reversalPatternSeries!, out var preparationDiagnostics))
+                    {
+                        _logger.Info(
+                            $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
+                            $"ReversalHookPreparing detected on {reversalPatternSource}. {preparationDiagnostics}");
+                        EmitOtherCandidate(
+                            $"ReversalHookPreparing detected on {reversalPatternSource}. {preparationDiagnostics}",
+                            "Preparing",
+                            "ReversalHookPreparing detected on D1");
+                        return;
+                    }
+
                     _logger.Info(
                         $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
                         $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
@@ -5532,6 +5547,18 @@ namespace IbSwingTrader.Application.Candidates
 
             return result;
         }
+
+        private static bool IsReversalHookPreparing(
+            RecentFeatureSeries recentSeries,
+            out string diagnostics)
+            => BellPatternClassifier.IsReversalHookPreparing(
+                recentSeries.DailyCloseSeries,
+                recentSeries.DailyBbUpperBandSeries,
+                recentSeries.DailyBbMidBandSeries,
+                recentSeries.DailyBbLowerBandSeries,
+                recentSeries.DailyRsiSeries,
+                recentSeries.DailyMacdHistogramSeries,
+                out diagnostics);
 
         private static bool IsPriceTurningTowardDailyMid(RecentFeatureSeries recentSeries)
             => BellPatternClassifier.IsPriceTurningTowardDailyMid(

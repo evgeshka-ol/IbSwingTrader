@@ -96,6 +96,22 @@ namespace IbSwingTrader.Application.Evaluation
                     "ReversalHook confirmed on D1");
             }
 
+            if (BellPatternClassifier.IsReversalHookPreparing(
+                    series.DailyCloseSeries,
+                    series.DailyBbUpperBandSeries,
+                    series.DailyBbMidBandSeries,
+                    series.DailyBbLowerBandSeries,
+                    series.DailyRsiSeries,
+                    series.DailyMacdHistogramSeries,
+                    out _))
+            {
+                return new CandidatePatternVerdict(
+                    "ReversalHookPreparing",
+                    "ReversalHookPreparing",
+                    "Match",
+                    "ReversalHookPreparing detected on D1");
+            }
+
             return new CandidatePatternVerdict(
                 "Other",
                 "None",

@@ -29,4 +29,15 @@ Check(
         upper, mid, lower, BollingerFigureDirection.Up, BellPatternTimeframe.Daily) == BellPatternKind.BellUp,
     "The same geometry remains a normal BellUp once the Daily mid direction has turned up");
 
-Console.WriteLine($"Passed {assertions} DailyTransitionBellUp checks.");
+var reversalClose = new[] { 10m, 9m, 8m, 7m, 6.5m, 6.3m };
+var reversalUpper = new List<decimal> { 11m, 10.5m, 10m, 9.5m, 9.1m, 8.8m };
+var reversalMid = new List<decimal> { 10m, 9.5m, 9m, 8.6m, 8.35m, 8.2m };
+var reversalLower = new List<decimal> { 9m, 8m, 7m, 6.2m, 5.6m, 5.2m };
+var reversalRsi = new List<decimal> { 45m, 40m, 35m, 30m, 31m, 33m };
+var reversalHistogram = new List<decimal> { -1m, -1.2m, -1.4m, -1.5m, -1.45m, -1.3m };
+Check(
+    BellPatternClassifier.IsReversalHookPreparing(
+        reversalClose, reversalUpper, reversalMid, reversalLower, reversalRsi, reversalHistogram, out _),
+    "A decelerating lower-band decline with improving confirmation is a ReversalHookPreparing diagnostic");
+
+Console.WriteLine($"Passed {assertions} Bell pattern checks.");

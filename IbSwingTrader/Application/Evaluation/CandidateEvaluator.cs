@@ -518,6 +518,15 @@ namespace IbSwingTrader.Application.Evaluation
                 return;
             }
 
+            if (IsOtherReversalHookPreparingCandidate(candidate))
+            {
+                result.DetectedPipeline = "ReversalHookPreparing";
+                result.DetectedPattern = "ReversalHookPreparing";
+                result.PatternVerdict = "Match";
+                result.PatternVerdictReason = candidate.PatternVerdictReason;
+                return;
+            }
+
             // An Other candidate can still carry a confirmed BellUp signal. It was
             // deliberately kept out of the trade-ready groups (for example because
             // it is not ready yet), so running the generic Other/Reversal classifier
@@ -558,6 +567,17 @@ namespace IbSwingTrader.Application.Evaluation
                 : candidate.PatternVerdictReason;
             return sourceIsOther &&
                    reason.StartsWith("DailyTransitionBellUp detected on Daily", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsOtherReversalHookPreparingCandidate(CandidateDetails candidate)
+        {
+            var sourceIsOther = candidate.CandidateSource.Equals("Other", StringComparison.OrdinalIgnoreCase) ||
+                                candidate.CandidateSource.Equals("DiagnosticRejected", StringComparison.OrdinalIgnoreCase);
+            var reason = candidate.PatternVerdictReason.StartsWith("Reason=", StringComparison.OrdinalIgnoreCase)
+                ? candidate.PatternVerdictReason["Reason=".Length..]
+                : candidate.PatternVerdictReason;
+            return sourceIsOther &&
+                   reason.StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TouchesPrice(Candle candle, decimal price)
