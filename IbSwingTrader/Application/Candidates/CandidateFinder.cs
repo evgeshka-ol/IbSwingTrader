@@ -967,7 +967,7 @@ namespace IbSwingTrader.Application.Candidates
                         EmitOtherCandidate(
                             $"ReversalHookPreparing detected on {reversalPatternSource}. {preparationDiagnostics}",
                             "Preparing",
-                            "ReversalHookPreparing detected on D1");
+                            "ReversalHookPreparing (MACD-led) detected on D1");
                         return;
                     }
 
@@ -5563,7 +5563,8 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.DailyBbUpperBandSeries,
                 recentSeries.DailyBbMidBandSeries,
                 recentSeries.DailyBbLowerBandSeries,
-                recentSeries.DailyRsiSeries,
+                recentSeries.DailyMacdLineSeries,
+                recentSeries.DailyMacdSignalSeries,
                 recentSeries.DailyMacdHistogramSeries,
                 out diagnostics);
 

@@ -101,7 +101,8 @@ namespace IbSwingTrader.Application.Evaluation
                     series.DailyBbUpperBandSeries,
                     series.DailyBbMidBandSeries,
                     series.DailyBbLowerBandSeries,
-                    series.DailyRsiSeries,
+                    series.DailyMacdLineSeries,
+                    series.DailyMacdSignalSeries,
                     series.DailyMacdHistogramSeries,
                     out _))
             {
@@ -109,7 +110,7 @@ namespace IbSwingTrader.Application.Evaluation
                     "ReversalHookPreparing",
                     "ReversalHookPreparing",
                     "Match",
-                    "ReversalHookPreparing detected on D1");
+                    "ReversalHookPreparing (MACD-led) detected on D1");
             }
 
             return new CandidatePatternVerdict(

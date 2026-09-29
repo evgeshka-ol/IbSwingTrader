@@ -636,15 +636,18 @@ namespace IbSwingTrader.Application.Candidates
                    rsiTurnsUp;
         }
 
-        // Diagnostic only: the lower Daily band is still falling, but its decline
-        // is visibly decelerating before a completed lower-band hook exists. This
-        // deliberately does not relax IsReversalHookPattern or create a trade plan.
+        // Diagnostic only: a price reversal toward the still-descending Daily mid
+        // is accompanied by a confirmed MACD turn. Bollinger bands deliberately
+        // remain context here: after an impulse they commonly expand and the lower
+        // band can lag the price/MACD turn by several sessions. This does not relax
+        // IsReversalHookPattern or create a trade plan.
         public static bool IsReversalHookPreparing(
             IReadOnlyList<decimal> dailyCloseSeries,
             List<decimal> upper,
             List<decimal> mid,
             List<decimal> lower,
-            List<decimal> rsi,
+            List<decimal> macdLine,
+            List<decimal> macdSignal,
             List<decimal> macdHistogram,
             out string diagnostics)
         {
@@ -667,38 +670,37 @@ namespace IbSwingTrader.Application.Candidates
 
             var lowerDeltas = CalculateDeltas(lower);
             var lowerRecent = lowerDeltas.TakeLast(3).ToList();
-            var lowerBrokeDown = lowerDeltas.TakeLast(5).Any(x => x < 0m);
-            var lowerDeclineDecelerating =
-                lowerRecent.Count >= 3 &&
-                lowerRecent[^1] < 0m &&
-                lowerRecent[^2] < 0m &&
-                lowerRecent[^1] > lowerRecent[^2] &&
-                lowerRecent[^2] >= lowerRecent[^3];
+            var histogramDeltas = CalculateDeltas(macdHistogram);
+            var histogramRecent = histogramDeltas.TakeLast(3).ToList();
+            var histogramTurnsUp =
+                histogramRecent.Count >= 2 &&
+                histogramRecent.Count(x => x > 0m) >= 2 &&
+                macdHistogram[^1] > macdHistogram[^3];
 
-            var midRecentSlopePct = CalculateTailRelativeSlopePct(mid, 3);
-            var midPriorSlopePct = CalculateSegmentRelativeSlopePct(mid, 3, 3);
-            var midDecelerating =
-                midRecentSlopePct >= 0m ||
-                (midPriorSlopePct < 0m &&
-                 midRecentSlopePct < 0m &&
-                 Math.Abs(midRecentSlopePct) <= Math.Abs(midPriorSlopePct) * 0.8m);
-            var histogramImproving = macdHistogram[^1] > macdHistogram[^2];
-            var rsiRecovering = rsi.Count < 4 || rsi[^1] >= rsi[^2];
-            var confirmations = new[] { midDecelerating, histogramImproving, rsiRecovering }
-                .Count(x => x);
+            var macdConverges = false;
+            if (macdLine.Count >= 4 && macdSignal.Count >= 4)
+            {
+                var pairCount = Math.Min(macdLine.Count, macdSignal.Count);
+                var macdGap = macdLine
+                    .TakeLast(pairCount)
+                    .Zip(macdSignal.TakeLast(pairCount), (line, signal) => line - signal)
+                    .ToList();
+                macdConverges =
+                    macdGap.Count >= 3 &&
+                    macdGap[^1] > macdGap[^2] &&
+                    macdGap[^2] >= macdGap[^3];
+            }
+
+            var priceTurnsTowardMid = IsPriceTurningTowardDailyMid(dailyCloseSeries, mid);
 
             diagnostics =
-                $"LowerBrokeDown={lowerBrokeDown}, " +
-                $"LowerDeclineDecelerating={lowerDeclineDecelerating}, " +
-                $"MidDecelerating={midDecelerating}, " +
-                $"MacdHistogramImproving={histogramImproving}, " +
-                $"RsiRecovering={rsiRecovering}, " +
-                $"Confirmations={confirmations}, " +
+                $"PriceTurnsTowardMid={priceTurnsTowardMid}, " +
+                $"MacdHistogramTurnsUp={histogramTurnsUp}, " +
+                $"MacdConverges={macdConverges}, " +
                 $"LowerDeltasTail=[{string.Join(' ', lowerRecent)}], " +
-                $"MidRecentSlopePct={midRecentSlopePct}, " +
-                $"MidPriorSlopePct={midPriorSlopePct}";
+                $"MacdHistogramTail=[{string.Join(' ', macdHistogram.TakeLast(4))}]";
 
-            return lowerBrokeDown && lowerDeclineDecelerating && confirmations >= 2;
+            return priceTurnsTowardMid && histogramTurnsUp && macdConverges;
         }
     }
 }
