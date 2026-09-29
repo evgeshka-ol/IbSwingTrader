@@ -77,6 +77,11 @@ the remaining chart/cache candle-alignment issue.
   geometry is strong but the longer Daily-mid direction remains `Down`. It is
   emitted to `Other`, never admitted or ranked as `Runaway`; collect its
   realized outcomes before considering a production admission rule.
+- `ReversalHookPreparing` is likewise diagnostic-only: price remains below
+  the closed Daily mid and the falling lower Daily band is decelerating with
+  at least two improving confirmations among Daily mid, MACD histogram, and
+  RSI. It is emitted to `Other` without a plan; it must earn any future
+  admission from realized outcomes.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
   consolidation candle remains eligible. Additionally, when Daily
