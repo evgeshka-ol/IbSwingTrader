@@ -72,7 +72,9 @@ the remaining chart/cache candle-alignment issue.
   the later plateau is quiet and the Bollinger envelope has contracted from
   its post-rise maximum; a fresh late expansion remains BellUp-like. This is
   deliberately experimental and must be validated against new scans before
-  thresholds are tightened.
+  thresholds are tightened. It is evaluated only after BellUp has been checked
+  on both H4 and Daily; a Triangle on one timeframe must not hide a confirmed
+  BellUp on the other.
 - `DailyTransitionBellUp` is a separate diagnostic state: the Daily BellUp
   geometry is strong but the longer Daily-mid direction remains `Down`. It is
   emitted to `Other`, never admitted or ranked as `Runaway`; collect its

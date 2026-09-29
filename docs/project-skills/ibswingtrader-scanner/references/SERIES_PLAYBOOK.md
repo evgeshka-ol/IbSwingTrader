@@ -171,6 +171,10 @@ accepted working examples.
 
 ### Triangle Growth
 
+Triangle is a diagnostic fallback, not a cross-timeframe veto. First classify
+BellUp independently on Daily and H4; only if neither confirms BellUp may a
+Triangle on either timeframe route the ticker to `Other`.
+
 Typical signs on H4:
 
 - one large green impulse candle
