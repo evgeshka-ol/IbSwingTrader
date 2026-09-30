@@ -1,6 +1,6 @@
 ---
 name: ibswingtrader-scanner
-description: Use when working on the scanner, candidate ranking, wishlist promotion, TodayResearchLike vs Reversal separation, or tuning scanner settings in IbSwingTrader. Covers how the project selects candidates, how to read the main series, where the scanner logic lives, and which settings and outputs matter most.
+description: Use when working on scanner classification, BellUp or ReversalHook readiness, candidate ranking, wishlist promotion, or scanner settings in IbSwingTrader. Covers how the project selects candidates, how to read the main series, where scanner logic lives, and which settings and outputs matter most.
 ---
 
 # IbSwingTrader Scanner
@@ -17,37 +17,33 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 The scanner's job is to find future fat moves early.
 
-**Current focus (user clarification, 2026-09-09):** keep only `BellUp` in
-the playable `Runaway` group and detect it before its boost has already
-happened. The user considers BellUp recognition reasonably effective,
-unlike other patterns, especially Reversal. This focus supersedes older
-default instructions to prioritize Reversal work. There are now three output
-categories: `Runaway`, `Reversal`, and `Other`; `Other` is the destination for
-setups that match neither playable category, not a third trading pattern.
-See `references/SERIES_PLAYBOOK.md` "BellUp entry timing" for the user's
-exact candle-body rule and its implementation. See
-`references/SETTINGS_MAP.md` for output categories and legacy CSV caveats.
-The body-based timing veto applies only to the timeframe of the confirmed
-BellUp, not jointly to Daily and H4. SECZ's annotated Daily/H4 charts explain
-why an H4 continuation can be playable before a Daily BellUp has formed;
-see `SERIES_PLAYBOOK.md` "SECZ chart clarification" for that distinction and
-the remaining chart/cache candle-alignment issue.
-
-- Minimal near-term goal: the #1 current `Runaway` row should
-  consistently become a practical winning idea and capture more than 10%.
-  Optimize top-1 quality before widening attention to the rest of the list.
-  The user's concrete success example is SECZ from the September 8 scan:
-  H4 BellUp, evaluated Win +10.93%, currently rank 4 among admitted Runaway.
-  One such winner regularly at rank 1 is sufficient for the minimum goal.
-  See `../ibswingtrader-evaluation/references/TRADEPLAN_SCOPE.md` for the
-  saved entry/exit details and the distinction from amplitude alone.
+- **Current output contract (since 2026-09-23):** candidates are classified
+  into `BellUp`, `ReversalHook`, or `Other`. This replaced the former
+  `Runaway`/`Reversal` Daily-mid family split as the candidate-group model.
+  Legacy fields and historical datasets may still contain the old names; do
+  not treat them as current output groups. See `references/SETTINGS_MAP.md`
+  for CSV compatibility notes.
+- BellUp remains the immediate production focus. ReversalHook is evaluated
+  independently of whether price is above or below the Daily mid; its own
+  pattern and higher-timeframe readiness checks determine playability.
+  Confirmed but non-ready patterns are retained in `Other`. Triangle is a
+  diagnostic fallback and must not override BellUp on the other timeframe.
+- Keep pattern recognition separate from trade readiness. BellUp has
+  timeframe-specific timing and phase checks. ReversalHook confirmation uses
+  Daily rows, with H4 as a history fallback for recent IPOs. Pattern
+  classification alone does not imply a successful trade.
+- The scanner seeks future high-amplitude moves. `AmplitudePct` is the
+  scanner-quality oracle; trade-plan conversion is evaluated separately.
+  Use current research/evaluation feedback rather than assuming older
+  `Runaway`-specific rankings still describe current groups.
 - For scanner quality, the main oracle is `AmplitudePct`, not `Win/Loss/NoEntry`.
 - `NoEntry` may be a `TradePlan` problem.
 - Low amplitude is a scanner problem.
-- Priority #1: names in today's summary `Runaway` should be confirmed by later evaluation as high-amplitude winners.
+- Priority #1: names in today's playable `BellUp` summary should be
+  confirmed by later evaluation as high-amplitude winners.
 - Series shape is a primary scanner signal. The feature row must always come from the saved scanner snapshot. Evaluation supplies only the outcome label and amplitude.
 
-## Current architecture and output contract (2026-09-16)
+## Current architecture and output contract (2026-09-29)
 
 - Broker authentication remains entirely inside TWS/IB Gateway. The scanner
   connects through the local IB API socket and contains no broker credentials
@@ -62,8 +58,9 @@ the remaining chart/cache candle-alignment issue.
   `ExitProfile`). `PatternVerdictReason` follows `CandidateGroup` and contains
   values such as `BellUp confirmed on H4` or `BellUp confirmed on Daily`; the
   technical OHLC/indicator arrays are intentionally at the end of the row.
-- The playable `Runaway` output is BellUp-only. `Reversal` remains the separate
-  below-mid family, while `Other` is the non-playable output bucket.
+- The three output sections and CSV `CandidateGroup` values are `BellUp`,
+  `ReversalHook`, and `Other`. Only the first two are playable groups;
+  `Other` retains rejected, unconfirmed, or non-ready diagnostics.
 - `Triangle` is now a distinct diagnostic pattern, not a trading category. The
   experimental scanner heuristic is checked on H4 and Daily: a positive body
   at least twice the prior body followed by several small, tightly clustered
@@ -77,7 +74,7 @@ the remaining chart/cache candle-alignment issue.
   BellUp on the other.
 - `DailyTransitionBellUp` is a separate diagnostic state: the Daily BellUp
   geometry is strong but the longer Daily-mid direction remains `Down`. It is
-  emitted to `Other`, never admitted or ranked as `Runaway`; collect its
+  emitted to `Other`, never admitted or ranked as `BellUp`; collect its
   realized outcomes before considering a production admission rule.
 - `ReversalHookPreparing` is likewise diagnostic-only: price remains below
   the closed Daily mid but turns toward it while both the MACD histogram and
@@ -95,40 +92,42 @@ the remaining chart/cache candle-alignment issue.
   qualifying impulse candles when available, or the single prior impulse when
   that is all the cache provides.
 
-## Next architecture direction: pattern-first groups (2026-09-18)
+## Pattern-first groups (implemented 2026-09-23)
 
-The current `Runaway`/`Reversal` split is a legacy regime split and is too
-dependent on the latest Daily Bollinger mid. BBNX demonstrated the failure
-mode: a ReversalHook can begin below the mid, cross above it, and then produce
-a large continuation while the hard split prevents the ReversalHook branch
-from running. The planned user-facing groups are therefore:
+The former `Runaway`/`Reversal` split was too dependent on the latest Daily
+Bollinger mid. BBNX demonstrated the failure mode: a ReversalHook can begin
+below the mid, cross above it, and then produce a large continuation. The
+pattern-first groups were implemented in commit `d4a4f1d`:
 
 - `BellUp`: a confirmed BellUp pattern on H4 or Daily;
-- `ReversalHook`: a confirmed ReversalHook on H4 or Daily;
+- `ReversalHook`: a confirmed Daily ReversalHook, with H4 as a fallback for
+  recent IPOs that lack reliable Daily history;
 - `Other`: neither pattern confirmed or a confirmed pattern rejected as not
   currently trade-ready.
 
-This is an architecture decision, not yet a code migration. Until the
-migration is implemented, the live CSV still uses `Runaway`, `Reversal`, and
-`Other`. The target migration classifies patterns independently as soon as a
-ticker is received from the broker; Daily mid remains a ranking/context
-feature, not a hard ReversalHook admission gate. BellUp remains the immediate
-production focus, while ReversalHook is first validated as an independent
-diagnostic path.
+The live console and CSV use these groups. Candidate processing uses one pool
+until pattern classification is complete; the former Daily-mid split no
+longer defines the output category. BellUp is checked before ReversalHook. A
+detected BellUp that fails timing or readiness remains `Other`, rather than
+being relabeled ReversalHook. ReversalHook playability also requires
+higher-timeframe support.
+The ReversalHook implementation was subsequently strengthened to check
+support from the next higher available scale; the check can accept either a
+higher-scale BellUp or an early return-to-mid context. A Daily hook checks
+Weekly context, while the H4 IPO fallback checks Daily context.
 
-Pattern episodes should retain timeframe and phase metadata (`Active`,
+Pattern episodes should eventually retain timeframe and phase metadata (`Active`,
 `Exhausted`, or `Transition`) and, where available, the previous pattern. A
 useful transition shape is `ReversalHook -> BellUp -> Exhausted`; BBNX is the
 first exemplar for this state model: Daily ReversalHook around Aug 3-7, a
 short H4 ReversalHook around Aug 3-4, H4 BellUp beginning Aug 7 and exhausting
 after the Aug 11 impulse, plus a later Daily ReversalHook beginning Sep 14.
+This episode-history model is a future direction; current output stores the
+detected group and confirmation reason, not a complete transition history.
 
-BBNX is an exemplar, not a hard-coded template. Before changing live groups,
-find additional labelled examples in `Data/cache`, reconstruct their OHLC and
-Bollinger rows at scan time, and compare independent ReversalHook matches with
-realized `AmplitudePct`. The existing ReversalHook score/gate has not shown a
-validated edge (see `SCANNER_MODEL.md`); this migration must therefore begin
-in diagnostic/replay mode and not silently widen production admission.
+BBNX remains an exemplar, not a hard-coded template. The group migration is
+live; further ReversalHook detection or ranking changes still need more
+cache-confirmed examples and empirical validation against realized outcomes.
 
 ## Pipeline
 
@@ -145,7 +144,11 @@ have no data at the old edge of the requested lookback while still having
 enough recent H4 bars for scanner analysis. The first empty older chunk after
 valid data marks the listing boundary and must not discard the loaded bars.
 
-## Main split
+## Legacy family model (historical context)
+
+The following `Runaway`/`Reversal` family split describes the former model
+and legacy fields. It is retained to explain historical datasets and older
+analysis notes; it does not define current candidate output groups.
 
 - `Reversal`: below-mid / pullback / return-to-mean style ideas.
 - `Runaway`: above-mid / runaway / continuation style ideas.
@@ -157,8 +160,8 @@ Internal `Runaway` subtypes:
 - `LaunchContinuation`: real Bollinger launch with strong daily/H4 expansion
 - `PullbackContinuation`: constructive continuation after a pullback
 
-Current final `Runaway` admission is intentionally strict: the candidate must
-confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. (The
+The former final `Runaway` admission was intentionally strict: the candidate
+had to confirm `BellUp` on real Bollinger rows in either `H4` or `Daily`. (The
 literal-template match/veto mentioned in older notes was removed 2026-09-01 —
 see "Series-template direction" below.) Other above-mid continuation subtypes
 remain diagnostic only.
@@ -185,9 +188,9 @@ Both families should produce meaningful future amplitude:
 - `Reversal` should still usually produce `AmplitudePct > 10%`.
 - If `Reversal` amplitude is below 10%, treat that as scanner failure, not a trade-plan issue.
 
-Current final `Reversal` promotion uses the working `ReversalHook` pattern
-after the hard split — the split only decides "below daily mid";
-`ReversalHook` decides trade-readiness and is what actually gates admission.
+Current final `ReversalHook` promotion uses the ReversalHook pattern without
+the former hard below-mid split. See the current output contract above and
+`SERIES_PLAYBOOK.md` for current readiness rules.
 Weekly rows remain context only. Full row-shape checklist (incl. the
 freshness requirement on the lower-band turn) and worked examples:
 `SERIES_PLAYBOOK.md` "ReversalHook" — do not restate or fork that checklist
@@ -267,20 +270,21 @@ to this history; do not resurrect that methodology without new evidence.
 
 ### Ranking (current state — see `SCANNER_MODEL.md` for validation history)
 
-`ReRankCandidates` in `CandidateFinder.cs` ranks each family's **full**
-candidate pool (admitted and `DiagnosticRejected` together — see
-`SETTINGS_MAP.md` `EmitAllSeenCandidates`) by a **template-free quality
-score**, validated by AUC against `evaluation-dataset.csv` before being wired
-in:
+`ReRankCandidates` in `CandidateFinder.cs` ranks the BellUp pool with the
+Runaway-era quality formula and the remaining pool (ReversalHook plus
+diagnostics) with the Reversal-era formula. Those formula names and AUC
+validation cohorts predate the pattern-group migration; see `SCANNER_MODEL.md`
+for historical results. Rejected rows remain available under `Other` (see
+`SETTINGS_MAP.md` `EmitAllSeenCandidates`).
 
-- `CalculateRunawayLaunchQualityScore` (Runaway): Daily mid/upper-band tail
+- `CalculateRunawayLaunchQualityScore` (legacy Runaway formula, used for BellUp): Daily mid/upper-band tail
   slope + H4 mid-band tail slope + H4 upper-band tail slope (added
   2026-09-01, AUC 0.673 alone) + H4 band-width expansion (added 2026-09-01,
   AUC 0.639 alone) — combined AUC 0.62 → 0.69 on 422 decided rows, stable
   across a chronological split. See `SCANNER_MODEL.md` for the full feature
   sweep and rejected candidates (Weekly slopes, RSI, MACD histogram all
   tested weaker).
-- `CalculateReversalHookQualityScore` (Reversal): Daily band-width
+- `CalculateReversalHookQualityScore` (legacy Reversal formula, used for the remaining pool): Daily band-width
   compression + Daily lower-band hook tail slope. Re-tested 2026-09-01 against
   260 decided rows: AUC 0.51, no signal — see `REVERSAL_EDGE.md` "Open items"
   before extending this formula further.
@@ -363,7 +367,8 @@ migration rule and what `candidates.csv` currently admits.
 
 When scanner quality is weak:
 
-1. Check whether the ticker was missed by the market presets, rejected by the family pattern, or present but ranked too low.
+1. Check whether the ticker was missed by the market presets, rejected by a
+   pattern/readiness check, or present but ranked too low.
 2. Use the original series in `candidates.csv`; use evaluation only to label those snapshots.
 3. For a ranking question specifically, read `RankingQualityScore` and
    `EstimatedHitRatePct` on the candidate directly from `candidates.csv`
@@ -371,6 +376,6 @@ When scanner quality is weak:
    columns were removed 2026-09-01 along with the feature they described).
 4. Prefer fixing:
    - recall
-   - family pattern recognition after the hard daily split
+   - BellUp/ReversalHook pattern recognition and readiness
    - ranking
 5. Touch `TradePlan` only after the list is already good.

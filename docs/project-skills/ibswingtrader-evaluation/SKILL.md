@@ -26,25 +26,23 @@ Do not mix them.
 
 For scanner quality, the key metric is `AmplitudePct`.
 
-**Category caveat (2026-09-09):** playable `Runaway` now focuses on BellUp;
-`Other` holds nonmatching setups. In the September 8 snapshots, a row can
-still have `CandidateGroup=Runaway` in `candidates.csv` but
-`CandidateSource=Other`, a zero trade plan, and `CandidateGroup=Other` in
-evaluation. The September 9 code change aligns output groups on the next
-write, including legacy `DiagnosticRejected` rows under `Other`, and preserves
-the source when loading candidates for evaluation. Existing CSV files have
-not been regenerated. Match by ticker/ScanTime and inspect source before identifying
-the playable top-1. `NoEntry` with a zero plan on an `Other` row is not
-evidence of a mistimed/deep entry price. Current output details are in
-`../ibswingtrader-scanner/references/SETTINGS_MAP.md`.
+**Current category contract (since 2026-09-23):** candidate groups are
+`BellUp`, `ReversalHook`, and `Other`. Historical rows may retain the former
+`Runaway`/`Reversal` values. When comparing candidate and evaluation data,
+join by ticker and `ScanTime`, then inspect the saved `CandidateGroup`,
+`CandidateSource`, and `PatternVerdictReason`; do not infer current pattern
+membership from a legacy family label. An `Other` row with a zero plan is a
+diagnostic, not evidence of a mistimed or deep entry. See scanner
+`SETTINGS_MAP.md` for details.
 
 - High amplitude + `NoEntry` means scanner may be right and `TradePlan` may be wrong.
 - Low amplitude means the scanner likely surfaced a weak ticker.
 - The count of `Win` rows measures `TradePlan` conversion, not scanner recall.
 - Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude point to `TradePlan` failure.
-- `Reversal` should still clear meaningful amplitude, normally `> 10%`; below that is scanner failure.
+- `ReversalHook` should still clear meaningful amplitude, normally `> 10%`;
+  below that is scanner failure.
 
-## Current data contract and pattern parity (2026-09-16)
+## Current data contract and pattern parity (2026-09-29)
 
 - Candidate and evaluation trade columns use the same short names: `ScanPrice`,
   `EntryPrice`, `ExitPrice`, `StopLoss`, `StopLimitPrice`,
@@ -52,12 +50,15 @@ evidence of a mistimed/deep entry price. Current output details are in
   series are kept at the right side of the CSV after scalar fields.
 - `PatternVerdictReason` is the explicit pattern/timeframe field. Its values
   omit the redundant `Reason=` prefix, for example `BellUp confirmed on H4`.
+- The candidate groups are `BellUp`, `ReversalHook`, and `Other`. Pattern
+  classification no longer uses the old Daily-mid family split as its output
+  taxonomy. `Other` includes confirmed setups rejected by readiness gates.
 - The live scanner now has an experimental `Triangle` diagnostic (post-spike
   small-body consolidation) and routes it to non-playable `Other`. The
-  evaluator's realized-row verdict path still reports BellUp/ReversalHook
-  classifications and has not yet been made fully Triangle-aware; do not use
-  evaluator BellUp output alone to claim scanner/evaluator parity for Triangle
-  rows.
+  evaluator preserves a saved `Other`/Triangle diagnosis as a Triangle match
+  when processing current candidate rows. Its generic realized-row pattern
+  recheck remains centered on BellUp/ReversalHook; this is not a full
+  time-series Triangle replay.
 - Preserve the distinction between pattern discovery and outcome measurement:
   a Triangle/Other row can have a large later amplitude, but it was not a
   playable BellUp candidate at scan time. Use the saved candidate snapshot and

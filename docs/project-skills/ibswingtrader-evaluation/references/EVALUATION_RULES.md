@@ -4,6 +4,11 @@ Main artifact:
 
 - `Data/datasets/evaluation-dataset.csv`
 
+Current candidate groups are `BellUp`, `ReversalHook`, and `Other`. Historical
+rows may contain the former `Runaway`/`Reversal` labels; use the saved group,
+source, and scan-time pattern reason when distinguishing current playable
+setups from legacy family labels.
+
 ## What matters most
 
 ### Scanner oracle
@@ -16,19 +21,15 @@ Suggested mental buckets:
 - `5% to <10%` borderline
 - `<5%` weak / likely poor list quality
 
-For both scanner families:
+For both playable pattern groups:
 
-- `Runaway` should be judged by whether it becomes the next research dataset.
-- `Reversal` should still produce meaningful amplitude, normally `> 10%`.
+- `BellUp` should be judged by whether it becomes the next research dataset.
+- `ReversalHook` should still produce meaningful amplitude, normally `> 10%`.
 - If amplitude is below 10%, treat that as scanner failure, even when the trade plan correctly avoids entry.
-- In live scan tuning, a row-based amplitude proxy can be used only as a late
-  final filter. Do not use realized `AmplitudePct` before evaluation, and do not
-  let that proxy change the family split.
-- Family membership is fixed by the last closed daily Bollinger mid split:
-  - below daily mid on the last closed daily bar -> `Reversal`
-  - at or above daily mid on the last closed daily bar -> `Runaway`
-- Do not change the family boundary during amplitude or trade-plan tuning; only
-  list promotion, ranking, and exit shaping should move after the split is correct.
+- Do not use realized `AmplitudePct` before evaluation. Candidate pattern
+  groups are `BellUp`, `ReversalHook`, and `Other`; the former Daily-mid
+  `Runaway`/`Reversal` family split is legacy and does not define current
+  group membership.
 - Do not classify an isolated terminal H4/Daily jump as `BellUp`; the expansion
   must not be explained by one final spike in band width and momentum.
 

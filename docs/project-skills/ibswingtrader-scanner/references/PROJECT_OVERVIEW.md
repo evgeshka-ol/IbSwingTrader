@@ -40,10 +40,10 @@
 
 ## Core idea
 
-The project tries to identify fat moves before the main expansion, then separate:
-
-- reversal / return setups
-- above-mid continuation / runaway setups
+The project tries to identify fat moves before the main expansion. Current
+candidate output groups are `BellUp`, `ReversalHook`, and `Other`; these are
+pattern groups, not the former below/above-Daily-mid families. `Other` keeps
+unconfirmed and non-ready cases available for analysis.
 
 The most important feedback loop is:
 

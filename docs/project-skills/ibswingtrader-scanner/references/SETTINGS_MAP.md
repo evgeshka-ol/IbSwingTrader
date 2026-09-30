@@ -31,34 +31,31 @@ Useful when too many names are seen but not promoted.
 
 ### `GetCandidates.Finder`
 
-- **Current output categories (2026-09-09):** the user's intended categories
-  are `Runaway` (BellUp only), `Reversal`, and `Other` (matches neither
-  playable category). Preserve rejected rows for analysis without treating
-  `Other` as a playable Runaway recommendation.
-  - Current implementation: rejects from either family are stored with
-    `CandidateSource=Other`, a price snapshot, a rejection reason, and a zero
-    plan. `CandidateGroups.IsOther` also recognizes legacy
-    `DiagnosticRejected` sources. Console, CSV and evaluation separate these
-    from playable Runaway/Reversal and rank each output group independently.
-    All newly rejected setups are retained regardless of `EmitAllSeenCandidates`.
-    The setting still affects scan-context breadth and deduplication.
-  - CSV compatibility caveat: the original 2026-09-08 `candidates.csv` labels
-    these rows `CandidateGroup=Runaway`, whereas evaluation labels them
-    `Other`. Join by ticker and scan timestamp, and inspect source as well
-    as group before computing playable Runaway top-1 results. A rank-1
-    `Other` row in that CSV is not the console's first playable Runaway.
-    On the next application write, legacy `Other`/`DiagnosticRejected` rows
-    are exported under `Other` too, retaining their source, snapshots and
-    historical plans. Existing files were not rewritten during this change.
+- **Current output categories (since 2026-09-23):** `BellUp`, `ReversalHook`,
+  and `Other`. The migration is recorded in commit `d4a4f1d`.
+  - BellUp and ReversalHook are the playable pattern groups. `Other` retains
+    unconfirmed or confirmed-but-not-ready diagnostics, with a rejection
+    reason and no active trade plan. `CandidateGroups.IsOther` also recognizes
+    legacy `DiagnosticRejected` sources.
+  - Pattern classification is independent of the former Daily-mid
+    `Runaway`/`Reversal` split. BellUp is checked first; a BellUp that fails
+    readiness remains `Other` and is not relabeled ReversalHook.
+  - Current console and CSV output use the new group names. Historical CSV
+    rows may still contain `Runaway`/`Reversal`; join candidate and evaluation
+    records by ticker and scan timestamp, and prefer their saved
+    `CandidateGroup`, `CandidateSource`, and `PatternVerdictReason` over
+    inferring the pattern from legacy family fields.
+  - Playable rows use `CandidateSource=BellUp` or `ReversalHook`; rejected
+    rows use `Other` (older rows can retain `DiagnosticRejected`). The writer
+    places the categories in separate console/CSV sections.
+  - Rejected setups are retained regardless of `EmitAllSeenCandidates`. The
+    setting still affects scan-context breadth and deduplication.
 
-- `EmitAllSeenCandidates`: **deliberately `true`, not a bug.** Historical
-  behavior before the `Other` separation described above: when `true`,
-  `CandidateResultWriter` writes and displays every seen candidate — including
-  ones the admission gate rejected (`CandidateSource=DiagnosticRejected`,
-  `BellUp`/`ReversalHook` not confirmed) — ranked together with genuinely
-  admitted ones (`Primary`/`SameDayContinuation`) by the same quality score, in
-  the same console output and `candidates.csv` sections, with no source marker
-  visible in the console.
+- `EmitAllSeenCandidates`: **deliberately `true`, not a bug.** The current
+  behavior retains rejected candidates under `Other`, separately from the
+  playable `BellUp` and `ReversalHook` sections. The setting still affects
+  scan-context breadth and deduplication; it is not a switch for hiding all
+  rejected diagnostics.
   - Origin: earlier rounds of tightening the admission filter kept collapsing
     the visible list to empty or 1-2 tickers, while the broker and outside
     sites (e.g. Yahoo Finance) kept showing real high-amplitude movers on the
@@ -73,15 +70,10 @@ Useful when too many names are seen but not promoted.
     is *consistently* landing on `AmplitudePct >= 10%` winners. Until then,
     ranking quality (`RankingQualityScore` / `AdjustedRank`) is the lever to
     improve, not admission strictness.
-  - Analysis on 2026-09-01 against `evaluation-dataset.csv` (23 scans): current
-    rank-1 already hits `AmplitudePct >= 10%` in at least one of
-    Runaway/Reversal on 20/23 scans (87%) — Runaway rank-1 alone 74%, Reversal
-    rank-1 alone 52%, both categories together only 9/23 (39%). The properly
-    *admitted*-only pool performs worse in this sample (Runaway admitted-only
-    top pick 52% vs 71% for the rejected-but-top-scored pool; Reversal
-    `Primary` admissions exist in only 6/23 scans and never cleared 12%
-    amplitude) — another reason not to re-enable the gate as a shortcut fix
-    right now.
+  - Historical 2026-09-01 rank-1 analysis used `Runaway`/`Reversal`; its
+    percentages describe the old family model and must not be read as current
+    BellUp/ReversalHook group performance. Recompute on current group labels
+    before using those figures for a present-day decision.
 
 ### `GetCandidates.NextDayRanking`
 
@@ -111,10 +103,9 @@ real match on zero rows across its entire history in `candidates.csv`
 exists in code — check `RankingQualityScore` instead.
 
 `FinalTopCandidates`, `SecondPassWindowMultiplier`, and
-`SecondPassMinimumWindow` were removed on 2026-07-11: `Reversal` reranking
-previously capped its second-pass window using these, silently leaving part of
-a large list unadjusted by template matching. Both `Runaway` and `Reversal`
-now always rerank their full candidate pool.
+`SecondPassMinimumWindow` were removed on 2026-07-11. Ranking now runs on the
+current BellUp and non-BellUp pools without a top-window cap; see the scanner
+skill for the legacy score formulas used by those pools.
 
 ### `GetCandidates.TradePlan`
 

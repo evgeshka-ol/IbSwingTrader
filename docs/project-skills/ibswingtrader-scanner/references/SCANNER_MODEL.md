@@ -3,13 +3,19 @@
 ## Main purpose and current priority
 
 See `SKILL.md` "Core intent" for the canonical, current statement of scanner
-purpose and the top-1-quality priority (`Runaway` #1 row should consistently
+purpose and the top-1-quality priority (`BellUp` #1 row should consistently
 capture >10%, `AmplitudePct` is the scanner-quality oracle, next-day
 `research_top_gainers.csv` coverage is the main feedback loop). Not restated
 here to avoid drift between two copies — this file covers model detail,
 failure modes, and implementation/validation history instead.
 
-## Two candidate families
+## Former Runaway/Reversal family model (historical)
+
+The family descriptions and Daily-mid assignment rules below document the
+pre-2026-09-23 model. Current candidate output groups are `BellUp`,
+`ReversalHook`, and `Other`; see the scanner skill's pattern-first section for
+the live behavior. Historical evaluation rows and dated studies can still use
+the old family labels.
 
 ### Reversal
 
@@ -139,9 +145,9 @@ This is ranking failure.
 
 This is stale/weak ranking and should be penalized.
 
-## Current project direction
+## Former project direction (historical)
 
-The current direction is:
+At the time this note was written, the direction was:
 
 1. use series as the primary signal
 2. make `Runaway` predict tomorrow's research dataset
@@ -184,7 +190,7 @@ happened between the two paths (the live `IsReversalHookPattern` required
 both) — the shared class kept the stricter live behavior as canonical. Any
 future change to Bell/ReversalHook rules belongs in this one file.
 
-## Ranking implementation status — superseded (2026-07-11), then replaced (2026-07-13)
+## Ranking implementation status — historical family-era validation
 
 The comparison principle above was briefly implemented as a strict tiered
 sort: `Confirmed` template match > `Weak` template match > `None`, with the
@@ -201,7 +207,14 @@ this dataset. The low-amplitude veto logic described above is still real
 *mechanically*, but tuning `FullMatchDistance`/`WeakMatchDistance` will not
 fix a ranking problem, because there was no signal there to threshold on.
 
-Current ranking (since 2026-07-13) is a validated, template-free quality
+The quality formulas introduced since 2026-07-13 remain in use as
+template-free ranking features, but their names and validation cohorts belong
+to the former family taxonomy. Current output ranking operates on the
+pattern-first groups. The formulas below were validated against old
+`Runaway`/`Reversal` family labels; those results are not validation of
+current `BellUp`/`ReversalHook` group performance:
+
+The previous ranking model used a validated, template-free quality
 score instead: `CalculateRunawayLaunchQualityScore` (Daily mid/upper-band tail
 slope + H4 mid-band tail slope) for `Runaway`, `CalculateReversalHookQualityScore`
 (Daily band-width compression + lower-band hook tail slope) for `Reversal`.
@@ -221,7 +234,7 @@ If extending ranking further, validate a candidate feature's AUC against
 realized `AmplitudePct` before wiring it into a quality-score function —
 that discipline is what caught the 2026-07-11 approach not working.
 
-## Runaway quality-score feature sweep (2026-09-01)
+## Historical Runaway quality-score feature sweep (2026-09-01)
 
 With Runaway top-1 already hitting `AmplitudePct >= 10%` in 74% of scans
 (vs Reversal's 52%), ran a feature sweep to push it further before touching

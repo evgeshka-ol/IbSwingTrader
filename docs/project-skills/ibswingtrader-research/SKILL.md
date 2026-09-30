@@ -24,30 +24,31 @@ Its main job is to answer:
 
 ## Current top priority
 
-Priority #1 is next-day research coverage from `Runaway`.
+Priority #1 is next-day research coverage from the playable `BellUp` group.
 
 The nearest minimal target is top-1 quality:
 
-- the first current `Runaway` row in `candidates.csv`
+- the first current `BellUp` row in `candidates.csv`
 - should become a practical winner
 - should capture more than 10%
 
 Treat top-1 misses as the highest-signal feedback. A broad list is useful only
 after rank #1 is consistently good enough to play.
 
-The current scanner contract is BellUp-only for playable `Runaway`. A detected
-post-spike consolidation (`Triangle`) is a separate diagnostic pattern and is
+The current scanner contract uses `BellUp`, `ReversalHook`, and `Other`
+groups. A detected post-spike consolidation (`Triangle`) is a separate
+diagnostic pattern and is
 routed to `Other`; research comparisons must therefore distinguish a genuine
 BellUp miss from a correctly rejected Triangle. Use `PatternVerdictReason` in
 the candidate snapshot to make that distinction explicit.
 
 Tickers that appear in today's `candidates.csv` current scan rows
-`Runaway` should appear in tomorrow's
+`BellUp` should appear in tomorrow's
 `research_top_gainers.csv`.
 
 When this does not happen, treat it as the primary scanner feedback loop:
 
-- if the summary names do not reach strong amplitude, fix scanner selection/ranking
+- if the BellUp names do not reach strong amplitude, fix scanner selection/ranking
 - if research winners were only in full data or wishlist, fix promotion/ranking
 - if research winners were absent entirely, fix recall/universe/filtering
 

@@ -132,19 +132,12 @@ an impulsive reversal; neither is a prerequisite for this diagnostic. It
 belongs in `Other` with no trade plan. This does not weaken the confirmed
 ReversalHook rules.
 
-`ReversalHook` is the current working daily return-to-mid pattern for the final
-`Reversal` path. It is evaluated only after the ticker has already been split
-into `Reversal` by the last closed daily close being below the daily Bollinger
-mid.
-
-Planned architecture change (2026-09-18): this below-mid prerequisite is a
-legacy implementation constraint, not part of the intended pattern
-definition. The target classifier will evaluate ReversalHook independently on
-every broker-returned ticker and use pattern-first groups (`BellUp`,
-`ReversalHook`, `Other`). BBNX is the first transition exemplar: its
-ReversalHook crossed above the Daily mid and later continued strongly. Do not
-implement this migration from BBNX alone; collect cache-confirmed examples and
-validate the independent detector against realized outcomes first.
+`ReversalHook` is the current return-to-mid pattern for the pattern-first
+`ReversalHook` output group. Since the 2026-09-23 migration, it is evaluated
+independently of the former below-Daily-mid family split. The Daily mid can
+still provide context, but it is not a hard ReversalHook admission gate.
+BBNX is a transition exemplar; do not treat this single example as validation
+of general predictive performance.
 
 The row shape:
 
@@ -236,8 +229,8 @@ Bell pair:
   price should mean-revert toward the mid as the flatting begins.
 - One clean timeframe is enough to recognize Bell. The source timeframe sets
   the expected horizon:
-  - `H4` means today and may enter final `Runaway`
-  - `Daily` means tomorrow and may enter final `Runaway`
+  - `H4` means today and may enter final `BellUp`
+  - `Daily` means tomorrow and may enter final `BellUp`
   - `Weekly` is context only and never decides final matching
 - A valid H4 `BellUp` may be a gradual squeeze launch, not only a final local
   kink. The upper band should pull away from a rising mid while the lower band
@@ -251,9 +244,11 @@ Bell pair:
   latest red candle moves by body from the upper-band zone back toward the mid,
   RSI rolls over, and MACD/band geometry begins to close or bend against the
   move. KMI on 2026-06-24 is the working negative example.
-- A Daily `BellUp` or `ReversalHook` still needs H4 not to contradict the setup
-  for today's trade-ready list. Weekly can strengthen context, but Weekly must
-  not be the reason a candidate is admitted.
+- A higher-timeframe `BellUp` still needs H4 not to contradict it for today's
+  trade-ready list. ReversalHook checks support at the next higher available
+  scale: Daily context supports the recent-IPO H4 fallback; Weekly context
+  supports a Daily hook. Higher-scale support is a readiness check, not a
+  substitute for the confirmed pattern.
 - When the Daily BellUp geometry is strong but the long-lookback Daily mid is
   still descending, classify it as `DailyTransitionBellUp`. This is a
   diagnostic `Other` state, not a relaxed BellUp: retain it for outcome
@@ -264,26 +259,26 @@ Bell pair:
   point while H4 RSI is elevated and the last two H4 rows show terminal band
   expansion. (This is the Daily-timeframe counterpart to the KMI H4
   terminal-pullback rejection above.)
-- After loading the current M15 rows, reject a `Runaway` whose latest closed H4
-  close was above the H4 Bollinger mid but whose live M15 price has crossed
+- After loading the current M15 rows, reject a BellUp candidate when its latest
+  closed H4 close was above the H4 Bollinger mid but live M15 price has crossed
   below that same mid. This is a structural invalidation of the saved setup,
   not a fixed percentage-move filter.
-- Use M15 only for execution timing after D1/H4 classification. For `Runaway`,
+- Use M15 only for execution timing after D1/H4 classification. For `BellUp`,
   a confirmed M15 `BellUp` predicts entry near the rising M15 mid or the latest
-  shallow pullback low. For `Reversal`, a confirmed M15 `ReversalHook` predicts
+  shallow pullback low. For `ReversalHook`, a confirmed M15 hook predicts
   entry near the hooked lower band or the latest local low. If the matching
   M15 pattern is unavailable, retain the existing entry forecast as fallback;
-  M15 must not change the D1 family split.
+  M15 must not change the Daily/H4 pattern classification.
 
-The final `Runaway` list currently admits only AMLX-like `BellUp` candidates on
+The final `BellUp` list currently admits only AMLX-like `BellUp` candidates on
 real Bollinger rows from `H4` or `Daily`. (The template-match ranking support
 and low-amplitude veto mentioned in older notes were removed 2026-09-01 — see
 `SCANNER_MODEL.md` "Series-template matching"; the veto had never actually
 fired in the feature's history.) Weekly-only Bell and non-Bell continuation
-shapes are diagnostic context, not final `Runaway` promotion.
+shapes are diagnostic context, not final `BellUp` promotion.
 
-When strict promotion returns no candidates in either family, keep the result
-empty.
+When strict promotion returns no playable candidates, keep the result empty;
+preserve diagnostic rows under `Other` when available.
 
 When the higher-frame runway shape is present, separate the phase by the saved
 pre-move H4 rows:
@@ -296,7 +291,7 @@ pre-move H4 rows:
   context, not a reversal.
 - `Neutral`: neither the higher-frame runway nor the H4 trigger is confirmed
   well enough by the saved rows. Keep it out of the trade-ready
-  `Runaway` path even if an older live-mover or template
+  `BellUp` path even if an older live-mover or template
   branch likes it.
 
 When comparing band curves across tickers, compare shape rather than absolute
@@ -304,7 +299,7 @@ price. Normalize by the starting point or compare deltas from the first point.
 
 ## BellUp entry timing (user clarification, 2026-09-09)
 
-The active objective is a playable `Runaway` list containing only BellUp,
+The active objective is a playable `BellUp` list,
 at the right moment before the boost. Recognizing the BellUp shape and
 deciding whether entry is already late are separate checks. Setups matching
 neither playable family belong in `Other`.

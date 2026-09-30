@@ -9,9 +9,9 @@ Daily loop:
    - yesterday's scanner
    - today's research
 5. Decide what kind of problem you have:
-   - `Runaway -> next-day research` miss
+   - `BellUp -> next-day research` miss
    - recall
-   - `WishList -> TodayResearchLike` promotion
+   - wishlist-to-`BellUp`/`ReversalHook` promotion
    - ranking
    - `TradePlan`
 
@@ -29,11 +29,13 @@ Fix promotion and gating.
 
 Fix ranking.
 
-### If `Runaway` summary names do not become research winners
+### If `BellUp` summary names do not become research winners
 
 Fix scanner selection/ranking first.
 
-This is the top-priority feedback loop.
+This is the top-priority feedback loop. Older reports may call it the
+`Runaway -> next-day research` loop; that wording refers to the former family
+split.
 
 ### If winners are in summary but `NoEntry` with strong amplitude
 

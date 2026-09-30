@@ -1,5 +1,11 @@
 # Reversal: the user's proven manual edge
 
+> **Terminology:** this is historical context about the user's manual
+> Reversal strategy and the pre-2026-09-23 `Reversal` family. The current
+> output group is `ReversalHook`, which is classified independently of the
+> former Daily-mid split. Current admission behavior is documented in
+> `../SKILL.md` and `SERIES_PLAYBOOK.md`.
+
 This file supplements `SKILL.md` and `SCANNER_MODEL.md` with context specific
 to the `Reversal` family that does not belong in the general model description:
 why `Reversal` gets priority, the precise trigger definition in the user's own
@@ -223,6 +229,11 @@ None of the below has cleared that bar yet.
   contrast, are reliably present in every row.
 
 ## Architecture decision (2026-09-03): layered funnel + graded exemplar similarity
+
+This section records a broader detector-design proposal, not the later output
+group migration. The `BellUp`/`ReversalHook`/`Other` group migration was
+implemented on 2026-09-23; the proposed graded exemplar-similarity method
+remains unimplemented and requires validation before production use.
 
 Agreed direction to replace `IsReversalHookPattern`'s binary gate (which the
 `NAT` case above proves is structurally blind to same-day intraday

@@ -6,7 +6,7 @@
 
 The project is currently optimizing for a simple playable loop:
 
-- the #1 current `Runaway` row should win consistently
+- the #1 current `BellUp` row should win consistently
 - the trade plan should capture more than 10% when that row has enough amplitude
 
 Analyze top-1 failures before broad aggregate metrics. If top-1 has strong
@@ -34,7 +34,8 @@ Saved scan: `2026-09-08 07:51:20 America/New_York`. Evaluation on September 9:
 - Saved `DiagnosticsRankingQualityScore=15.08`, estimated hit rate `55%`.
 
 Use this as a positive case of recognition, entry timing and profit capture
-working together. Compare its original scanner snapshot with higher-ranked
+under the historical `Runaway` family labels. The scanner now emits the
+pattern-first `BellUp` group. Compare its original snapshot with higher-ranked
 setups when investigating ranking. Do not hardcode SECZ or promote a shape
 from this single outcome without validation across scans. The newer body
 timing gate has not been replayed through the full application on this
@@ -50,8 +51,8 @@ treating this example as a verified pass under the new gate.
 - many top candidates have low amplitude
 - research winners are seen but not promoted
 - summary contains stale or weak names
-- `Runaway` summary names do not become next-day research winners
-- `Reversal` repeatedly produce amplitude below 10%
+- `BellUp` summary names do not become next-day research winners
+- `ReversalHook` repeatedly produce amplitude below 10%
 
 ## Fix TradePlan first when:
 
@@ -61,7 +62,7 @@ treating this example as a verified pass under the new gate.
 - many strong rows end up `NoEntry`
 - many strong-amplitude rows are `Loss` or remain `Open`
 
-Large counts of `Loss` on strong-amplitude `Runaway` usually
+Large counts of `Loss` on strong-amplitude `BellUp` usually
 mean the entry was too early for the local structure. Do not treat this as a
 simple "lower the entry" problem. The trade plan needs to predict entry and exit
 from the same kind of series evidence used by the scanner.
@@ -193,8 +194,8 @@ remaining high-amplitude row families.
 
 The project should first produce:
 
-- a good `Reversal` list
-- a good `Runaway` list
+- a good `ReversalHook` list
+- a good `BellUp` list
 
 Only after that should entry/exit tuning become the main focus.
 

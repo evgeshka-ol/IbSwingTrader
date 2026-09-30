@@ -2,6 +2,10 @@
 
 Updated 2026-09-17.
 
+This field guide predates the 2026-09-23 pattern-group migration. Current
+candidate output groups are `BellUp`, `ReversalHook`, and `Other`; older CSV
+snapshots and examples below may use the former `Runaway`/`Reversal` labels.
+
 `TotalScore` replaces the flattened `ScoreScore` header. It is the sum of
 DailyScore, WeeklyScore and EntryScore, not a percentage probability.
 Console `conf=...%` comes from `DiagnosticsEstimatedHitRatePct`, which remains
