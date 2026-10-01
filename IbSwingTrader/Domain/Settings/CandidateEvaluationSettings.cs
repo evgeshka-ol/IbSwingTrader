@@ -4,6 +4,8 @@ namespace IbSwingTrader.Domain.Settings
     {
         public string SearchPattern { get; set; } = "candidates_*.json";
         public int ForwardEvaluationDays { get; set; } = 7;
+        public int RecentScanDatesToEvaluate { get; set; } = 2;
+        public string[] AllowedOutcomesToEvaluate { get; set; } = ["Open"];
         public int FreshDataSafetyLagMinutes { get; set; } = 10;
         public decimal DefaultTargetPct { get; set; } = 10m;
         public bool UseAmbiguousBarResolver { get; set; } = true;

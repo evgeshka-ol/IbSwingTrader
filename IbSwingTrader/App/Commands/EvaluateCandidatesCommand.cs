@@ -47,6 +47,14 @@ namespace IbSwingTrader.App.Commands
             _logger.Info($"Candidates found: {candidates.Count}");
             var evaluationSettings = _candidateEvaluationSettingsProvider.Get();
             var existingDatasetRows = await _evaluationDatasetBuilder.ReadCurrentAsync();
+            var canonicalByScanKey = existingDatasetRows
+                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x
+                        .OrderByDescending(y => y.EvaluatedAt)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
 
             var marketNow = MarketTime.Now();
             var marketToday = marketNow.Date;
@@ -67,7 +75,7 @@ namespace IbSwingTrader.App.Commands
             var latestEvaluatedScanDate = existingDatasetRows.Count == 0
                 ? DateTime.MinValue
                 : existingDatasetRows.Max(x => x.ScanTime.Date);
-            var recentScanDateCount = Math.Max(1, evaluationSettings.ForwardEvaluationDays + 1);
+            var recentScanDateCount = Math.Max(1, evaluationSettings.RecentScanDatesToEvaluate);
             var recentScanDates = tradingScanDates
                 .Take(recentScanDateCount)
                 .ToHashSet();
@@ -87,8 +95,16 @@ namespace IbSwingTrader.App.Commands
             }
 
             var selectedScanDateSet = selectedScanDates.ToHashSet();
-            var selectedScanCandidates = eligibleCandidates
+            var selectedDateCandidates = eligibleCandidates
                 .Where(x => selectedScanDateSet.Contains(x.Scan.ScanTime.Date))
+                .ToList();
+            var allowedOutcomes = new HashSet<string>(
+                evaluationSettings.AllowedOutcomesToEvaluate ?? [],
+                StringComparer.OrdinalIgnoreCase);
+            var selectedScanCandidates = selectedDateCandidates
+                .Where(x => canonicalByScanKey.TryGetValue(BuildScanKey(x), out var row) &&
+                            IsAllowedOutcome(row, allowedOutcomes) &&
+                            IsWithinOpenEvaluationWindow(row, evaluationSettings, marketToday))
                 .ToList();
             var newestSelectedScanDate = selectedScanDates.Max();
             var oldestSelectedScanDate = selectedScanDates.Min();
@@ -105,17 +121,9 @@ namespace IbSwingTrader.App.Commands
                 $"skipped older candidates={olderCandidates}, " +
                 $"skipped between candidates={betweenSkippedCandidates}, " +
                 $"skipped newer candidates={newerCandidates}, " +
+                $"allowedOutcomes={string.Join(",", allowedOutcomes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}, " +
                 $"latestEvaluatedScanDate={FormatDate(latestEvaluatedScanDate)}, " +
                 $"availableUntil={availableNow:yyyy-MM-dd HH:mm:ss}");
-
-            var canonicalByScanKey = existingDatasetRows
-                .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    x => x.Key,
-                    x => x
-                        .OrderByDescending(y => y.EvaluatedAt)
-                        .First(),
-                    StringComparer.OrdinalIgnoreCase);
 
             var candidatesToEvaluate = selectedScanCandidates
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
@@ -144,8 +152,10 @@ namespace IbSwingTrader.App.Commands
                 var openCandidates = existingDatasetRows
                     .Where(x =>
                         string.Equals(x.Outcome, "Open", StringComparison.OrdinalIgnoreCase) &&
+                        allowedOutcomes.Contains(x.Outcome) &&
                         EvaluationScanPolicy.IsEligible(x.ScanTime, marketNow, availableNow) &&
                         !x.IsStaleOpen &&
+                        IsWithinOpenEvaluationWindow(x, evaluationSettings, marketToday) &&
                         x.ScanTime.Date < oldestSelectedDate)
                     .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                     .Select(x => x
@@ -162,6 +172,8 @@ namespace IbSwingTrader.App.Commands
 
             var incompleteCandidates = existingDatasetRows
                 .Where(x => EvaluationScanPolicy.IsEligible(x.ScanTime, marketNow, availableNow))
+                .Where(x => allowedOutcomes.Contains(x.Outcome))
+                .Where(x => IsWithinOpenEvaluationWindow(x, evaluationSettings, marketToday))
                 .Where(NeedsPostScanMetricsReevaluation)
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -453,6 +465,24 @@ namespace IbSwingTrader.App.Commands
                     LossPercent = CalcPct(evaluation.EntryPrice, evaluation.StopLoss)
                 }
             };
+        }
+
+        private static bool IsAllowedOutcome(
+            EvaluationDatasetRow row,
+            HashSet<string> allowedOutcomes)
+        {
+            return !string.IsNullOrWhiteSpace(row.Outcome) &&
+                   allowedOutcomes.Contains(row.Outcome);
+        }
+
+        private static bool IsWithinOpenEvaluationWindow(
+            EvaluationDatasetRow row,
+            CandidateEvaluationSettings settings,
+            DateTime marketToday)
+        {
+            return !row.Outcome.Equals("Open", StringComparison.OrdinalIgnoreCase) ||
+                   (!row.IsStaleOpen &&
+                    (marketToday - row.ScanTime.Date).Days < Math.Max(1, settings.ForwardEvaluationDays));
         }
 
         private static bool NeedsPostScanMetricsReevaluation(EvaluationDatasetRow row)
