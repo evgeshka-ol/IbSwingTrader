@@ -157,3 +157,34 @@ active risk, but revisit it if that command ever gets wired up.
 
 Temporary repair switch for legacy `NoEntry` rows with zero amplitude.
 Turn it off after backfill is done.
+
+### `CandidateEvaluation.ForwardEvaluationDays`
+
+Controls only the forward price-history window used to evaluate each candidate.
+For example, `10` means inspect up to ten days of future price history for a
+candidate. It does not control how many scan dates are selected.
+
+### `CandidateEvaluation.RecentScanDatesToEvaluate`
+
+Controls how many most recent eligible scan dates are reevaluated. The default
+is `2`; newly discovered scan dates newer than the latest date in the dataset
+are also included. Keep this independent from the forward history window.
+
+On 2026-09-29, before this setting existed, `ForwardEvaluationDays` was raised
+from `1` to `10`. The old coupled behavior selected 11 trading scan dates and
+2,511 candidates in the 2026-09-30 run, before open/incomplete retries. The
+current configuration uses a ten-day forward window and two recent scan dates.
+
+`ReevaluateOpenCandidates` is separate: when enabled, previously saved open
+rows older than the selected date window are added for another evaluation,
+while their scan date is still within `ForwardEvaluationDays`. Open rows whose
+forward window has elapsed are not retried.
+
+### `CandidateEvaluation.AllowedOutcomesToEvaluate`
+
+An array of saved evaluation outcomes eligible for reevaluation. Candidates
+without a saved evaluation, or whose latest saved outcome is not in this list,
+are skipped. The current value is `["Open"]`; add another quoted outcome as a
+comma-separated array item to include it. The same filter applies to incomplete
+metric retries. Open rows are retried only while their forward window remains
+active.
