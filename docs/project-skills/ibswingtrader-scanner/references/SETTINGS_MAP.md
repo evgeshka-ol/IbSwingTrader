@@ -112,6 +112,13 @@ skill for the legacy score formulas used by those pools.
 Do not use this to solve scanner recall/ranking issues.
 Use it only after the list quality is good.
 
+`BellUpBoostExitMinProfitPct` is the minimum target return for the BellUp
+boost-body exit override. It is a decimal fraction (`0.015` = 1.5%). If the
+average previous boost body produces a smaller target, the exit target is
+raised to this floor; entry and stop remain unchanged. This avoids labeling a
+sub-commission move as a useful BellUp win while retaining candidates whose
+price may reach the more meaningful target.
+
 ## Research settings
 
 ### `Research.RecentScanDays`
@@ -183,8 +190,9 @@ forward window has elapsed are not retried.
 ### `CandidateEvaluation.AllowedOutcomesToEvaluate`
 
 An array of saved evaluation outcomes eligible for reevaluation. Candidates
-without a saved evaluation, or whose latest saved outcome is not in this list,
-are skipped. The current value is `["Open"]`; add another quoted outcome as a
+with no saved evaluation are evaluated once so new scans enter the report.
+Existing rows are reevaluated only when their latest saved outcome is in this
+list. The current value is `["Open"]`; add another quoted outcome as a
 comma-separated array item to include it. The same filter applies to incomplete
 metric retries. Open rows are retried only while their forward window remains
 active.
