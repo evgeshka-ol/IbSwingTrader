@@ -35,6 +35,13 @@ membership from a legacy family label. An `Other` row with a zero plan is a
 diagnostic, not evidence of a mistimed or deep entry. See scanner
 `SETTINGS_MAP.md` for details.
 
+Reversal phase reasons carrying `DiagnosticOnly=True` (since 2026-10-02)
+are preserved from the scanner through evaluation and dataset construction.
+Their `Match` verdict means the recorded diagnostic label is preserved, not
+that the setup was admitted, traded, or profitable. Both D1/H4 phases and
+the snapshot price remain scan-time evidence; do not replace that price with
+the first post-publication M5 open when interpreting target progress.
+
 - High amplitude + `NoEntry` means scanner may be right and `TradePlan` may be wrong.
 - Low amplitude means the scanner likely surfaced a weak ticker.
 - The count of `Win` rows measures `TradePlan` conversion, not scanner recall.

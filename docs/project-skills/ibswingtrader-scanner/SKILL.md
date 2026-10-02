@@ -76,12 +76,14 @@ The scanner's job is to find future fat moves early.
   geometry is strong but the longer Daily-mid direction remains `Down`. It is
   emitted to `Other`, never admitted or ranked as `BellUp`; collect its
   realized outcomes before considering a production admission rule.
-- `ReversalHookPreparing` is likewise diagnostic-only: price remains below
-  the closed Daily mid but turns toward it while both the MACD histogram and
-  MACD line/signal gap confirm a turn. The lower Daily band may still be
-  falling and BB width may still be expanding; both lag an impulsive reversal.
-  It is emitted to `Other` without a plan; it must earn any future admission
-  from realized outcomes.
+- Reversal phase diagnostics (2026-10-02) independently replay completed D1
+  and H4 bars, including H4 for mature tickers. `ReversalHookPreparing`,
+  `ReversalHookActive`, `ReversalHookTargetReached`, and `ReversalHookStalled`
+  are emitted to `Other` without a plan when strict confirmation fails.
+  `PatternVerdictReason` preserves both timeframe phases, bend age/time,
+  completed-bar time, bands and snapshot price. These experimental labels
+  do not change admission or ranking. See `references/SERIES_PLAYBOOK.md`.
+  The earlier MACD-led Daily Preparing detector remains a fallback.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
   consolidation candle remains eligible. Additionally, when Daily

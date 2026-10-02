@@ -124,7 +124,36 @@ means the entry was too early and the stop was hit before the real move.
 
 ### ReversalHook
 
-`ReversalHookPreparing` is the diagnostic phase before a confirmed Daily hook:
+Since 2026-10-02, `ReversalHookPhaseClassifier` adds an independent diagnostic
+on completed D1 and H4 prefixes. This runs even when Daily history is sufficient.
+No future evaluation prices or still-forming candles enter the phase calculation.
+
+- `Preparing`: two successive rising closes with improving MACD histogram,
+  without a recent qualifying mid-band bend.
+- `Active`: recovery continues after a recent mid bend and both the last
+  completed close and scanner snapshot price remain below that timeframe's mid.
+- `TargetReached`: recovery continues, but the completed close or snapshot
+  price has reached that timeframe's mid. This does not mean the upper band
+  or the other timeframe's target has been reached.
+- `Stalled`: a recent bend exists but the two-bar recovery has stopped.
+
+The experimental bend looks back six bars for three negative mid deltas,
+followed by a less-negative delta at least 65% of the prior average, with a
+rising close and histogram. Price must have been below mid before the bend.
+This ratio is borrowed from existing recognition, not validated as a new
+admission rule. A fully flat prior band cannot qualify. Age is measured in
+completed bars, and the bend timestamp is saved alongside the latest completed
+bar timestamp. If several phases exist, the displayed label prefers Active,
+then TargetReached, Preparing, Stalled; both D1 and H4 remain in the reason.
+
+These labels replace the generic Preparing/unconfirmed description only when
+strict confirmation fails. They remain in `Other` with zero plans. Evaluation
+preserves the saved `DiagnosticOnly=True` diagnosis rather than rebuilding it
+from a later price. Snapshot price is not a fresh publication quote. Before
+allowing these phases to create plans, validate failed rebounds as well as
+ACN/CTSH-like moves and add fresh-price readiness at publication.
+
+The older MACD-led `ReversalHookPreparing` fallback is a separate diagnostic:
 price is still below the latest closed Daily mid but turns toward it, while the
 MACD histogram turns up and the MACD line closes its gap to the signal line.
 The lower band may still be falling and BB width may still be expanding after
