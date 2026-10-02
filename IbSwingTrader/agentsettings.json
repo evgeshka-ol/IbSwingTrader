@@ -352,6 +352,7 @@
             "DefaultProfitPct": 0.05,
             "MinProfitPct": 0.03,
             "MaxProfitPct": 0.10,
+            "BellUpBoostExitMinProfitPct": 0.015,
             "H4TargetLookbackBars": 24,
             "EntryPullbackAtrFraction": 0.20,
             "MinimumEntryDiscountPct": 0.0015,

@@ -3356,6 +3356,11 @@ namespace IbSwingTrader.Application.Candidates
             {
                 if (TryBuildBellUpBoostExit(ctx, bellPatternSignal, trade.Entry, out var boostTarget, out var boostReason))
                 {
+                    var minimumExit = decimal.Round(
+                        trade.Entry * (1m + Math.Max(0m, tradeSettings.BellUpBoostExitMinProfitPct)),
+                        2,
+                        MidpointRounding.AwayFromZero);
+                    var appliedExit = Math.Max(boostTarget.ExitPrice, minimumExit);
                     var earlierBoost = boostTarget.EarlierBoost;
                     var earlierBoostText = earlierBoost == null
                         ? "none"
@@ -3368,9 +3373,11 @@ namespace IbSwingTrader.Application.Candidates
                         $"LatestBoost={boostTarget.LatestBoost.Time:yyyy-MM-dd HH:mm:ss}, " +
                         $"LatestBody={boostTarget.LatestBoost.Close - boostTarget.LatestBoost.Open}, " +
                         $"EarlierBoost={earlierBoostText}, EarlierBody={earlierBodyText}, " +
-                        $"AverageBody={boostTarget.AverageBody}, PreviousExit={trade.Exit}, Exit={boostTarget.ExitPrice}. " +
+                        $"AverageBody={boostTarget.AverageBody}, PreviousExit={trade.Exit}, " +
+                        $"BoostExit={boostTarget.ExitPrice}, MinProfitPct={_fmt.Percent(tradeSettings.BellUpBoostExitMinProfitPct)}, " +
+                        $"Exit={appliedExit}. " +
                         "Entry and stop unchanged.");
-                    trade.Exit = boostTarget.ExitPrice;
+                    trade.Exit = appliedExit;
                     trade.ExitProfile = $"bellup-{boostTarget.BoostCount}-boost-{bellPatternSignal.Timeframe}";
                 }
                 else

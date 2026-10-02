@@ -102,9 +102,9 @@ namespace IbSwingTrader.App.Commands
                 evaluationSettings.AllowedOutcomesToEvaluate ?? [],
                 StringComparer.OrdinalIgnoreCase);
             var selectedScanCandidates = selectedDateCandidates
-                .Where(x => canonicalByScanKey.TryGetValue(BuildScanKey(x), out var row) &&
-                            IsAllowedOutcome(row, allowedOutcomes) &&
-                            IsWithinOpenEvaluationWindow(row, evaluationSettings, marketToday))
+                .Where(x => !canonicalByScanKey.TryGetValue(BuildScanKey(x), out var row) ||
+                            (IsAllowedOutcome(row, allowedOutcomes) &&
+                             IsWithinOpenEvaluationWindow(row, evaluationSettings, marketToday)))
                 .ToList();
             var newestSelectedScanDate = selectedScanDates.Max();
             var oldestSelectedScanDate = selectedScanDates.Min();
