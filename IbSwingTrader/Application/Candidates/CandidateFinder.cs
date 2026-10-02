@@ -935,6 +935,7 @@ namespace IbSwingTrader.Application.Candidates
 
             if (!isTodayResearchLikeCandidate)
             {
+                var phaseDiagnosis = BuildReversalPhaseDiagnosis(ctx);
                 var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
                 var reversalPatternSource = "D1";
                 if (!HasMinimumReversalPatternRows(reversalPatternSeries))
@@ -958,6 +959,16 @@ namespace IbSwingTrader.Application.Candidates
 
                 if (!IsReversalHookPattern(reversalPatternSeries!, out var reversalHookDiagnostics))
                 {
+                    if (phaseDiagnosis.Pattern != null)
+                    {
+                        _logger.Info($"Reversal phase diagnosis: {ctx.Stock.Ticker}. {phaseDiagnosis.Reason}");
+                        EmitOtherCandidate(
+                            $"{phaseDiagnosis.Reason}; StrictConfirmation={reversalHookDiagnostics}",
+                            phaseDiagnosis.Pattern,
+                            phaseDiagnosis.Reason);
+                        return;
+                    }
+
                     if (reversalPatternSource == "D1" &&
                         IsReversalHookPreparing(reversalPatternSeries!, out var preparationDiagnostics))
                     {
@@ -4945,6 +4956,51 @@ namespace IbSwingTrader.Application.Candidates
             _logger.Debug($"Session-aligned H4 view built: {ticker}, bars={aligned.Count}, " +
                           $"last={aligned[^1].Time:yyyy-MM-dd HH:mm:ss}");
             return aligned;
+        }
+
+        private (string? Pattern, string Reason) BuildReversalPhaseDiagnosis(WishListContext ctx)
+        {
+            var snapshotPrice = ResolveScanPrice(ctx.Snapshot);
+            ReversalHookPhase Analyze(List<Candle> source, Timeframe timeframe)
+            {
+                var completed = BellUpEntryTiming.GetCompletedCandles(source, timeframe, ctx.ScanTimeMarket);
+                var close = new List<decimal>();
+                var mid = new List<decimal>();
+                var histogram = new List<decimal>();
+                // Calculate only completed prefixes: no in-progress bar or future outcome enters diagnosis.
+                for (var i = Math.Max(0, completed.Count - RecentDailySeriesLength); i < completed.Count; i++)
+                {
+                    var features = _featureEngine.Calculate(completed, i + 1);
+                    close.Add(completed[i].Close);
+                    mid.Add(timeframe == Timeframe.D1 ? features.DailyBollingerMidBand : features.H4BollingerMidBand);
+                    histogram.Add(timeframe == Timeframe.D1 ? features.DailyMACDHistogram : features.MACDHistogram);
+                }
+                var phase = ReversalHookPhaseClassifier.Analyze(close, mid, histogram, snapshotPrice);
+                var bendTime = phase.BarsSinceBend >= 0
+                    ? completed[completed.Count - 1 - phase.BarsSinceBend].Time.ToString("yyyy-MM-dd HH:mm:ss")
+                    : "none";
+                var lastTime = completed.Count > 0
+                    ? completed[^1].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
+                return phase with { Diagnostics = $"{phase.Diagnostics}, BendBar={bendTime}, LastCompletedBar={lastTime}" };
+            }
+
+            var daily = Analyze(ctx.DailyCandles ?? BuildDailyBars(ctx.Candles), Timeframe.D1);
+            var h4 = Analyze(ctx.Candles, Timeframe.H4);
+            var phases = new[] { (Timeframe: "D1", Phase: daily), (Timeframe: "H4", Phase: h4) };
+            // Both timeframes remain visible; a reached H4 mid is not completion of the Daily move.
+            var selected = phases.FirstOrDefault(x => x.Phase.Name == "Active");
+            if (selected.Phase.Name == null)
+                selected = phases.FirstOrDefault(x => x.Phase.Name == "TargetReached");
+            if (selected.Phase.Name == null)
+                selected = phases.FirstOrDefault(x => x.Phase.Name == "Preparing");
+            if (selected.Phase.Name == null)
+                selected = phases.FirstOrDefault(x => x.Phase.Name == "Stalled");
+            var details = $"D1={daily.Name} ({daily.Diagnostics}); H4={h4.Name} ({h4.Diagnostics})";
+            _logger.Debug($"Reversal phase context: {ctx.Stock.Ticker}. {details}");
+            return selected.Phase.Name == null
+                ? (null, details)
+                : ($"ReversalHook{selected.Phase.Name}",
+                    $"ReversalHook{selected.Phase.Name} detected on {selected.Timeframe}; DiagnosticOnly=True; {details}");
         }
 
         private RecentFeatureSeries? BuildReversalPatternSeries(List<Candle>? dailyCandles)

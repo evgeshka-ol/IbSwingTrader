@@ -509,6 +509,15 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateEvaluationResult result,
             CandidateDetails candidate)
         {
+            if (ReversalHookPhaseClassifier.TryGetSavedPattern(candidate.PatternVerdictReason, out var phase))
+            {
+                result.DetectedPipeline = phase;
+                result.DetectedPattern = phase;
+                result.PatternVerdict = "Match";
+                result.PatternVerdictReason = candidate.PatternVerdictReason;
+                return;
+            }
+
             if (IsOtherDailyTransitionBellUpCandidate(candidate))
             {
                 result.DetectedPipeline = "DailyTransitionBellUp";

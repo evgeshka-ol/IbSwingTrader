@@ -13,12 +13,16 @@ namespace IbSwingTrader.Application.Evaluation
         public CandidatePatternVerdict Analyze(CandidateEvaluationResult candidate)
         {
             ArgumentNullException.ThrowIfNull(candidate);
+            if (ReversalHookPhaseClassifier.TryGetSavedPattern(candidate.PatternVerdictReason, out var phase))
+                return new CandidatePatternVerdict(phase, phase, "Match", candidate.PatternVerdictReason);
             return AnalyzeInternal(new PatternSeries(candidate));
         }
 
         public CandidatePatternVerdict Analyze(EvaluationDatasetRow row)
         {
             ArgumentNullException.ThrowIfNull(row);
+            if (ReversalHookPhaseClassifier.TryGetSavedPattern(row.PatternVerdictReason, out var phase))
+                return new CandidatePatternVerdict(phase, phase, "Match", row.PatternVerdictReason);
             return AnalyzeInternal(new PatternSeries(row));
         }
 
