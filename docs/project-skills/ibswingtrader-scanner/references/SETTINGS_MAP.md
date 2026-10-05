@@ -119,6 +119,26 @@ raised to this floor; entry and stop remain unchanged. This avoids labeling a
 sub-commission move as a useful BellUp win while retaining candidates whose
 price may reach the more meaningful target.
 
+Since 2026-10-05, `BellUpProfitReductionThresholdPct` (default `0.10` = 10%)
+and `BellUpProfitReductionDivisor` (default `2`) reduce the final playable
+BellUp profit target. Profit **equal to or above** the threshold qualifies.
+The exit becomes `entry + (exit - entry) / divisor`, rounded to cents; this
+divides the profit distance, not the absolute exit price. Both momentum and
+boost-body exit profiles are covered, after the boost override. Entry, stop,
+ranking and candidate group are unchanged. The existing
+`BellUpBoostExitMinProfitPct` floor also protects reduced targets, without
+raising the original target. A divisor of `1` disables reduction; values
+below `1` or a negative threshold also skip it. A zero threshold applies it
+to every positive BellUp target. Publication refresh rebuilds the base plan
+before applying reduction once. Modified profiles get `-profit-reduced` and
+the log records original/new targets and percentages. Existing saved plans
+and evaluation rows are not retrospectively rewritten.
+
+The supporting historical screen is
+`docs/investigation-2026-10-05-half-profit-targets.md`. That study used a
+strictly greater-than-10% condition; the implemented inclusive threshold is
+the user's subsequent explicit choice.
+
 ## Research settings
 
 ### `Research.RecentScanDays`

@@ -15,6 +15,11 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 ## Core intent
 
+Playable BellUp plans apply the configured final-target reduction after all
+exit calculations: profit at least 10% is divided by 2 by default, with the
+existing 1.5% floor preserved. See `references/SETTINGS_MAP.md` for controls.
+This changes execution targets, not scanner admission or ranking.
+
 The scanner's job is to find future fat moves early.
 
 - **Current output contract (since 2026-09-23):** candidates are classified
