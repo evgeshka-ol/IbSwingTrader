@@ -427,8 +427,8 @@ namespace IbSwingTrader.Infrastructure.Logging
             _console.Write(" ", ConsoleColor.Gray);
             _console.Write(
                 candidate.Diagnostics?.EstimatedHitRatePct is { } hitRatePct
-                    ? $"conf={_fmt.Generic(hitRatePct)}%"
-                    : "conf=n/a",
+                    ? $"Win~={_fmt.Generic(hitRatePct)}%"
+                    : "Win~=n/a",
                 ConsoleColor.Cyan);
             _console.WriteLine(string.Empty, ConsoleColor.Gray);
         }
@@ -437,6 +437,8 @@ namespace IbSwingTrader.Infrastructure.Logging
         {
             _console.WriteLine(string.Empty, ConsoleColor.Gray);
             _console.WriteLine(title, ConsoleColor.Cyan);
+            if (title == "BellUp")
+                _console.WriteLine("Win~: experimental estimate for entered/resolved plans; Open/NoEntry excluded from fitting.", ConsoleColor.DarkGray);
         }
 
         private static decimal ResolveStopLimitPrice(CandidateDetails candidate)

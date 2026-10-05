@@ -21,5 +21,7 @@ namespace IbSwingTrader.Domain.Candidates
         public decimal? RankingQualityScore { get; set; }
 
         public decimal? EstimatedHitRatePct { get; set; }
+        public string EstimatedHitRateModel { get; set; } = string.Empty;
+        public string EstimatedHitRateScope { get; set; } = string.Empty;
     }
 }

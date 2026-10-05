@@ -377,6 +377,17 @@ namespace IbSwingTrader.Application.Candidates
                 await RefreshBellUpForPublication(candidate, ctx);
             }
 
+            // Estimate only after publication refresh/fallback finalized entry, exit and stop.
+            foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
+            {
+                if (candidate.Diagnostics == null)
+                    continue;
+                var probability = BellUpWinProbability.Estimate(candidate);
+                candidate.Diagnostics.EstimatedHitRatePct = probability;
+                candidate.Diagnostics.EstimatedHitRateModel = probability.HasValue ? BellUpWinProbability.ModelVersion : string.Empty;
+                candidate.Diagnostics.EstimatedHitRateScope = probability.HasValue ? BellUpWinProbability.Scope : string.Empty;
+            }
+
             LogScanPerformanceSummary(performance);
 
             return new CandidateSearchResult
@@ -4736,7 +4747,8 @@ namespace IbSwingTrader.Application.Candidates
                     if (x.Diagnostics != null)
                     {
                         x.Diagnostics.RankingQualityScore = qualityScore;
-                        x.Diagnostics.EstimatedHitRatePct = EstimateHitRatePct(qualityScore, family);
+                        // Win probability is assigned after final publication pricing.
+                        x.Diagnostics.EstimatedHitRatePct = null;
                     }
 
                     var adjustedRank =
@@ -4819,34 +4831,6 @@ namespace IbSwingTrader.Application.Candidates
             var lowerHookSlope = CalculateTailRelativeSlopePct(lower, 3);
 
             return compressionInverse * 30m + lowerHookSlope * 0.5m;
-        }
-
-        // Coarse, honest buckets from a thin historical sample (evaluation-dataset.csv). Runaway buckets
-        // rechecked 2026-09-01 against 422 decided Win/Loss rows after adding the H4 upper-band slope and
-        // H4 width-expansion terms to CalculateRunawayLaunchQualityScore (AUC 0.62 -> 0.69 on that change,
-        // stable across a chronological split): >=25 -> 88.9% (n=45), [10,25) -> 53.8% (n=93), else -> ~31%
-        // (n=284 combined, 32.8%/29.5% either side of 0) observed AmplitudePct>=10% rate. Reversal buckets
-        // still reflect the original 2026-07-14 check (n=19) and are left as-is: the called-for recheck
-        // happened 2026-09-01 against 260 decided Win/Loss rows and CalculateReversalHookQualityScore came
-        // back AUC 0.51 (no signal) - see docs/project-skills/ibswingtrader-scanner/references/REVERSAL_EDGE.md
-        // "Open items". Recalibrating these buckets would be tuning noise, not a probability; don't touch
-        // them without a score that has shown real signal first. This is a rough historical hit-rate
-        // readout, not a statistically calibrated probability - recheck and adjust these breakpoints/rates
-        // as more days of evaluation data accumulate rather than trusting them as fixed truth.
-        private static decimal EstimateHitRatePct(decimal qualityScore, SeriesTemplateFamily family)
-        {
-            if (family == SeriesTemplateFamily.TodayResearchLike)
-            {
-                if (qualityScore >= 25m)
-                    return 85m;
-                if (qualityScore >= 10m)
-                    return 55m;
-                return 30m;
-            }
-
-            return qualityScore >= 15m
-                ? 50m
-                : 30m;
         }
 
         private static bool TryCalculateRealBollingerEnvelope(
