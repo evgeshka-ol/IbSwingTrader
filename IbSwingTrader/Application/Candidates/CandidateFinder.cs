@@ -3395,6 +3395,37 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     _logger.Info($"BellUp boost exit not applied for {ctx.Stock.Ticker}: {boostReason}. Existing exit retained.");
                 }
+
+                // Apply once to the final target, including momentum and boost-body exits.
+                // Publication refresh builds a new base plan, so it does not divide an old target again.
+                var reductionThreshold = tradeSettings.BellUpProfitReductionThresholdPct;
+                var reductionDivisor = tradeSettings.BellUpProfitReductionDivisor;
+                if (trade.Entry > 0m && trade.Exit > trade.Entry &&
+                    reductionThreshold >= 0m && reductionDivisor > 1m &&
+                    trade.Exit >= trade.Entry * (1m + reductionThreshold))
+                {
+                    var originalExit = trade.Exit;
+                    var reducedExit = decimal.Round(
+                        trade.Entry + (originalExit - trade.Entry) / reductionDivisor,
+                        2,
+                        MidpointRounding.AwayFromZero);
+                    var minimumExit = decimal.Round(
+                        trade.Entry * (1m + Math.Max(0m, tradeSettings.BellUpBoostExitMinProfitPct)),
+                        2,
+                        MidpointRounding.AwayFromZero);
+                    // A configured floor must never increase the original target in this reduction step.
+                    trade.Exit = Math.Min(originalExit, Math.Max(reducedExit, minimumExit));
+                    if (trade.Exit < originalExit)
+                    {
+                        trade.ExitProfile += "-profit-reduced";
+                        _logger.Info(
+                            $"BellUp profit target reduced for {ctx.Stock.Ticker}. " +
+                            $"ThresholdPct={reductionThreshold * 100m:0.####}, Divisor={reductionDivisor}, " +
+                            $"PreviousExit={originalExit}, Exit={trade.Exit}, " +
+                            $"PreviousProfitPct={(originalExit / trade.Entry - 1m) * 100m:0.####}, " +
+                            $"ProfitPct={(trade.Exit / trade.Entry - 1m) * 100m:0.####}");
+                    }
+                }
             }
 
             var plan = new TradePlanInfo

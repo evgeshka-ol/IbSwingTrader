@@ -113,6 +113,8 @@ namespace IbSwingTrader.Domain.Settings
         public decimal MinProfitPct { get; set; } = 0.03m;
         public decimal MaxProfitPct { get; set; } = 0.10m;
         public decimal BellUpBoostExitMinProfitPct { get; set; } = 0.015m;
+        public decimal BellUpProfitReductionThresholdPct { get; set; } = 0.10m;
+        public decimal BellUpProfitReductionDivisor { get; set; } = 2m;
         public int H4TargetLookbackBars { get; set; } = 24;
         public int EntryLookbackHours { get; set; } = 48;
         public int EntryMaLength { get; set; } = 20;
