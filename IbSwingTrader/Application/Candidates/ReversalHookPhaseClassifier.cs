@@ -7,7 +7,7 @@ namespace IbSwingTrader.Application.Candidates
     {
         public static bool TryGetSavedPattern(string reason, out string pattern)
         {
-            foreach (var phase in new[] { "Preparing", "Active", "TargetReached", "Stalled" })
+            foreach (var phase in new[] { "Preparing", "Active", "MidCrossed", "Completed", "TargetReached", "Stalled" })
             {
                 pattern = $"ReversalHook{phase}";
                 if (reason.StartsWith($"{pattern} detected on ", StringComparison.Ordinal) &&
@@ -22,7 +22,8 @@ namespace IbSwingTrader.Application.Candidates
             IReadOnlyList<decimal> close,
             IReadOnlyList<decimal> mid,
             IReadOnlyList<decimal> histogram,
-            decimal snapshotPrice)
+            decimal snapshotPrice,
+            IReadOnlyList<decimal>? upper = null)
         {
             var count = Math.Min(close.Count, Math.Min(mid.Count, histogram.Count));
             if (count < 7)
@@ -42,7 +43,7 @@ namespace IbSwingTrader.Application.Candidates
                 var prior = (d1 + d2 + d3) / 3m;
                 // A flat band is not a bend. Require a declining run and discrete deceleration.
                 // The 65% ratio mirrors existing recognition; it is not a validated trading gate.
-                if (d1 < 0m && d2 < 0m && d3 < 0m && latest > d3 &&
+                if (bands[i - 4] > 0m && bands[i] > 0m && d1 < 0m && d2 < 0m && d3 < 0m && latest > d3 &&
                     latest >= prior * 0.65m && prices[i - 1] < bands[i - 1] &&
                     prices[i] > prices[i - 1] && momentum[i] > momentum[i - 1])
                     bend = i;
@@ -50,10 +51,22 @@ namespace IbSwingTrader.Application.Candidates
 
             var recovering = prices[^1] > prices[^2] && prices[^2] > prices[^3] &&
                              momentum[^1] > momentum[^2] && momentum[^2] >= momentum[^3];
+            if (bend >= 0)
+            {
+                // Preserve an established recovery through a pause; do not require two new green bars.
+                recovering = prices[^1] > prices[bend - 1] &&
+                             momentum[^1] >= momentum[bend] &&
+                             prices[^1] > prices.TakeLast(3).Min();
+            }
+            var currentPrice = snapshotPrice > 0m ? snapshotPrice : prices[^1];
+            if (bend >= 0 && currentPrice <= prices[bend - 1])
+                recovering = false;
+            var upperReached = upper is { Count: > 0 } && upper[^1] > bands[^1] &&
+                               Math.Max(currentPrice, prices[^1]) >= upper[^1];
             var name = bend < 0 ? (recovering ? "Preparing" : "None")
+                : upperReached ? "Completed"
                 : !recovering ? "Stalled"
-                : prices[^1] >= bands[^1] || snapshotPrice > 0m && snapshotPrice >= bands[^1]
-                    ? "TargetReached" : "Active";
+                : Math.Max(currentPrice, prices[^1]) >= bands[^1] ? "MidCrossed" : "Active";
             var age = bend < 0 ? -1 : count - 1 - bend;
             return new(name, age,
                 $"BarsSinceBend={age}, Recovering={recovering}, Mid={bands[^1]}, " +

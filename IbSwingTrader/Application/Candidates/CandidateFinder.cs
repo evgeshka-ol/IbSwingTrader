@@ -377,6 +377,14 @@ namespace IbSwingTrader.Application.Candidates
                 await RefreshBellUpForPublication(candidate, ctx);
             }
 
+            foreach (var candidate in finalCandidates.Where(x => x.CandidateSource == "ReversalHook"))
+            {
+                var ctx = contextsForOutput.First(x =>
+                    string.Equals(x.Stock.Ticker, candidate.Ticker, StringComparison.OrdinalIgnoreCase) &&
+                    x.Preset.ScanCode == candidate.Scan.PresetScanCode);
+                await RefreshReversalForPublication(candidate, ctx);
+            }
+
             // Estimate only after publication refresh/fallback finalized entry, exit and stop.
             foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
             {
@@ -396,6 +404,122 @@ namespace IbSwingTrader.Application.Candidates
                 SameDayCandidates = sameDayCandidates,
                 WishList = []
             };
+        }
+
+        private async Task RefreshReversalForPublication(CandidateDetails candidate, WishListContext ctx)
+        {
+            candidate.PatternVerdictReason = candidate.PatternVerdictReason.Replace("; PublicationPending=True", string.Empty);
+            void Reject(string reason)
+            {
+                candidate.CandidateSource = "Other";
+                candidate.TradePlan.EntryPrice = 0m;
+                candidate.TradePlan.ExitPrice = 0m;
+                candidate.TradePlan.StopLoss = 0m;
+                candidate.TradePlan.StopLimitPrice = 0m;
+                candidate.TradePlan.ProfitPercent = 0m;
+                candidate.TradePlan.LossPercent = 0m;
+                candidate.TradePlan.PublicationRefreshStatus = "ReversalRejected";
+                candidate.PatternVerdictReason += $"; NotReady={reason}";
+                _logger.Info($"ReversalHook publication rejected: {candidate.Ticker}. {reason}");
+            }
+            try
+            {
+                if (ctx.Contract == null)
+                    throw new InvalidOperationException("Contract unavailable for fresh price");
+                // Only the deduplicated recognized shortlist is refreshed, not the full universe.
+                var now = MarketTime.Now();
+                var h4 = await _historicalData.GetCandlesRange(candidate.Ticker, ctx.Contract,
+                    Timeframe.H4, ctx.Candles.Min(x => x.Time), now);
+                if (h4 is { Count: > 0 })
+                {
+                    var ordered = h4.OrderBy(x => x.Time).ToList();
+                    ctx.Candles.Clear();
+                    ctx.Candles.AddRange(ordered);
+                }
+                if (ctx.DailyCandles is { Count: > 0 })
+                {
+                    var daily = await _historicalData.GetCandlesRange(candidate.Ticker, ctx.Contract,
+                        Timeframe.D1, ctx.DailyCandles.Min(x => x.Time), MarketTime.Now());
+                    if (daily is { Count: > 0 })
+                    {
+                        var ordered = daily.OrderBy(x => x.Time).ToList();
+                        ctx.DailyCandles.Clear();
+                        ctx.DailyCandles.AddRange(ordered);
+                    }
+                }
+                var requestedAt = MarketTime.Now();
+                var bars = await _historicalData.GetFreshM5Snapshot(candidate.Ticker, ctx.Contract,
+                    requestedAt.AddMinutes(-15), requestedAt);
+                var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
+                if (quote == null)
+                    throw new InvalidOperationException("No current or immediately preceding M5 bar");
+                quote.ApplyTo(candidate.TradePlan);
+                candidate.TradePlan.EntryPriceSource = "ReversalDiagnosisFreshM5";
+                var episode = BuildReversalPhaseDiagnosis(ctx, quote.Price);
+                candidate.PatternVerdictReason = episode.Reason;
+                var completedH4 = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, MarketTime.Now());
+                var series = BuildRecentFeatureSeries(completedH4);
+                candidate.RecentH4OpenSeries = series.H4OpenSeries;
+                candidate.RecentH4HighSeries = series.H4HighSeries;
+                candidate.RecentH4LowSeries = series.H4LowSeries;
+                candidate.RecentH4CloseSeries = series.H4CloseSeries;
+                candidate.RecentH4BbUpperBandSeries = series.H4BbUpperBandSeries;
+                candidate.RecentH4BbMidBandSeries = series.H4BbMidBandSeries;
+                candidate.RecentH4BbLowerBandSeries = series.H4BbLowerBandSeries;
+                candidate.RecentH4RsiSeries = series.H4RsiSeries;
+                candidate.RecentH4MacdLineSeries = series.H4MacdLineSeries;
+                candidate.RecentH4MacdSignalSeries = series.H4MacdSignalSeries;
+                candidate.RecentH4MacdHistogramSeries = series.H4MacdHistogramSeries;
+                var dailySource = ctx.DailyCandles ?? BuildDailyBars(ctx.Candles);
+                var dailySeries = BuildReversalPatternSeries(dailySource);
+                if (dailySeries != null)
+                {
+                    candidate.RecentDailyCloseSeries = dailySeries.DailyCloseSeries;
+                    candidate.RecentDailyBbUpperBandSeries = dailySeries.DailyBbUpperBandSeries;
+                    candidate.RecentDailyBbMidBandSeries = dailySeries.DailyBbMidBandSeries;
+                    candidate.RecentDailyBbLowerBandSeries = dailySeries.DailyBbLowerBandSeries;
+                    candidate.RecentDailyRsiSeries = dailySeries.DailyRsiSeries;
+                    candidate.RecentDailyMacdLineSeries = dailySeries.DailyMacdLineSeries;
+                    candidate.RecentDailyMacdSignalSeries = dailySeries.DailyMacdSignalSeries;
+                    candidate.RecentDailyMacdHistogramSeries = dailySeries.DailyMacdHistogramSeries;
+                    var completed = BellUpEntryTiming.GetCompletedCandles(dailySource, Timeframe.D1, MarketTime.Now())
+                        .TakeLast(RecentDailySeriesLength).ToList();
+                    candidate.RecentDailyOpenSeries = completed.Select(x => x.Open).ToList();
+                    candidate.RecentDailyHighSeries = completed.Select(x => x.High).ToList();
+                    candidate.RecentDailyLowSeries = completed.Select(x => x.Low).ToList();
+                }
+                if (!episode.Recognized || episode.Phase is not ("Active" or "MidCrossed"))
+                {
+                    Reject($"EpisodeRecognized={episode.Recognized}, Phase={episode.Phase}");
+                    return;
+                }
+                if (IsRunawayBellUpPattern(ClassifyBellPatternSignal(BuildBollingerStateSet(series), series)))
+                {
+                    Reject("BellUp appeared in refreshed history; preserve BellUp precedence");
+                    return;
+                }
+                if (!IsReversalHookHigherTimeframeSupportive(episode.Timeframe,
+                        BuildBollingerStateSet(series), series, quote.Price, out var support))
+                {
+                    Reject(support);
+                    return;
+                }
+                var plan = await BuildTradePlan(ctx, quote, reversalPublication: true);
+                if (plan.EntryPrice <= 0m || plan.ExitPrice <= plan.EntryPrice ||
+                    plan.StopLoss <= 0m || plan.StopLoss >= plan.EntryPrice)
+                {
+                    Reject("Invalid fresh trade plan structure");
+                    return;
+                }
+                plan.PublicationRefreshStatus = "ReversalFreshM5";
+                candidate.TradePlan = plan;
+                candidate.PatternVerdictReason = $"ReversalHook confirmed on {episode.Timeframe}; {episode.Reason}; Support={support}";
+            }
+            catch (Exception ex)
+            {
+                // No executable ReversalHook plan is published using a historical-price fallback.
+                Reject($"Publication refresh unavailable: {ex.Message}");
+            }
         }
 
         private async Task RefreshBellUpForPublication(CandidateDetails candidate, WishListContext ctx)
@@ -892,6 +1016,7 @@ namespace IbSwingTrader.Application.Candidates
 
             var eligibilityReason = string.Empty;
             var confirmedReversalTimeframe = string.Empty;
+            var reversalRecognitionReason = string.Empty;
             var isTodayResearchLikeCandidate = IsTodayResearchLikeCandidate(
                     mergedWishItem,
                     ctx,
@@ -946,83 +1071,15 @@ namespace IbSwingTrader.Application.Candidates
 
             if (!isTodayResearchLikeCandidate)
             {
-                var phaseDiagnosis = BuildReversalPhaseDiagnosis(ctx);
-                var reversalPatternSeries = BuildReversalPatternSeries(ctx.DailyCandles);
-                var reversalPatternSource = "D1";
-                if (!HasMinimumReversalPatternRows(reversalPatternSeries))
+                var episode = BuildReversalPhaseDiagnosis(ctx);
+                if (!episode.Recognized)
                 {
-                    reversalPatternSeries = BuildH4ReversalPatternSeries(
-                        ctx.Candles,
-                        recentSeries);
-                    reversalPatternSource = "H4 IPO fallback";
-                }
-
-                if (!HasMinimumReversalPatternRows(reversalPatternSeries))
-                {
-                    _logger.Info(
-                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook not confirmed. " +
-                        "Reason=reliable D1 and H4 pattern rows unavailable");
-                    EmitOtherCandidate(
-                        "Rejected: ReversalHook reliable D1 and H4 pattern rows unavailable", "Missing data");
+                    EmitOtherCandidate(episode.Reason, "Reversal unconfirmed", episode.Reason);
                     return;
                 }
-
-                if (!IsReversalHookPattern(reversalPatternSeries!, out var reversalHookDiagnostics))
-                {
-                    if (phaseDiagnosis.Pattern != null)
-                    {
-                        _logger.Info($"Reversal phase diagnosis: {ctx.Stock.Ticker}. {phaseDiagnosis.Reason}");
-                        EmitOtherCandidate(
-                            $"{phaseDiagnosis.Reason}; StrictConfirmation={reversalHookDiagnostics}",
-                            phaseDiagnosis.Pattern,
-                            phaseDiagnosis.Reason);
-                        return;
-                    }
-
-                    if (reversalPatternSource == "D1" &&
-                        IsReversalHookPreparing(reversalPatternSeries!, out var preparationDiagnostics))
-                    {
-                        _logger.Info(
-                            $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                            $"ReversalHookPreparing detected on {reversalPatternSource}. {preparationDiagnostics}");
-                        EmitOtherCandidate(
-                            $"ReversalHookPreparing detected on {reversalPatternSource}. {preparationDiagnostics}",
-                            "Preparing",
-                            "ReversalHookPreparing (MACD-led) detected on D1");
-                        return;
-                    }
-
-                    _logger.Info(
-                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook not confirmed on {reversalPatternSource} rows. " +
-                        $"{reversalHookDiagnostics}");
-                    EmitOtherCandidate(
-                        $"Rejected: ReversalHook not confirmed on {reversalPatternSource} rows. {reversalHookDiagnostics}", "Reversal unconfirmed");
-                    return;
-                }
-
-                _logger.Info(
-                    $"ReversalHook confirmed for {ctx.Stock.Ticker} on {reversalPatternSource}.");
-                confirmedReversalTimeframe = reversalPatternSource.StartsWith("H4", StringComparison.OrdinalIgnoreCase)
-                    ? "H4"
-                    : "D1";
-
-                if (!IsReversalHookHigherTimeframeSupportive(
-                        confirmedReversalTimeframe,
-                        bbState,
-                        recentSeries,
-                        ResolveScanPrice(ctx.Snapshot),
-                        out var higherTimeframeReason))
-                {
-                    _logger.Info(
-                        $"{rejectionLogPrefix}: {ctx.Stock.Ticker}. " +
-                        $"ReversalHook is not trade-ready: {higherTimeframeReason}");
-                    EmitOtherCandidate(
-                        $"Rejected: ReversalHook higher timeframe is not supportive. {higherTimeframeReason}",
-                        "Higher timeframe not supportive");
-                    return;
-                }
+                // Recognition is independent of readiness. Final admission follows fresh publication pricing.
+                confirmedReversalTimeframe = episode.Timeframe;
+                reversalRecognitionReason = episode.Reason;
             }
 
             var trade = ctx.Trade ??= await BuildTradePlan(ctx);
@@ -1073,7 +1130,7 @@ namespace IbSwingTrader.Application.Candidates
                 ? "BellUp"
                 : "ReversalHook";
             if (!isTodayResearchLikeCandidate && !string.IsNullOrWhiteSpace(confirmedReversalTimeframe))
-                candidateItem.PatternVerdictReason = $"ReversalHook confirmed on {confirmedReversalTimeframe}";
+                candidateItem.PatternVerdictReason = $"{reversalRecognitionReason}; PublicationPending=True";
 
             _logger.Info(
                 $"BB regimes for {ctx.Stock.Ticker}: " +
@@ -2886,7 +2943,8 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx, ExecutionPriceSnapshot? publicationQuote = null)
+        private async Task<TradePlanInfo> BuildTradePlan(WishListContext ctx, ExecutionPriceSnapshot? publicationQuote = null,
+            bool reversalPublication = false)
         {
             var tradeSettings = _getCandidatesSettingsProvider.Get().TradePlan;
             var finderSettings = _getCandidatesSettingsProvider.Get().Finder;
@@ -2949,10 +3007,11 @@ namespace IbSwingTrader.Application.Candidates
             var todayResearchLikeSeriesScore = CalculateTodayResearchLikeSeriesScore(bbState, recentSeries);
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
             var isBellUpPhaseReadyToday =
+                !reversalPublication &&
                 ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.TodayResearchLike &&
                 todayResearchLikePatternKind == TodayResearchLikePatternKind.BellUp &&
                 IsBellUpPhaseReadyToday(ctx, bellPatternSignal, out _);
-            if (publicationQuote != null && !isBellUpPhaseReadyToday)
+            if (publicationQuote != null && !isBellUpPhaseReadyToday && !reversalPublication)
                 throw new InvalidOperationException("BellUp is no longer ready for a publication entry");
             var historicalPrice = ResolveScanPrice(ctx.Snapshot);
             var liveReferencePrice = publicationQuote?.Price ??
@@ -2963,7 +3022,7 @@ namespace IbSwingTrader.Application.Candidates
             var bellUpPublicationEntry = publicationQuote?.ProjectedEntryPrice ?? publicationQuote?.Price;
             var scanPrice = isBellUpPhaseReadyToday
                 ? (bellUpPublicationEntry ?? liveReferencePrice)
-                : historicalPrice;
+                : (reversalPublication ? liveReferencePrice : historicalPrice);
             var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
                 recentSeries,
@@ -3365,7 +3424,7 @@ namespace IbSwingTrader.Application.Candidates
                 scanPrice,
                 scanPriceFloorOverride,
                 entryDiscountOverridePct,
-                ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal
+                reversalPublication || ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal
                     ? TradeEntryPatternFamily.ReversalHook
                     : TradeEntryPatternFamily.BellUp,
                 defaultProfitPctOverride,
@@ -3451,6 +3510,7 @@ namespace IbSwingTrader.Application.Candidates
                 ReferencePriceSource = entryCandles?.Count > 0 ? "M15History" : "IndicatorFallback",
                 EntryPriceSource = publicationQuote == null
                     ? (isBellUpPhaseReadyToday ? "BellUpFreshPrice" : "ExistingTradePlan")
+                    : reversalPublication ? "ReversalFreshM5Price"
                     : publicationQuote.ProjectedEntryPrice.HasValue
                         ? "BellUpM5BodyContinuation"
                         : "BellUpFreshM5PriceFallback",
@@ -4973,49 +5033,62 @@ namespace IbSwingTrader.Application.Candidates
             return aligned;
         }
 
-        private (string? Pattern, string Reason) BuildReversalPhaseDiagnosis(WishListContext ctx)
+        private (bool Recognized, string Timeframe, string Phase, string Reason) BuildReversalPhaseDiagnosis(
+            WishListContext ctx, decimal? freshPrice = null)
         {
-            var snapshotPrice = ResolveScanPrice(ctx.Snapshot);
-            ReversalHookPhase Analyze(List<Candle> source, Timeframe timeframe)
+            var currentPrice = freshPrice ?? ResolveScanPrice(ctx.Snapshot);
+            var now = MarketTime.Now();
+            (bool Recognized, string Timeframe, string Phase, string Reason) Analyze(List<Candle> source, Timeframe timeframe)
             {
-                var completed = BellUpEntryTiming.GetCompletedCandles(source, timeframe, ctx.ScanTimeMarket);
-                var close = new List<decimal>();
-                var mid = new List<decimal>();
-                var histogram = new List<decimal>();
-                // Calculate only completed prefixes: no in-progress bar or future outcome enters diagnosis.
+                var completed = BellUpEntryTiming.GetCompletedCandles(source, timeframe, now);
+                var series = new RecentFeatureSeries();
                 for (var i = Math.Max(0, completed.Count - RecentDailySeriesLength); i < completed.Count; i++)
                 {
                     var features = _featureEngine.Calculate(completed, i + 1);
-                    close.Add(completed[i].Close);
-                    mid.Add(timeframe == Timeframe.D1 ? features.DailyBollingerMidBand : features.H4BollingerMidBand);
-                    histogram.Add(timeframe == Timeframe.D1 ? features.DailyMACDHistogram : features.MACDHistogram);
+                    var daily = timeframe == Timeframe.D1;
+                    series.DailyCloseSeries.Add(completed[i].Close);
+                    series.DailyBbUpperBandSeries.Add(daily ? features.DailyBollingerUpperBand : features.H4BollingerUpperBand);
+                    series.DailyBbMidBandSeries.Add(daily ? features.DailyBollingerMidBand : features.H4BollingerMidBand);
+                    series.DailyBbLowerBandSeries.Add(daily ? features.DailyBollingerLowerBand : features.H4BollingerLowerBand);
+                    series.DailyRsiSeries.Add(daily ? features.DailyRSI14 : features.RSI14);
+                    series.DailyMacdLineSeries.Add(daily ? features.DailyMACDLine : features.MACDLine);
+                    series.DailyMacdSignalSeries.Add(daily ? features.DailyMACDSignal : features.MACDSignal);
+                    series.DailyMacdHistogramSeries.Add(daily ? features.DailyMACDHistogram : features.MACDHistogram);
                 }
-                var phase = ReversalHookPhaseClassifier.Analyze(close, mid, histogram, snapshotPrice);
+                var phase = ReversalHookPhaseClassifier.Analyze(series.DailyCloseSeries,
+                    series.DailyBbMidBandSeries, series.DailyMacdHistogramSeries, currentPrice,
+                    series.DailyBbUpperBandSeries);
+                var recognized = IsReversalHookPattern(series, out var recognition);
+                var name = phase.Name;
+                // The historical strict hook can precede the discrete middle-band bend.
+                if (recognized && phase.BarsSinceBend < 0 && series.DailyCloseSeries.Count >= 3)
+                {
+                    var recovering = series.DailyCloseSeries[^1] > series.DailyCloseSeries.TakeLast(3).Min() &&
+                                     series.DailyMacdHistogramSeries[^1] >= series.DailyMacdHistogramSeries[^2];
+                    name = currentPrice >= series.DailyBbUpperBandSeries[^1] ? "Completed"
+                        : !recovering ? "Stalled"
+                        : currentPrice >= series.DailyBbMidBandSeries[^1] ? "MidCrossed" : "Active";
+                }
                 var bendTime = phase.BarsSinceBend >= 0
-                    ? completed[completed.Count - 1 - phase.BarsSinceBend].Time.ToString("yyyy-MM-dd HH:mm:ss")
-                    : "none";
-                var lastTime = completed.Count > 0
-                    ? completed[^1].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
-                return phase with { Diagnostics = $"{phase.Diagnostics}, BendBar={bendTime}, LastCompletedBar={lastTime}" };
+                    ? completed[completed.Count - 1 - phase.BarsSinceBend].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
+                var lastTime = completed.Count > 0 ? completed[^1].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
+                var label = timeframe == Timeframe.D1 ? "D1" : "H4";
+                return (recognized, label, name,
+                    $"{label}={name}, Recognized={recognized}, {phase.Diagnostics}, BendBar={bendTime}, " +
+                    $"LastCompletedBar={lastTime}, {recognition}");
             }
-
             var daily = Analyze(ctx.DailyCandles ?? BuildDailyBars(ctx.Candles), Timeframe.D1);
             var h4 = Analyze(ctx.Candles, Timeframe.H4);
-            var phases = new[] { (Timeframe: "D1", Phase: daily), (Timeframe: "H4", Phase: h4) };
-            // Both timeframes remain visible; a reached H4 mid is not completion of the Daily move.
-            var selected = phases.FirstOrDefault(x => x.Phase.Name == "Active");
-            if (selected.Phase.Name == null)
-                selected = phases.FirstOrDefault(x => x.Phase.Name == "TargetReached");
-            if (selected.Phase.Name == null)
-                selected = phases.FirstOrDefault(x => x.Phase.Name == "Preparing");
-            if (selected.Phase.Name == null)
-                selected = phases.FirstOrDefault(x => x.Phase.Name == "Stalled");
-            var details = $"D1={daily.Name} ({daily.Diagnostics}); H4={h4.Name} ({h4.Diagnostics})";
-            _logger.Debug($"Reversal phase context: {ctx.Stock.Ticker}. {details}");
-            return selected.Phase.Name == null
-                ? (null, details)
-                : ($"ReversalHook{selected.Phase.Name}",
-                    $"ReversalHook{selected.Phase.Name} detected on {selected.Timeframe}; DiagnosticOnly=True; {details}");
+            var both = new[] { daily, h4 };
+            var selected = both.OrderByDescending(x => x.Recognized && (x.Phase is "Active" or "MidCrossed"))
+                .ThenByDescending(x => x.Recognized)
+                .ThenByDescending(x => x.Phase == "Preparing").First();
+            var prefix = selected.Recognized ? $"ReversalHook recognized on {selected.Timeframe}"
+                : $"ReversalHook unconfirmed on D1/H4";
+            var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={(freshPrice.HasValue ? "FreshM5" : "HistoricalSnapshot")}; " +
+                         $"{daily.Reason}; {h4.Reason}";
+            _logger.Info($"Reversal episode: {ctx.Stock.Ticker}. {reason}");
+            return (selected.Recognized, selected.Timeframe, selected.Phase, reason);
         }
 
         private RecentFeatureSeries? BuildReversalPatternSeries(List<Candle>? dailyCandles)
@@ -5026,10 +5099,7 @@ namespace IbSwingTrader.Application.Candidates
             var ordered = dailyCandles
                 .OrderBy(x => x.Time)
                 .ToList();
-            var marketToday = MarketTime.Now().Date;
-            var completed = ordered[^1].Time.Date == marketToday
-                ? ordered.Take(ordered.Count - 1).ToList()
-                : ordered;
+            var completed = BellUpEntryTiming.GetCompletedCandles(ordered, Timeframe.D1, MarketTime.Now());
 
             if (completed.Count < 2)
                 return null;
@@ -5068,40 +5138,6 @@ namespace IbSwingTrader.Application.Candidates
                     completed,
                     scanIndex,
                     x => x.DailyMACDHistogram)
-            };
-        }
-
-        private static bool HasMinimumReversalPatternRows(RecentFeatureSeries? series)
-        {
-            return series != null &&
-                   series.DailyCloseSeries.Count >= 6 &&
-                   series.DailyBbUpperBandSeries.Count >= 6 &&
-                   series.DailyBbMidBandSeries.Count >= 6 &&
-                   series.DailyBbLowerBandSeries.Count >= 6 &&
-                   series.DailyRsiSeries.Count >= 4 &&
-                   series.DailyMacdHistogramSeries.Count >= 4;
-        }
-
-        private static RecentFeatureSeries BuildH4ReversalPatternSeries(
-            List<Candle> candles,
-            RecentFeatureSeries scannerSeries)
-        {
-            var closes = candles
-                .OrderBy(x => x.Time)
-                .TakeLast(scannerSeries.H4BbMidBandSeries.Count)
-                .Select(x => decimal.Round(x.Close, 2, MidpointRounding.AwayFromZero))
-                .ToList();
-
-            return new RecentFeatureSeries
-            {
-                DailyCloseSeries = closes,
-                DailyBbUpperBandSeries = [.. scannerSeries.H4BbUpperBandSeries],
-                DailyBbMidBandSeries = [.. scannerSeries.H4BbMidBandSeries],
-                DailyBbLowerBandSeries = [.. scannerSeries.H4BbLowerBandSeries],
-                DailyRsiSeries = [.. scannerSeries.H4RsiSeries],
-                DailyMacdLineSeries = [.. scannerSeries.H4MacdLineSeries],
-                DailyMacdSignalSeries = [.. scannerSeries.H4MacdSignalSeries],
-                DailyMacdHistogramSeries = [.. scannerSeries.H4MacdHistogramSeries]
             };
         }
 
@@ -5632,19 +5668,6 @@ namespace IbSwingTrader.Application.Candidates
 
             return result;
         }
-
-        private static bool IsReversalHookPreparing(
-            RecentFeatureSeries recentSeries,
-            out string diagnostics)
-            => BellPatternClassifier.IsReversalHookPreparing(
-                recentSeries.DailyCloseSeries,
-                recentSeries.DailyBbUpperBandSeries,
-                recentSeries.DailyBbMidBandSeries,
-                recentSeries.DailyBbLowerBandSeries,
-                recentSeries.DailyMacdLineSeries,
-                recentSeries.DailyMacdSignalSeries,
-                recentSeries.DailyMacdHistogramSeries,
-                out diagnostics);
 
         private static bool IsPriceTurningTowardDailyMid(RecentFeatureSeries recentSeries)
             => BellPatternClassifier.IsPriceTurningTowardDailyMid(

@@ -13,6 +13,9 @@ namespace IbSwingTrader.Application.Evaluation
         public CandidatePatternVerdict Analyze(CandidateEvaluationResult candidate)
         {
             ArgumentNullException.ThrowIfNull(candidate);
+            var saved = SavedReversalVerdict(candidate.PatternVerdictReason);
+            if (saved != null)
+                return saved;
             if (ReversalHookPhaseClassifier.TryGetSavedPattern(candidate.PatternVerdictReason, out var phase))
                 return new CandidatePatternVerdict(phase, phase, "Match", candidate.PatternVerdictReason);
             return AnalyzeInternal(new PatternSeries(candidate));
@@ -21,9 +24,23 @@ namespace IbSwingTrader.Application.Evaluation
         public CandidatePatternVerdict Analyze(EvaluationDatasetRow row)
         {
             ArgumentNullException.ThrowIfNull(row);
+            var saved = SavedReversalVerdict(row.PatternVerdictReason);
+            if (saved != null)
+                return saved;
             if (ReversalHookPhaseClassifier.TryGetSavedPattern(row.PatternVerdictReason, out var phase))
                 return new CandidatePatternVerdict(phase, phase, "Match", row.PatternVerdictReason);
             return AnalyzeInternal(new PatternSeries(row));
+        }
+
+        private static CandidatePatternVerdict? SavedReversalVerdict(string reason)
+        {
+            var recognized = reason.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
+                             reason.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal);
+            var rejected = reason.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal);
+            return recognized || rejected
+                ? new CandidatePatternVerdict("ReversalHook", recognized ? "ReversalHook" : "None",
+                    recognized ? "Match" : "Mismatch", reason)
+                : null;
         }
 
         private CandidatePatternVerdict AnalyzeInternal(PatternSeries series)

@@ -502,6 +502,39 @@ namespace IbSwingTrader.Application.Candidates
         // addition to everything the pre-extraction offline copy checked.
         public static bool IsReversalHookPattern(
             IReadOnlyList<decimal> dailyCloseSeries,
+            List<decimal> upper, List<decimal> mid, List<decimal> lower,
+            List<decimal> rsi, List<decimal> macdLine, List<decimal> macdSignal,
+            List<decimal> macdHistogram, out string diagnostics)
+        {
+            // Recognize an episode in completed history, independently of today's entry readiness.
+            var phase = ReversalHookPhaseClassifier.Analyze(dailyCloseSeries, mid, macdHistogram, 0m, upper);
+            if (phase.BarsSinceBend >= 0)
+            {
+                diagnostics = $"Recognition=MidBendEpisode, Phase={phase.Name}, {phase.Diagnostics}";
+                return true;
+            }
+
+            var count = new[] { dailyCloseSeries.Count, upper.Count, mid.Count, lower.Count,
+                macdHistogram.Count }.Min();
+            diagnostics = "Reason=no-recent-reversal-episode";
+            for (var age = 0; age < Math.Min(6, count); age++)
+            {
+                List<decimal> Prefix(List<decimal> values) => values.Take(Math.Max(0, values.Count - age)).ToList();
+                if (IsReversalHookAtBar(dailyCloseSeries.Take(Math.Max(0, dailyCloseSeries.Count - age)).ToList(),
+                        Prefix(upper), Prefix(mid), Prefix(lower), Prefix(rsi), Prefix(macdLine),
+                        Prefix(macdSignal), Prefix(macdHistogram), out var reason))
+                {
+                    diagnostics = $"Recognition=HistoricalHook, BarsSinceSignal={age}, {reason}";
+                    return true;
+                }
+                if (age == 0)
+                    diagnostics += $"; LatestBar={reason}";
+            }
+            return false;
+        }
+
+        private static bool IsReversalHookAtBar(
+            IReadOnlyList<decimal> dailyCloseSeries,
             List<decimal> upper,
             List<decimal> mid,
             List<decimal> lower,

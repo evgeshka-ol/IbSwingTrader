@@ -509,6 +509,18 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateEvaluationResult result,
             CandidateDetails candidate)
         {
+            if (candidate.PatternVerdictReason.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
+                candidate.PatternVerdictReason.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal) ||
+                candidate.PatternVerdictReason.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal))
+            {
+                result.DetectedPipeline = "ReversalHook";
+                var matched = !candidate.PatternVerdictReason.StartsWith("ReversalHook unconfirmed", StringComparison.Ordinal);
+                result.DetectedPattern = matched ? "ReversalHook" : "None";
+                result.PatternVerdict = matched ? "Match" : "Mismatch";
+                result.PatternVerdictReason = candidate.PatternVerdictReason;
+                return;
+            }
+
             if (ReversalHookPhaseClassifier.TryGetSavedPattern(candidate.PatternVerdictReason, out var phase))
             {
                 result.DetectedPipeline = phase;
