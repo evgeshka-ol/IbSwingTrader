@@ -1,5 +1,10 @@
 # Scanner Model
 
+Current ReversalHook behavior changed on 2026-10-06 to completed-episode
+recognition and fresh-price readiness. See SERIES_PLAYBOOK.md "ReversalHook".
+The strict-gate studies below remain historical validation records; they do
+not validate the new episode route or its future trade conversion.
+
 ## Main purpose and current priority
 
 See `SKILL.md` "Core intent" for the canonical, current statement of scanner

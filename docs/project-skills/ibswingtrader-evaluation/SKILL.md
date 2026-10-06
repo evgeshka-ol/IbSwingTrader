@@ -24,6 +24,12 @@ Do not mix them.
 
 ## Main rule
 
+Since 2026-10-06, preserve saved `ReversalHook recognized on ...`,
+`ReversalHook confirmed on ...`, and `ReversalHook unconfirmed on D1/H4`
+reasons, including phases and NotReady details. A recognition Match on Other
+is not trade admission. Reversal episodes can remain recognized above mid;
+do not reintroduce a latest-price-below-mid gate during evaluation.
+
 For scanner quality, the key metric is `AmplitudePct`.
 
 **Current category contract (since 2026-09-23):** candidate groups are

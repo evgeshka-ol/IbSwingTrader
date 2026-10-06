@@ -124,42 +124,56 @@ means the entry was too early and the stop was hit before the real move.
 
 ### ReversalHook
 
-Since 2026-10-02, `ReversalHookPhaseClassifier` adds an independent diagnostic
-on completed D1 and H4 prefixes. This runs even when Daily history is sufficient.
-No future evaluation prices or still-forming candles enter the phase calculation.
+Since 2026-10-06, ReversalHook recognizes recent episodes independently on
+completed D1 and H4 prefixes. H4 is checked even with sufficient D1 history.
+BellUp retains precedence; a recognized but non-ready BellUp is not relabelled
+as a reversal. Triangle remains a fallback diagnostic.
 
-- `Preparing`: two successive rising closes with improving MACD histogram,
-  without a recent qualifying mid-band bend.
-- `Active`: recovery continues after a recent mid bend and both the last
-  completed close and scanner snapshot price remain below that timeframe's mid.
-- `TargetReached`: recovery continues, but the completed close or snapshot
-  price has reached that timeframe's mid. This does not mean the upper band
-  or the other timeframe's target has been reached.
-- `Stalled`: a recent bend exists but the two-bar recovery has stopped.
+Recognition succeeds if either:
 
-The experimental bend looks back six bars for three negative mid deltas,
-followed by a less-negative delta at least 65% of the prior average, with a
-rising close and histogram. Price must have been below mid before the bend.
-This ratio is borrowed from existing recognition, not validated as a new
-admission rule. A fully flat prior band cannot qualify. Age is measured in
-completed bars, and the bend timestamp is saved alongside the latest completed
-bar timestamp. If several phases exist, the displayed label prefers Active,
-then TargetReached, Preparing, Stalled; both D1 and H4 remain in the reason.
+- a recent middle-band bend follows three negative deltas and a delta that
+  improves on the previous one and is at least 65% of their average, while
+  price rises from below mid and MACD histogram improves; or
+- the historical strict hook rule matches a completed prefix within the last
+  six bars. The below-mid requirement applies at that historical seed, not to
+  the latest price. Lower-band/RSI/compression requirements remain part of this
+  legacy seed, rather than universal requirements for every episode.
 
-These labels replace the generic Preparing/unconfirmed description only when
-strict confirmation fails. They remain in `Other` with zero plans. Evaluation
-preserves the saved `DiagnosticOnly=True` diagnosis rather than rebuilding it
-from a later price. Snapshot price is not a fresh publication quote. Before
-allowing these phases to create plans, validate failed rebounds as well as
-ACN/CTSH-like moves and add fresh-price readiness at publication.
+This is a user-authorized recognition change, not empirically validated new
+ranking weights. Flat prior mid bands cannot establish the middle-band seed.
+No future outcomes or incomplete candles establish either seed.
 
-The older MACD-led `ReversalHookPreparing` fallback is a separate diagnostic:
-price is still below the latest closed Daily mid but turns toward it, while the
-MACD histogram turns up and the MACD line closes its gap to the signal line.
-The lower band may still be falling and BB width may still be expanding after
-an impulsive reversal; neither is a prerequisite for this diagnostic. It
-belongs in `Other` with no trade plan. This does not weaken the confirmed
-ReversalHook rules.
+Phases: `Preparing` (recovery without a recognized seed), `Active` (ongoing
+recovery below mid), `MidCrossed` (ongoing recovery after crossing mid),
+`Completed` (close or current price reached upper band), and `Stalled`
+(recovery no longer holds). A pause does not erase an established episode:
+price must remain above the pre-bend close, histogram at least at the bend's
+level, and latest close above the three-bar minimum. Fresh price below the
+pre-bend close invalidates recovery. Historical seeds use a local
+price/histogram continuation check when no discrete mid bend is available.
+The old `TargetReached` and MACD-led Preparing labels remain in historical data.
+
+Both timeframe diagnoses, age and completed-bar timestamps are retained in
+`PatternVerdictReason`. A recognized active episode is preferred; if none is
+active, recognition is still recorded with its phase. H4 crossing does not
+imply Daily completion. Middle crossing is no longer an automatic rejection.
+
+Before publication, only the deduplicated recognized shortlist refreshes H4,
+Daily and fresh M5. Recognition and phase are recalculated. Admission requires
+an Active/MidCrossed episode, existing higher-timeframe support and a valid
+fresh-price plan. Stalled/Completed, missing fresh quote, lost recognition or
+failed support produces Other with zero trade levels and explicit `NotReady`.
+If refreshed history newly recognizes BellUp, the pending reversal is retained
+as Other with the precedence reason, rather than publishing a reversal plan
+for that BellUp. The next scan can apply the normal BellUp pipeline.
+No historical-price fallback authorizes a ReversalHook entry. Higher-timeframe
+Down/Collapse veto and the existing support conditions remain unchanged.
+Thus recognition improvements do not guarantee admission for every rebound.
+
+The reversal publication plan uses the fresh M5 price under reversal entry
+policy, without BellUp body projection or BellUp target reduction. Its status
+is `ReversalFreshM5`; rejected plans use `ReversalRejected`. Evaluation preserves
+saved recognition/phase/readiness reasons instead of inventing a later signal.
 
 `ReversalHook` is the current return-to-mid pattern for the pattern-first
 `ReversalHook` output group. Since the 2026-09-23 migration, it is evaluated
@@ -168,7 +182,7 @@ still provide context, but it is not a hard ReversalHook admission gate.
 BBNX is a transition exemplar; do not treat this single example as validation
 of general predictive performance.
 
-The row shape:
+The legacy strict seed row shape (one recognition route):
 
 - daily lower Bollinger band was falling and then hooks upward
 - the lower-band hook is strong enough to show a real turn, not only a small

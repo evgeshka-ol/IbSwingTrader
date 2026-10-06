@@ -41,7 +41,7 @@ The scanner's job is to find future fat moves early.
   diagnostic fallback and must not override BellUp on the other timeframe.
 - Keep pattern recognition separate from trade readiness. BellUp has
   timeframe-specific timing and phase checks. ReversalHook confirmation uses
-  Daily rows, with H4 as a history fallback for recent IPOs. Pattern
+  recent completed episodes independently on Daily and H4. Pattern
   classification alone does not imply a successful trade.
 - The scanner seeks future high-amplitude moves. `AmplitudePct` is the
   scanner-quality oracle; trade-plan conversion is evaluated separately.
@@ -87,14 +87,13 @@ The scanner's job is to find future fat moves early.
   geometry is strong but the longer Daily-mid direction remains `Down`. It is
   emitted to `Other`, never admitted or ranked as `BellUp`; collect its
   realized outcomes before considering a production admission rule.
-- Reversal phase diagnostics (2026-10-02) independently replay completed D1
-  and H4 bars, including H4 for mature tickers. `ReversalHookPreparing`,
-  `ReversalHookActive`, `ReversalHookTargetReached`, and `ReversalHookStalled`
-  are emitted to `Other` without a plan when strict confirmation fails.
-  `PatternVerdictReason` preserves both timeframe phases, bend age/time,
-  completed-bar time, bands and snapshot price. These experimental labels
-  do not change admission or ranking. See `references/SERIES_PLAYBOOK.md`.
-  The earlier MACD-led Daily Preparing detector remains a fallback.
+- ReversalHook episode recognition (2026-10-06) looks for a recent mid bend
+  or historical strict hook on completed D1/H4 prefixes. Latest price above
+  mid does not erase recognition. Active/MidCrossed phases can be admitted
+  after fresh-M5 pricing and the existing higher-timeframe support checks;
+  Preparing/Stalled/Completed and readiness failures stay in Other. Both
+  timeframe diagnoses and explicit rejection reasons are saved. See
+  `references/SERIES_PLAYBOOK.md` for phase and publication rules.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
   consolidation candle remains eligible. Additionally, when Daily
