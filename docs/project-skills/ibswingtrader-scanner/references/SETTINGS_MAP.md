@@ -139,6 +139,29 @@ The supporting historical screen is
 strictly greater-than-10% condition; the implemented inclusive threshold is
 the user's subsequent explicit choice.
 
+### Experimental Win estimate (2026-10-05)
+
+`DiagnosticsEstimatedHitRatePct` now estimates Win instead of amplitude.
+`BellUpWinProbability` uses final target profit, stop distance, relative volume
+and three-interval H4 RSI change. It applies only to playable BellUp with
+valid prices and RSI history; other groups receive null. Ranking is unchanged.
+Diagnostics include `EstimatedHitRateModel` and `EstimatedHitRateScope`.
+
+Frozen model v1 uses 46 resolved replay plans across 28 tickers, with reduced
+targets and equal total training weight per ticker. It is a ridge logistic
+model (L2=4, symmetric intercept prior), with scaled/clipped inputs.
+Coefficients: `docs/model-2026-10-05-bellup-win.json` and
+`BellUpWinProbability.cs`. Reproduction: `tools/fit_bellup_win_probability.py`
+reads the two dated analysis JSON artifacts; it does not deploy coefficients.
+
+Scope is `WinGivenEntryAndResolution`: Open/NoEntry were excluded from fitting.
+This is not unconditional ten-day P(Win) for all candidates. It is experimental,
+not independently calibrated, and resolved-outcome selection introduces bias.
+A wider stop can increase estimated Win without improving expected profit.
+Console uses `Win~` with an explanatory legend. The estimate is assigned after
+publication refresh, including singleton pools. Historical values are unchanged;
+execution policy changes require revisiting labels and calibration.
+
 ## Research settings
 
 ### `Research.RecentScanDays`

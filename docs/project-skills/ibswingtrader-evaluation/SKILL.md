@@ -51,6 +51,13 @@ the first post-publication M5 open when interpreting target progress.
 
 ## Current data contract and pattern parity (2026-09-29)
 
+Since 2026-10-05, new scanner `DiagnosticsEstimatedHitRatePct` values use
+the experimental model `bellup-win-ridge-2026-10-05-v1`, scope
+`WinGivenEntryAndResolution`. Historical percentages remain amplitude
+estimates. Compare by model/scope metadata; the conditional estimate is
+not a probability of Win for all candidates within ten days. Open/NoEntry
+were excluded from model fitting; later calibration must account for them.
+
 - Candidate and evaluation trade columns use the same short names: `ScanPrice`,
   `EntryPrice`, `ExitPrice`, `StopLoss`, `StopLimitPrice`,
   `PlannedProfitPct`, `PlannedLossPct`, and `ExitProfile`. Candidate technical

@@ -20,6 +20,12 @@ exit calculations: profit at least 10% is divided by 2 by default, with the
 existing 1.5% floor preserved. See `references/SETTINGS_MAP.md` for controls.
 This changes execution targets, not scanner admission or ranking.
 
+`DiagnosticsEstimatedHitRatePct` uses the experimental BellUp Win model
+`bellup-win-ridge-2026-10-05-v1`, assigned after final publication pricing.
+It estimates Win conditional on entry and a resolved outcome, not amplitude
+or unconditional ten-day success. Console uses `Win~` and explains the scope.
+Unsupported groups/plans show n/a. See `references/SETTINGS_MAP.md`.
+
 The scanner's job is to find future fat moves early.
 
 - **Current output contract (since 2026-09-23):** candidates are classified
