@@ -6,6 +6,7 @@ namespace IbSwingTrader.Application.Candidates
 
         public static bool IsBoost(Candle candle, Candle preceding)
         {
+            // Legacy body predicate retained for boost-body exit targets, not entry timing.
             var body = candle.Close - candle.Open;
             return body > 0m && body >= BurstBodyMultiplier * Math.Abs(preceding.Close - preceding.Open);
         }
@@ -26,8 +27,11 @@ namespace IbSwingTrader.Application.Candidates
             IEnumerable<Candle> h4Candles,
             Timeframe patternTimeframe,
             DateTime scanTime,
-            out string reason)
-            => IsReady(dailyCandles, h4Candles, patternTimeframe, scanTime, out reason, out _);
+            out string reason,
+            int rangeLookbackBars = 5,
+            decimal rangeMultiplier = 2m)
+            => IsReady(dailyCandles, h4Candles, patternTimeframe, scanTime, out reason, out _,
+                rangeLookbackBars, rangeMultiplier);
 
         public static bool IsReady(
             IEnumerable<Candle> dailyCandles,
@@ -35,7 +39,9 @@ namespace IbSwingTrader.Application.Candidates
             Timeframe patternTimeframe,
             DateTime scanTime,
             out string reason,
-            out string shortReason)
+            out string shortReason,
+            int rangeLookbackBars = 5,
+            decimal rangeMultiplier = 2m)
         {
             if (patternTimeframe is not (Timeframe.D1 or Timeframe.H4))
             {
@@ -45,24 +51,33 @@ namespace IbSwingTrader.Application.Candidates
             }
 
             var isDaily = patternTimeframe == Timeframe.D1;
+            if (rangeLookbackBars < 1 || rangeMultiplier <= 0m)
+            {
+                shortReason = "Invalid timing settings";
+                reason = "BellUp range lookback and multiplier must be positive";
+                return false;
+            }
             var completed = GetCompletedCandles(isDaily ? dailyCandles : h4Candles, patternTimeframe, scanTime)
-                .TakeLast(3)
+                .TakeLast(rangeLookbackBars + 1)
                 .ToList();
 
-            return IsTimeframeReady(completed, isDaily ? "Daily" : "H4", out reason, out shortReason);
+            return IsTimeframeReady(completed, isDaily ? "Daily" : "H4",
+                rangeLookbackBars, rangeMultiplier, out reason, out shortReason);
         }
 
         private static bool IsTimeframeReady(
             IReadOnlyList<Candle> completedCandles,
             string timeframe,
+            int rangeLookbackBars,
+            decimal rangeMultiplier,
             out string reason,
             out string shortReason)
         {
             shortReason = string.Empty;
-            if (completedCandles.Count < 3)
+            if (completedCandles.Count < rangeLookbackBars + 1)
             {
                 shortReason = "Missing candles";
-                reason = $"{timeframe}: three completed candles are required for BellUp entry timing";
+                reason = $"{timeframe}: {rangeLookbackBars + 1} completed candles are required for BellUp range timing";
                 return false;
             }
 
@@ -70,12 +85,25 @@ namespace IbSwingTrader.Application.Candidates
             // A one-day consolidation after a T-2 impulse is a valid continuation
             // setup, especially when H4 remains constructive.
             var candle = completedCandles[^1];
-            var preceding = completedCandles[^2];
-            if (IsBoost(candle, preceding))
+            var ranges = completedCandles.Take(completedCandles.Count - 1)
+                .Select(x => x.High - x.Low).OrderBy(x => x).ToList();
+            var middle = ranges.Count / 2;
+            var median = ranges.Count % 2 == 0
+                ? (ranges[middle - 1] + ranges[middle]) / 2m : ranges[middle];
+            if (ranges[0] < 0m || median <= 0m || candle.High < candle.Low)
+            {
+                shortReason = "Missing range data";
+                reason = $"{timeframe}: a positive median of valid candle ranges is required for BellUp timing";
+                return false;
+            }
+            var range = candle.High - candle.Low;
+            if (candle.Close > candle.Open && range >= rangeMultiplier * median)
             {
                 shortReason = "Recent boost";
                 reason = $"{timeframe}: BellUp boost on T-1 ({candle.Time:yyyy-MM-dd HH:mm:ss}); " +
-                         "green body is at least 2x the preceding body; do not enter";
+                         $"green candle range={range}, PreviousMedianRange={median}, " +
+                         $"RangeRatio={range / median:0.####}, Lookback={rangeLookbackBars}, " +
+                         $"Threshold={rangeMultiplier}; do not enter";
                 return false;
             }
 

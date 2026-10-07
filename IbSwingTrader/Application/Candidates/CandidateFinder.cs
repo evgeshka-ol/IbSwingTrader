@@ -1294,7 +1294,9 @@ namespace IbSwingTrader.Application.Candidates
                     Timeframe.D1,
                     ctx.ScanTimeMarket,
                     out var dailyTimingReason,
-                    out var dailyTimingShortReason))
+                    out var dailyTimingShortReason,
+                    _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeLookbackBars,
+                    _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeMultiplier))
             {
                 // A large Daily boost is not by itself a reason to discard a
                 // still-fresh H4 continuation. Keep the Daily veto for H4
@@ -2001,7 +2003,9 @@ namespace IbSwingTrader.Application.Candidates
                 pattern.Timeframe == BellPatternTimeframe.Daily ? Timeframe.D1 : Timeframe.H4,
                 ctx.ScanTimeMarket,
                 out reason,
-                out shortReason))
+                out shortReason,
+                _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeLookbackBars,
+                _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeMultiplier))
                 return false;
 
             var history = BuildBellUpHistory(ctx, pattern);

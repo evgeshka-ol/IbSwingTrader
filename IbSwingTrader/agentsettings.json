@@ -353,6 +353,8 @@
             "MinProfitPct": 0.03,
             "MaxProfitPct": 0.10,
             "BellUpBoostExitMinProfitPct": 0.015,
+            "BellUpRecentBoostRangeLookbackBars": 5,
+            "BellUpRecentBoostRangeMultiplier": 2,
             "BellUpProfitReductionThresholdPct": 0.10,
             "BellUpProfitReductionDivisor": 2,
             "H4TargetLookbackBars": 24,
