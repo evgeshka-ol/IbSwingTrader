@@ -343,6 +343,8 @@ namespace IbSwingTrader.Application.Dataset
             var key = BuildEvaluationKey(evaluation);
             candidateIndex.TryGetValue(key, out var candidateSnapshot);
             var candidate = candidateSnapshot?.Candidate;
+            if (candidate != null)
+                ScannerPriceRebase.Apply(evaluation, candidate.TradePlan.LiveReferencePrice);
             var isFromWishlist = candidate?.IsFromWishlist ?? evaluation.IsFromWishlist;
             var candidateSource = candidate?.CandidateSource ?? evaluation.CandidateSource;
             if (string.IsNullOrWhiteSpace(candidateSource))

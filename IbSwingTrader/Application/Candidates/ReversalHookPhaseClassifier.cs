@@ -59,6 +59,13 @@ namespace IbSwingTrader.Application.Candidates
                              prices[^1] > prices.TakeLast(3).Min();
             }
             var currentPrice = snapshotPrice > 0m ? snapshotPrice : prices[^1];
+            if (bend >= 0 && snapshotPrice > 0m && currentPrice > bands[^1] &&
+                prices[bend - 1] < bands[bend - 1] && currentPrice > prices[bend - 1] &&
+                momentum[^1] >= momentum[bend])
+            {
+                // Live reclaim can resume a recognized episode despite a pause in closed bars.
+                recovering = true;
+            }
             if (bend >= 0 && currentPrice <= prices[bend - 1])
                 recovering = false;
             var upperReached = upper is { Count: > 0 } && upper[^1] > bands[^1] &&

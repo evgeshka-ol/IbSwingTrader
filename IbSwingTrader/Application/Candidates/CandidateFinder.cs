@@ -453,6 +453,7 @@ namespace IbSwingTrader.Application.Candidates
                 var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
                 if (quote == null)
                     throw new InvalidOperationException("No current or immediately preceding M5 bar");
+                candidate.TradePlan.LiveReferencePrice = quote.Price;
                 quote.ApplyTo(candidate.TradePlan);
                 candidate.TradePlan.EntryPriceSource = "ReversalDiagnosisFreshM5";
                 var episode = BuildReversalPhaseDiagnosis(ctx, quote.Price);
@@ -960,6 +961,7 @@ namespace IbSwingTrader.Application.Candidates
             var entryScore = _candidateScore.Calculate(ctx.Snapshot);
             var recentSeries = BuildRecentFeatureSeries(ctx.Candles);
             var bbState = BuildBollingerStateSet(recentSeries);
+            ExecutionPriceSnapshot? reversalBridgeQuote = null;
             void EmitOtherCandidate(string reason, string shortReason, string? patternVerdictReason = null)
             {
                 // Keep rejected setups for evaluation without constructing an executable plan.
@@ -974,6 +976,12 @@ namespace IbSwingTrader.Application.Candidates
                     ReferencePriceObservedAt = ctx.EntryObservedAt ?? ctx.ScanTimeMarket,
                     ReferencePriceSource = referenceBarTime.HasValue ? "M15History" : "ScanSnapshot"
                 };
+                if (reversalBridgeQuote != null)
+                {
+                    trade.LiveReferencePrice = reversalBridgeQuote.Price;
+                    reversalBridgeQuote.ApplyTo(trade);
+                    trade.EntryPriceSource = "ReversalDiagnosisM5Bridge";
+                }
                 var dailyScore = mergedWishItem.Score.DailyScore ?? 0m;
                 var weeklyScore = mergedWishItem.Score.WeeklyScore ?? 0m;
                 var finalScore = dailyScore + weeklyScore + entryScore;
@@ -1071,7 +1079,10 @@ namespace IbSwingTrader.Application.Candidates
 
             if (!isTodayResearchLikeCandidate)
             {
-                var episode = BuildReversalPhaseDiagnosis(ctx);
+                var bridge = await LoadReversalM5Bridge(ctx);
+                reversalBridgeQuote = bridge;
+                var episode = BuildReversalPhaseDiagnosis(ctx, bridge?.Price,
+                    bridge != null ? $"M5Bridge@{bridge.PriceTime:yyyy-MM-dd HH:mm:ss}" : null);
                 if (!episode.Recognized)
                 {
                     EmitOtherCandidate(episode.Reason, "Reversal unconfirmed", episode.Reason);
@@ -5033,8 +5044,39 @@ namespace IbSwingTrader.Application.Candidates
             return aligned;
         }
 
+        private async Task<ExecutionPriceSnapshot?> LoadReversalM5Bridge(WishListContext ctx)
+        {
+            try
+            {
+                var now = MarketTime.Now();
+                var completed = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, now);
+                if (completed.Count == 0)
+                    return null;
+                var start = completed[^1].Time.AddHours(4);
+                if (start >= now)
+                    return null;
+                ctx.Contract ??= await _contractResolver.ResolveStockAsync(ctx.Stock.Ticker);
+                // This range API reuses cached M5 and requests only missing session ranges,
+                // with its normal one-bar overlap. Weekends are handled by the market calendar.
+                var bars = await _historicalData.GetCandlesRange(ctx.Stock.Ticker, ctx.Contract,
+                    Timeframe.M5, start, now);
+                var quote = bars == null ? null : ExecutionPriceSnapshot.FromM5(
+                    bars.Where(x => x.Time >= start && x.Time.AddMinutes(5) <= now), now, MarketTime.Now());
+                _logger.Info($"Reversal M5 bridge: {ctx.Stock.Ticker}. " +
+                    $"LastClosedH4={completed[^1].Time:yyyy-MM-dd HH:mm:ss}, " +
+                    $"BridgeStart={start:yyyy-MM-dd HH:mm:ss}, End={now:yyyy-MM-dd HH:mm:ss}, " +
+                    $"Bars={bars?.Count ?? 0}, RecentPrice={(quote == null ? "unavailable" : quote.Price.ToString())}");
+                return quote == null ? null : quote with { Source = "M5Bridge" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Info($"Reversal M5 bridge unavailable: {ctx.Stock.Ticker}. {ex.Message}");
+                return null;
+            }
+        }
+
         private (bool Recognized, string Timeframe, string Phase, string Reason) BuildReversalPhaseDiagnosis(
-            WishListContext ctx, decimal? freshPrice = null)
+            WishListContext ctx, decimal? freshPrice = null, string? priceSource = null)
         {
             var currentPrice = freshPrice ?? ResolveScanPrice(ctx.Snapshot);
             var now = MarketTime.Now();
@@ -5085,7 +5127,7 @@ namespace IbSwingTrader.Application.Candidates
                 .ThenByDescending(x => x.Phase == "Preparing").First();
             var prefix = selected.Recognized ? $"ReversalHook recognized on {selected.Timeframe}"
                 : $"ReversalHook unconfirmed on D1/H4";
-            var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={(freshPrice.HasValue ? "FreshM5" : "HistoricalSnapshot")}; " +
+            var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={priceSource ?? (freshPrice.HasValue ? "FreshM5" : "HistoricalSnapshot")}; " +
                          $"{daily.Reason}; {h4.Reason}";
             _logger.Info($"Reversal episode: {ctx.Stock.Ticker}. {reason}");
             return (selected.Recognized, selected.Timeframe, selected.Phase, reason);

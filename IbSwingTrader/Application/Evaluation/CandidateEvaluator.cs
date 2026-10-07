@@ -200,7 +200,7 @@ namespace IbSwingTrader.Application.Evaluation
             var exitPrice = candidate.TradePlan.ExitPrice;
             var stopPrice = candidate.TradePlan.StopLoss;
 
-            result.ScanPrice = ordered[0].Open;
+            // ScanPrice is the saved scanner reference, never the first future candle's open.
             result.CurrentPrice = ordered[^1].Close;
             result.ScanMovePct = RoundPct(CalcPct(result.ScanPrice, result.CurrentPrice));
             result.CurrentPct = RoundPct(CalcPct(entryPrice, result.CurrentPrice));
@@ -437,9 +437,10 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbDirection = candidate.H4BbDirection,
                 H4BbRegime = candidate.H4BbRegime,
                 IsFromWishlist = candidate.IsFromWishlist,
-                StrategyVersion = 6,
+                StrategyVersion = 7,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
+                ScanPrice = candidate.TradePlan.LiveReferencePrice,
                 ExitPrice = candidate.TradePlan.ExitPrice,
                 StopLoss = candidate.TradePlan.StopLoss
             };
@@ -496,9 +497,10 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbDirection = candidate.H4BbDirection,
                 H4BbRegime = candidate.H4BbRegime,
                 IsFromWishlist = candidate.IsFromWishlist,
-                StrategyVersion = 6,
+                StrategyVersion = 7,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
+                ScanPrice = candidate.TradePlan.LiveReferencePrice,
                 ExitPrice = candidate.TradePlan.ExitPrice,
                 StopLoss = candidate.TradePlan.StopLoss,
                 Outcome = $"Error: {error}"
