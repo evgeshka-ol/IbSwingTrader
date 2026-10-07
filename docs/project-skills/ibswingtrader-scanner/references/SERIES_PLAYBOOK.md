@@ -158,6 +158,24 @@ Both timeframe diagnoses, age and completed-bar timestamps are retained in
 active, recognition is still recorded with its phase. H4 crossing does not
 imply Daily completion. Middle crossing is no longer an automatic rejection.
 
+Since 2026-10-07, before ReversalHook diagnosis, non-BellUp candidates load an
+M5 bridge from the last completed native H4 bar's end (`bar.Time + 4h`) to now.
+GetCandlesRange reuses cached M5 and requests missing ranges with its existing
+overlap policy. Use exchange-time timestamps, not chart display times.
+Only completed M5 are used here, with the current/immediately preceding
+bucket rule to prevent old-session prices being treated as current. Without
+recent M5, the diagnosis explicitly uses HistoricalSnapshot. The bridge runs
+even without a recognized seed, before the recognition rejection.
+
+An established bend can resume at a live mid reclaim when current price is
+above mid and the pre-bend close, and the closed histogram is no worse than
+at the bend. A future MACD crossover is not presumed certain. Fresh price
+alone does not establish a historical seed, and incomplete H4/Daily bars do
+not become confirmed. M5 diagnostic price/provenance are saved in the candidate.
+Final fresh-M5 publication validation remains separate. The bridge adds
+possible missing-data requests for the non-BellUp pool, not an unconditional
+download of all M5 history. BellUp timing is unchanged.
+
 Before publication, only the deduplicated recognized shortlist refreshes H4,
 Daily and fresh M5. Recognition and phase are recalculated. Admission requires
 an Active/MidCrossed episode, existing higher-timeframe support and a valid

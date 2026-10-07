@@ -109,6 +109,12 @@ skill for the legacy score formulas used by those pools.
 
 ### `GetCandidates.TradePlan`
 
+Since 2026-10-07, evaluation ScanPrice preserves the same saved
+TradePlan.LiveReferencePrice exported as candidates.csv ScanPrice. The first
+future M5 open is no longer substituted into this field. Historical indicator
+prices can still be stale: ResolveScanPrice reconstructs the last historical
+daily close from its Bollinger-mid distance, not a real-time market quote.
+
 Do not use this to solve scanner recall/ranking issues.
 Use it only after the list quality is good.
 

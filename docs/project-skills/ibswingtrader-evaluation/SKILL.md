@@ -24,6 +24,14 @@ Do not mix them.
 
 ## Main rule
 
+Since 2026-10-07 (StrategyVersion=7), evaluation ScanPrice is the saved
+candidate TradePlan.LiveReferencePrice, identical to candidates.csv ScanPrice.
+It is never overwritten with the first post-publication M5 open. Scan-relative
+percentages use this same reference; entry-relative profit/loss and outcome
+remain unchanged. Dataset rebuilds restore the reference where an exact
+candidate snapshot exists and rebase dependent metrics. Older unmatched rows
+retain legacy semantics. Dated investigations remain historical records.
+
 Since 2026-10-06, preserve saved `ReversalHook recognized on ...`,
 `ReversalHook confirmed on ...`, and `ReversalHook unconfirmed on D1/H4`
 reasons, including phases and NotReady details. A recognition Match on Other

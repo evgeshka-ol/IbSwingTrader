@@ -94,6 +94,10 @@ The scanner's job is to find future fat moves early.
   Preparing/Stalled/Completed and readiness failures stay in Other. Both
   timeframe diagnoses and explicit rejection reasons are saved. See
   `references/SERIES_PLAYBOOK.md` for phase and publication rules.
+- Since 2026-10-07, ReversalHook phase diagnosis first loads cached/missing M5
+  after the end of the latest closed native H4 bar. Recent M5 updates current
+  price and can revive a seeded episode at mid reclaim; incomplete H4/Daily
+  bars are not treated as confirmed. This runs before recognition rejection.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
   consolidation candle remains eligible. Additionally, when Daily

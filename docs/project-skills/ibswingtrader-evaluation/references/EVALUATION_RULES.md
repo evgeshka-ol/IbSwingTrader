@@ -2,6 +2,15 @@
 
 Main artifact:
 
+Price contract since 2026-10-07: ScanPrice is the price saved by the scanner
+in candidates.csv, not a later M5 open. MaxPct, MinPct, ScanMovePct and
+scan-relative timing percentages use that reference. A saved historical
+reference can be stale; changing the report does not make it a fresh quote.
+Trade outcomes and planned profit/loss remain based on plan entry/exit/stop.
+StrategyVersion=7 marks the new contract; rebuilds repair matched legacy
+rows from their exact candidate snapshots. Without a snapshot the old price
+cannot safely be reconstructed from future bars and is left unchanged.
+
 - `Data/datasets/evaluation-dataset.csv`
 
 Current candidate groups are `BellUp`, `ReversalHook`, and `Other`. Historical
