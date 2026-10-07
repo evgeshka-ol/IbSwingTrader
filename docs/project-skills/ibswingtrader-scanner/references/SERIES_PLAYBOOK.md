@@ -365,54 +365,40 @@ at the right moment before the boost. Recognizing the BellUp shape and
 deciding whether entry is already late are separate checks. Setups matching
 neither playable family belong in `Other`.
 
-Apply the following timing rule on the timeframe of the confirmed BellUp
-(Daily or H4), using aligned Open/Close candles and signed body
-`B = Close - Open`. Do not require both timeframes to pass this body test.
-Let T-1 be the latest completed candle and T-2 the completed candle before it:
+### Current timing rule (2026-10-07)
 
-1. If `B(T-1) > 0` and `B(T-1) >= 2 * abs(B(T-2))`, the boost happened on
-   T-1: do not enter.
-2. A T-2 boost does not veto entry by itself: one completed consolidation
-   candle after an impulse is a valid continuation setup.
-3. Otherwise, retain the ticker as a playable candidate, provided its BellUp
-   and other eligibility checks pass.
+On the confirmed BellUp timeframe (Daily or H4), T-1 is the latest completed
+candle. It blocks entry as Recent boost when Close > Open and its High-Low
+range is at least the configured multiplier times the median range of the
+previous N completed candles. Defaults: N=5 and multiplier=2. The current
+candle is excluded from the median. An older impulse followed by ordinary
+consolidation does not veto entry by itself.
 
-The boost candle must be green; its predecessor can be either color, since
-the comparison uses the predecessor's absolute body length. This is a
-body-size comparison, not a wick/range or close-to-close percentage test.
-Three completed candles are still required as the conservative minimum history
-for the timing check. Determine
-completion from candle timestamps; Daily series may already exclude the
-forming candle while H4 series may include it. Do not blindly use identical
-array offsets for both timeframes. Missing history cannot establish that
-both checks passed; the implementation sends such a setup to `Other` with
-an insufficient-history reason.
+The selected-timeframe check and the existing confirmed-Daily cross-timeframe
+veto use this same rule. Existing H4 continuation overrides and other readiness
+checks remain in force. Only closed candles establish the timing veto; Daily
+completion is 16:00 and H4 completion is start+4h in market-local timestamps.
+Native D1 is preferred, with H4-derived Daily bars as the existing fallback.
 
-This is the user's requested behavior, not a claim of AUC/holdout validation.
-It supersedes the older Daily 5% close-to-close definition in code comments.
+The check needs N+1 completed candles (six by default). Invalid settings,
+negative ranges or a non-positive median produce an explicit non-ready reason.
+A veto reports timeframe, T-1 time, range, prior median, ratio, window and
+threshold. Missing-history rejection is not a boost.
 
-### Implementation (2026-09-09)
+`BellUpEntryTiming.IsReady` implements range timing. Its separate legacy
+`IsBoost(candle, preceding)` remains a body-based predicate solely for
+`BellUpBoostExit`: target selection/averaging still uses prior boost bodies.
+This entry-timing change does not replace exit targets with wick ranges.
+Final BellUp target reduction and minimum-profit rules remain applicable.
 
-`Application/Candidates/BellUpEntryTiming.cs` implements the shared body
-rule for the selected Daily or H4 timeframe. `ClassifyBellPatternSignal`
-selects the pattern's timeframe using the existing classifier policy;
-`CandidateFinder.TryAddCandidate` applies the timing check to
-otherwise eligible BellUp candidates before building a trade plan. A boost
-on that timeframe sends the row to `Other`, with a zero plan and a reason
-identifying the timeframe and T-1 candle. No boost means this timing gate
-passes, not that unrelated eligibility checks are bypassed.
+Settings: GetCandidates.TradePlan.BellUpRecentBoostRangeLookbackBars and
+BellUpRecentBoostRangeMultiplier. This user-authorized experimental change is
+supported by the dated range study, not a full trade-plan holdout evaluation.
+It does not guarantee admission if another readiness check fails.
 
-The check uses raw candles without rounding the bodies, preferring the
-context's D1 candles and falling back to the existing H4-to-Daily aggregation
-only when D1 candles are unavailable. Times are market-local as prepared by
-the existing data pipeline. Daily completion uses the regular 16:00 session
-close; H4 completion uses candle start plus four hours. A green candle after
-a zero-body candle satisfies the literal 2x rule; two zero bodies do not.
-
-The trade-plan readiness profile uses the same predicate. The old Daily
-5% close-to-close test, H4 single-position check, and late-phase ranking
-offset/penalty application were removed; the rule now controls admission.
-Existing BellUp geometry and other late-phase checks remain in effect.
+Historical rule through 2026-10-06: green T-1 body >=2x absolute T-2 body,
+with three completed bars required. The dated SECZ notes below describe that
+old body rule and remain investigation history.
 
 ### SECZ chart clarification (2026-09-09)
 

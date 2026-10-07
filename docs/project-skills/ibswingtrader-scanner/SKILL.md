@@ -100,7 +100,12 @@ The scanner's job is to find future fat moves early.
   bars are not treated as confirmed. This runs before recognition rejection.
 - BellUp timing rejects a setup only when the latest qualifying boost has
   occurred on the confirmed timeframe. A T-2 impulse followed by a completed
-  consolidation candle remains eligible. Additionally, when Daily
+  consolidation candle remains eligible.
+  Since 2026-10-07, the timing boost is a green candle with range >=2x the
+  median of the previous five ranges (configurable), not a body ratio. Six
+  completed candles are required by default. Exit targets retain body-based
+  boost selection. See SERIES_PLAYBOOK.md for the full current timing rule.
+  Additionally, when Daily
   independently confirms BellUp, its timing is a cross-timeframe veto even
   for an H4-selected signal; an H4-only BellUp is not blocked by absent Daily
   confirmation. H4 lower-band turn with a flat Daily middle band is an

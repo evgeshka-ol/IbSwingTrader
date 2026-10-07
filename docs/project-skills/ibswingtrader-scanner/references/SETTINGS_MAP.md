@@ -109,6 +109,14 @@ skill for the legacy score formulas used by those pools.
 
 ### `GetCandidates.TradePlan`
 
+Since 2026-10-07, BellUp Recent boost timing uses
+`BellUpRecentBoostRangeLookbackBars=5` and `BellUpRecentBoostRangeMultiplier=2`.
+A green latest completed candle with High-Low >= multiplier * median of
+previous N completed ranges blocks entry. N+1 bars are required. Both values
+must be positive. These controls affect timing, including the existing Daily
+veto, not the body-based boost selection used to calculate exit targets.
+See SERIES_PLAYBOOK.md for overrides, missing-data handling and provenance.
+
 Since 2026-10-07, evaluation ScanPrice preserves the same saved
 TradePlan.LiveReferencePrice exported as candidates.csv ScanPrice. The first
 future M5 open is no longer substituted into this field. Historical indicator
