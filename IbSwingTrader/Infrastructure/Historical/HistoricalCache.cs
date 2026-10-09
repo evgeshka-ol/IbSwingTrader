@@ -30,6 +30,19 @@ namespace IbSwingTrader.Infrastructure.Historical
             Directory.CreateDirectory(_folder);
         }
 
+        public string? GetVersion(string symbol)
+        {
+            try
+            {
+                var info = new FileInfo(BuildPath(symbol));
+                return info.Exists ? $"{info.LastWriteTimeUtc.Ticks}:{info.Length}" : "missing";
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public bool TryLoad(
             string symbol,
             Timeframe timeframe,

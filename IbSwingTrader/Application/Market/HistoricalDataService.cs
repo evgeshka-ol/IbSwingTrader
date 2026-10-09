@@ -385,6 +385,13 @@ namespace IbSwingTrader.Application.Market
                 var current = ordered[i].Time;
                 var diff = current - prev;
 
+                // These intervals cannot be reported as gaps; avoid schedule/cache work for them.
+                if (diff <= expectedStep + tolerance)
+                    continue;
+                var missingBars = (int)Math.Round(diff.TotalSeconds / expectedStep.TotalSeconds) - 1;
+                if (IsIntraday(timeframe) && missingBars < 3)
+                    continue;
+
                 var isExpectedGap = await _marketGapAnalyzer.IsExpectedGapAsync(
                     contract,
                     timeframe,
@@ -392,14 +399,6 @@ namespace IbSwingTrader.Application.Market
                     MarketTime.ToUtc(current));
 
                 if (isExpectedGap)
-                    continue;
-
-                if (diff <= expectedStep + tolerance)
-                    continue;
-
-                var missingBars = (int)Math.Round(diff.TotalSeconds / expectedStep.TotalSeconds) - 1;
-
-                if (IsIntraday(timeframe) && missingBars < 3)
                     continue;
 
                 result.Add(new DateRange(prev, current));

@@ -14,6 +14,10 @@ namespace IbSwingTrader.Application.Market
         private readonly IMarketScheduleResolver _marketScheduleResolver = marketScheduleResolver;
         private readonly IMarketSessionSettingsProvider _marketSessionSettingsProvider = marketSessionSettingsProvider;
         private readonly IHistoricalCache _historicalCache = historicalCache;
+        private const int ObservedPatternCacheLimit = 4096;
+        private readonly object _patternCacheLock = new();
+        private readonly Dictionary<(string Symbol, Timeframe Frame, DateTime PreviousUtc, string Zone, bool Extended),
+            (string Version, ObservedIntradayPattern? Pattern)> _observedPatterns = new();
 
         public async Task<bool> IsExpectedGapAsync(
             Contract contract,
@@ -148,6 +152,18 @@ namespace IbSwingTrader.Application.Market
             if (string.IsNullOrWhiteSpace(symbol))
                 return null;
 
+            // Keep exact reference time: coarse day caching would change the evidence window.
+            var key = (symbol.ToUpperInvariant(), timeframe, previousBarUtc, timeZone.Id, useExtendedHours);
+            var version = _historicalCache.GetVersion(symbol);
+            if (version != null)
+            {
+                lock (_patternCacheLock)
+                {
+                    if (_observedPatterns.TryGetValue(key, out var entry) && entry.Version == version)
+                        return entry.Pattern;
+                }
+            }
+
             if (!_historicalCache.TryLoad(symbol, timeframe, out var cached) ||
                 cached is null ||
                 cached.Count == 0)
@@ -155,6 +171,23 @@ namespace IbSwingTrader.Application.Market
                 return null;
             }
 
+            var pattern = BuildObservedPattern(cached, previousBarUtc, useExtendedHours);
+            // A concurrent save must not cache a pattern under the wrong file version.
+            if (version != null && version == _historicalCache.GetVersion(symbol))
+            {
+                lock (_patternCacheLock)
+                {
+                    if (_observedPatterns.Count >= ObservedPatternCacheLimit && !_observedPatterns.ContainsKey(key))
+                        _observedPatterns.Clear();
+                    _observedPatterns[key] = (version, pattern);
+                }
+            }
+            return pattern;
+        }
+
+        private static ObservedIntradayPattern? BuildObservedPattern(
+            List<Candle> cached, DateTime previousBarUtc, bool useExtendedHours)
+        {
             var cutoffUtc = previousBarUtc.AddDays(-ObservedLookbackDays);
 
             var recentCandles = cached
