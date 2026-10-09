@@ -60,6 +60,8 @@ Since 2026-10-09, scanner history loading has bounded empty-chunk retries,
 a seven-calendar-day maximum M5 bridge age, and run-local reuse of prepared
 history and feature prefixes. Reuse expires across H4/M5 boundaries as
 appropriate; final publication pricing remains fresh. See SETTINGS_MAP.md.
+Gap checks also apply existing cheap interval thresholds before schedule
+analysis and memoize observed slots against the historical file version.
 
 - Broker authentication remains entirely inside TWS/IB Gateway. The scanner
   connects through the local IB API socket and contains no broker credentials

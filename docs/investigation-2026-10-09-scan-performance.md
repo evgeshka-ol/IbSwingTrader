@@ -50,3 +50,47 @@ Actual elapsed time and cache behavior require the next user-run scan.
 Compare total time, slowest ticker operations, In-run reuse summary,
 prepared history reuse messages and historical empty-chunk streaks.
 No promise of returning to 40 minutes is made before that measurement.
+
+## Follow-up run after changes
+
+log-20261009_0918.log: 1:43:16. This is a different universe/time of day:
+185 unique tickers versus 151 in the earlier run, including TOP_OPEN_PERC_GAIN
+which was empty earlier. XOM does not appear in this follow-up log, so its
+absence alone does not prove that the stale-bridge guard triggered for XOM.
+The empty-chunk guard is directly evidenced by TGB: three empty H4 blocks,
+then abort, total ticker operation 3:06.439. HELP took 1:59.365.
+
+Prepared history was reused 98 times, M5 bridge results 14 times.
+Run summary: PreparedTickers=174, FailedTickers=1, FeaturePrefixes=38541,
+RecentSeries=87, M5BridgeTickers=159. Preparation stages sum about 57 minutes,
+Ranking/Rebuild takes 24:11.823, and publication validation/output account
+for the remaining approximately 22 minutes. There were 93 fresh M5 snapshots.
+
+Logged historical request waiting totals about 12.25 minutes: successful
+requests ~7.58 minutes, timeouts ~4.67 minutes. This is not a complete CPU
+profile, but it rules out network waiting as the dominant remainder.
+IREN/IONQ/SMR show 43–45 second log gaps between the response and history trim.
+
+Code inspection identifies a likely next optimization: HistoricalDataService
+FindGapsAsync calls MarketGapAnalyzer.IsExpectedGapAsync before checking
+whether the interval is too short to be a reportable gap. The analyzer then
+resolves schedules and reconstructs observed patterns via historical-cache
+reads. This runs for ordinary adjacent candles too, and during missing-range
+and coverage checks. Move cheap interval/tolerance/missing-bar checks before
+the asynchronous analyzer, and memoize observed session patterns where safe.
+The exact time contribution of each operation is not measured by this log.
+No additional production changes were made in this follow-up analysis.
+
+## Follow-up implementation authorized after analysis
+
+Cheap diff/tolerance/minimum-missing-bar checks now precede schedule analysis
+in FindGapsAsync. The predicates and gap output rules are retained.
+Observed intraday slot models are cached at exact reference timestamps,
+including timezone and extended-hours mode, against historical file metadata
+version (LastWriteTimeUtc + Length). Updates invalidate the memoized result;
+concurrent version changes prevent insertion. The cache is bounded to 4096
+entries; cache implementations without version support retain uncached behavior.
+The existing twenty-day evidence window and calendar fallback are preserved.
+
+Targeted diff checks passed. Builds, tests and broker/application commands
+were not run. A subsequent user-run scan must measure the actual speed gain.

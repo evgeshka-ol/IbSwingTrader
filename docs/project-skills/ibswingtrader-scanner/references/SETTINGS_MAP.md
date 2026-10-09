@@ -55,6 +55,16 @@ Logs contain `In-run reuse summary`, `Historical empty-chunk streak`, and
 explicit stale/failed bridge reasons. Final fresh publication pricing remains
 an independent broker request. See the dated 2026-10-09 performance record.
 
+Further gap-check optimization (2026-10-09): HistoricalDataService rejects
+intervals below the existing tolerance/missing-bar thresholds before calling
+the asynchronous schedule analyzer. Reportable-gap criteria are unchanged.
+MarketGapAnalyzer memoizes observed slot patterns using exact reference time,
+symbol, timeframe, timezone and extended-hours mode. The source historical
+file version (write timestamp + size) invalidates results after saves/updates.
+Version is checked before and after calculation; unsupported version tracking
+disables memoization. Cache is bounded to 4096 entries. No daily rounding of
+reference time or additional future candles enters the observed-pattern window.
+
 - **Current output categories (since 2026-09-23):** `BellUp`, `ReversalHook`,
   and `Other`. The migration is recorded in commit `d4a4f1d`.
   - BellUp and ReversalHook are the playable pattern groups. `Other` retains
