@@ -56,6 +56,11 @@ The scanner's job is to find future fat moves early.
 
 ## Current architecture and output contract (2026-09-29)
 
+Since 2026-10-09, scanner history loading has bounded empty-chunk retries,
+a seven-calendar-day maximum M5 bridge age, and run-local reuse of prepared
+history and feature prefixes. Reuse expires across H4/M5 boundaries as
+appropriate; final publication pricing remains fresh. See SETTINGS_MAP.md.
+
 - Broker authentication remains entirely inside TWS/IB Gateway. The scanner
   connects through the local IB API socket and contains no broker credentials
   in source or settings.

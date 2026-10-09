@@ -31,6 +31,30 @@ Useful when too many names are seen but not promoted.
 
 ### `GetCandidates.Finder`
 
+Performance guards since 2026-10-09:
+
+- `ReversalM5BridgeMaxCalendarDays=7`: if the end of the last completed H4
+  is older than this calendar window, skip the M5 bridge and keep the setup
+  non-playable with a stale-history reason. Never fill months of H4 gaps via M5.
+- `HistoricalMaxConsecutiveEmptyChunks=3`: scanner range loading aborts after
+  this many consecutive empty chunks in expected trading periods, counting
+  after existing request retries. Off-session empty periods do not count;
+  a nonempty chunk resets the streak. Empty responses include possible
+  timeouts; the provider does not expose a distinct timeout result here.
+  A nonpositive value disables this guard; other service callers retain
+  their previous behavior unless they explicitly pass a positive limit.
+- Prepared history/signal snapshots are reused by ticker within the current
+  run until the next possible H4 completion boundary. Preset-specific scoring
+  and filtering still run. Feature prefixes/recent series are memoized by
+  input list; mutation during publication refresh invalidates their cache.
+  M5 bridge results are reused only within the same five-minute bucket.
+  Failed H4 preparations and failed M5 bridges are not retried for every
+  preset in the same run. All run caches reset at the next FindAsync.
+
+Logs contain `In-run reuse summary`, `Historical empty-chunk streak`, and
+explicit stale/failed bridge reasons. Final fresh publication pricing remains
+an independent broker request. See the dated 2026-10-09 performance record.
+
 - **Current output categories (since 2026-09-23):** `BellUp`, `ReversalHook`,
   and `Other`. The migration is recorded in commit `d4a4f1d`.
   - BellUp and ReversalHook are the playable pattern groups. `Other` retains
