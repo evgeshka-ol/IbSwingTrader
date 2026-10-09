@@ -604,6 +604,8 @@ namespace IbSwingTrader.Domain.Settings
         public int LookbackCalendarDays { get; set; } = 240;
         public int ContractResolveTimeoutSeconds { get; set; } = 45;
         public int ContractResolveMaxAttempts { get; set; } = 2;
+        public int ReversalM5BridgeMaxCalendarDays { get; set; } = 7;
+        public int HistoricalMaxConsecutiveEmptyChunks { get; set; } = 3;
         public bool EmitAllSeenCandidates { get; set; } = false;
     }
 

@@ -47,7 +47,8 @@ namespace IbSwingTrader.Application.Market
             Contract contract,
             Timeframe timeframe,
             DateTime start,
-            DateTime end)
+            DateTime end,
+            int maxConsecutiveEmptyChunks = 0)
         {
             if (end <= start)
                 return [];
@@ -59,6 +60,8 @@ namespace IbSwingTrader.Application.Market
                 return [];
 
             var expectedStep = GetExpectedStep(timeframe);
+            var loadState = new HistoryLoadState(maxConsecutiveEmptyChunks > 0
+                ? maxConsecutiveEmptyChunks : int.MaxValue);
             var overlap = expectedStep;
 
             List<Candle> allCandles = [];
@@ -96,7 +99,8 @@ namespace IbSwingTrader.Application.Market
                         contract,
                         timeframe,
                         range.Start,
-                        range.End);
+                        range.End,
+                        loadState);
 
                     if (loaded.Count > 0)
                         allCandles.AddRange(loaded);
@@ -134,7 +138,8 @@ namespace IbSwingTrader.Application.Market
             Contract contract,
             Timeframe timeframe,
             DateTime start,
-            DateTime end)
+            DateTime end,
+            HistoryLoadState loadState)
         {
             var chunkSpan = timeframe.GetMaxRequestSpan();
             var allCandles = new List<Candle>();
@@ -164,6 +169,7 @@ namespace IbSwingTrader.Application.Market
 
                     if (chunkCandles != null && chunkCandles.Count > 0)
                     {
+                        loadState.EmptyStreak = 0;
                         allCandles.AddRange(chunkCandles);
                     }
                     else if (allCandles.Count > 0)
@@ -173,6 +179,10 @@ namespace IbSwingTrader.Application.Market
                             $"start={h4ChunkStart:yyyy-MM-dd HH:mm:ss}, end={h4ChunkEnd:yyyy-MM-dd HH:mm:ss}, " +
                             $"loadedCandles={allCandles.Count}");
                         break;
+                    }
+                    else
+                    {
+                        await CountEmptyChunk(symbol, contract, timeframe, h4ChunkStart, h4ChunkEnd, loadState);
                     }
 
                     h4ChunkEnd = h4ChunkStart;
@@ -211,13 +221,40 @@ namespace IbSwingTrader.Application.Market
 
                 if (chunkCandles != null && chunkCandles.Count > 0)
                 {
+                    loadState.EmptyStreak = 0;
                     allCandles.AddRange(chunkCandles);
+                }
+                else
+                {
+                    await CountEmptyChunk(symbol, contract, timeframe, currentChunkStart, currentChunkEnd, loadState);
                 }
 
                 chunkStart = chunkEnd;
             }
 
             return MergeCandles(allCandles);
+        }
+
+        private sealed class HistoryLoadState(int limit)
+        {
+            public int Limit { get; } = limit;
+            public int EmptyStreak { get; set; }
+        }
+
+        private async Task CountEmptyChunk(string symbol, Contract contract, Timeframe timeframe,
+            DateTime start, DateTime end, HistoryLoadState state)
+        {
+            if (state.Limit == int.MaxValue)
+                return;
+            if (!await _marketCoverageService.HasExpectedBarsBetweenAsync(contract, timeframe,
+                    MarketTime.ToUtc(start), MarketTime.ToUtc(end)))
+                return;
+            state.EmptyStreak++;
+            _logger.Info($"Historical empty-chunk streak: {symbol}, tf={timeframe}, " +
+                $"Streak={state.EmptyStreak}/{state.Limit}, Start={start:O}, End={end:O}");
+            if (state.EmptyStreak >= state.Limit)
+                throw new InvalidOperationException($"Historical load aborted for {symbol}/{timeframe}: " +
+                    $"{state.EmptyStreak} consecutive empty chunks in expected trading periods (possible timeouts)");
         }
 
         private async Task<List<DateRange>> BuildMissingRangesAsync(

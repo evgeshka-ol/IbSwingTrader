@@ -13,5 +13,6 @@ public interface IHistoricalDataService
         Contract contract,
         Timeframe timeframe,
         DateTime start,
-        DateTime end);
+        DateTime end,
+        int maxConsecutiveEmptyChunks = 0);
 }

@@ -321,6 +321,8 @@
             "LookbackCalendarDays": 240,
             "ContractResolveTimeoutSeconds": 15,
             "ContractResolveMaxAttempts": 2,
+            "ReversalM5BridgeMaxCalendarDays": 7,
+            "HistoricalMaxConsecutiveEmptyChunks": 3,
             "EmitAllSeenCandidates": true
         },
 
