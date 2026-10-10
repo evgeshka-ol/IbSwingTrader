@@ -15,6 +15,7 @@ namespace IbSwingTrader.Application.Candidates
         ICandidateSignalAnalyzer signalAnalyzer,
         IBollingerFigureAnalyzer bollingerFigureAnalyzer,
         IWishListScore wishListScore,
+        ReversalWatchList reversalWatchList,
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
@@ -32,6 +33,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly ICandidateSignalAnalyzer _signalAnalyzer = signalAnalyzer;
         private readonly IBollingerFigureAnalyzer _bollingerFigureAnalyzer = bollingerFigureAnalyzer;
         private readonly IWishListScore _wishListScore = wishListScore;
+        private readonly ReversalWatchList _reversalWatchList = reversalWatchList;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
@@ -45,7 +47,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly Dictionary<List<Candle>, RecentFeatureSeries> _recentSeriesForRun = new();
         private readonly Dictionary<(List<Candle> Candles, int Count), FeatureSet> _featuresForRun = new();
         private readonly Dictionary<(List<Candle> Source, Timeframe Frame, DateTime Cutoff), List<Candle>> _completedForRun = new();
-        private readonly Dictionary<string, (DateTime Bucket, ExecutionPriceSnapshot? Quote)> _bridgeForRun =
+        private readonly Dictionary<string, (DateTime Bucket, ExecutionPriceSnapshot? Quote, List<Candle> Bars)> _bridgeForRun =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _bridgeFailedForRun = new(StringComparer.OrdinalIgnoreCase);
 
@@ -90,23 +92,42 @@ namespace IbSwingTrader.Application.Candidates
             var allScannedWishListContexts = new List<WishListContext>();
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
             var performance = new ScanPerformanceSummary();
-            foreach (var preset in _scannerPresets.GetAll())
+            await _reversalWatchList.LoadAsync(marketNow);
+            var watchBatches = _reversalWatchList.GetScanBatches()
+                .Select(x => (x.Preset, SavedStocks: (List<StockInfo>?)x.Stocks)).ToList();
+            var liveBatches = _scannerPresets.GetAll()
+                .Select(x => (Preset: x, SavedStocks: (List<StockInfo>?)null)).ToList();
+            var batches = getCandidatesSettings.UseWishListFirst
+                ? watchBatches.Concat(liveBatches) : liveBatches.Concat(watchBatches);
+            foreach (var batch in batches)
             {
-                var stageMetric = performance.BeginStage(preset.ScanCode);
-                var stocks = await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
+                var preset = batch.Preset;
+                var stageName = batch.SavedStocks == null ? preset.ScanCode : $"WishList/{preset.ScanCode}";
+                var stageMetric = performance.BeginStage(stageName);
+                var stocks = batch.SavedStocks ?? await _stockUniverseProvider.GetStocksAsync(preset.ScanCode);
                 var receivedAt = MarketTime.Now();
                 foreach (var stock in stocks)
                     firstSeen.TryAdd(stock.Ticker, receivedAt);
                 stageMetric.Input = stocks.Count;
+                var eligibleStocks = stocks.Where(_preFilter.Pass).ToHashSet();
+                if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
+                {
+                    foreach (var stock in eligibleStocks)
+                        _reversalWatchList.ObserveDrop(stock, preset, receivedAt);
+                    // Persist the whole returned loser universe before slow history requests.
+                    // An interrupted run must not lose names it already received.
+                    await _reversalWatchList.SaveAsync();
+                }
 
                 foreach (var stock in stocks)
                 {
-                    var tickerMetric = performance.BeginTicker(preset.ScanCode, stock.Ticker);
+                    var tickerMetric = performance.BeginTicker(stageName, stock.Ticker);
                     try
                     {
                         stageMetric.Processed++;
+                        _reversalWatchList.MarkAttempt(stock.Ticker, MarketTime.Now());
 
-                        if (!_preFilter.Pass(stock))
+                        if (!eligibleStocks.Contains(stock))
                         {
                             stageMetric.Skipped++;
                             tickerMetric.Skipped = true;
@@ -350,7 +371,7 @@ namespace IbSwingTrader.Application.Candidates
                         target,
                         scanItem,
                         ctx,
-                        isFromWishlist: dailyFamilySplit == DailyFamilySplit.Reversal,
+                        isFromWishlist: _reversalWatchList.WasWatchedAtStart(ctx.Stock.Ticker),
                         marketTimezone,
                         bucketName: dailyFamilySplit == DailyFamilySplit.Reversal
                             ? "reversal candidates"
@@ -419,7 +440,8 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var ctx = contextsForOutput.First(x =>
                     string.Equals(x.Stock.Ticker, candidate.Ticker, StringComparison.OrdinalIgnoreCase) &&
-                    x.Preset.ScanCode == candidate.Scan.PresetScanCode);
+                    x.Preset.ScanCode == candidate.Scan.PresetScanCode &&
+                    x.ScanTimeMarket == candidate.Scan.SignalObservedAt);
                 await RefreshBellUpForPublication(candidate, ctx);
             }
 
@@ -427,7 +449,8 @@ namespace IbSwingTrader.Application.Candidates
             {
                 var ctx = contextsForOutput.First(x =>
                     string.Equals(x.Stock.Ticker, candidate.Ticker, StringComparison.OrdinalIgnoreCase) &&
-                    x.Preset.ScanCode == candidate.Scan.PresetScanCode);
+                    x.Preset.ScanCode == candidate.Scan.PresetScanCode &&
+                    x.ScanTimeMarket == candidate.Scan.SignalObservedAt);
                 await RefreshReversalForPublication(candidate, ctx);
             }
 
@@ -447,11 +470,13 @@ namespace IbSwingTrader.Application.Candidates
                 $"RecentSeries={_recentSeriesForRun.Count}, M5BridgeTickers={_bridgeForRun.Count}");
             LogScanPerformanceSummary(performance);
 
+            _reversalWatchList.RecordResults(finalCandidates.Concat(sameDayCandidates), MarketTime.Now());
+            await _reversalWatchList.SaveAsync();
             return new CandidateSearchResult
             {
                 Candidates = [.. finalCandidates],
                 SameDayCandidates = sameDayCandidates,
-                WishList = []
+                WishList = _reversalWatchList.GetItems()
             };
         }
 
@@ -503,6 +528,8 @@ namespace IbSwingTrader.Application.Candidates
                 var requestedAt = MarketTime.Now();
                 var bars = await _historicalData.GetFreshM5Snapshot(candidate.Ticker, ctx.Contract,
                     requestedAt.AddMinutes(-15), requestedAt);
+                ctx.ReversalBridgeBars = ctx.ReversalBridgeBars.Concat(bars.Where(x => x.Time.AddMinutes(5) <= requestedAt))
+                    .GroupBy(x => x.Time).Select(x => x.Last()).OrderBy(x => x.Time).ToList();
                 var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
                 if (quote == null)
                     throw new InvalidOperationException("No current or immediately preceding M5 bar");
@@ -5177,6 +5204,7 @@ namespace IbSwingTrader.Application.Candidates
                 var bucket = now.AddTicks(-(now.Ticks % TimeSpan.FromMinutes(5).Ticks));
                 if (_bridgeForRun.TryGetValue(ctx.Stock.Ticker, out var cached) && cached.Bucket == bucket)
                 {
+                    ctx.ReversalBridgeBars = cached.Bars;
                     _logger.Info($"In-run M5 bridge reused: {ctx.Stock.Ticker}, Bucket={bucket:O}");
                     return cached.Quote;
                 }
@@ -5185,6 +5213,8 @@ namespace IbSwingTrader.Application.Candidates
                 // with its normal one-bar overlap. Weekends are handled by the market calendar.
                 var bars = await _historicalData.GetCandlesRange(ctx.Stock.Ticker, ctx.Contract,
                     Timeframe.M5, start, now, settings.HistoricalMaxConsecutiveEmptyChunks);
+                ctx.ReversalBridgeBars = bars?.Where(x => x.Time >= start && x.Time.AddMinutes(5) <= now)
+                    .OrderBy(x => x.Time).ToList() ?? [];
                 var quote = bars == null ? null : ExecutionPriceSnapshot.FromM5(
                     bars.Where(x => x.Time >= start && x.Time.AddMinutes(5) <= now), now, MarketTime.Now());
                 _logger.Info($"Reversal M5 bridge: {ctx.Stock.Ticker}. " +
@@ -5192,7 +5222,7 @@ namespace IbSwingTrader.Application.Candidates
                     $"BridgeStart={start:yyyy-MM-dd HH:mm:ss}, End={now:yyyy-MM-dd HH:mm:ss}, " +
                     $"Bars={bars?.Count ?? 0}, RecentPrice={(quote == null ? "unavailable" : quote.Price.ToString())}");
                 var result = quote == null ? null : quote with { Source = "M5Bridge" };
-                _bridgeForRun[ctx.Stock.Ticker] = (bucket, result);
+                _bridgeForRun[ctx.Stock.Ticker] = (bucket, result, ctx.ReversalBridgeBars);
                 return result;
             }
             catch (Exception ex)
@@ -5258,6 +5288,21 @@ namespace IbSwingTrader.Application.Candidates
                 : $"ReversalHook unconfirmed on D1/H4";
             var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={priceSource ?? (freshPrice.HasValue ? "FreshM5" : "HistoricalSnapshot")}; " +
                          $"{daily.Reason}; {h4.Reason}";
+            if (_getCandidatesSettingsProvider.Get().Finder.ReversalSupplementalDiagnostics)
+            {
+                try
+                {
+                    var supplemental = ReversalSupplementalDiagnostics.Describe(
+                        GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now),
+                        ctx.ReversalBridgeBars, now, CalculateRunFeature);
+                    reason += $"; {supplemental}";
+                }
+                catch (Exception ex)
+                {
+                    reason += "; ReversalSupplemental(DiagnosticOnly=True, Status=CalculationFailed)";
+                    _logger.Info($"Reversal supplemental diagnosis failed: {ctx.Stock.Ticker}. {ex.Message}");
+                }
+            }
             _logger.Info($"Reversal episode: {ctx.Stock.Ticker}. {reason}");
             return (selected.Recognized, selected.Timeframe, selected.Phase, reason);
         }
@@ -7767,6 +7812,7 @@ namespace IbSwingTrader.Application.Candidates
             public TradePlanInfo? Trade { get; set; }
             public bool ReversalBridgeStale { get; set; }
             public bool ReversalBridgeFailed { get; set; }
+            public List<Candle> ReversalBridgeBars { get; set; } = [];
             public List<Candle>? EntryCandles { get; set; }
             public DateTime? EntryObservedAt { get; set; }
             public ScanPerformanceTickerMetric? PerformanceMetric { get; set; }

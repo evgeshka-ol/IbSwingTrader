@@ -34,7 +34,17 @@ namespace IbSwingTrader.Infrastructure.Logging
                 sb.AppendLine(string.Join(",", values));
             }
 
-            await File.WriteAllTextAsync(csvPath, sb.ToString(), Encoding.UTF8);
+            var temporaryPath = csvPath + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                await File.WriteAllTextAsync(temporaryPath, sb.ToString(), Encoding.UTF8);
+                File.Move(temporaryPath, csvPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                    File.Delete(temporaryPath);
+            }
 
             var jsonPath = GetJsonPath(filePath);
             DeleteLegacyJsonIfPresent(csvPath, jsonPath);

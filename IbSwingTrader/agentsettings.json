@@ -197,7 +197,12 @@
     "GetCandidates": {
         "RowsPerScan": 100,
         "UseWishListFirst": true,
-        "MaxWishListItems": 300,
+        "MaxWishListItems": 0,
+        "ReversalWatchList": {
+            "Enabled": true,
+            "RetentionCalendarDays": 30,
+            "ScanCodes": ["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]
+        },
 
         "ScanCodes": [
             {
@@ -322,6 +327,7 @@
             "ContractResolveTimeoutSeconds": 15,
             "ContractResolveMaxAttempts": 2,
             "ReversalM5BridgeMaxCalendarDays": 7,
+            "ReversalSupplementalDiagnostics": true,
             "HistoricalMaxConsecutiveEmptyChunks": 3,
             "EmitAllSeenCandidates": true
         },

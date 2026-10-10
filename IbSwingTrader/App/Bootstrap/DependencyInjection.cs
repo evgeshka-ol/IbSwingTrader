@@ -39,6 +39,7 @@ namespace IbSwingTrader.App.Bootstrap
             services.AddSingleton<ICandidateFileService, CandidateFileService>();
             services.AddSingleton<ICandidateResultWriter, CandidateResultWriter>();
             services.AddSingleton<IWishListResultWriter, WishListResultWriter>();
+            services.AddSingleton<ReversalWatchList>();
 
             // tws / market data
             services.AddSingleton<ITwsConnection, TwsConnection>();

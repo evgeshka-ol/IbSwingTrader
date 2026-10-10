@@ -51,6 +51,9 @@ namespace IbSwingTrader.Domain.WishList
         public List<decimal> RecentH4RsiSeries { get; set; } = [];
 
         public DateTime? FirstSeen { get; set; }
+        public DateTime? LastDropSeenAt { get; set; }
+        public string WatchCurrency { get; set; } = string.Empty;
+        public string WatchStockType { get; set; } = string.Empty;
 
         public DateTime? LastEvaluatedAt { get; set; }
 

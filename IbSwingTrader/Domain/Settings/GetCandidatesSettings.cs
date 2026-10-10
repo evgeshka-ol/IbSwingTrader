@@ -5,6 +5,7 @@ namespace IbSwingTrader.Domain.Settings
         public int RowsPerScan { get; set; }
         public bool UseWishListFirst { get; set; }
         public int MaxWishListItems { get; set; }
+        public ReversalWatchListSettings ReversalWatchList { get; set; } = new();
 
         public List<ScanCodeSettings> ScanCodes { get; set; } = [];
         public WishListFilterSettings WishListFilter { get; set; } = new();
@@ -15,6 +16,13 @@ namespace IbSwingTrader.Domain.Settings
         public TradePlanSettings TradePlan { get; set; } = new();
         public NextDayRankingSettings NextDayRanking { get; set; } = new();
         public PremarketSummarySettings PremarketSummary { get; set; } = new();
+    }
+
+    public class ReversalWatchListSettings
+    {
+        public bool Enabled { get; set; } = true;
+        public int RetentionCalendarDays { get; set; } = 30;
+        public List<string> ScanCodes { get; set; } = ["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"];
     }
 
     public class ScanCodeSettings
@@ -605,6 +613,7 @@ namespace IbSwingTrader.Domain.Settings
         public int ContractResolveTimeoutSeconds { get; set; } = 45;
         public int ContractResolveMaxAttempts { get; set; } = 2;
         public int ReversalM5BridgeMaxCalendarDays { get; set; } = 7;
+        public bool ReversalSupplementalDiagnostics { get; set; } = true;
         public int HistoricalMaxConsecutiveEmptyChunks { get; set; } = 3;
         public bool EmitAllSeenCandidates { get; set; } = false;
     }

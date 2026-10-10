@@ -554,6 +554,11 @@ namespace IbSwingTrader.App.Commands
                     ? "Marked for removal by wish list evaluation"
                     : $"Marked for removal: {item.LastStatusReason}";
 
+            // Reversal watch expiry belongs to ReversalWatchList.RetentionCalendarDays,
+            // anchored to the latest drop, not legacy target forecasts or FirstSeen.
+            if (item.LastDropSeenAt.HasValue)
+                return null;
+
             var firstSeen = item.FirstSeen ?? item.Scan.ScanTime;
             var ageDays = (marketNow.Date - firstSeen.Date).TotalDays;
 
