@@ -163,9 +163,21 @@ cache-confirmed examples and empirical validation against realized outcomes.
 2. inspect `Data/Tickers/candidates.csv`
 3. compare yesterday's scan with today's `research_top_gainers.csv`
 
-The scanner no longer uses `wishlist.csv` as an intermediate candidate stage.
-Historical candle accumulation belongs to the historical cache, not to a
-second candidate queue.
+Since 2026-10-10, `wishlist.csv` is again a persistent recall universe for
+new losers from `TOP_OPEN_PERC_LOSE` and `TOP_PERC_LOSE`. Enrollment follows
+the basic stock prefilter, before history/price-floor/pattern/entry checks.
+Each subsequent scan loads those symbols directly and applies the same
+BellUp -> ReversalHook -> Other pipeline even when scanner codes no longer
+return them. Default expiry is 30 calendar days after the last loser sighting;
+repeat drops renew it. `UseWishListFirst=true` prioritizes their history stage;
+`MaxWishListItems=0` checks every active symbol. Positive limits rotate by
+oldest attempted evaluation and retain overflow. Historical candle storage
+still belongs to the cache. See SETTINGS_MAP.md for controls and provenance.
+
+`Finder.ReversalSupplementalDiagnostics=true` also records gradual closed-H4
+recovery and provisional H4 indicators reconstructed from returned completed
+M5 in `PatternVerdictReason` and logs. These are diagnostic only: they do not
+establish a confirmed pattern or authorize entry. See SERIES_PLAYBOOK.md.
 
 For H4 history, load missing chunks newest-first. A recently listed ticker may
 have no data at the old edge of the requested lookback while still having

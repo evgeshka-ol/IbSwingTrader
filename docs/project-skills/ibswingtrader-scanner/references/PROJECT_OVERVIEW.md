@@ -8,6 +8,8 @@
   - builds scanner output
   - writes `Data/Tickers/candidates.csv`
   - writes/updates `Data/Tickers/wishlist.csv`
+  - watches losers from the two configured loser codes on subsequent scans
+    by ticker, independently of whether the current universe returns them
 - `evaluate-candidates`
   - evaluates candidate outcomes
   - writes directly to `Data/datasets/evaluation-dataset.csv`

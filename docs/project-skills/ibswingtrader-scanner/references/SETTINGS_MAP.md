@@ -19,13 +19,58 @@ Be careful: these filters can improve safety but also reduce recall.
 
 ### `GetCandidates.WishListFilter`
 
-Controls who can enter `WishList`.
+Legacy scoring/filter settings; they do not gate enrollment in the persistent
+loser watch universe restored on 2026-10-10. A fallen name must not already
+be ready to trade in order to be watched.
 
-Use this to manage early scan breadth.
+### `GetCandidates.ReversalWatchList`
+
+- `Enabled=true`: read/save the persistent recall universe in
+  `Paths.WishListFile` (`Data/Tickers/wishlist.csv`). Disabled skips its loading,
+  enrollment and saving, leaving the file intact.
+- `ScanCodes=["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]`: enroll all returned
+  names passing the basic stock prefilter, before historical-data, recent-price
+  floor, pattern and entry checks. History failure does not erase enrollment.
+- `RetentionCalendarDays=30`: expire at the scan start when the latest loser
+  sighting is at least 30 calendar dates old. `0` or negative disables expiry.
+  Direct monitoring does not renew this date; another loser sighting does.
+- `UseWishListFirst=true`: prepare watched names before current scanner-code
+  names. Classification still uses the shared current pattern pipeline.
+- `MaxWishListItems=0`: no scan limit; every active item is checked each run.
+  A positive limit checks oldest attempted evaluations first and retains the
+  remainder, without imposing a storage limit.
+
+`LastDropSeenAt`, `WatchCurrency`, `WatchStockType`, `FirstSeen`,
+`LastEvaluatedAt`, `LastStatusReason` and `LastStatusTime` survive CSV round trips.
+Status records the latest published pattern group, not a trading outcome;
+failed/no-output attempts retain the row with an explicit pending-result status.
+`IsFromWishlist` now means the ticker was active in the watch universe at run
+start; it no longer means the legacy below-Daily-mid family. Duplicate live
+and watched histories reuse the existing run caches; final output deduplicates
+by ticker. Enrollment persists even if a setup is Other or already recognized.
+
+Existing loser-code wishlist rows migrate using their ScanTime as LastDropSeenAt.
+Other legacy rows remain in the file, but are not automatically enrolled.
+Legacy expected-target cleanup does not remove managed watch rows; explicit
+`LastStatus=Remove` still does. Watch expiry is owned by the scanner settings.
+More active symbols can increase scan duration; existing history retry/bridge
+bounds apply equally to direct monitoring.
+Loser batches are checkpointed before historical loading, with atomic CSV
+replacement, and statuses are saved again at run completion. Full implementation
+notes: `docs/implementation-2026-10-10-reversal-watch-list.md`.
+
+### `GetCandidates.Finder.ReversalSupplementalDiagnostics`
+
+Default `true`. Save exact provisional OHLC/Bollinger/MACD/RSI and gradual
+recovery diagnostics in `PatternVerdictReason` and the Reversal episode log.
+Reuses the bounded M5 bridge; adds no separate M5 request. Closed points reuse
+the run feature cache; only the new provisional point needs calculation.
+These values do not influence admission, ranking or Win probability.
 
 ### `GetCandidates.CandidateFilter`
 
-Controls conversion from `WishList` to candidate.
+Controls legacy candidate filtering; watch enrollment itself does not imply
+candidate admission. Current pattern/readiness checks apply to both sources.
 
 Useful when too many names are seen but not promoted.
 

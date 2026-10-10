@@ -188,6 +188,36 @@ No historical-price fallback authorizes a ReversalHook entry. Higher-timeframe
 Down/Collapse veto and the existing support conditions remain unchanged.
 Thus recognition improvements do not guarantee admission for every rebound.
 
+### Supplemental closed/partial H4 diagnostics (2026-10-10)
+
+When `Finder.ReversalSupplementalDiagnostics` is enabled, the Reversal episode
+reason contains `ReversalSupplemental(DiagnosticOnly=True, ...)` independently
+of confirmed recognition. `ClosedH4Gradual` checks four negative mid deltas,
+at least two improvements among their three adjacent comparisons, latest delta
+above the first, rising price versus two bars earlier, improving histogram
+with one allowed pause, and prior price below mid. This exploratory diagnostic
+supplements the canonical discrete bend; it is not another admission path.
+
+The current native H4 is reconstructed only from completed M5 returned by the
+current run's existing bridge/publication requests, never from the cached final
+H4 high/close. `PartialStart`, decision time, M5 counts and last observed M5 are
+saved. Fresh calculation requires coverage from interval start, no internal
+five-minute gaps, at least one positive-volume bar and a positive-volume close
+no older than ten minutes after its bar end. The last observed trading close
+is used; zero-volume placeholders cannot establish a signal by themselves.
+Otherwise `PartialStatus` explains missing/stale/incomplete coverage.
+
+For fresh coverage, exact OHLC, volume, Bollinger bands, MACD line/signal/histogram,
+RSI, `PartialGradual` and provisional phase/bend age are saved. Calculations
+use a separate copied H4 prefix; confirmed series remain closed-bar series.
+Partial bars from fresh snapshots are excluded until their requested-time
+boundary has passed their close. Diagnostic errors do not reject a candidate.
+
+`PartialPhase` and gradual recovery are research fields only. They do not alter
+BellUp precedence, confirmed episodes, higher-timeframe support or fresh-price
+publication rules. See `docs/research-2026-10-10-reversal-recognition.md` for
+the evidence and its retrospective cache-availability limitations.
+
 The reversal publication plan uses the fresh M5 price under reversal entry
 policy, without BellUp body projection or BellUp target reduction. Its status
 is `ReversalFreshM5`; rejected plans use `ReversalRejected`. Evaluation preserves
