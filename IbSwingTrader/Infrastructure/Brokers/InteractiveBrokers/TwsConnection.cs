@@ -5,7 +5,7 @@ using IBApi.protobuf;
 
 namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 {
-    public class TwsConnection : EWrapper, ITwsConnection
+    public partial class TwsConnection : EWrapper, ITwsConnection
     {
         private static readonly TimeSpan DefaultContractDetailsTimeout = TimeSpan.FromSeconds(15);
 
@@ -485,6 +485,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void error(int id, int errorCode, string errorMsg)
         {
+            ReceiveLiveError(id, errorCode, errorMsg);
             _logger.Error($"IB ERROR LONG id={id} code={errorCode} msg={errorMsg}");
         }
 
@@ -497,6 +498,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void error(int id, long errorTime, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
+            ReceiveLiveError(id, errorCode, errorMsg);
             var details = string.IsNullOrWhiteSpace(advancedOrderRejectJson)
                 ? string.Empty
                 : $" details={advancedOrderRejectJson}";
@@ -624,6 +626,8 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
         public void connectionClosed()
         {
             _ibConnected = false;
+            foreach (var request in _liveQuotes.Values)
+                request.Completion.TrySetResult(null);
             _logger.Info("TWS connection closed");
         }
 
@@ -643,6 +647,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
+            ReceiveLivePrice(tickerId, field, price, attribs);
             AddMarketProbeLine(
                 tickerId,
                 $"tickPrice field={field} price={price} autoExec={attribs.CanAutoExecute} pastLimit={attribs.PastLimit} preOpen={attribs.PreOpen}");
@@ -657,6 +662,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void tickString(int tickerId, int field, string value)
         {
+            ReceiveLiveTrade(tickerId, field, value);
             AddMarketProbeLine(
                 tickerId,
                 $"tickString field={field} value={value}");
@@ -839,6 +845,7 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         public void marketDataType(int reqId, int marketDataType)
         {
+            ReceiveLiveDataType(reqId, marketDataType);
             AddMarketProbeLine(
                 reqId,
                 $"marketDataType type={marketDataType}");

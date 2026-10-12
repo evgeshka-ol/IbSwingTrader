@@ -328,6 +328,10 @@
             "ContractResolveMaxAttempts": 2,
             "ReversalM5BridgeMaxCalendarDays": 7,
             "ReversalSupplementalDiagnostics": true,
+            "ReversalLiveQuoteFallback": true,
+            "ReversalLiveQuoteTimeoutSeconds": 8,
+            "ReversalLiveQuoteMaxAgeSeconds": 60,
+            "ReversalLiveQuoteMaxSpreadPct": 2.0,
             "HistoricalMaxConsecutiveEmptyChunks": 3,
             "EmitAllSeenCandidates": true
         },

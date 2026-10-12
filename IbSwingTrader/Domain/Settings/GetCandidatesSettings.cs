@@ -614,6 +614,10 @@ namespace IbSwingTrader.Domain.Settings
         public int ContractResolveMaxAttempts { get; set; } = 2;
         public int ReversalM5BridgeMaxCalendarDays { get; set; } = 7;
         public bool ReversalSupplementalDiagnostics { get; set; } = true;
+        public bool ReversalLiveQuoteFallback { get; set; } = true;
+        public int ReversalLiveQuoteTimeoutSeconds { get; set; } = 8;
+        public int ReversalLiveQuoteMaxAgeSeconds { get; set; } = 60;
+        public decimal ReversalLiveQuoteMaxSpreadPct { get; set; } = 2m;
         public int HistoricalMaxConsecutiveEmptyChunks { get; set; } = 3;
         public bool EmitAllSeenCandidates { get; set; } = false;
     }

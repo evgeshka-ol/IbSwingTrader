@@ -1,4 +1,4 @@
-﻿using IBApi;
+using IBApi;
 
 namespace IbSwingTrader.Abstractions.Market
 {
@@ -15,5 +15,7 @@ namespace IbSwingTrader.Abstractions.Market
         Task<string> RequestScannerParametersAsync();
         Task<FundamentalSnapshot?> GetFundamentalSnapshotAsync(Contract contract);
         Task<List<string>> ProbeMarketDataAsync(Contract contract, int seconds = 10);
+        Task<LiveQuote?> GetLiveQuoteAsync(Contract contract, int timeoutSeconds,
+            int maxAgeSeconds, decimal maxSpreadPct) => Task.FromResult<LiveQuote?>(null);
     }
 }

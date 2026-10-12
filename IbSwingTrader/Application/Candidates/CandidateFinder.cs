@@ -16,6 +16,7 @@ namespace IbSwingTrader.Application.Candidates
         IBollingerFigureAnalyzer bollingerFigureAnalyzer,
         IWishListScore wishListScore,
         ReversalWatchList reversalWatchList,
+        ITwsConnection twsConnection,
         ICandidateScore candidateScore,
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
@@ -34,6 +35,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly IBollingerFigureAnalyzer _bollingerFigureAnalyzer = bollingerFigureAnalyzer;
         private readonly IWishListScore _wishListScore = wishListScore;
         private readonly ReversalWatchList _reversalWatchList = reversalWatchList;
+        private readonly ITwsConnection _twsConnection = twsConnection;
         private readonly ICandidateScore _candidateScore = candidateScore;
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
@@ -526,17 +528,37 @@ namespace IbSwingTrader.Application.Candidates
                     }
                 }
                 var requestedAt = MarketTime.Now();
-                var bars = await _historicalData.GetFreshM5Snapshot(candidate.Ticker, ctx.Contract,
-                    requestedAt.AddMinutes(-15), requestedAt);
+                List<Candle> bars = [];
+                try
+                {
+                    bars = await _historicalData.GetFreshM5Snapshot(candidate.Ticker, ctx.Contract,
+                        requestedAt.AddMinutes(-15), requestedAt);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Info($"Reversal fresh M5 unavailable: {candidate.Ticker}. {ex.Message}");
+                }
                 ctx.ReversalBridgeBars = ctx.ReversalBridgeBars.Concat(bars.Where(x => x.Time.AddMinutes(5) <= requestedAt))
                     .GroupBy(x => x.Time).Select(x => x.Last()).OrderBy(x => x.Time).ToList();
                 var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
+                var quoteSettings = _getCandidatesSettingsProvider.Get().Finder;
+                if (quote == null && quoteSettings.ReversalLiveQuoteFallback)
+                {
+                    var live = await _twsConnection.GetLiveQuoteAsync(ctx.Contract,
+                        quoteSettings.ReversalLiveQuoteTimeoutSeconds,
+                        quoteSettings.ReversalLiveQuoteMaxAgeSeconds, quoteSettings.ReversalLiveQuoteMaxSpreadPct);
+                    if (live != null)
+                        quote = new ExecutionPriceSnapshot(live.Price,
+                            MarketTime.FromUtc(live.PriceTimeUtc, _marketSettingsProvider.Get().Timezone),
+                            MarketTime.FromUtc(live.ObservedAtUtc, _marketSettingsProvider.Get().Timezone),
+                            live.Source, null, null);
+                }
                 if (quote == null)
-                    throw new InvalidOperationException("No current or immediately preceding M5 bar");
+                    throw new InvalidOperationException("No fresh M5 or acceptable live quote");
                 candidate.TradePlan.LiveReferencePrice = quote.Price;
                 quote.ApplyTo(candidate.TradePlan);
-                candidate.TradePlan.EntryPriceSource = "ReversalDiagnosisFreshM5";
-                var episode = BuildReversalPhaseDiagnosis(ctx, quote.Price);
+                candidate.TradePlan.EntryPriceSource = "ReversalDiagnosis" + quote.Source;
+                var episode = BuildReversalPhaseDiagnosis(ctx, quote.Price, quote.Source);
                 candidate.PatternVerdictReason = episode.Reason;
                 var completedH4 = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, MarketTime.Now());
                 var series = BuildRecentFeatureSeries(completedH4);
@@ -586,13 +608,21 @@ namespace IbSwingTrader.Application.Candidates
                     return;
                 }
                 var plan = await BuildTradePlan(ctx, quote, reversalPublication: true);
+                if (quote.Source.StartsWith("IBLive", StringComparison.Ordinal) &&
+                    MarketTime.Now() - quote.PriceTime > TimeSpan.FromSeconds(Math.Max(1, quoteSettings.ReversalLiveQuoteMaxAgeSeconds)))
+                {
+                    Reject("Live quote expired while building publication plan");
+                    return;
+                }
                 if (plan.EntryPrice <= 0m || plan.ExitPrice <= plan.EntryPrice ||
                     plan.StopLoss <= 0m || plan.StopLoss >= plan.EntryPrice)
                 {
                     Reject("Invalid fresh trade plan structure");
                     return;
                 }
-                plan.PublicationRefreshStatus = "ReversalFreshM5";
+                plan.EntryPriceSource = "Reversal" + quote.Source;
+                plan.PublicationRefreshStatus = quote.Source.StartsWith("IBLive", StringComparison.Ordinal)
+                    ? "ReversalLiveQuoteFallback" : "ReversalFreshM5";
                 candidate.TradePlan = plan;
                 candidate.PatternVerdictReason = $"ReversalHook confirmed on {episode.Timeframe}; {episode.Reason}; Support={support}";
             }
