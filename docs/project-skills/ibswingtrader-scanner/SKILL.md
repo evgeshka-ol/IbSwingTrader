@@ -101,6 +101,10 @@ analysis and memoize observed slots against the historical file version.
   Preparing/Stalled/Completed and readiness failures stay in Other. Both
   timeframe diagnoses and explicit rejection reasons are saved. See
   `references/SERIES_PLAYBOOK.md` for phase and publication rules.
+- Since 2026-10-10, recognized ReversalHook publication can fall back from
+  unavailable fresh M5 to a bounded IB live quote request. Only live feed
+  bid/ask or a timestamped live trade is accepted; delayed/frozen quotes do
+  not authorize an entry. Source and timestamps are retained. See SETTINGS_MAP.md.
 - Since 2026-10-07, ReversalHook phase diagnosis first loads cached/missing M5
   after the end of the latest closed native H4 bar. Recent M5 updates current
   price and can revive a seeded episode at mid reclaim; incomplete H4/Daily

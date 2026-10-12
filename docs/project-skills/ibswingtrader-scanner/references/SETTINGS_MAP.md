@@ -67,6 +67,32 @@ Reuses the bounded M5 bridge; adds no separate M5 request. Closed points reuse
 the run feature cache; only the new provisional point needs calculation.
 These values do not influence admission, ranking or Win probability.
 
+### `GetCandidates.Finder.ReversalLiveQuoteFallback`
+
+Default `true`. Only when recognized ReversalHook publication lacks fresh M5,
+request streaming IB top-of-book + RTVolume, then cancel the subscription.
+No regulatory snapshot is requested. This does not configure or purchase
+market-data subscriptions; live entitlement is still required.
+
+- `ReversalLiveQuoteTimeoutSeconds=8`: bounded request wait, clamped to 1–30.
+- `ReversalLiveQuoteMaxAgeSeconds=60`: maximum quote receipt age or exchange
+  trade age, checked again after constructing the publication plan.
+- `ReversalLiveQuoteMaxSpreadPct=2.0`: `(ask-bid)/bid*100` limit for a current
+  positive book; ask is the buy reference. Crossed/wide books reject even if
+  a recent trade is present. Without a valid book, use an atomic RTVolume
+  price/timestamp pair; no previous-day close or untimestamped Last fallback.
+
+Only confirmed live marketDataType=1 is eligible. Source is
+`IBLiveAskObserved` (receipt time, not exchange quote time) or
+`IBLiveLastTrade` (exchange trade time). Existing trade reference provenance
+fields and `PriceSource` retain it; publication status is
+`ReversalLiveQuoteFallback`. No M5 body projection or fabricated bar timestamp
+is attached. Failure still produces Other with explicit rejection and IB
+reason logs. Default adds at most eight seconds per fallback attempt;
+successful bid/ask can complete earlier.
+
+See `docs/implementation-2026-10-10-reversal-live-quote-fallback.md`.
+
 ### `GetCandidates.CandidateFilter`
 
 Controls legacy candidate filtering; watch enrollment itself does not imply

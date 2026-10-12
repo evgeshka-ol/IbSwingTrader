@@ -184,6 +184,23 @@ failed support produces Other with zero trade levels and explicit `NotReady`.
 If refreshed history newly recognizes BellUp, the pending reversal is retained
 as Other with the precedence reason, rather than publishing a reversal plan
 for that BellUp. The next scan can apply the normal BellUp pipeline.
+Since 2026-10-10, if fresh M5 is absent or its request fails, the recognized
+publication shortlist may use a short-lived IB live quote request. It accepts
+a positive uncrossed bid/ask within the configured spread limit and uses ask
+for a buy reference. Without a valid book, an RTVolume trade with a checked
+exchange timestamp may supply the reference. A known wide/crossed current
+book cannot be bypassed by a last trade. Only marketDataType=1 is accepted;
+unknown, delayed and frozen modes fail. Quote observations do not create OHLC
+bars or establish a pattern seed. Fresh-M5 remains preferred.
+
+`PriceSource`, trade reference source/time/observed time and publication status
+distinguish `IBLiveAskObserved`, `IBLiveLastTrade` and M5. Ask time denotes
+receipt time because top-of-book does not supply an exchange timestamp;
+trade time comes from the atomic RTVolume event. Both use the configured age
+limit; fallback prices are checked again after plan construction. This quote
+fallback applies only to already recognized ReversalHook publication, not
+BellUp, diagnostic universe probing, or historical bar reconstruction.
+
 No historical-price fallback authorizes a ReversalHook entry. Higher-timeframe
 Down/Collapse veto and the existing support conditions remain unchanged.
 Thus recognition improvements do not guarantee admission for every rebound.
