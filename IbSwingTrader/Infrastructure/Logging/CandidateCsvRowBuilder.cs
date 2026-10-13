@@ -67,6 +67,7 @@ namespace IbSwingTrader.Infrastructure.Logging
 
                     Add(row, headers, "Ticker", candidate.Ticker);
                     Add(row, headers, nameof(candidate.Scan.ScanTime), FormatValue(candidate.Scan.ScanTime));
+                    Add(row, headers, "DiagnosticsEstimatedHitRatePct", FormatValue(candidate.Diagnostics?.EstimatedHitRatePct));
                     Add(row, headers, "CandidateGroup", groupName);
                     Add(row, headers, nameof(candidate.PatternVerdictReason), candidate.PatternVerdictReason);
                     AddTradePlanFields(row, headers, candidate);
