@@ -401,6 +401,11 @@ migration rule and what `candidates.csv` currently admits.
 
 ## Read these references
 
+For research on Triangle completion, return to Bollinger mid or a late
+downside excursion, read `references/TRIANGLE_RETURN_TO_MID.md`. It preserves
+the user's observations since 2023 and the ALHC example; distinguish that
+falling structure from the deployed post-rise Triangle heuristic.
+
 - `references/PROJECT_OVERVIEW.md`
 - `references/SCANNER_MODEL.md`
 - `references/SERIES_PLAYBOOK.md`

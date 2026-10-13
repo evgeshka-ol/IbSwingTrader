@@ -63,6 +63,11 @@ When this does not happen, treat it as the primary scanner feedback loop:
 
 ## Read these references
 
+For the user's Triangle-completion / return-to-mid hypothesis, also read
+`../ibswingtrader-scanner/references/TRIANGLE_RETURN_TO_MID.md`. It defines
+the pending checks and the optional downside-excursion feature; current
+Triangle output remains diagnostic Other.
+
 - `references/RESEARCH_ORACLE.md`
 - `references/KNOWN_EDGE_CASES.md`
 - `references/WORKFLOW_CHECKLIST.md`
