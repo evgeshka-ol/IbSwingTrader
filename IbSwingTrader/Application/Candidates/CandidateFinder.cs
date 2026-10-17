@@ -97,6 +97,18 @@ namespace IbSwingTrader.Application.Candidates
             var candidateResults = new Dictionary<string, CandidateDetails>(StringComparer.OrdinalIgnoreCase);
             var performance = new ScanPerformanceSummary();
             await _reversalWatchList.LoadAsync(marketNow);
+            if (_reversalWatchList.Enabled)
+            {
+                // Retire old hook cycles from local history before spending broker
+                // requests on them. Native completed bars only; no cache mutation.
+                foreach (var item in _reversalWatchList.GetItems())
+                {
+                    _historicalCache.TryLoad(item.Ticker, Timeframe.D1, out var cachedDaily);
+                    _historicalCache.TryLoad(item.Ticker, Timeframe.H4, out var cachedH4);
+                    InspectReversalWatchHistory(item.Ticker, cachedDaily, cachedH4, marketNow);
+                }
+                await _reversalWatchList.SaveAsync();
+            }
             var watchBatches = _reversalWatchList.GetScanBatches()
                 .Select(x => (x.Preset, SavedStocks: (List<StockInfo>?)x.Stocks)).ToList();
             var liveBatches = _scannerPresets.GetAll()
@@ -258,7 +270,29 @@ namespace IbSwingTrader.Application.Candidates
                             preparedForRun[stock.Ticker] = new PreparedTickerData(contract, candles, dailyCandles, snapshot, validUntil);
                         }
 
-                        if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
+                        if (batch.SavedStocks != null || _reversalWatchList.CapturesCode(preset.ScanCode))
+                            InspectReversalWatchHistory(stock.Ticker, dailyCandles, candles, MarketTime.Now());
+
+                        if (batch.SavedStocks != null && !_reversalWatchList.IsActive(stock.Ticker) &&
+                            !_reversalWatchList.HasNewSignal(stock.Ticker))
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            continue;
+                        }
+
+                        if (batch.SavedStocks != null && _reversalWatchList.NeedsEnrollmentValidation(stock.Ticker))
+                        {
+                            var valid = await ObserveReversalDropBelowDailyMid(stock, preset, contract,
+                                dailyCandles, contractResolveTimeout, contractResolveMaxAttempts, validateExisting: true);
+                            if (!valid)
+                            {
+                                stageMetric.Skipped++;
+                                tickerMetric.Skipped = true;
+                                continue;
+                            }
+                        }
+                        else if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
                             await ObserveReversalDropBelowDailyMid(stock, preset, contract,
                                 dailyCandles, contractResolveTimeout, contractResolveMaxAttempts);
 
@@ -306,6 +340,7 @@ namespace IbSwingTrader.Application.Candidates
                             Snapshot = snapshot,
                             Candles = candles,
                             DailyCandles = dailyCandles,
+                            IsWatchOnly = batch.SavedStocks != null,
                             ChartH4Candles = TryLoadSessionAlignedH4Candles(stock.Ticker, marketNow),
                             ScanTimeMarket = MarketTime.Now(),
                             AvgDollarVolumeDaily = avgDollarVolume,
@@ -329,9 +364,12 @@ namespace IbSwingTrader.Application.Candidates
                 stageMetric.Stop();
             }
 
-            var contextsForOutput = emitAllSeenCandidates
+            var liveContextTickers = allScannedWishListContexts.Where(x => !x.IsWatchOnly)
+                .Select(x => x.Stock.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var contextsForOutput = (emitAllSeenCandidates
                 ? allScannedWishListContexts
-                : scannedWishListContexts.Values.ToList();
+                : scannedWishListContexts.Values.ToList())
+                .Where(x => !x.IsWatchOnly || !liveContextTickers.Contains(x.Stock.Ticker)).ToList();
             var scannedWishListItems = contextsForOutput
                 .Select(x => x.WishListItem)
                 .ToList();
@@ -480,6 +518,8 @@ namespace IbSwingTrader.Application.Candidates
                 $"RecentSeries={_recentSeriesForRun.Count}, M5BridgeTickers={_bridgeForRun.Count}");
             LogScanPerformanceSummary(performance);
 
+            foreach (var ctx in contextsForOutput.Where(x => _reversalWatchList.IsActive(x.Stock.Ticker)))
+                InspectReversalWatchHistory(ctx.Stock.Ticker, ctx.DailyCandles, ctx.Candles, MarketTime.Now());
             _reversalWatchList.RecordResults(finalCandidates.Concat(sameDayCandidates), MarketTime.Now());
             await _reversalWatchList.SaveAsync();
             return new CandidateSearchResult
@@ -490,11 +530,22 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private async Task ObserveReversalDropBelowDailyMid(
+        private void InspectReversalWatchHistory(string ticker, List<Candle>? daily,
+            List<Candle>? h4, DateTime now)
+        {
+            if (!_reversalWatchList.Enabled)
+                return;
+            _reversalWatchList.InspectHistory(ticker,
+                GetCompletedCandlesForRun(daily ?? [], Timeframe.D1, now),
+                GetCompletedCandlesForRun(h4 ?? [], Timeframe.H4, now));
+        }
+
+        private async Task<bool> ObserveReversalDropBelowDailyMid(
             StockInfo stock, PresetScanCode preset, Contract? contract, List<Candle>? dailyCandles,
-            TimeSpan contractTimeout, int contractAttempts)
+            TimeSpan contractTimeout, int contractAttempts, bool validateExisting = false)
         {
             var qualified = false;
+            var validatedExisting = false;
             try
             {
                 var now = MarketTime.Now();
@@ -511,13 +562,13 @@ namespace IbSwingTrader.Application.Candidates
                 if (completed.Count < 20 || completed[^1].Time.Date != expectedDate)
                 {
                     _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=missing-or-stale-closed-D1");
-                    return;
+                    return false;
                 }
                 var mid = CalculateRunFeature(completed, completed.Count).DailyBollingerMidBand;
                 if (mid <= 0m)
                 {
                     _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=invalid-D1-mid");
-                    return;
+                    return false;
                 }
                 contract ??= await _contractResolver.ResolveStockAsync(stock.Ticker, contractTimeout, contractAttempts);
                 var requestedAt = MarketTime.Now();
@@ -527,13 +578,25 @@ namespace IbSwingTrader.Application.Candidates
                 if (quote == null)
                 {
                     _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=no-fresh-M5-price");
-                    return;
+                    return false;
                 }
                 _logger.Info($"Reversal watch enrollment check: {stock.Ticker}, " +
                     $"Price={_fmt.Generic(quote.Price)}, PriceSource={quote.Source}, PriceTime={quote.PriceTime:O}, " +
-                    $"DailyMid={_fmt.Generic(mid)}, DailyBar={completed[^1].Time:O}, BelowMid={quote.Price < mid}");
-                _reversalWatchList.ObserveDrop(stock, preset, quote.ObservedAt, quote.Price, mid);
-                qualified = quote.Price < mid;
+                    $"DailyMid={_fmt.Generic(mid)}, DailyBar={completed[^1].Time:O}, " +
+                    $"MinimumBelowDailyMidPct={_reversalWatchList.MinimumBelowDailyMidPct}, " +
+                    $"QualifyingDrop={_reversalWatchList.IsDeepBelowMid(quote.Price, mid)}");
+                _reversalWatchList.ObservePosition(stock.Ticker, quote.ObservedAt, quote.Price, mid);
+                if (validateExisting || _reversalWatchList.NeedsEnrollmentValidation(stock.Ticker))
+                {
+                    _reversalWatchList.ValidateExisting(stock.Ticker, quote.ObservedAt, quote.Price, mid);
+                    validatedExisting = true;
+                }
+                if (validateExisting)
+                {
+                    qualified = _reversalWatchList.IsActive(stock.Ticker);
+                }
+                else
+                    qualified = _reversalWatchList.ObserveDrop(stock, preset, quote.ObservedAt, quote.Price, mid);
             }
             catch (Exception ex) when (ex is not TwsConnectionException)
             {
@@ -541,8 +604,9 @@ namespace IbSwingTrader.Application.Candidates
             }
             // Persistence errors must propagate rather than masquerade as missing price.
             // Checkpoint qualified observations without waiting for ranking/publication.
-            if (qualified)
+            if (qualified || validatedExisting)
                 await _reversalWatchList.SaveAsync();
+            return qualified;
         }
 
         private async Task RefreshReversalForPublication(CandidateDetails candidate, WishListContext ctx)
@@ -999,6 +1063,13 @@ namespace IbSwingTrader.Application.Candidates
         {
             if (results.TryGetValue(item.Stock.Ticker, out var existing))
             {
+                // A ticker also returned by a current scanner code retains the
+                // normal pipeline; watch-only restrictions must not mask it.
+                if (existing.IsWatchOnly != item.IsWatchOnly)
+                {
+                    if (existing.IsWatchOnly) results[item.Stock.Ticker] = item;
+                    return;
+                }
                 var existingPriority = CalculateWishListContextPriority(existing);
                 var itemPriority = CalculateWishListContextPriority(item);
                 var existingHasDailyRows = existing.DailyCandles is { Count: >= 2 };
@@ -1210,6 +1281,13 @@ namespace IbSwingTrader.Application.Candidates
 
             var bellPatternSignal = ClassifyBellPatternSignal(bbState, recentSeries);
             var bellUpDetected = IsRunawayBellUpPattern(bellPatternSignal);
+            if (ctx.IsWatchOnly && (bellUpDetected || isTodayResearchLikeCandidate))
+            {
+                EmitOtherCandidate(
+                    "Persistent wishlist monitors ReversalHook only; BellUp requires a current live scanner source",
+                    "Reversal watch only");
+                return;
+            }
             if (isTodayResearchLikeCandidate &&
                 IsH4BellUpExhaustedWithFlatDaily(bellPatternSignal, ctx, recentSeries))
             {
@@ -7945,6 +8023,7 @@ namespace IbSwingTrader.Application.Candidates
             public required CandidateSignalSnapshot Snapshot { get; init; }
             public required List<Candle> Candles { get; init; }
             public List<Candle>? DailyCandles { get; init; }
+            public bool IsWatchOnly { get; init; }
             public List<Candle>? ChartH4Candles { get; init; }
             public required DateTime ScanTimeMarket { get; init; }
             public required decimal AvgDollarVolumeDaily { get; init; }

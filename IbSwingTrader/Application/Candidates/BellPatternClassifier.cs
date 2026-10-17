@@ -505,11 +505,21 @@ namespace IbSwingTrader.Application.Candidates
             List<decimal> upper, List<decimal> mid, List<decimal> lower,
             List<decimal> rsi, List<decimal> macdLine, List<decimal> macdSignal,
             List<decimal> macdHistogram, out string diagnostics)
+            => TryFindReversalHookSignal(dailyCloseSeries, upper, mid, lower, rsi,
+                macdLine, macdSignal, macdHistogram, out _, out diagnostics);
+
+        public static bool TryFindReversalHookSignal(
+            IReadOnlyList<decimal> dailyCloseSeries,
+            List<decimal> upper, List<decimal> mid, List<decimal> lower,
+            List<decimal> rsi, List<decimal> macdLine, List<decimal> macdSignal,
+            List<decimal> macdHistogram, out int barsSinceSignal, out string diagnostics)
         {
+            barsSinceSignal = -1;
             // Recognize an episode in completed history, independently of today's entry readiness.
             var phase = ReversalHookPhaseClassifier.Analyze(dailyCloseSeries, mid, macdHistogram, 0m, upper);
             if (phase.BarsSinceBend >= 0)
             {
+                barsSinceSignal = phase.BarsSinceBend;
                 diagnostics = $"Recognition=MidBendEpisode, Phase={phase.Name}, {phase.Diagnostics}";
                 return true;
             }
@@ -524,6 +534,7 @@ namespace IbSwingTrader.Application.Candidates
                         Prefix(upper), Prefix(mid), Prefix(lower), Prefix(rsi), Prefix(macdLine),
                         Prefix(macdSignal), Prefix(macdHistogram), out var reason))
                 {
+                    barsSinceSignal = age;
                     diagnostics = $"Recognition=HistoricalHook, BarsSinceSignal={age}, {reason}";
                     return true;
                 }

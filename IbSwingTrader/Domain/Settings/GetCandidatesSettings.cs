@@ -22,6 +22,7 @@ namespace IbSwingTrader.Domain.Settings
     {
         public bool Enabled { get; set; } = true;
         public int RetentionCalendarDays { get; set; } = 30;
+        public decimal MinimumBelowDailyMidPct { get; set; } = 5m;
         public List<string> ScanCodes { get; set; } = ["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"];
     }
 

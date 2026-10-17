@@ -201,6 +201,7 @@
         "ReversalWatchList": {
             "Enabled": true,
             "RetentionCalendarDays": 30,
+            "MinimumBelowDailyMidPct": 5,
             "ScanCodes": ["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]
         },
 

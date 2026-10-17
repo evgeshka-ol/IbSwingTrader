@@ -5,6 +5,42 @@ namespace IbSwingTrader.Application.Dataset
     {
         private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
 
+        // A native, single-timeframe history pass for watch-cycle migration.
+        // Reuse the exact indicator primitives without rebuilding unrelated
+        // Daily/Weekly aggregates for every historical prefix.
+        public static List<FeatureSet> CalculateNativeReversalHistory(List<Candle> candles)
+        {
+            var closes = candles.Select(x => x.Close).ToList();
+            var macd = BuildMacdSeries(closes);
+            var result = new List<FeatureSet>(candles.Count);
+            var window = new List<decimal>(20);
+            for (var i = 0; i < closes.Count; i++)
+            {
+                window.Add(closes[i]);
+                if (window.Count > 20) window.RemoveAt(0);
+                var bands = CalcBollingerBandsFromSeries(window, 20, 2m);
+                var rsi = CalcRsiFromSeries(window, 14);
+                result.Add(new FeatureSet
+                {
+                    DailyBollingerUpperBand = bands?.Upper ?? 0m,
+                    DailyBollingerMidBand = bands?.Mid ?? 0m,
+                    DailyBollingerLowerBand = bands?.Lower ?? 0m,
+                    DailyRSI14 = rsi,
+                    DailyMACDLine = macd[i].Macd,
+                    DailyMACDSignal = macd[i].Signal,
+                    DailyMACDHistogram = macd[i].Histogram,
+                    H4BollingerUpperBand = bands?.Upper ?? 0m,
+                    H4BollingerMidBand = bands?.Mid ?? 0m,
+                    H4BollingerLowerBand = bands?.Lower ?? 0m,
+                    RSI14 = rsi,
+                    MACDLine = macd[i].Macd,
+                    MACDSignal = macd[i].Signal,
+                    MACDHistogram = macd[i].Histogram
+                });
+            }
+            return result;
+        }
+
         public FeatureSet Calculate(List<Candle> candles, int index)
         {
             ArgumentNullException.ThrowIfNull(candles);
