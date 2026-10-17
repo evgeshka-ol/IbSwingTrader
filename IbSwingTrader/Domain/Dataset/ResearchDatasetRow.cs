@@ -2,6 +2,8 @@ namespace IbSwingTrader.Domain.Dataset
 {
     public class ResearchDatasetRow : TickerEntity
     {
+        public string BollingerModel { get; set; } = string.Empty;
+
         public required string Mode { get; set; }
 
         public required string Source { get; set; }

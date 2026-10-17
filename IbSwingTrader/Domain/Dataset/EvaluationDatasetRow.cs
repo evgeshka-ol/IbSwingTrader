@@ -8,6 +8,8 @@ namespace IbSwingTrader.Domain.Dataset
 
         public DateTime? ExitTime { get; set; }
 
+        public string BollingerModel { get; set; } = string.Empty;
+
         public string CandidateGroup { get; set; } = string.Empty;
         public string PatternVerdict { get; set; } = string.Empty;
         public string DetectedPattern { get; set; } = string.Empty;

@@ -222,6 +222,7 @@ namespace IbSwingTrader.Infrastructure.Historical
 
             return new CachedPatternSnapshot
             {
+                BollingerModel = FeatureEngine.BollingerModel,
                 RecentDailyBbUpperBandSeries = dailyBbUpperBand,
                 RecentDailyBbMidBandSeries = dailyBbMidBand,
                 RecentDailyBbLowerBandSeries = dailyBbLowerBand,

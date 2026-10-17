@@ -39,6 +39,17 @@ Check(!restored.AwaitingNewDrop, "A qualified new drop starts another active cyc
 Check(!restored.ObserveHook(t), "Old hook must not retire the new drop cycle");
 Check(restored.ObserveHook(t.AddDays(4)) && restored.AwaitingNewDrop, "A new hook consumes the new cycle");
 
+var migrated = new ReversalWatchState
+{
+    BollingerModel = "legacy-SMA", LastDailyBar = t.Date, LastH4Bar = t,
+    LastHookAt = t, AwaitingNewDrop = true, LeftDropZoneSinceHook = true
+};
+migrated.EnsureIndicatorModel(FeatureEngine.BollingerModel);
+Check(migrated.LastDailyBar == null && migrated.LastH4Bar == null,
+    "Indicator-model migration replays local history instead of reusing SMA cursors");
+Check(migrated.AwaitingNewDrop && migrated.LastHookAt == t && !migrated.LeftDropZoneSinceHook,
+    "Model migration retains consumed hook memory and requires new-model rearm");
+
 // Bulk migration indicators must equal the existing per-prefix feature engine.
 var engine = new FeatureEngine();
 foreach (var frame in new[] { Timeframe.D1, Timeframe.H4 })

@@ -685,7 +685,7 @@ namespace IbSwingTrader.Application.Candidates
                 candidate.TradePlan.LiveReferencePrice = quote.Price;
                 quote.ApplyTo(candidate.TradePlan);
                 candidate.TradePlan.EntryPriceSource = "ReversalDiagnosis" + quote.Source;
-                var episode = BuildReversalPhaseDiagnosis(ctx, quote.Price, quote.Source);
+                var episode = BuildReversalPhaseDiagnosis(ctx, quote);
                 candidate.PatternVerdictReason = episode.Reason;
                 var completedH4 = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, MarketTime.Now());
                 var series = BuildRecentFeatureSeries(completedH4);
@@ -1338,7 +1338,7 @@ namespace IbSwingTrader.Application.Candidates
                     EmitOtherCandidate(reason, "Stale history", reason);
                     return;
                 }
-                var episode = BuildReversalPhaseDiagnosis(ctx, bridge?.Price,
+                var episode = BuildReversalPhaseDiagnosis(ctx, bridge,
                     bridge != null ? $"M5Bridge@{bridge.PriceTime:yyyy-MM-dd HH:mm:ss}" : null);
                 if (ctx.ReversalBridgeFailed)
                 {
@@ -4070,6 +4070,7 @@ namespace IbSwingTrader.Application.Candidates
                 Ticker = stock.Ticker,
                 Scan = new ScanInfo
                 {
+                    BollingerModel = FeatureEngine.BollingerModel,
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
                     ScanTime = scanTimeMarket,
@@ -4215,6 +4216,7 @@ namespace IbSwingTrader.Application.Candidates
                 },
                 Scan = new ScanInfo
                 {
+                    BollingerModel = FeatureEngine.BollingerModel,
                     PresetScanCode = preset.ScanCode,
                     PresetDescription = preset.Description,
                     ScanTime = scanTimeMarket,
@@ -5438,10 +5440,19 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         private (bool Recognized, string Timeframe, string Phase, string Reason) BuildReversalPhaseDiagnosis(
-            WishListContext ctx, decimal? freshPrice = null, string? priceSource = null)
+            WishListContext ctx, ExecutionPriceSnapshot? quote = null, string? priceSource = null)
         {
+            var freshPrice = quote?.Price;
             var currentPrice = freshPrice ?? ResolveScanPrice(ctx.Snapshot);
             var now = MarketTime.Now();
+            var schedule = _localMarketScheduleProvider.BuildSchedule(
+                DateTime.SpecifyKind(now.Date.AddDays(-14), DateTimeKind.Utc),
+                DateTime.SpecifyKind(now.Date.AddDays(2), DateTimeKind.Utc));
+            var expectedLastClosedH4 = schedule.Days.Where(x => x.IsTradingDay)
+                .SelectMany(x => new[] { 4, 8, 12, 16 }.Select(hour => x.Date.ToDateTime(new TimeOnly(hour, 0))))
+                .Where(x => x.AddHours(4) <= now).DefaultIfEmpty(DateTime.MinValue).Max();
+            var h4Momentum = ReversalH4Momentum.Evaluate(
+                GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now), quote, now, expectedLastClosedH4);
             (bool Recognized, string Timeframe, string Phase, string Reason) Analyze(List<Candle> source, Timeframe timeframe)
             {
                 var completed = GetCompletedCandlesForRun(source, timeframe, now);
@@ -5461,7 +5472,7 @@ namespace IbSwingTrader.Application.Candidates
                 }
                 var phase = ReversalHookPhaseClassifier.Analyze(series.DailyCloseSeries,
                     series.DailyBbMidBandSeries, series.DailyMacdHistogramSeries, currentPrice,
-                    series.DailyBbUpperBandSeries);
+                    series.DailyBbUpperBandSeries, h4Momentum);
                 var recognized = IsReversalHookPattern(series, out var recognition);
                 var name = phase.Name;
                 // The historical strict hook can precede the discrete middle-band bend.
@@ -5504,7 +5515,7 @@ namespace IbSwingTrader.Application.Candidates
                 .ThenByDescending(x => x.Phase == "Preparing").First();
             var prefix = selected.Recognized ? $"ReversalHook recognized on {selected.Timeframe}"
                 : $"ReversalHook unconfirmed on D1/H4";
-            var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={priceSource ?? (freshPrice.HasValue ? "FreshM5" : "HistoricalSnapshot")}; " +
+            var reason = $"{prefix}; Phase={selected.Phase}; PriceSource={priceSource ?? quote?.Source ?? "HistoricalSnapshot"}; " +
                          $"{daily.Reason}; {h4.Reason}";
             if (_getCandidatesSettingsProvider.Get().Finder.ReversalSupplementalDiagnostics)
             {
@@ -7297,7 +7308,7 @@ namespace IbSwingTrader.Application.Candidates
                 TrendPosition = snapshot.Current.H4MaSignedDistancePct,
                 DailyTrendPosition = snapshot.Current.DailyMaSignedDistancePct,
                 DailyPullback10d = CalculateDailyPullback10d(candles),
-                BBMidSignedDistancePct = CalculateSmaSignedDistancePct(candles, 20),
+                BBMidSignedDistancePct = snapshot.Current.H4BollingerMidDistancePct,
                 WeeklyMACDHistDelta = CalculateWeeklyMacdHistDelta(candles)
             };
         }

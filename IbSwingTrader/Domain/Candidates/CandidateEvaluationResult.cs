@@ -7,6 +7,8 @@ namespace IbSwingTrader.Domain.Candidates
         public DateTime EvaluatedAt { get; set; }
 
         public required string PresetScanCode { get; set; }
+        public string BollingerModel { get; set; } = string.Empty;
+
         public string CandidateSource { get; set; } = string.Empty;
         public string DetectedPipeline { get; set; } = string.Empty;
         public string DetectedPattern { get; set; } = string.Empty;

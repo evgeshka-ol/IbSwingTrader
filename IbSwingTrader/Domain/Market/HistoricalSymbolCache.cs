@@ -24,6 +24,7 @@ namespace IbSwingTrader.Domain.Market
 
     public class CachedPatternSnapshot
     {
+        public string BollingerModel { get; set; } = string.Empty;
         public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbLowerBandSeries { get; set; } = [];

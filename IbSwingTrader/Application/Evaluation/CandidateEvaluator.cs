@@ -425,6 +425,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
+                BollingerModel = candidate.Scan.BollingerModel,
                 ScanTime = candidate.Scan.ScanTime,
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
@@ -485,6 +486,7 @@ namespace IbSwingTrader.Application.Evaluation
             return new CandidateEvaluationResult
             {
                 Ticker = candidate.Ticker,
+                BollingerModel = candidate.Scan.BollingerModel,
                 ScanTime = candidate.Scan.ScanTime,
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,

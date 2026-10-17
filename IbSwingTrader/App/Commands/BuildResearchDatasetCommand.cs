@@ -833,6 +833,7 @@ namespace IbSwingTrader.App.Commands
 
             var row = new ResearchDatasetRow
             {
+                BollingerModel = FeatureEngine.BollingerModel,
                 Ticker = ticker,
                 Mode = settings.Mode,
                 Source = settings.Source,

@@ -6,7 +6,7 @@ var time = new DateTime(2026, 9, 21, 5, 3, 21).AddTicks(3188049);
 var candidate = new CandidateDetails
 {
     Ticker = "MSTR", CandidateSource = "SameDayContinuation",
-    Scan = new ScanInfo { ScanTime = time.AddSeconds(-15), PublishedAt = time,
+    Scan = new ScanInfo { BollingerModel = "indicator-model-check", ScanTime = time.AddSeconds(-15), PublishedAt = time,
         FirstSeenAt = time.AddMinutes(-44), RunStartedAt = time.AddMinutes(-63) },
     TradePlan = new TradePlanInfo
     {
@@ -29,6 +29,7 @@ try
     var path = Path.Combine(directory.FullName, "candidates.csv");
     await service.WriteAsync(path, new CandidateFileDocument { SameDayCandidates = [candidate] }, [candidate]);
     var loaded = (await service.ReadAsync(path)).SameDayCandidates.Single();
+    Check(loaded.Scan.BollingerModel == "indicator-model-check", "Indicator model survives CSV");
     Check(loaded.Scan.PublishedAt == time, "Publication timestamp precision survives CSV");
     Check(loaded.Scan.FirstSeenAt == candidate.Scan.FirstSeenAt, "First detection survives CSV");
     Check(loaded.TradePlan.ReferencePriceTime == candidate.TradePlan.ReferencePriceTime, "Price cutoff survives CSV");
@@ -41,6 +42,7 @@ try
         "Ticker,ScanTime,CandidateGroup,CandidateSource,ScanPrice,EntryPrice\n" +
         "OLD,2026-09-18 05:03:06,Runaway,SameDayContinuation,100,99\n");
     var legacy = (await service.ReadAsync(path)).SameDayCandidates.Single();
+    Check(string.IsNullOrEmpty(legacy.Scan.BollingerModel), "Legacy rows do not acquire invented EMA metadata");
     Check(legacy.Scan.PublishedAt == null && legacy.TradePlan.ReferencePriceTime == null,
         "Legacy rows do not acquire invented timestamps");
     Check(legacy.TradePlan.LiveReferencePrice == 100m && legacy.TradePlan.EntryPrice == 99m,

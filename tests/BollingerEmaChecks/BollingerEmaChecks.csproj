@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="IbSwingTrader.Abstractions.Dataset" />
+    <Using Include="IbSwingTrader.Domain.Market" />
+    <Using Include="IbSwingTrader.Domain.Dataset" />
+    <Compile Include="../../IbSwingTrader/Application/Dataset/FeatureEngine.cs" Link="FeatureEngine.cs" />
+    <Compile Include="../../IbSwingTrader/Abstractions/Dataset/IFeatureEngine.cs" Link="IFeatureEngine.cs" />
+    <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
+    <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
+    <Compile Include="../../IbSwingTrader/Domain/Dataset/FeatureSet.cs" Link="FeatureSet.cs" />
+  </ItemGroup>
+</Project>

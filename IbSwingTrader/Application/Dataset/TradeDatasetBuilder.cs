@@ -73,6 +73,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 var row = new TradeDatasetRow
                 {
+                    BollingerModel = FeatureEngine.BollingerModel,
                     Ticker = trade.Ticker,
                     IsShort = trade.IsShort,
 

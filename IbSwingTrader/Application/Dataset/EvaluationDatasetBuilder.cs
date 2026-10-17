@@ -404,6 +404,7 @@ namespace IbSwingTrader.Application.Dataset
             var row = new EvaluationDatasetRow
             {
                 Ticker = evaluation.Ticker,
+                BollingerModel = candidate?.Scan.BollingerModel ?? evaluation.BollingerModel,
                 ScanTime = evaluation.ScanTime,
                 EntryTime = evaluation.EntryTime,
                 ExitTime = evaluation.ExitTime ??

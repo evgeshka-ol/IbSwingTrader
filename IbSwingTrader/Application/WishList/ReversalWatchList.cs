@@ -18,6 +18,7 @@ namespace IbSwingTrader.Application.WishList
         {
             if (!_states.TryGetValue(ticker, out var state))
                 _states[ticker] = state = new ReversalWatchState();
+            state.EnsureIndicatorModel(FeatureEngine.BollingerModel);
             return state;
         }
         public bool IsActive(string ticker) => _items.ContainsKey(ticker);
@@ -128,6 +129,7 @@ namespace IbSwingTrader.Application.WishList
             item.WatchStockType = stock.StockType ?? string.Empty;
             item.Scan = new ScanInfo
             {
+                BollingerModel = FeatureEngine.BollingerModel,
                 PresetScanCode = preset.ScanCode, PresetDescription = preset.Description,
                 ScanTime = now, ScanTimeZone = marketSettings.Get().Timezone
             };

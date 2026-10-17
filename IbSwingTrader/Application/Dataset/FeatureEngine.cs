@@ -3,7 +3,20 @@ namespace IbSwingTrader.Application.Dataset
 {
     public class FeatureEngine : IFeatureEngine
     {
+        public const string BollingerModel = "ema20-sma-seed20-popstd20-v1";
+
         private static readonly TimeSpan RegularSessionEnd = new(16, 0, 0);
+
+        public static (decimal PreviousHistogram, decimal Line, decimal Signal, decimal Histogram)?
+            CalculateMacdWithCurrentPrice(IReadOnlyList<decimal> completedCloses, decimal currentPrice)
+        {
+            if (completedCloses.Count < 2 || currentPrice <= 0m || completedCloses.Any(x => x <= 0m))
+                return null;
+            // MACD is close-only: no invented OHLC candle or final H4 value.
+            var points = BuildMacdSeries([.. completedCloses, currentPrice]);
+            var last = points[^1];
+            return (points[^2].Histogram, last.Macd, last.Signal, last.Histogram);
+        }
 
         // A native, single-timeframe history pass for watch-cycle migration.
         // Reuse the exact indicator primitives without rebuilding unrelated
@@ -12,13 +25,14 @@ namespace IbSwingTrader.Application.Dataset
         {
             var closes = candles.Select(x => x.Close).ToList();
             var macd = BuildMacdSeries(closes);
+            var ema = BuildEmaSeries(closes, 20);
             var result = new List<FeatureSet>(candles.Count);
             var window = new List<decimal>(20);
             for (var i = 0; i < closes.Count; i++)
             {
                 window.Add(closes[i]);
                 if (window.Count > 20) window.RemoveAt(0);
-                var bands = CalcBollingerBandsFromSeries(window, 20, 2m);
+                var bands = CalcBollingerBandsFromSeries(window, 20, 2m, ema[i]);
                 var rsi = CalcRsiFromSeries(window, 14);
                 result.Add(new FeatureSet
                 {
@@ -48,12 +62,15 @@ namespace IbSwingTrader.Application.Dataset
             if (index <= 0 || index > candles.Count)
                 throw new ArgumentOutOfRangeException(nameof(index));
 
-            var h4Bands = CalcBollingerBandsFromSeries(BuildH4Closes(candles, index), 20, 2m);
-            var dailyBands = CalcBollingerBandsFromSeries(BuildDailyCloses(candles, index), 20, 2m);
-            var weeklyBands = CalcBollingerBandsFromSeries(BuildWeeklyCloses(candles, index), 20, 2m);
-            var h4Macd = CalcMacdPointFromSeries(BuildH4Closes(candles, index));
-            var dailyMacd = CalcMacdPointFromSeries(BuildDailyCloses(candles, index));
-            var weeklyMacd = CalcMacdPointFromSeries(BuildWeeklyCloses(candles, index));
+            var h4Closes = BuildH4Closes(candles, index);
+            var dailyCloses = BuildDailyCloses(candles, index);
+            var weeklyCloses = BuildWeeklyCloses(candles, index);
+            var h4Bands = CalcBollingerBandsFromSeries(h4Closes, 20, 2m);
+            var dailyBands = CalcBollingerBandsFromSeries(dailyCloses, 20, 2m);
+            var weeklyBands = CalcBollingerBandsFromSeries(weeklyCloses, 20, 2m);
+            var h4Macd = CalcMacdPointFromSeries(h4Closes);
+            var dailyMacd = CalcMacdPointFromSeries(dailyCloses);
+            var weeklyMacd = CalcMacdPointFromSeries(weeklyCloses);
 
             return new FeatureSet
             {
@@ -62,7 +79,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- 4H ---
                 H4MaSignedDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 50),
-                H4BollingerMidDistancePct = CalcSmaSignedDistancePctFromCandles(candles, index, 20),
+                H4BollingerMidDistancePct = SignedBandDistance(h4Closes[^1], h4Bands?.Mid) ?? 0m,
                 H4BollingerUpperDistancePct = CalcH4BollingerUpperDistancePct(candles, index, 20, 2m),
                 H4BollingerBandWidthPct = CalcH4BollingerBandWidthPct(candles, index, 20, 2m),
                 H4BollingerUpperBand = h4Bands?.Upper ?? 0m,
@@ -76,7 +93,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- Daily ---
                 DailyMaSignedDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
-                DailyBollingerMidDistancePct = CalcDailySmaSignedDistancePct(candles, index, 20),
+                DailyBollingerMidDistancePct = SignedBandDistance(dailyCloses[^1], dailyBands?.Mid) ?? 0m,
                 DailyBollingerUpperDistancePct = CalcDailyBollingerUpperDistancePct(candles, index, 20, 2m),
                 DailyBollingerBandWidthPct = CalcDailyBollingerBandWidthPct(candles, index, 20, 2m),
                 DailyBollingerUpperBand = dailyBands?.Upper ?? 0m,
@@ -90,7 +107,7 @@ namespace IbSwingTrader.Application.Dataset
 
                 // --- Weekly ---
                 WeeklyMaSignedDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
-                WeeklyBollingerMidDistancePct = CalcWeeklySmaSignedDistancePct(candles, index, 20),
+                WeeklyBollingerMidDistancePct = weeklyCloses.Count > 0 ? SignedBandDistance(weeklyCloses[^1], weeklyBands?.Mid) : null,
                 WeeklyBollingerUpperDistancePct = CalcWeeklyBollingerUpperDistancePct(candles, index, 20, 2m),
                 WeeklyBollingerBandWidthPct = CalcWeeklyBollingerBandWidthPct(candles, index, 20, 2m),
                 WeeklyBollingerUpperBand = weeklyBands?.Upper,
@@ -427,63 +444,57 @@ namespace IbSwingTrader.Application.Dataset
             return macdSeries[^1];
         }
 
+        private static decimal? SignedBandDistance(decimal close, decimal? mid) =>
+            mid.HasValue && mid.Value > 0m ? (close - mid.Value) / mid.Value * 100m : null;
+
         private static decimal? CalcBollingerUpperDistancePctFromSeries(
-            List<decimal> closes,
-            int length,
-            decimal stdDevMultiplier)
+            List<decimal> closes, int length, decimal stdDevMultiplier)
         {
-            if (closes.Count < length)
-                return null;
-
-            var window = closes.Skip(closes.Count - length).ToList();
-            var sma = window.Average();
-            var stdDev = CalcStandardDeviation(window, sma);
-            var upperBand = sma + stdDevMultiplier * stdDev;
-
-            if (upperBand == 0m)
-                return null;
-
-            var close = closes[^1];
-            return (upperBand - close) / close * 100m;
+            var bands = CalcBollingerBandsFromSeries(closes, length, stdDevMultiplier);
+            return bands != null && bands.Upper > 0m && closes[^1] > 0m
+                ? (bands.Upper - closes[^1]) / closes[^1] * 100m : null;
         }
 
         private static decimal? CalcBollingerBandWidthPctFromSeries(
-            List<decimal> closes,
-            int length,
-            decimal stdDevMultiplier)
+            List<decimal> closes, int length, decimal stdDevMultiplier)
         {
-            if (closes.Count < length)
-                return null;
-
-            var window = closes.Skip(closes.Count - length).ToList();
-            var sma = window.Average();
-
-            if (sma == 0m)
-                return null;
-
-            var stdDev = CalcStandardDeviation(window, sma);
-            var upperBand = sma + stdDevMultiplier * stdDev;
-            var lowerBand = sma - stdDevMultiplier * stdDev;
-
-            return (upperBand - lowerBand) / sma * 100m;
+            var bands = CalcBollingerBandsFromSeries(closes, length, stdDevMultiplier);
+            return bands != null && bands.Mid > 0m
+                ? (bands.Upper - bands.Lower) / bands.Mid * 100m : null;
         }
 
         private static BollingerBands? CalcBollingerBandsFromSeries(
-            List<decimal> closes,
-            int length,
-            decimal stdDevMultiplier)
+            List<decimal> closes, int length, decimal stdDevMultiplier, decimal? knownEma = null)
         {
             if (closes.Count < length)
                 return null;
-
             var window = closes.Skip(closes.Count - length).ToList();
-            var mid = window.Average();
-            var stdDev = CalcStandardDeviation(window, mid);
+            // Sigma retains the population deviation of the last N closes around
+            // their arithmetic mean. Only the envelope's center becomes EMA.
+            var stdDev = CalcStandardDeviation(window, window.Average());
+            var mid = knownEma ?? BuildEmaSeries(closes, length)[^1]!.Value;
+            return new BollingerBands(mid + stdDevMultiplier * stdDev,
+                mid, mid - stdDevMultiplier * stdDev);
+        }
 
-            return new BollingerBands(
-                mid + stdDevMultiplier * stdDev,
-                mid,
-                mid - stdDevMultiplier * stdDev);
+        private static List<decimal?> BuildEmaSeries(List<decimal> closes, int length)
+        {
+            var result = new List<decimal?>(closes.Count);
+            var alpha = 2m / (length + 1);
+            decimal sum = 0m, ema = 0m;
+            for (var i = 0; i < closes.Count; i++)
+            {
+                if (i < length) sum += closes[i];
+                if (i < length - 1)
+                {
+                    result.Add(null);
+                    continue;
+                }
+                ema = i == length - 1 ? sum / length
+                    : closes[i] * alpha + ema * (1m - alpha);
+                result.Add(ema);
+            }
+            return result;
         }
 
         private static decimal CalcStandardDeviation(List<decimal> values, decimal mean)

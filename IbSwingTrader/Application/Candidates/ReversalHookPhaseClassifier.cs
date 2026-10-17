@@ -2,6 +2,7 @@ namespace IbSwingTrader.Application.Candidates
 {
     // Alternative recognition only. These phases do not authorize an entry or rank a ticker.
     public readonly record struct ReversalHookPhase(string Name, int BarsSinceBend, string Diagnostics);
+    public readonly record struct ReversalRecoveryMomentum(bool IsImproving, string Diagnostics);
 
     public static class ReversalHookPhaseClassifier
     {
@@ -23,7 +24,8 @@ namespace IbSwingTrader.Application.Candidates
             IReadOnlyList<decimal> mid,
             IReadOnlyList<decimal> histogram,
             decimal snapshotPrice,
-            IReadOnlyList<decimal>? upper = null)
+            IReadOnlyList<decimal>? upper = null,
+            ReversalRecoveryMomentum? recoveryMomentum = null)
         {
             var count = Math.Min(close.Count, Math.Min(mid.Count, histogram.Count));
             if (count < 7)
@@ -61,9 +63,10 @@ namespace IbSwingTrader.Application.Candidates
             var currentPrice = snapshotPrice > 0m ? snapshotPrice : prices[^1];
             if (bend >= 0 && snapshotPrice > 0m && currentPrice > bands[^1] &&
                 prices[bend - 1] < bands[bend - 1] && currentPrice > prices[bend - 1] &&
-                momentum[^1] >= momentum[bend])
+                (momentum[^1] >= momentum[bend] || recoveryMomentum?.IsImproving == true))
             {
-                // Live reclaim can resume a recognized episode despite a pause in closed bars.
+                // A fresh H4 momentum recovery can resume an established Daily
+                // episode without waiting for yesterday's Daily MACD to catch up.
                 recovering = true;
             }
             if (bend >= 0 && currentPrice <= prices[bend - 1])
@@ -77,7 +80,8 @@ namespace IbSwingTrader.Application.Candidates
             var age = bend < 0 ? -1 : count - 1 - bend;
             return new(name, age,
                 $"BarsSinceBend={age}, Recovering={recovering}, Mid={bands[^1]}, " +
-                $"CompletedClose={prices[^1]}, SnapshotPrice={snapshotPrice}");
+                $"CompletedClose={prices[^1]}, SnapshotPrice={snapshotPrice}" +
+                (recoveryMomentum.HasValue ? $", {recoveryMomentum.Value.Diagnostics}" : string.Empty));
         }
     }
 }

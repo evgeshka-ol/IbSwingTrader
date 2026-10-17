@@ -2,6 +2,8 @@ namespace IbSwingTrader.Domain.Dataset
 {
     public class TradeDatasetRow : TradeRecord
     {
+        public string BollingerModel { get; set; } = string.Empty;
+
         // Same real Bollinger/MACD/RSI lookback windows the scanner writes to candidates.csv, ending at entry
         public List<decimal> RecentDailyBbUpperBandSeries { get; set; } = [];
         public List<decimal> RecentDailyBbMidBandSeries { get; set; } = [];
