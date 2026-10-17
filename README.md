@@ -56,10 +56,13 @@ The per-symbol cache is stored under `Data/cache/<SYMBOL>.json`. Each file conta
 
 ### Feature and pattern analysis
 
-The feature engine calculates Bollinger Bands, RSI, MACD and supporting
+The feature engine calculates EMA20-centered Bollinger Bands (±2 population
+standard deviations over 20 closes), RSI, MACD and supporting
 series. Current candidate groups are `BellUp`, `ReversalHook` and `Other`.
 BellUp has precedence; recognized setups rejected by readiness remain Other.
-ReversalHook recognizes recent completed D1/H4 episodes independently of
+Fresh H4 MACD improvement can support a recognized hook's live mid reclaim.
+New snapshots carry `BollingerModel` to distinguish the EMA migration from
+legacy SMA data. ReversalHook recognizes recent completed D1/H4 episodes independently of
 the former Daily-mid family split and can remain active after crossing mid.
 
 BellUp timing compares the latest green completed candle's range with the

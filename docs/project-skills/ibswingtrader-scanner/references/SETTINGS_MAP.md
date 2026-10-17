@@ -4,6 +4,14 @@ Main settings file:
 
 - `IbSwingTrader/agentsettings.json`
 
+## Indicator model
+
+Since 2026-10-17, shared Bollinger is EMA20 center +/-2 population sigma20,
+with an initial SMA20 seed. This is a code-level model change, not a setting
+that reinterprets saved CSVs. New rows carry BollingerModel. See
+[Bollinger EMA and recovery](BOLLINGER_EMA_AND_RECOVERY.md) for formula,
+metadata, fresh H4 momentum and watch-ledger migration.
+
 ## High-impact scanner settings
 
 ### `GetCandidates.PreFilter`
@@ -311,7 +319,9 @@ Scope is `WinGivenEntryAndResolution`: Open/NoEntry were excluded from fitting.
 This is not unconditional ten-day P(Win) for all candidates. It is experimental,
 not independently calibrated, and resolved-outcome selection introduces bias.
 A wider stop can increase estimated Win without improving expected profit.
-Console uses `Win~` with an explanatory legend. The estimate is assigned after
+Console uses `Win~` with an explanatory legend. The frozen v1 fit predates the EMA migration; compare calibration by
+BollingerModel and plan policy. No coefficient refit is implied.
+The estimate is assigned after
 publication refresh, including singleton pools. Historical values are unchanged;
 execution policy changes require revisiting labels and calibration.
 

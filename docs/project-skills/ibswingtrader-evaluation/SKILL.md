@@ -29,6 +29,13 @@ evidence and does not replace Win, profit or confidence calibration.
 
 ## Main rule
 
+Since 2026-10-17, new scanner BollingerModel is
+ema20-sma-seed20-popstd20-v1. Preserve it through evaluations/datasets;
+legacy blanks must not be relabeled with the current model. A saved recovery
+reason can include fresh provisional H4 MACD support; preserve that decision
+evidence rather than replacing it with later completed H4. See scanner
+[Bollinger EMA and recovery](../ibswingtrader-scanner/references/BOLLINGER_EMA_AND_RECOVERY.md).
+
 Since 2026-10-07 (StrategyVersion=7), evaluation ScanPrice is the saved
 candidate TradePlan.LiveReferencePrice, identical to candidates.csv ScanPrice.
 It is never overwritten with the first post-publication M5 open. Scan-relative

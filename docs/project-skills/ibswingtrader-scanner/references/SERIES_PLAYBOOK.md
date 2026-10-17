@@ -1,5 +1,12 @@
 # Series Playbook
 
+Current computational contract (2026-10-17):
+[Bollinger EMA and fresh H4 recovery](BOLLINGER_EMA_AND_RECOVERY.md).
+EMA20 replaces the former SMA Bollinger center across live feature consumers;
+older dated examples below retain their original SMA values. Plain MA context
+fields are unchanged. Historical curve matching/validation is not automatic
+validation of the EMA model.
+
 These are the main series used to understand a ticker before it fully expands.
 
 The `Recent*Series` window lengths (Daily/Weekly/H4 lookback, plus the swing-
@@ -167,8 +174,10 @@ recent M5, the diagnosis explicitly uses HistoricalSnapshot. The bridge runs
 even without a recognized seed, before the recognition rejection.
 
 An established bend can resume at a live mid reclaim when current price is
-above mid and the pre-bend close, and the closed histogram is no worse than
-at the bend. A future MACD crossover is not presumed certain. Fresh price
+above mid and the pre-bend close, and either the closed histogram is no worse
+than at the bend or a fresh close-only provisional H4 histogram improves
+against its previous closed H4 value. See BOLLINGER_EMA_AND_RECOVERY.md for
+native-interval, timestamp and history guards. A future MACD crossover is not presumed certain. Fresh price
 alone does not establish a historical seed, and incomplete H4/Daily bars do
 not become confirmed. M5 diagnostic price/provenance are saved in the candidate.
 Final fresh-M5 publication validation remains separate. The bridge adds

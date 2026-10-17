@@ -5,6 +5,13 @@ is catching ReversalHook after a meaningful drop, not tracking any old loser
 or generating BellUp opportunities. General scanner admission/ranking and the
 [current success criteria](../../../guides/success-criteria.md) remain separate.
 
+## Indicator-model change
+
+The same-day [EMA migration](BOLLINGER_EMA_AND_RECOVERY.md) changes the
+Bollinger mid to EMA20. Ledger model identifiers reset per-frame inspection
+cursors while preserving consumed hook and active-cycle memory. The WEAV
+numbers below describe the original SMA snapshot, not new EMA values.
+
 ## Enrollment
 
 A current TOP_OPEN_PERC_LOSE/TOP_PERC_LOSE sighting must pass the basic

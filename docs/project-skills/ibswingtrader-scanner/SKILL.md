@@ -24,6 +24,13 @@ next-day research coverage are supporting diagnostics, not the main oracle.
 
 ## Current contract
 
+Bollinger now uses EMA20 center with +/-2 population sigma over the last20
+closes (SMA20 seed). New snapshots carry BollingerModel; old snapshots remain
+legacy. Current H4 momentum may support a recognized mid-bend episode's live
+mid reclaim rather than waiting for closed Daily MACD. Read the exact model,
+freshness and migration rules in
+[Bollinger EMA and recovery](references/BOLLINGER_EMA_AND_RECOVERY.md).
+
 - Output groups are BellUp, ReversalHook and Other. The former Daily-mid
   Runaway/Reversal split is historical; it does not determine current groups.
 - BellUp has precedence. A recognized BellUp rejected by timing/readiness
@@ -124,6 +131,8 @@ performance. See [success criteria](../../guides/success-criteria.md).
   TWS readiness and source-code zones.
 - [Series Playbook](references/SERIES_PLAYBOOK.md): exact geometry, phases,
   cross-timeframe support, publication, timing and diagnostic boundaries.
+- [Bollinger EMA and recovery](references/BOLLINGER_EMA_AND_RECOVERY.md): shared
+  formula, metadata, current H4 MACD support and preserved publication checks.
 - [Reversal watch lifecycle](references/REVERSAL_WATCH_LIFECYCLE.md): 5% Daily-mid
   enrollment, hook retirement, new-drop rearm, persistence and legacy migration.
 - [Settings map](references/SETTINGS_MAP.md): watch retention/enrollment,

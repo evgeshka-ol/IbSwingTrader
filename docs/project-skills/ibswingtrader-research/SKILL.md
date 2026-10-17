@@ -15,6 +15,12 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 ## Core intent and priority
 
+New feature rows use EMA20-centered Bollinger and carry BollingerModel as of
+2026-10-17. Keep historical SMA/unspecified cohorts separate when comparing
+patterns, confidence and outcomes. The dated cache studies retain their
+original formula; see scanner
+[Bollinger EMA and recovery](../ibswingtrader-scanner/references/BOLLINGER_EMA_AND_RECOVERY.md).
+
 Follow the canonical [success criteria](../../guides/success-criteria.md),
 confirmed 2026-10-17: winners among entered plans, their profit percentages,
 and confidence-versus-outcome agreement. The minimum goal is a dependable
