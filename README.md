@@ -144,3 +144,7 @@ Dated studies retain their original assumptions and results.
 ## Development Checks
 
 Focused console check projects are available under `tests/` for scanner timing, evaluation selection and amplitude direction, and BellUp exit/exhaustion rules. The main application is built with the normal .NET SDK toolchain; TWS integration checks require a reachable TWS/IB Gateway instance.
+
+Execution checks also live under `tests/`: `ExecutionTimingChecks` covers M5
+price freshness and entry projection; `ExecutionCsvChecks` covers timestamp
+and price precision through CSV round trips.

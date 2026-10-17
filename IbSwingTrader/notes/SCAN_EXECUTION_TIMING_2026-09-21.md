@@ -69,14 +69,14 @@ This measures five-minute forecast error against a current-open baseline;
 it does not establish entry profitability. Exact past partial prices require
 the new saved snapshots and cannot be recovered from completed OHLC alone.
 
-User-run checks (the pure timing project has no broker/package dependencies;
+User-run checks from the repository root (the pure timing project has no broker/package dependencies;
 CSV checks reference the application project but do not connect to TWS):
 
-    dotnet run --project checks/ExecutionTimingChecks
-    dotnet run --project checks/ExecutionCsvChecks
-    dotnet run --project ../tests/CandidateCsvChecks
-    dotnet run --project ../tests/BellUpBoostExitChecks
-    dotnet run --project ../tests/EvaluationSelectionChecks
+    dotnet run --project tests/ExecutionTimingChecks
+    dotnet run --project tests/ExecutionCsvChecks
+    dotnet run --project tests/CandidateCsvChecks
+    dotnet run --project tests/BellUpBoostExitChecks
+    dotnet run --project tests/EvaluationSelectionChecks
 
 Builds, application runs and tests remain user-run under the project rules.
 
