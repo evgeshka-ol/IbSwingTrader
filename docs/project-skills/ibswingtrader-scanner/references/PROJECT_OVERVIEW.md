@@ -5,6 +5,11 @@
 ## Main commands
 
 - `get-candidates`
+  - checks TWS/IB Gateway connectivity and API readiness before starting the
+    finder, including wishlist loading/history preparation; unavailable TWS or
+    readiness timeout aborts the command via the existing connection-error
+    handler (exit code 1), without writing candidates or wishlist
+  - retains the local non-trading-day skip before attempting a connection
   - builds scanner output
   - writes `Data/Tickers/candidates.csv`
   - writes/updates `Data/Tickers/wishlist.csv`
@@ -33,6 +38,12 @@
   - removes stale files and legacy rows
 
 ## Main artifacts
+
+For user-installed automatic runs on Windows, see `docs/SCANNER_SCHEDULE.md`
+and `tools/Register-ScannerSchedule.ps1`. Schedule times are local Windows
+wall-clock values, not ET. Scheduling invokes the existing get-candidates
+command, with no separate pattern-specific scan mode. The signed-in user's
+TWS/Gateway session must already be available. Registration/runs are user-owned.
 
 - `Data/Tickers/candidates.csv`
 - `Data/Tickers/wishlist.csv`

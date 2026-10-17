@@ -97,6 +97,49 @@ Do not let a high win count hide weak scanner recall/ranking.
 
 ## Recent project behavior
 
+### Entry and target in one M5 (2026-10-14)
+
+The first entry bar can contain a target high that occurred before entry,
+as demonstrated by VFC, scan 2026-10-13 04:50:25, entry 16.25 / target 16.57.
+Its 09:45 M5 was O16.55/H16.57/L16.18/C16.22; the user's M1 chart shows
+the target before the later downward crossing of entry. Candle color alone
+does not establish this ordering.
+
+When that entry M5 touches the target, request exactly five M1 ending at
+parent start + five minutes (`300 S`, one-minute bars), with no range-gap
+expansion or overlap. Reuse a complete cached five-minute window. Broker
+retries, if needed, request the same bounded window. Missing M1 coverage
+does not trigger downloads of the session, ticks or smaller bars.
+
+Require all five minute starts and valid OHLC. Drop minutes before the first
+entry touch, update EntryTime to that minute, then replay the suffix followed
+by ordinary later M5. Legacy Candle.Timeframe metadata can be unset; the
+parent interval is known to be five minutes from the evaluator's M5 source.
+
+If the entry minute opens above entry, its high may precede entry. Use a
+separate conservative replay candle with Open=entry, High=max(entry, Close),
+and its observed Low/Close: an ending close at/above target proves an
+after-entry recovery, whereas a high alone does not. If both stop and exit
+are still within the same replay minute, conservatively prefer stop and log
+the unresolved ordering; never download finer data or infer Win from color.
+
+Without complete matching M1, suppress the parent's unconfirmed upside and
+retain its downside conservatively, then continue with subsequent M5. This
+can undercount a genuine intraminute winner, rather than inventing one.
+Replay candles are in-memory bounds, never replacement market bars in cache.
+Post-entry excursion metrics and the final correction loop use this same
+replay, so the original parent high cannot silently restore a rejected Win.
+Scan-wide amplitude retains its original market-history calculation.
+
+Logs: `Entry-bar M1 window`, `Entry-bar sequence replay/unresolved/unavailable`,
+`Entry-bar target not confirmed`, `Entry-minute exit/stop order unresolved`.
+Existing stop/target resolution for other M5 bars remains separate.
+
+Already saved Win rows, including VFC, are not automatically reevaluated with
+`AllowedOutcomesToEvaluate=["Open"]`. This change governs evaluations that
+actually run; it does not rewrite historical results or broaden outcome
+selection. Rechecking a saved Win requires a separately authorized replay.
+
 The project now recalculates amplitude for `NoEntry`.
 
 Legacy rows can be backfilled through:

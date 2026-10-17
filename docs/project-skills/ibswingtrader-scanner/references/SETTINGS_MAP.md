@@ -28,12 +28,16 @@ be ready to trade in order to be watched.
 - `Enabled=true`: read/save the persistent recall universe in
   `Paths.WishListFile` (`Data/Tickers/wishlist.csv`). Disabled skips its loading,
   enrollment and saving, leaving the file intact.
-- `ScanCodes=["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]`: enroll all returned
-  names passing the basic stock prefilter, before historical-data, recent-price
-  floor, pattern and entry checks. History failure does not erase enrollment.
+- `ScanCodes=["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]`: since 2026-10-15,
+  enroll/renew only names passing the basic prefilter whose fresh current
+  price is strictly below the latest completed native D1 Bollinger mid.
+  History preparation precedes this check; recent-price floor, pattern and
+  entry admission follow it. No fresh price or reliable D1 means no enrollment
+  or renewal, with an explicit log reason. Existing records survive failures.
 - `RetentionCalendarDays=30`: expire at the scan start when the latest loser
   sighting is at least 30 calendar dates old. `0` or negative disables expiry.
-  Direct monitoring does not renew this date; another loser sighting does.
+  Direct monitoring does not renew this date; another loser sighting with
+  a fresh price below the closed D1 mid does.
 - `UseWishListFirst=true`: prepare watched names before current scanner-code
   names. Classification still uses the shared current pattern pipeline.
 - `MaxWishListItems=0`: no scan limit; every active item is checked each run.
@@ -55,9 +59,19 @@ Legacy expected-target cleanup does not remove managed watch rows; explicit
 `LastStatus=Remove` still does. Watch expiry is owned by the scanner settings.
 More active symbols can increase scan duration; existing history retry/bridge
 bounds apply equally to direct monitoring.
-Loser batches are checkpointed before historical loading, with atomic CSV
-replacement, and statuses are saved again at run completion. Full implementation
-notes: `docs/implementation-2026-10-10-reversal-watch-list.md`.
+Each qualifying loser observation is checkpointed after its price check,
+with atomic CSV replacement; statuses are saved again at run completion.
+The price check requests a bounded ten-minute fresh M5 snapshot and accepts
+the current or immediately preceding M5 bucket via ExecutionPriceSnapshot.
+No historical close, H4 mid, provisional D1 or stale cached M5 substitutes
+for the comparison. At least 20 native completed D1 bars are required; the
+latest must match the last completed trading date from the local schedule,
+using the existing 16:00 D1 completion convention. Exact price, mid, D1 date
+and M5 source/time are logged. This adds a fresh-price request per eligible
+loser observation; publication validation remains separate. Existing watch
+rows are retained when above mid; this condition governs enrollment/renewal,
+not ReversalHook recognition or continuation after a mid crossing.
+Historical implementation notes: `docs/implementation-2026-10-10-reversal-watch-list.md`.
 
 ### `GetCandidates.Finder.ReversalSupplementalDiagnostics`
 
@@ -66,6 +80,13 @@ recovery diagnostics in `PatternVerdictReason` and the Reversal episode log.
 Reuses the bounded M5 bridge; adds no separate M5 request. Closed points reuse
 the run feature cache; only the new provisional point needs calculation.
 These values do not influence admission, ranking or Win probability.
+
+Since 2026-10-16 it also emits closed H4/D1 `ReversalLowerBandBody`
+observations: exact lower-versus-body position, four recent candle records,
+and body/range ratios against up to five preceding bars. These distinguish
+the user's abrupt-drop/pause hypothesis from gradual drift for later research.
+They neither confirm another ReversalHook seed nor require Lower above body
+for admission. No new request is made. See SERIES_PLAYBOOK.md.
 
 ### `GetCandidates.Finder.ReversalLiveQuoteFallback`
 

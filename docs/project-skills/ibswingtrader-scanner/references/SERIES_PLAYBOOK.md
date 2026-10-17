@@ -207,6 +207,34 @@ Thus recognition improvements do not guarantee admission for every rebound.
 
 ### Supplemental closed/partial H4 diagnostics (2026-10-10)
 
+Since 2026-10-16, the same supplemental switch also records
+`ReversalLowerBandBody(DiagnosticOnly=True, ...)` independently for closed
+H4 and D1 in each phase reason/log. This records the user's distinction
+between abrupt drop/pause/rebound and gradual drift along the lower band;
+it does not introduce another recognition seed or a mandatory lower-above-
+body condition for ordinary ReversalHook.
+
+The last four completed candles retain exact OHLC/volume and lower band,
+LowerVsBody (AboveBody when Lower > max(Open,Close), InsideBody including
+boundary touches, BelowBody, or Unavailable), signed body percentage and
+absolute body/range ratios to the median of up to five strictly preceding
+candles. ReferenceBars makes short baselines explicit; zero/missing medians
+produce n/a. Last/previous positions and PositionChangedIntoBodyFromAbove
+describe relative states, not proof the line itself caused a crossing.
+Decision time and each bar start are retained; forming H4/D1 are excluded
+using existing start+4h / 16:00 conventions. No future rebound is an input.
+
+No numeric sharp-drop or short-pause thresholds have been validated here;
+the four-point reporting window and five-point baseline are descriptive
+choices, not calibrated admission rules. This context has no effect on
+recognition, phase, support, freshness, ranking, plans or candidate group.
+Existing phase parsing is unchanged. It reuses prepared closed bars/features,
+adds no broker calls and isolates diagnostic failures. Two TSLA screenshots
+(`TSLA-Л-pattern-ReversalHook.png`, `TSLA-ReversalHook.png`) motivate the
+distinction; their timeframe and exact episode dates are not established
+by the cropped images. Do not claim exact historical TSLA replay.
+User-run checks: `dotnet run --project tests/ReversalLowerBandBodyChecks`.
+
 When `Finder.ReversalSupplementalDiagnostics` is enabled, the Reversal episode
 reason contains `ReversalSupplemental(DiagnosticOnly=True, ...)` independently
 of confirmed recognition. `ClosedH4Gradual` checks four negative mid deltas,
@@ -271,6 +299,113 @@ working negative example.
 The best timing is the first or second daily bar after the lower-band hook.
 POET, ASM, SSRM, CDE, and SVM from the 2026-06-15 evaluation set are the first
 accepted working examples.
+
+### Л-Pattern: rising slope followed by a fall toward mid
+
+The user's 2026-10-15 observation: a smooth sloping rise, sometimes initially
+BellUp-like, followed almost immediately by a large red candle toward the
+Bollinger mid resembles the Cyrillic letter Л. PENG Daily on October 14 is
+the working example; the user identifies the October 13 upper-band bend as
+the useful preceding warning. The later chart comparison established that
+the sharp bend is clearest on the falling candle. The earlier slowdown is
+now diagnostic only, not a complete Л classifier or new output group.
+See `docs/investigation-2026-10-15-peng-l-pattern.md` for saved evidence.
+
+### П-Pattern and upper-band pause diagnostic (2026-10-15)
+
+The user's NVAX H4 example has a sharp rise, a short sideways bridge and a
+similarly sharp fall: Cyrillic П. Its shared warning with PENG's Л is upper-
+band slowing around a pause. The initially authorized filter was withdrawn
+after discussion: the preceding candles do not establish the later fall.
+The current instruction is to collect diagnostics and seek additional
+features that distinguish continuation pauses from declines.
+
+On the selected confirmed BellUp timeframe only, use the latest four completed
+native candles and exact unrounded upper/mid values. Let a/b/c be the last
+three upper-band increments. Record a pause when a > b > 0 and c < b,
+the maximum of the middle two closes exceeds the first close, the last close
+does not exceed the previous one, remains strictly above mid, and mid is
+flat/rising on the last transition. Inputs must be aligned, positive and
+chronological with upper > mid. This is two-step deceleration plus stalled
+price, not a calibrated numerical definition of a visually sharp bend.
+
+`BellUpUpperBandSlowdown.IsPause` implements the geometry. After admission,
+ranking and publication, matching output rows receive
+`BellUpPauseDiagnostic(DiagnosticOnly=True, ...)` in PatternVerdictReason and
+Context.Notes, plus a `BellUp pause diagnostic` log. This covers selected
+BellUp patterns in playable rows and Other rejected by separate gates.
+Saved details include timeframe, original decision time, last completed bar
+time, three exact upper deltas, previous/latest close and mid. Calculations
+use the original context and completed-bar cutoff; no extra broker requests
+are made. Diagnostic failures are logged without affecting output.
+
+The observation does not change candidate group, readiness, entry/exit/stop,
+ranking or Win~. It uses no future fall, incomplete candle or mandatory
+RSI/MACD confirmation. A later price advance or renewed band acceleration
+clears this particular observation. Other gates still apply. It neither
+closes positions nor changes historical candidate/evaluation rows.
+
+Native NVAX H4 upper increments are approximately 0.627 -> 0.335 -> 0.262
+through October 6 04:00, whose confirmation is available only at 08:00.
+The much flatter 08:00 bar is already the falling candle. Yahoo's displayed
+13:00 rise must not be equated to a different native timestamp without
+interval alignment. Two examples and focused checks do not establish
+precision, recall or profitability. A match is a pause observation, not a
+forecast of a decline. See `docs/investigation-2026-10-15-nvax-p-pattern.md`.
+
+User-run checks: `dotnet run --project tests/BellUpUpperBandChecks`.
+
+Additional research hypothesis from the user (2026-10-15): during the
+post-impulse bridge, track whether the rising upper band reaches/crosses
+the flat candle level before price falls. Compare NVAX H4 October 5-6 with
+ACVA H4 September 10-11 (`Data/Charts/ACVA-H4-Triangle.png`). In native cache,
+NVAX October 6 04:00 close 12.43 remains above upper about 12.27346.
+ACVA's first two plateau closes also remain above upper (10.43 vs 9.42912
+and 9.98770); its third plateau close is 10.41 vs upper about 10.44294,
+near the candle high 10.44, and the band subsequently moves above the plateau.
+Thus being above upper on the second paused candle alone does not distinguish
+these examples. Crossing at the third is unavailable at the second; a future
+crossing cannot label the earlier decision. The small cache/high difference
+also prevents claiming an exact wick intersection from rounded chart values.
+
+Record this as a hypothesis for later diagnostics/research, not an admission
+rule or proof that NVAX could not form a Triangle. The upper band is computed
+from price: its subsequent flattening is partly a consequence of the falling
+close, not proof the earlier band position caused the fall. Compare plateau
+age, signed close/upper distance normalized by band width, candle body/wick
+intersection, and continued upper growth on equal-age prefixes, including
+continuations and failures. Existing pause diagnostics/filters are unchanged.
+
+Cache study completed 2026-10-15:
+`docs/investigation-2026-10-15-pause-upper-position.md`. Primary H4 cohort
+(one-bar rise, two paused bars, next three bars) contains 4,254 observations.
+Down occurs in 30.9% when Upper < Low versus 29.5% when Upper has reached
+Low or higher; ticker-cluster bootstrap difference interval includes zero.
+Close–Upper distance AUC is 0.517. Later slices and alternate horizons do
+not establish reliable direction separation. XP/QDEL continue upward with
+Upper < Low; PCVX falls with Upper > High. Preserve diagnostic-only status;
+do not turn upper/candle position into a trading veto from these examples.
+
+Body refinement (2026-10-16): see
+`docs/investigation-2026-10-16-pause-body-position.md`. In the same primary
+H4 cohort Down is 29.9% with Upper below body vs 31.1% inside body. This
+does not establish safe admission on a body intersection. The user's proposed
+sequence (last closed H4, then last closed D1), directional crossing event,
+same-session horizon and mirrored lower-band case remain untested; neither
+independent-timeframe table tests that full hypothesis. Keep diagnostic-only
+status until a separately specified joint/prefix study provides evidence.
+
+Impulse-level refinement (2026-10-16): the user distinguishes flat bodies
+near the impulse Close (П/Л bridge) from upward steps whose bodies stay above
+that Close (continuation context). Cache study:
+`docs/investigation-2026-10-16-pause-impulse-level.md`. With a long one-bar
+rise and two paused H4 bars, next-bar Open–Close <=−5% occurs in 5.04% of
+flat-at-top observations vs 2.17% of steps-above-top; sharp upside is also
+more common in the flat group. At three paused bars the downside difference
+nearly disappears. This is preliminary conditional risk separation, not a
+validated П/BellUp classifier or guaranteed direction. FIG provides a
+steps-above-top/Upper-inside-body counterexample followed by a >5% red H4.
+No production filter or ranking change is justified by this study alone.
 
 ### Triangle Growth
 

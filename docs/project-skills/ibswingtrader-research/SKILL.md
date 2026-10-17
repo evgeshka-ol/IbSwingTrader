@@ -74,6 +74,12 @@ Triangle output remains diagnostic Other.
 
 ## Practical workflow
 
+For the upper-band-versus-prior-candle hypothesis during post-rise pauses,
+see `docs/investigation-2026-10-15-pause-upper-position.md`. Its cache-only
+study found no useful primary H4 separation; it is not a trade-outcome or
+production-classifier replay. Upper below Low must not be treated as proof
+of an impending П/Л fall or inability to continue a Triangle-like pause.
+
 1. build today's research dataset
 2. compare it with yesterday's `candidates.csv`
 3. classify:

@@ -65,6 +65,12 @@ the first post-publication M5 open when interpreting target progress.
 
 ## Current data contract and pattern parity (2026-09-29)
 
+Since 2026-10-14, when entry and target both touch the first entry M5, replay
+only that five-minute window with M1 before assigning Win. Discard pre-entry
+minutes; do not infer intraminute order from candle color. Incomplete minute
+coverage cannot confirm that parent's target; continue with later M5 using
+conservative post-entry bounds. See EVALUATION_RULES.md for replay and retry scope.
+
 Since 2026-10-05, new scanner `DiagnosticsEstimatedHitRatePct` values use
 the experimental model `bellup-win-ridge-2026-10-05-v1`, scope
 `WinGivenEntryAndResolution`. Historical percentages remain amplitude

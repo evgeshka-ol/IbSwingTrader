@@ -319,6 +319,12 @@ Win/Loss rows) by decomposing the heuristic into independent pieces:
 again, it still needs raw H4 candle data before it can be tested, not just
 more evaluation-dataset rows.
 
+Follow-up (2026-10-15): the initially added two-step upper-band slowdown plus
+stalled-price veto was withdrawn at the user's request. It now records only
+`BellUpPauseDiagnostic`; pauses can precede continuation, consolidation or
+decline. See SERIES_PLAYBOOK.md "П-Pattern". The AUC values above remain
+historical evidence; the diagnostic has no independent outcome validation.
+
 A related but distinct daily-bar mid-band feature — the `REVERSAL_EDGE.md`
 "mid-band bend" trigger for `Reversal` — was tested the same way on
 2026-09-01 (see that file's "Open items") and also came back at chance

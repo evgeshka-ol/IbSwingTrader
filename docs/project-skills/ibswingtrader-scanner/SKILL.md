@@ -168,12 +168,17 @@ cache-confirmed examples and empirical validation against realized outcomes.
 3. compare yesterday's scan with today's `research_top_gainers.csv`
 
 Since 2026-10-10, `wishlist.csv` is again a persistent recall universe for
-new losers from `TOP_OPEN_PERC_LOSE` and `TOP_PERC_LOSE`. Enrollment follows
-the basic stock prefilter, before history/price-floor/pattern/entry checks.
+new losers from `TOP_OPEN_PERC_LOSE` and `TOP_PERC_LOSE`. Since 2026-10-15,
+enrollment/renewal requires a fresh current M5 price strictly below the
+Bollinger mid of the latest completed native D1. Equality/above-mid and
+missing fresh price or reliable Daily history do not enroll or renew.
+The check runs after history preparation, before the recent-price floor,
+pattern admission and entry checks. Existing watch rows are not purged
+merely because price recovered above mid.
 Each subsequent scan loads those symbols directly and applies the same
 BellUp -> ReversalHook -> Other pipeline even when scanner codes no longer
 return them. Default expiry is 30 calendar days after the last loser sighting;
-repeat drops renew it. `UseWishListFirst=true` prioritizes their history stage;
+qualifying below-mid repeat drops renew it. `UseWishListFirst=true` prioritizes their history stage;
 `MaxWishListItems=0` checks every active symbol. Positive limits rotate by
 oldest attempted evaluation and retain overflow. Historical candle storage
 still belongs to the cache. See SETTINGS_MAP.md for controls and provenance.
@@ -372,6 +377,12 @@ at chance (AUC=0.54 on the upper/mid kink itself, AUC=0.48 on the
 `DKNG`/`ChannelReclaim` lower-band variant). Full investigation, the
 HELP/DKNG grounding examples, and why `ChannelReclaim` still needs raw H4
 candle data before it can be tested are in `SCANNER_MODEL.md`.
+
+Since 2026-10-15, two-step upper-band slowdown and stalled price are saved
+only as `BellUpPauseDiagnostic(DiagnosticOnly=True, ...)` for the selected
+BellUp timeframe. The initially added readiness veto was withdrawn at the
+user's request: a pause does not establish a future Л/П fall. This diagnostic
+does not affect admission, plans, ranking or Win~. See SERIES_PLAYBOOK.md "П-Pattern".
 
 `BellUp` (bullish squeeze→launch) and `BellDown` (mirrored bearish form) are
 recognized from real Bollinger upper/mid/lower rows on H4 or Daily only
