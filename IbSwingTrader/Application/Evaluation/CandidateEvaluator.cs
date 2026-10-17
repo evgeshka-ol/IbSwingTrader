@@ -232,6 +232,31 @@ namespace IbSwingTrader.Application.Evaluation
                 .OrderBy(x => x.Time)
                 .ToList();
 
+            // Evaluation history here is M5; legacy cached bars can have default
+            // Candle.Timeframe metadata, so do not use that field as a gate.
+            var refinedEntryBar = TouchesPrice(entryCandle, exitPrice);
+            if (refinedEntryBar)
+            {
+                var replay = await _ambiguousBarResolver.ResolveEntryBarAsync(candidate, contract, entryCandle, entryPrice);
+                if (replay is { Count: > 0 })
+                {
+                    result.EntryTime = replay[0].Time;
+                    afterEntry = replay.Concat(afterEntry.Skip(1)).ToList();
+                }
+                else
+                {
+                    // Preserve guaranteed downside after crossing entry from above,
+                    // but never promote the unknown parent high to a proven exit.
+                    afterEntry[0] = new Candle
+                    {
+                        Timeframe = Timeframe.M5, Time = entryCandle.Time,
+                        Open = entryPrice, Close = Math.Min(entryPrice, entryCandle.Close),
+                        High = entryPrice, Low = Math.Min(entryPrice, entryCandle.Low), Volume = entryCandle.Volume
+                    };
+                    _logger.Warning($"Entry-bar target not confirmed: {candidate.Ticker}, M5={entryCandle.Time:O}; continuing with later M5");
+                }
+            }
+
             if (afterEntry.Count > 0)
             {
                 result.DaysAfterEntry = (afterEntry[^1].Time.Date - entryCandle.Time.Date).Days;
@@ -242,6 +267,13 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 var hitExit = TouchesPrice(candle, exitPrice);
                 var hitStop = TouchesPrice(candle, stopPrice);
+
+                if (hitExit && hitStop && refinedEntryBar && candle.Time < entryCandle.Time.AddMinutes(5))
+                {
+                    // M1 cannot establish order within its own OHLC. No finer request.
+                    hitExit = false;
+                    _logger.Warning($"Entry-minute exit/stop order unresolved: {candidate.Ticker}, Time={candle.Time:O}; conservative stop outcome");
+                }
 
                 if (hitExit && result.ExitTime == null)
                 {

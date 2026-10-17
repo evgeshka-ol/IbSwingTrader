@@ -20,6 +20,26 @@ namespace IbSwingTrader.Application.Market
         private readonly IMarketGapAnalyzer _marketGapAnalyzer = marketGapAnalyzer;
         private readonly IMarketCoverageService _marketCoverageService = marketCoverageService;
 
+        public async Task<List<Candle>?> GetM1InsideM5(string symbol, Contract contract, DateTime start)
+        {
+            var end = start.AddMinutes(5);
+            _cache.TryLoad(symbol, Timeframe.M1, out var cached);
+            var window = MergeCandles((cached ?? []).Where(x => x.Time >= start && x.Time < end).ToList());
+            bool Complete(List<Candle> bars) => bars.Count == 5 &&
+                bars.Select((bar, index) => bar.Time == start.AddMinutes(index)).All(x => x);
+            if (Complete(window))
+                return window;
+            List<Candle> loaded;
+            using (await _throttler.AcquireAsync())
+                loaded = await _provider.GetCandles(contract, Timeframe.M1, MarketTime.ToUtc(end), 5);
+            loaded = loaded.Where(x => x.Time >= start && x.Time < end).ToList();
+            var merged = MergeCandles((cached ?? []).Concat(loaded).ToList());
+            if (loaded.Count > 0)
+                _cache.Save(symbol, Timeframe.M1, merged);
+            _logger.Info($"Entry-bar M1 window: {symbol}, Start={start:O}, EndExclusive={end:O}, RequestedBars=5, Received={loaded.Count}");
+            return merged.Where(x => x.Time >= start && x.Time < end).ToList();
+        }
+
         public async Task<List<Candle>> GetFreshM5Snapshot(
             string symbol, Contract contract, DateTime start, DateTime requestedAt)
         {

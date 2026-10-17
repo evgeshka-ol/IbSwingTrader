@@ -1,4 +1,4 @@
-﻿using IBApi;
+using IBApi;
 
 namespace IbSwingTrader.Application.Evaluation
 {
@@ -13,6 +13,53 @@ namespace IbSwingTrader.Application.Evaluation
         {
             _historicalDataService = historicalDataService;
             _logger = logger;
+        }
+
+        public async Task<List<Candle>?> ResolveEntryBarAsync(
+            CandidateDetails candidate, Contract contract, Candle parentCandle, decimal entryPrice)
+        {
+            try
+            {
+                var start = parentCandle.Time;
+                var subCandles = await _historicalDataService.GetM1InsideM5(candidate.Ticker, contract, start);
+                var ordered = (subCandles ?? []).Where(x => x.Time >= start && x.Time < start.AddMinutes(5))
+                    .GroupBy(x => x.Time).Select(x => x.Last()).OrderBy(x => x.Time).ToList();
+                if (ordered.Count != 5 || ordered.Select((x, i) => x.Time == start.AddMinutes(i)).Any(x => !x) ||
+                    ordered.Any(x => x.Open <= 0m || x.Close <= 0m || x.Low <= 0m ||
+                        x.High < Math.Max(x.Open, x.Close) || x.Low > Math.Min(x.Open, x.Close)))
+                {
+                    _logger.Warning($"Entry-bar sequence unresolved: {candidate.Ticker}, M5={start:O}, incomplete M1 coverage");
+                    return null;
+                }
+                var first = ordered.FindIndex(x => TouchesPrice(x, entryPrice));
+                if (first < 0)
+                {
+                    _logger.Warning($"Entry-bar sequence unresolved: {candidate.Ticker}, M5={start:O}, M1 does not reproduce entry");
+                    return null;
+                }
+                var replay = ordered.Skip(first).ToList();
+                var entryMinute = replay[0];
+                if (entryMinute.Open > entryPrice)
+                {
+                    // Its full high can predate entry. Only the path from entry to
+                    // the final close is certain; do not guess an intraminute order.
+                    replay[0] = new Candle
+                    {
+                        Timeframe = Timeframe.M1, Time = entryMinute.Time,
+                        Open = entryPrice, Close = entryMinute.Close,
+                        High = Math.Max(entryPrice, entryMinute.Close), Low = entryMinute.Low,
+                        Volume = entryMinute.Volume
+                    };
+                }
+                _logger.Info($"Entry-bar sequence replay: {candidate.Ticker}, M5={start:O}, " +
+                    $"EntryMinute={entryMinute.Time:O}, ExcludedMinutes={first}, ConservativeEntryMinute={entryMinute.Open > entryPrice}");
+                return replay;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"Entry-bar sequence unavailable: {candidate.Ticker}. {ex.Message}");
+                return null;
+            }
         }
 
         public async Task<AmbiguousBarResolutionResult?> ResolveLongAsync(

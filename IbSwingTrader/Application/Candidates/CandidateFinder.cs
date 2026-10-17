@@ -21,6 +21,7 @@ namespace IbSwingTrader.Application.Candidates
         ITradeBuilder tradeBuilder,
         IScanCodeInfoService scannerPresets,
         IMarketSettingsProvider marketSettingsProvider,
+        ILocalMarketScheduleProvider localMarketScheduleProvider,
         IGetCandidatesSettingsProvider getCandidatesSettingsProvider,
         INumberTextFormatter fmt,
         ITextLogger logger) : ICandidateFinder
@@ -40,6 +41,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly ITradeBuilder _tradeBuilder = tradeBuilder;
         private readonly IScanCodeInfoService _scannerPresets = scannerPresets;
         private readonly IMarketSettingsProvider _marketSettingsProvider = marketSettingsProvider;
+        private readonly ILocalMarketScheduleProvider _localMarketScheduleProvider = localMarketScheduleProvider;
         private readonly IGetCandidatesSettingsProvider _getCandidatesSettingsProvider = getCandidatesSettingsProvider;
         private readonly INumberTextFormatter _fmt = fmt;
         private readonly ITextLogger _logger = logger;
@@ -112,15 +114,6 @@ namespace IbSwingTrader.Application.Candidates
                     firstSeen.TryAdd(stock.Ticker, receivedAt);
                 stageMetric.Input = stocks.Count;
                 var eligibleStocks = stocks.Where(_preFilter.Pass).ToHashSet();
-                if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
-                {
-                    foreach (var stock in eligibleStocks)
-                        _reversalWatchList.ObserveDrop(stock, preset, receivedAt);
-                    // Persist the whole returned loser universe before slow history requests.
-                    // An interrupted run must not lose names it already received.
-                    await _reversalWatchList.SaveAsync();
-                }
-
                 foreach (var stock in stocks)
                 {
                     var tickerMetric = performance.BeginTicker(stageName, stock.Ticker);
@@ -247,16 +240,6 @@ namespace IbSwingTrader.Application.Candidates
                                 $"Ticker history prepared: {stock.Ticker}. " +
                                 $"H4={candles.Count}, D1={dailyBars.Count}, W1={weeklyBars.Count}");
 
-                            if (TryRejectByRecentDailyPriceFloor(stock.Ticker, dailyBars, out var recentPriceFloorReason))
-                            {
-                                stageMetric.Skipped++;
-                                tickerMetric.Skipped = true;
-                                _logger.Info($"Skipping {stock.Ticker}: {recentPriceFloorReason}");
-                                continue;
-                            }
-
-
-
                             try
                             {
                                 snapshot = _signalAnalyzer.Analyze(candles);
@@ -273,6 +256,19 @@ namespace IbSwingTrader.Application.Candidates
                             var validUntil = candles!.Select(x => x.Time.AddHours(4))
                                 .Where(x => x > preparationTime).Append(preparationBucket.AddHours(4)).Min();
                             preparedForRun[stock.Ticker] = new PreparedTickerData(contract, candles, dailyCandles, snapshot, validUntil);
+                        }
+
+                        if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
+                            await ObserveReversalDropBelowDailyMid(stock, preset, contract,
+                                dailyCandles, contractResolveTimeout, contractResolveMaxAttempts);
+
+                        if (TryRejectByRecentDailyPriceFloor(stock.Ticker,
+                            dailyCandles ?? BuildDailyBars(candles), out var recentPriceFloorReason))
+                        {
+                            stageMetric.Skipped++;
+                            tickerMetric.Skipped = true;
+                            _logger.Info($"Skipping {stock.Ticker}: {recentPriceFloorReason}");
+                            continue;
                         }
 
                         var lastPrice = candles[^1].Close;
@@ -456,6 +452,18 @@ namespace IbSwingTrader.Application.Candidates
                 await RefreshReversalForPublication(candidate, ctx);
             }
 
+            // Attach research observations after admission, ranking and publication.
+            // A pause must not influence any of those decisions.
+            foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
+            {
+                var ctx = contextsForOutput.FirstOrDefault(x =>
+                    string.Equals(x.Stock.Ticker, candidate.Ticker, StringComparison.OrdinalIgnoreCase) &&
+                    x.Preset.ScanCode == candidate.Scan.PresetScanCode &&
+                    x.ScanTimeMarket == candidate.Scan.SignalObservedAt);
+                if (ctx != null)
+                    AppendBellUpPauseDiagnostic(candidate, ctx);
+            }
+
             // Estimate only after publication refresh/fallback finalized entry, exit and stop.
             foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
             {
@@ -480,6 +488,61 @@ namespace IbSwingTrader.Application.Candidates
                 SameDayCandidates = sameDayCandidates,
                 WishList = _reversalWatchList.GetItems()
             };
+        }
+
+        private async Task ObserveReversalDropBelowDailyMid(
+            StockInfo stock, PresetScanCode preset, Contract? contract, List<Candle>? dailyCandles,
+            TimeSpan contractTimeout, int contractAttempts)
+        {
+            var qualified = false;
+            try
+            {
+                var now = MarketTime.Now();
+                // Native completed D1 only: neither an unfinished daily bar nor an
+                // H4-derived proxy establishes the watch enrollment threshold.
+                var completed = BellUpEntryTiming.GetCompletedCandles(
+                    dailyCandles ?? [], Timeframe.D1, now).OrderBy(x => x.Time).ToList();
+                var schedule = _localMarketScheduleProvider.BuildSchedule(
+                    DateTime.SpecifyKind(now.Date.AddDays(-14), DateTimeKind.Utc),
+                    DateTime.SpecifyKind(now.Date.AddDays(2), DateTimeKind.Utc));
+                var expectedDate = schedule.Days.Where(x => x.IsTradingDay)
+                    .Select(x => x.Date.ToDateTime(TimeOnly.MinValue))
+                    .Where(x => x.AddHours(16) <= now).DefaultIfEmpty(DateTime.MinValue).Max();
+                if (completed.Count < 20 || completed[^1].Time.Date != expectedDate)
+                {
+                    _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=missing-or-stale-closed-D1");
+                    return;
+                }
+                var mid = CalculateRunFeature(completed, completed.Count).DailyBollingerMidBand;
+                if (mid <= 0m)
+                {
+                    _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=invalid-D1-mid");
+                    return;
+                }
+                contract ??= await _contractResolver.ResolveStockAsync(stock.Ticker, contractTimeout, contractAttempts);
+                var requestedAt = MarketTime.Now();
+                var bars = await _historicalData.GetFreshM5Snapshot(
+                    stock.Ticker, contract, requestedAt.AddMinutes(-10), requestedAt);
+                var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
+                if (quote == null)
+                {
+                    _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=no-fresh-M5-price");
+                    return;
+                }
+                _logger.Info($"Reversal watch enrollment check: {stock.Ticker}, " +
+                    $"Price={_fmt.Generic(quote.Price)}, PriceSource={quote.Source}, PriceTime={quote.PriceTime:O}, " +
+                    $"DailyMid={_fmt.Generic(mid)}, DailyBar={completed[^1].Time:O}, BelowMid={quote.Price < mid}");
+                _reversalWatchList.ObserveDrop(stock, preset, quote.ObservedAt, quote.Price, mid);
+                qualified = quote.Price < mid;
+            }
+            catch (Exception ex) when (ex is not TwsConnectionException)
+            {
+                _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=price-check-failed. {ex.Message}");
+            }
+            // Persistence errors must propagate rather than masquerade as missing price.
+            // Checkpoint qualified observations without waiting for ranking/publication.
+            if (qualified)
+                await _reversalWatchList.SaveAsync();
         }
 
         private async Task RefreshReversalForPublication(CandidateDetails candidate, WishListContext ctx)
@@ -2145,6 +2208,31 @@ namespace IbSwingTrader.Application.Candidates
             return true;
         }
 
+        private void AppendBellUpPauseDiagnostic(CandidateDetails candidate, WishListContext ctx)
+        {
+            try
+            {
+                var series = BuildRecentFeatureSeries(ctx.Candles);
+                var pattern = ClassifyBellPatternSignal(BuildBollingerStateSet(series), series);
+                if (!IsRunawayBellUpPattern(pattern))
+                    return;
+                var history = BuildBellUpHistory(ctx, pattern);
+                if (!BellUpUpperBandSlowdown.IsPause(history.Candles, history.Upper, history.Mid))
+                    return;
+
+                var diagnostic = FormattableString.Invariant(
+                    $"BellUpPauseDiagnostic(DiagnosticOnly=True, Timeframe={pattern.Timeframe}, DecisionTime={ctx.ScanTimeMarket:O}, BarTime={history.Candles[^1].Time:O}, UpperDelta1={history.Upper[^3] - history.Upper[^4]}, UpperDelta2={history.Upper[^2] - history.Upper[^3]}, UpperDelta3={history.Upper[^1] - history.Upper[^2]}, PreviousClose={history.Candles[^2].Close}, Close={history.Candles[^1].Close}, Mid={history.Mid[^1]})");
+                candidate.PatternVerdictReason = AppendDiagnosticNote(candidate.PatternVerdictReason, diagnostic);
+                candidate.Context.Notes = AppendDiagnosticNote(candidate.Context.Notes, diagnostic);
+                _logger.Info($"BellUp pause diagnostic: {candidate.Ticker}. {diagnostic}");
+            }
+            catch (Exception ex)
+            {
+                // Optional research data must not reject a candidate or break output.
+                _logger.Info($"BellUp pause diagnostic unavailable: {candidate.Ticker}. {ex.Message}");
+            }
+        }
+
         private bool IsH4BellUpExhaustedWithFlatDaily(
             BellPatternSignal pattern,
             WishListContext ctx,
@@ -3675,7 +3763,8 @@ namespace IbSwingTrader.Application.Candidates
             return BellUpBoostExit.TryCalculate(history.Candles, history.Confirmed, entry, out target, out reason);
         }
 
-        private (List<Candle> Candles, List<bool> Confirmed, List<decimal> Lower) BuildBellUpHistory(
+        private (List<Candle> Candles, List<bool> Confirmed, List<decimal> Lower,
+            List<decimal> Upper, List<decimal> Mid) BuildBellUpHistory(
             WishListContext ctx,
             BellPatternSignal pattern)
         {
@@ -3689,12 +3778,18 @@ namespace IbSwingTrader.Application.Candidates
             var lower = new List<decimal>();
             var confirmed = new List<bool>();
             var lowerHistory = new List<decimal>();
+            var upperHistory = new List<decimal>();
+            var midHistory = new List<decimal>();
             var lookback = isDaily ? RecentDailySeriesLength : RecentH4SeriesLength;
 
             // Replay the shared classifier on prefixes; never infer an old phase from future bands.
             for (var i = 0; i < completed.Count; i++)
             {
                 var features = CalculateRunFeature(completed, i + 1);
+                // Preserve exact slopes for the slowdown guard; classification keeps
+                // its established rounded/windowed rows below.
+                upperHistory.Add(isDaily ? features.DailyBollingerUpperBand : features.H4BollingerUpperBand);
+                midHistory.Add(isDaily ? features.DailyBollingerMidBand : features.H4BollingerMidBand);
                 upper.Add(decimal.Round(isDaily ? features.DailyBollingerUpperBand : features.H4BollingerUpperBand, 2, MidpointRounding.AwayFromZero));
                 mid.Add(decimal.Round(isDaily ? features.DailyBollingerMidBand : features.H4BollingerMidBand, 2, MidpointRounding.AwayFromZero));
                 lower.Add(decimal.Round(isDaily ? features.DailyBollingerLowerBand : features.H4BollingerLowerBand, 2, MidpointRounding.AwayFromZero));
@@ -3710,7 +3805,7 @@ namespace IbSwingTrader.Application.Candidates
                     upper, mid, lower, ResolveSeriesDirection(mid), pattern.Timeframe) == BellPatternKind.BellUp);
             }
 
-            return (completed, confirmed, lowerHistory);
+            return (completed, confirmed, lowerHistory, upperHistory, midHistory);
         }
 
         private static decimal ResolveLiveReferencePrice(
@@ -5304,9 +5399,24 @@ namespace IbSwingTrader.Application.Candidates
                     ? completed[completed.Count - 1 - phase.BarsSinceBend].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
                 var lastTime = completed.Count > 0 ? completed[^1].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
                 var label = timeframe == Timeframe.D1 ? "D1" : "H4";
+                var candleContext = string.Empty;
+                if (_getCandidatesSettingsProvider.Get().Finder.ReversalSupplementalDiagnostics)
+                {
+                    try
+                    {
+                        candleContext = "; " + ReversalLowerBandBodyDiagnostics.Describe(
+                            completed.TakeLast(series.DailyBbLowerBandSeries.Count).ToList(),
+                            series.DailyBbLowerBandSeries, timeframe, now);
+                    }
+                    catch (Exception ex)
+                    {
+                        candleContext = $"; ReversalLowerBandBody(DiagnosticOnly=True, Timeframe={label}, Status=CalculationFailed)";
+                        _logger.Info($"Reversal lower-band/body diagnosis failed: {ctx.Stock.Ticker}. {ex.Message}");
+                    }
+                }
                 return (recognized, label, name,
                     $"{label}={name}, Recognized={recognized}, {phase.Diagnostics}, BendBar={bendTime}, " +
-                    $"LastCompletedBar={lastTime}, {recognition}");
+                    $"LastCompletedBar={lastTime}, {recognition}{candleContext}");
             }
             var daily = Analyze(ctx.DailyCandles ?? BuildDailyBars(ctx.Candles), Timeframe.D1);
             var h4 = Analyze(ctx.Candles, Timeframe.H4);

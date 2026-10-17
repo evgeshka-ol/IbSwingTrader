@@ -67,9 +67,10 @@ namespace IbSwingTrader.Application.WishList
                 }).ToList())).ToList();
         }
 
-        public void ObserveDrop(StockInfo stock, PresetScanCode preset, DateTime now)
+        public void ObserveDrop(StockInfo stock, PresetScanCode preset, DateTime now,
+            decimal currentPrice, decimal closedDailyMid)
         {
-            if (!CapturesCode(preset.ScanCode))
+            if (!CapturesCode(preset.ScanCode) || currentPrice <= 0m || closedDailyMid <= 0m || currentPrice >= closedDailyMid)
                 return;
             if (!_items.TryGetValue(stock.Ticker, out var item))
             {
@@ -77,7 +78,7 @@ namespace IbSwingTrader.Application.WishList
                 {
                     Ticker = stock.Ticker, FirstSeen = now,
                     Scan = new ScanInfo(), Score = new ScoreInfo(), Context = new MarketContextInfo(),
-                    LastStatus = "Watching", LastStatusReason = "New loser; waiting for a confirmed pattern", LastStatusTime = now
+                    LastStatus = "Watching", LastStatusReason = "New loser below closed Daily Bollinger mid; waiting for a confirmed pattern", LastStatusTime = now
                 };
                 _items[stock.Ticker] = item;
                 logger.Info($"Reversal watch enrolled: {stock.Ticker}, Preset={preset.ScanCode}");
