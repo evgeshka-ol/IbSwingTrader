@@ -7,12 +7,12 @@ not validate the new episode route or its future trade conversion.
 
 ## Main purpose and current priority
 
-See `SKILL.md` "Core intent" for the canonical, current statement of scanner
-purpose and the top-1-quality priority (`BellUp` #1 row should consistently
-capture >10%, `AmplitudePct` is the scanner-quality oracle, next-day
-`research_top_gainers.csv` coverage is the main feedback loop). Not restated
-here to avoid drift between two copies — this file covers model detail,
-failure modes, and implementation/validation history instead.
+Use the canonical [success criteria](../../../guides/success-criteria.md)
+(updated 2026-10-17): winners among entered plans, their profit percentages,
+and saved confidence calibration. Minimum: a dependable rank-1 winner with
+1.5% profit sufficient. Amplitude is supporting evidence. Historical AUC
+studies below used older amplitude targets and do not establish current
+Win/profit performance or a guaranteed winner.
 
 ## Former Runaway/Reversal family model (historical)
 
@@ -106,7 +106,7 @@ Important:
 - Do not reopen the family split when the problem is really profit capture or
   top-of-list quality.
 
-## Evaluation principle
+## Historical amplitude-first evaluation principle (superseded 2026-10-17)
 
 For scanner quality:
 
@@ -235,9 +235,10 @@ full candidate pool per scan (no top-window cap). See
 `ReRankCandidates`/`CalculateRunawayLaunchQualityScore`/`CalculateReversalHookQualityScore`
 in `CandidateFinder.cs`.
 
-If extending ranking further, validate a candidate feature's AUC against
-realized `AmplitudePct` before wiring it into a quality-score function —
-that discipline is what caught the 2026-07-11 approach not working.
+If extending ranking, validate against the current Win/profit and rank-1
+objectives before wiring in a feature. Historical amplitude AUC above is
+evidence for its original target only; preserve the empirical discipline
+that caught the 2026-07-11 approach not working.
 
 ## Historical Runaway quality-score feature sweep (2026-09-01)
 

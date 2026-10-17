@@ -12,6 +12,13 @@ project skill under `docs/project-skills/` and its relevant references:
 These files hold the detailed domain rules. Keep this file short and limited
 to guidance that applies across the repository.
 
+## Current success criteria
+
+Follow `docs/guides/success-criteria.md` for the current user objective:
+winners among entered plans, their profit percentages, and confidence versus
+outcomes. Minimum: a dependable rank-1 winner with 1.5% profit sufficient.
+Amplitude-first objectives in older investigations are historical.
+
 ## Current candidate groups
 
 The scanner classifies candidates into `BellUp`, `ReversalHook`, and `Other`.
@@ -31,4 +38,5 @@ they explicitly authorize Codex to run them.
 Treat dated investigation notes as historical records. When implementation
 changes, update the current project skills and references without rewriting
 old results as if they described current behavior. Label legacy terminology
-where it could be mistaken for the current output contract.
+where it could be mistaken for the current output contract. Follow the file
+placement and maintenance rules in `docs/README.md` for new documentation.

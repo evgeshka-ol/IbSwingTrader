@@ -90,7 +90,7 @@ def main():
     result = dict(outcomes=dict(Counter(row["outcome"] for row in all_rows)),
                   closed_unique_tickers=len({row["ticker"] for row in samples}),
                   exploratory_features=summary, samples=all_rows)
-    (ROOT / "docs/analysis-2026-10-05-win-features.json").write_text(json.dumps(result, indent=2) + "\n")
+    (ROOT / "docs/artifacts/analysis-2026-10-05-win-features.json").write_text(json.dumps(result, indent=2) + "\n")
     print("OUTCOMES", result["outcomes"], "closed unique", result["closed_unique_tickers"])
     for row in summary[:14]:
         print(json.dumps(row))

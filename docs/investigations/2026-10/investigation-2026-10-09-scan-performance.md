@@ -40,7 +40,7 @@ feature calculations are additional targets, not measured speed gains yet.
 Final publication fresh-price requests remain independent. Old data and
 missing price do not authorize a trade. Existing disk caches are not erased
 when a load aborts. The settings and cache/abort events are documented in
-project-skills/ibswingtrader-scanner/references/SETTINGS_MAP.md.
+docs/project-skills/ibswingtrader-scanner/references/SETTINGS_MAP.md.
 
 ## Validation status
 

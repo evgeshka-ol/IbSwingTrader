@@ -92,7 +92,7 @@ LastEvaluatedAt, LastStatus, LastStatusReason, LastStatusTime.
 
 Диагностика не разрешает вход, не меняет ranking/Win~, не снимает RSI и
 сжатие полос из строгого исторического seed. Это следующий этап после
-`research-2026-10-10-reversal-recognition.md`: сбор живых наблюдений без
+`../investigations/2026-10/research-2026-10-10-reversal-recognition.md`: сбор живых наблюдений без
 подмены доступных тогда данных позднее дополненным кешем.
 
 ## Что смотреть после запуска

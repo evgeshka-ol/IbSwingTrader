@@ -71,7 +71,7 @@ and M5 source/time are logged. This adds a fresh-price request per eligible
 loser observation; publication validation remains separate. Existing watch
 rows are retained when above mid; this condition governs enrollment/renewal,
 not ReversalHook recognition or continuation after a mid crossing.
-Historical implementation notes: `docs/implementation-2026-10-10-reversal-watch-list.md`.
+Historical implementation notes: `docs/implementation/implementation-2026-10-10-reversal-watch-list.md`.
 
 ### `GetCandidates.Finder.ReversalSupplementalDiagnostics`
 
@@ -112,7 +112,7 @@ is attached. Failure still produces Other with explicit rejection and IB
 reason logs. Default adds at most eight seconds per fallback attempt;
 successful bid/ask can complete earlier.
 
-See `docs/implementation-2026-10-10-reversal-live-quote-fallback.md`.
+See `docs/implementation/implementation-2026-10-10-reversal-live-quote-fallback.md`.
 
 ### `GetCandidates.CandidateFilter`
 
@@ -193,7 +193,9 @@ reference time or additional future candles enters the observed-pattern window.
     fix by adding a filter here.** The condition for turning this back to
     `false` (i.e. letting the admission gate decide what's shown, not just
     ranking) is empirical and set by the user: only once the top of the list
-    is *consistently* landing on `AmplitudePct >= 10%` winners. Until then,
+    meets the [current success criteria](../../../guides/success-criteria.md)
+    consistently (entered winners, profit and confidence agreement). The old
+    amplitude >=10% milestone is superseded as of 2026-10-17. Until then,
     ranking quality (`RankingQualityScore` / `AdjustedRank`) is the lever to
     improve, not admission strictness.
   - Historical 2026-09-01 rank-1 analysis used `Runaway`/`Reversal`; its
@@ -210,7 +212,7 @@ Use this when the right names are present but top summary is wrong.
 Since 2026-07-13, final order is driven by a template-free quality score
 (`CalculateRunawayLaunchQualityScore` / `CalculateReversalHookQualityScore` in
 `CandidateFinder.cs`, weighted by the hardcoded `QualityScoreRankWeight = 50`
-constant, not a settings knob). See `references/SCANNER_MODEL.md` "Shared
+constant, not a settings knob). See `SCANNER_MODEL.md` "Shared
 classifier implementation status" / `SKILL.md` "Ranking (current state)" for
 what actually decides order today.
 
@@ -249,8 +251,9 @@ future M5 open is no longer substituted into this field. Historical indicator
 prices can still be stale: ResolveScanPrice reconstructs the last historical
 daily close from its Bollinger-mid distance, not a real-time market quote.
 
-Do not use this to solve scanner recall/ranking issues.
-Use it only after the list quality is good.
+Use these controls for demonstrated execution problems. Assess the saved
+candidate and plan together against current Win/profit objectives; amplitude
+alone does not decide whether plan or ranking work takes priority.
 
 `BellUpBoostExitMinProfitPct` is the minimum target return for the BellUp
 boost-body exit override. It is a decimal fraction (`0.015` = 1.5%). If the
@@ -275,7 +278,7 @@ the log records original/new targets and percentages. Existing saved plans
 and evaluation rows are not retrospectively rewritten.
 
 The supporting historical screen is
-`docs/investigation-2026-10-05-half-profit-targets.md`. That study used a
+`docs/investigations/2026-10/investigation-2026-10-05-half-profit-targets.md`. That study used a
 strictly greater-than-10% condition; the implemented inclusive threshold is
 the user's subsequent explicit choice.
 
@@ -290,7 +293,7 @@ Diagnostics include `EstimatedHitRateModel` and `EstimatedHitRateScope`.
 Frozen model v1 uses 46 resolved replay plans across 28 tickers, with reduced
 targets and equal total training weight per ticker. It is a ridge logistic
 model (L2=4, symmetric intercept prior), with scaled/clipped inputs.
-Coefficients: `docs/model-2026-10-05-bellup-win.json` and
+Coefficients: `docs/artifacts/model-2026-10-05-bellup-win.json` and
 `BellUpWinProbability.cs`. Reproduction: `tools/fit_bellup_win_probability.py`
 reads the two dated analysis JSON artifacts; it does not deploy coefficients.
 

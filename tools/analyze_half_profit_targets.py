@@ -87,7 +87,7 @@ def main():
         item["old_realized"] = item["old_profit"] if row["Outcome"] == "Win" else float((stop / entry - 1) * 100) if row["Outcome"] == "Loss" else 0
         item["new_realized"] = item["new_profit"] if new == "Win" else float((stop / entry - 1) * 100) if new == "Loss" else 0
 
-    dest = ROOT / "docs/analysis-2026-10-05-half-profit-targets.json"
+    dest = ROOT / "docs/artifacts/analysis-2026-10-05-half-profit-targets.json"
     dest.write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n")
     print("TOTAL", len(output), "STATUS", dict(Counter(x["status"] for x in output)))
     for label, selected in (("all", output), ("friday", [x for x in output if x["scan"].startswith("2026-10-02")])):

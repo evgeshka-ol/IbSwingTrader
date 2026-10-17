@@ -100,5 +100,5 @@ N=8, порог 2: снимаются 29 отказов, max>=5% у 14 и max>=1
 проверить до production-внедрения. Код сканера/настройки не менялись.
 
 Скрипт: `python3 tools/analyze_boost_range_hypothesis.py`.
-Построчные результаты: `docs/analysis-2026-10-07-boost-range.json`.
+Построчные результаты: `docs/artifacts/analysis-2026-10-07-boost-range.json`.
 Приложение, брокерские команды, сборки и тесты не запускались.

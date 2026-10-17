@@ -24,9 +24,16 @@ other winners than to losers), so retuning its thresholds would only have
 changed which noise fired, not fixed anything. See
 `project-skills/ibswingtrader-scanner/references/SCANNER_MODEL.md` ("Ranking
 implementation status") for how that investigation played out and what
-replaced it, and `references/SETTINGS_MAP.md` for the same principle applied
+replaced it, and `project-skills/ibswingtrader-scanner/references/SETTINGS_MAP.md` for the same principle applied
 to scanner settings generally.
 
 The user responds well to this approach being applied unprompted — including
 multi-step empirical investigations — rather than a quick config change, even
 when it takes longer to get to an answer.
+
+## Current project objective
+
+The user's 2026-10-17 clarification supersedes the former amplitude-first
+objective. Use [success criteria](guides/success-criteria.md) for the ordered
+Win/profit/confidence metrics and rank-1 minimum. Preserve empirical validation
+before recalibrating; align its target with these current objectives.

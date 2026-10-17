@@ -20,80 +20,32 @@ setups from legacy family labels.
 
 ## What matters most
 
-### Scanner oracle
+Use [current success criteria](../../../guides/success-criteria.md) for the
+canonical objective, participation, unfinished horizons and calibration.
+The 2026-10-17 priorities are Win count/share among entered plans, winning
+profit percentages, then agreement of DiagnosticsEstimatedHitRatePct with
+outcomes. Minimum: a dependable rank-1 winner, with 1.5% profit sufficient.
 
-Use `AmplitudePct` first.
+## Interpretation
 
-Suggested mental buckets:
-
-- `>= 10%` strong / interesting
-- `5% to <10%` borderline
-- `<5%` weak / likely poor list quality
-
-For both playable pattern groups:
-
-- `BellUp` should be judged by whether it becomes the next research dataset.
-- `ReversalHook` should still produce meaningful amplitude, normally `> 10%`.
-- If amplitude is below 10%, treat that as scanner failure, even when the trade plan correctly avoids entry.
-- Do not use realized `AmplitudePct` before evaluation. Candidate pattern
-  groups are `BellUp`, `ReversalHook`, and `Other`; the former Daily-mid
-  `Runaway`/`Reversal` family split is legacy and does not define current
-  group membership.
-- Do not classify an isolated terminal H4/Daily jump as `BellUp`; the expansion
-  must not be explained by one final spike in band width and momentum.
-
-### Trade plan oracle
-
-Use:
-
-- `EntryTime`
-- `ExitTime`
-- `Outcome`
-- `PlannedProfitPct`
-- `PlannedLossPct`
-
-These tell you whether execution worked after the scanner already found the move.
-
-The number of winners is a trade-plan conversion metric.
-
-Many `Win` rows mean the trade plan is converting scanner opportunities.
-Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude mean the trade plan is failing to convert movement.
-
-## Interpretations
-
-### High amplitude + NoEntry
-
-Scanner likely found valid movement.
-
-This is usually a `TradePlan` issue, not a list issue.
-
-### Low amplitude + NoEntry
-
-This is usually not a trade-plan issue.
-
-The scanner likely surfaced a weak candidate.
-
-### Win with modest amplitude
-
-Can still be fine for execution, but does not prove scanner recall quality.
-
-### Loss with large amplitude
-
-Can indicate:
-
-- wrong side of movement
-- late entry
-- bad plan
-
-Do not use this alone to condemn the scanner. Large amplitude means the scanner
-still found movement; the failure is usually downstream unless the move direction
-or setup family was wrong.
-
-### Many winners but low amplitude
-
-This can make the trade plan look good while the scanner is still weak.
-
-Do not let a high win count hide weak scanner recall/ranking.
+- EntryTime establishes participation under the saved evaluation plan.
+  Show entered Win/Loss/Open and published NoEntry separately. Show both
+  Win/entered and resolved Win/(Win+Loss) with explicit denominators.
+- Read profit relative to entry and the evaluated exit. PlannedProfitPct is
+  a target until reached. Future maxima and scan-wide amplitude are not profit.
+- AmplitudePct is diagnostic: high amplitude plus NoEntry can suggest an
+  entry problem; high amplitude plus Loss can suggest bad timing, stops,
+  direction or ranking. Diagnose the path instead of assigning the cause
+  from amplitude alone. Neither counts as a winning trade.
+- A Win with 1.5% profit can satisfy the minimum goal even below 10% amplitude.
+  Do not classify it as scanner failure solely on that threshold.
+- Calibrate saved confidence within the matching model/scope/plan policy.
+  Current WinGivenEntryAndResolution is compared with Win/(Win+Loss);
+  disclose Open/NoEntry and incomplete coverage. Historical amplitude
+  estimates are not forecasts of Win under the current plan.
+- Scanner features use only the saved pre-outcome snapshot. Current groups
+  are BellUp, ReversalHook and Other; legacy family labels do not establish
+  current admission. A pattern match alone does not prove a win.
 
 ## Recent project behavior
 

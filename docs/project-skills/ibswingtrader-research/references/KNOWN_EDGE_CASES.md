@@ -9,7 +9,7 @@ Project response:
 - recent daily price floor filter
 - reject names that were very cheap in the recent completed daily window
 
-## POET regime transition
+## POET regime transition (historical family terminology)
 
 `POET` is a canonical example of:
 

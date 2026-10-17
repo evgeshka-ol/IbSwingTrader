@@ -111,7 +111,7 @@ def main():
     examples = [dict(time=b["Time"], features=candle_features(peng, i, 5)) for i, b in enumerate(peng)
                 if i >= 5 and b["Time"] in ("2026-10-02T08:00:00", "2026-10-05T16:00:00", "2026-10-06T12:00:00", "2026-10-06T16:00:00")]
     result = dict(statuses=dict(Counter(x["status"] for x in output)), summaries=summaries, peng=examples, rows=output)
-    (ROOT / "docs/analysis-2026-10-07-boost-range.json").write_text(json.dumps(result, indent=2) + "\n")
+    (ROOT / "docs/artifacts/analysis-2026-10-07-boost-range.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "rows"}, indent=2))
 
 

@@ -15,12 +15,17 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 ## Core intent
 
-Evaluation exists to answer two different questions:
+Evaluate the published candidate and its saved plan against the canonical
+[success criteria](../../guides/success-criteria.md), confirmed 2026-10-17:
 
-- did the scanner find fat future movement
-- did the trade plan execute it well
+1. winners among entered plans;
+2. their entry-relative profit percentages;
+3. agreement of saved DiagnosticsEstimatedHitRatePct with actual outcomes.
 
-Do not mix them.
+Minimum: a dependable rank-1 winner, with profit of at least 1.5% sufficient.
+This is a target, not an established guarantee. Keep recognition/ranking and
+execution mechanics distinguishable for diagnosis. Amplitude is supporting
+evidence and does not replace Win, profit or confidence calibration.
 
 ## Main rule
 
@@ -38,7 +43,7 @@ reasons, including phases and NotReady details. A recognition Match on Other
 is not trade admission. Reversal episodes can remain recognized above mid;
 do not reintroduce a latest-price-below-mid gate during evaluation.
 
-For scanner quality, the key metric is `AmplitudePct`.
+For current metric definitions and denominators, use the success criteria above.
 
 **Current category contract (since 2026-09-23):** candidate groups are
 `BellUp`, `ReversalHook`, and `Other`. Historical rows may retain the former
@@ -56,12 +61,13 @@ that the setup was admitted, traded, or profitable. Both D1/H4 phases and
 the snapshot price remain scan-time evidence; do not replace that price with
 the first post-publication M5 open when interpreting target progress.
 
-- High amplitude + `NoEntry` means scanner may be right and `TradePlan` may be wrong.
-- Low amplitude means the scanner likely surfaced a weak ticker.
-- The count of `Win` rows measures `TradePlan` conversion, not scanner recall.
-- Many `Loss`, `NoEntry`, or `Open` rows with strong amplitude point to `TradePlan` failure.
-- `ReversalHook` should still clear meaningful amplitude, normally `> 10%`;
-  below that is scanner failure.
+Participation means an entry under the saved plan, checked with EntryTime.
+Report entered Win/Loss/Open and NoEntry separately. Open is unresolved,
+not automatically a loss. A high-amplitude Loss remains a played loss;
+a 1.5% Win is not invalidated by amplitude below 10%. A zero-plan Other row
+is not a played trade. Confidence calibration must respect model/scope and
+plan policy; WinGivenEntryAndResolution uses Win/(Win+Loss), with Open and
+NoEntry reported alongside it. Historical amplitude estimates stay separate.
 
 ## Current data contract and pattern parity (2026-09-29)
 
@@ -121,9 +127,10 @@ scan path. See the `ibswingtrader-scanner` skill for the scanner side.
 
 ## Practical workflow
 
-1. inspect yesterday's `evaluation-dataset.csv`
-2. split weak rows from strong rows by amplitude
-3. decide whether to fix:
-   - scanner ranking
-   - scanner recall
-   - or `TradePlan`
+1. Inspect the original first playable row per scan and its evaluated result.
+2. Join candidates and evaluations by ticker and ScanTime; report entered
+   Win/Loss/Open, winning profit percentages and saved confidence calibration.
+3. Use source series, price freshness, amplitude and research coverage to
+   locate recall, recognition, ranking or execution problems.
+4. Validate changes against the current success criteria, retaining separate
+   observation horizons and repeated ticker/date dependencies.

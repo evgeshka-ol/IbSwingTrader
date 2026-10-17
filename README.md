@@ -13,6 +13,7 @@ IbSwingTrader is a .NET 10 command-line research and swing-trading assistant. It
 - [Outputs](#outputs)
 - [The Scan-Evaluate-Analyze Loop](#the-scan-evaluate-analyze-loop)
 - [Current Research State](#current-research-state)
+- [Documentation map](docs/README.md)
 - [Development Checks](#development-checks)
 
 ## High-Level Architecture
@@ -55,13 +56,18 @@ The per-symbol cache is stored under `Data/cache/<SYMBOL>.json`. Each file conta
 
 ### Feature and pattern analysis
 
-The feature engine calculates Bollinger Bands, RSI, MACD, moving-average context, volume and related series. Candidate logic then applies the scanner presets, wishlist filters, daily-family split, and pattern rules:
+The feature engine calculates Bollinger Bands, RSI, MACD and supporting
+series. Current candidate groups are `BellUp`, `ReversalHook` and `Other`.
+BellUp has precedence; recognized setups rejected by readiness remain Other.
+ReversalHook recognizes recent completed D1/H4 episodes independently of
+the former Daily-mid family split and can remain active after crossing mid.
 
-- `Runaway` is currently focused on confirmed `BellUp` on H4 or Daily;
-- `Reversal` uses the reversal-hook family;
-- everything else is retained as `Other` for evaluation and diagnostics.
-
-BellUp timing uses completed candles and the positive-body boost rule. Current trade-plan safeguards include lower-band-turn exhaustion detection, the H4-BellUp plus flat-Daily-mid exhaustion filter, late-entry penalties, and an exit target derived from one or two preceding qualifying boosts.
+BellUp timing compares the latest green completed candle's range with the
+median range of five preceding candles (default multiplier 2). Exit boost
+selection remains body-based. Final BellUp profit targets of at least 10%
+are reduced by half by default, preserving the existing 1.5% floor.
+Exact pattern, freshness and execution contracts live in the
+[project skills](docs/README.md#current-project-rules).
 
 ## AI-Assisted R&D & The Battle of Agents
 
@@ -100,30 +106,39 @@ The important generated files are under `Data/`:
 - `datasets/trade_dataset.csv`: optional trade-history dataset produced by `build-dataset`.
 - `logs/`: application diagnostics and timing information.
 
-Generated CSV/cache files are intentionally ignored by Git. The `docs/` directory contains dated design notes for scanner and evaluator changes.
+Generated CSV/cache files are intentionally ignored by Git. Start with the
+[documentation map](docs/README.md) for current rules, operating guides,
+dated investigations, implementation records and reproducible artifacts.
 
 ## The Scan-Evaluate-Analyze Loop
 
 The project is developed as an empirical feedback loop:
 
-1. **Scan.** Run `get-candidates`. The scanner queries TWS, refreshes cache edges, calculates features, classifies candidate families/patterns, builds an entry/exit/stop plan, ranks rows, and writes the current scan plus retained history.
+1. **Scan.** Run `get-candidates`. The scanner queries TWS, refreshes cache edges, calculates features, classifies candidate groups/patterns, builds an entry/exit/stop plan, ranks rows, and writes the current scan plus retained history.
 2. **Wait for market data.** The scan timestamp is treated as the information boundary. Future candles are not available to scanner decisions.
 3. **Evaluate.** Run `evaluate-candidates` on a later trading day. The evaluator selects eligible scan dates, loads post-scan M5/M15 data, tracks entry, target, stop, maximum/minimum excursions, extremum order, and open or closed outcomes.
-4. **Analyze.** Inspect the evaluation CSV, charts, logs, and dated research notes. Compare ranking, timing, pattern verdicts, signed amplitude, and trade-plan behavior with the observed price path.
-5. **Change and repeat.** Turn validated observations into a narrow rule or threshold change, add focused checks where practical, rebuild, and run new scans. Historical rows are evidence for the next iteration, not proof that a rule will generalize.
+4. **Analyze.** Inspect the evaluation CSV, charts, logs, and dated research notes. Compare entered-plan wins, winning profit percentages and saved confidence with actual outcomes. Use timing, pattern verdicts and amplitude to explain failures.
+5. **Change and repeat.** Turn validated observations into a narrow rule or threshold change; the user runs builds, tests and new scans. Historical rows are evidence for the next iteration, not proof that a rule will generalize.
 
 ## Current Research State
 
-The current iteration is concentrated on making `Runaway` a high-precision BellUp list rather than a broad momentum list. The main active questions are:
+The [current success criteria](docs/guides/success-criteria.md), confirmed by
+the user on 2026-10-17, prioritize:
 
-- detecting BellUp at the correct completed-candle moment on H4 and Daily;
-- rejecting an exhausted H4 BellUp when the lower band has turned upward and the Daily Bollinger mid line is flat;
-- avoiding late entries near a prior boost or candle high;
-- setting a realistic exit from the nearest qualifying boost (one boost is accepted; two are averaged);
-- preserving broker-native H4 timing and treating Yahoo chart aggregation as visual reference only;
-- measuring whether these changes improve the first-ranked candidate after the next-day evaluation.
+1. Winners among candidates that entered under their saved plans.
+2. Profit percentages of those winners.
+3. Agreement of `DiagnosticsEstimatedHitRatePct` with actual results.
 
-The project is currently in the **scan -> next-day evaluation -> manual analysis** phase. Recent changes are being validated with consecutive scans and their following evaluation reports. The immediate success criterion is not a large candidate count: it is recurring high-quality, correctly timed BellUp entries near the top of `Runaway`, while exhausted or ambiguous setups are removed or moved to `Other`.
+The minimum goal is a dependable winner at rank 1, with profit of at least
+1.5% sufficient. This is the requested goal, not an achieved guarantee.
+Inspect the original leading playable row and its ranking scope; report
+entered Win/Loss/Open and NoEntry separately. The current confidence model
+estimates Win conditional on entry and resolution; it is experimental.
+
+Amplitude and next-day `research_top_gainers.csv` coverage remain supporting
+diagnostics for recognition, recall, timing and ranking. They do not replace
+actual Win/profit results or make amplitude below 10% an automatic failure.
+Dated studies retain their original assumptions and results.
 
 ## Development Checks
 

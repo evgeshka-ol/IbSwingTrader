@@ -1,83 +1,37 @@
-# Research Oracle
+# Research oracle: supporting recall evidence
 
-Main artifact:
+Main artifact: Data/datasets/research_top_gainers.csv.
 
-- `Data/datasets/research_top_gainers.csv`
-
-Compare the playable `BellUp` and `ReversalHook` groups separately from
-`Other`. Older `Runaway`/`Reversal` references in historical reports describe
-the former family taxonomy.
+The [current success criteria](../../../guides/success-criteria.md) govern
+project outcomes: entered-plan winners, their profit, and confidence
+calibration. Research coverage and AmplitudePct are supporting diagnostics.
+A first-ranked 1.5% Win can meet the minimum goal without being a top gainer.
 
 ## Correct benchmark
 
-Do not compare today's scanner to today's winners.
+Compare yesterday's scanner with today's research winners to measure early
+coverage. Do not use today's winners to justify today's earlier decision or
+use later candles as scan-time features. Check snapshot availability and
+horizons; cache timestamps alone do not prove timely broker delivery.
 
-Compare:
+## Coverage classification
 
-- yesterday's scanner
-against
-- today's research winners
+- Caught in playable summary: useful early coverage. Inspect the saved plan
+  and evaluated outcome separately; a strong move need not be a played Win.
+- Summary row absent from next-day movers: inspect its actual Win/profit.
+  Absence alone does not mean failure under the current objective.
+- Seen in logs, wishlist or Other but not playable: inspect promotion,
+  recognition/readiness and fresh-price rejection reasons. A zero plan did
+  not enter merely because the ticker later moved.
+- Playable but below the leading row: inspect ranking against actual outcomes.
+- Fully absent: inspect recall, universe and filtering.
 
-This measures whether the scanner surfaced fat movement early enough.
+Use saved BellUp, ReversalHook and Other groups separately. Legacy
+Runaway/Reversal labels describe old datasets. Triangle remains diagnostic.
 
-## Priority #1 benchmark
+## Series-first diagnosis
 
-The most important benchmark is:
-
-- today's current top-ranked `BellUp` rows in `candidates.csv`
-- should become tomorrow's `research_top_gainers.csv` names
-
-This is the primary direction for scanner tuning.
-
-`BellUp` is not just a live-watch section. It is the
-project's best attempt to predict the next research dataset.
-
-When a current top-ranked `BellUp` name does not show up in the next
-research dataset with strong amplitude, treat that as scanner selection/ranking
-feedback before touching `TradePlan`.
-
-## Classification
-
-### Caught in current top rows
-
-The ticker was already in yesterday's current top-ranked candidate rows.
-
-This is the desired outcome.
-
-For `BellUp`, this is the highest-value success case.
-
-### Current top row failed next-day research
-
-The ticker was in yesterday's current top-ranked `BellUp` rows, but did
-not become a strong mover in today's research dataset.
-
-This is scanner selection/ranking failure unless the amplitude was still strong
-but the research threshold or universe missed it.
-
-### Seen but not promoted
-
-The ticker existed in yesterday's `WishList` or full `candidates.csv`, but not in current top-ranked rows.
-
-This is promotion or ranking failure.
-
-### Fully missed
-
-The ticker was absent from yesterday's flow.
-
-This is recall/universe/filter failure.
-
-## Series-first rule
-
-When a research winner is missed, inspect:
-
-- weekly mid-distance / width / MACD
-- daily mid-distance / width / MACD
-- H4 mid-distance / width / MACD
-
-The question is not only “was it up”.
-
-The question is:
-
-- what regime was it in
-- when that regime became visible
-- whether scanner logic knows how to promote that regime
+Inspect saved real Bollinger upper/mid/lower curves, MACD line/signal/
+histogram and RSI on Weekly/Daily/H4, with raw candles where needed.
+Distinguish when the setup became observable from when price finally moved.
+Use outcome labels only after forming features from the original snapshot.

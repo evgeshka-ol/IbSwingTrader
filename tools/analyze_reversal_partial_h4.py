@@ -149,7 +149,7 @@ def main():
         summary[variant] = dict(rows=len(chosen), tickers=len(set(x['ticker'] for x in chosen)), outcome_rows=len(outcomes), hit5=sum(x['future']['hit5'] for x in outcomes), hit10=sum(x['future']['up_pct'] >= 10 for x in outcomes), five_dates=sum(x['future']['trading_dates'] >= 5 for x in outcomes), median_up_pct=statistics.median(x['future']['up_pct'] for x in outcomes) if outcomes else None, median_down_pct=statistics.median(x['future']['down_pct'] for x in outcomes) if outcomes else None)
     output = dict(method='H4-only latest strict-gate ablation using native cache indicators where final closed price/mid reproduce saved rounded snapshot within .006. Saved rounded flags are diagnostic only. Cache replay retrospective; outcomes movement not trade wins. Repeated scans correlated; incomplete horizons censored.', rows=len(results), aligned_h4_rows=sum(x.get('cache_snapshot_aligned',False) for x in results), partial_status=dict(Counter(x['partial']['status'] for x in results)), summary=summary, cases=results)
     output['comparisons'] = comparisons(results)
-    path = ROOT/'docs/research-2026-10-10-reversal-recognition.json'
+    path = ROOT/'docs/artifacts/research-2026-10-10-reversal-recognition.json'
     path.write_text(json.dumps(output, ensure_ascii=False, indent=2)+'\n')
     print(json.dumps({k:v for k,v in output.items() if k != 'cases'}, indent=2))
     for x in results:

@@ -80,7 +80,7 @@ Down и разность частот Down между BelowLow и остальн
 
 `python3 tools/analyze_pause_upper_position.py`
 
-Результаты: `analysis-2026-10-15-pause-upper-position.json` (сводки и примеры),
+Результаты: `../../artifacts/analysis-2026-10-15-pause-upper-position.json` (сводки и примеры),
 `.events.json.gz` (все признаки и будущие окна), `.csv.gz` (плоские результаты).
 `--reuse-events` пересчитывает сводки из сохранённых наблюдений без чтения кеша.
 Кеш, candidates.csv и evaluation-dataset.csv не перезаписываются.

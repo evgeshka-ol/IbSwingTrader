@@ -6,6 +6,12 @@
 > former Daily-mid split. Current admission behavior is documented in
 > `../SKILL.md` and `SERIES_PLAYBOOK.md`.
 
+Current success metrics are defined in
+[success criteria](../../../guides/success-criteria.md), updated 2026-10-17.
+The old amplitude-based cohorts below remain historical evidence; the current
+minimum is a dependable rank-1 winner, with 1.5% profit sufficient. Historical
+unimplemented proposals do not override later episode recognition rules.
+
 This file supplements `SKILL.md` and `SCANNER_MODEL.md` with context specific
 to the `Reversal` family that does not belong in the general model description:
 why `Reversal` gets priority, the precise trigger definition in the user's own
@@ -262,7 +268,7 @@ this project:
 
 **Why this differs from July's already-disproven series-similarity
 approach** (`CalculateNormalizedPointDistance`/`CalculateGroupDistance`,
-removed 2026-09-01, see `SKILL.md` "Series-template direction" — 0/355
+removed 2026-09-01, see `MODEL_HISTORY.md` "Series-template direction" — 0/355
 templates ever matched across 7 tests): that approach already normalized for
 price/scale, so lack of normalization isn't why it failed. The difference
 this time is (a) a small human-verified exemplar set instead of 355

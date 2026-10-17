@@ -9,7 +9,7 @@ from analyze_pause_upper_position import ROOT, AGES, HORIZONS, summarize, cluste
 
 
 def main():
-    source = ROOT / 'docs/analysis-2026-10-15-pause-upper-position.events.json.gz'
+    source = ROOT / 'docs/artifacts/analysis-2026-10-15-pause-upper-position.events.json.gz'
     with gzip.open(source, 'rt') as f:
         events = json.load(f)
     groups = {'BelowBody': {'BelowLow', 'LowerWick'},
@@ -45,7 +45,7 @@ def main():
             low_to_prior_close_down_5_n=sum(o['min_pct']<=-5 for o in outcomes),
             red_candle_n=sum(v < -1e-9 for v in candle_returns),
             open_to_close_down_5_n=sum(v<=-5 for v in candle_returns))
-    out = ROOT / 'docs/analysis-2026-10-16-pause-body-position.json'
+    out = ROOT / 'docs/artifacts/analysis-2026-10-16-pause-body-position.json'
     out.write_text(json.dumps(result, indent=2, ensure_ascii=False)+'\n')
     selected = next(s for s in summaries if s['timeframe']=='H4' and s['rise_type']=='Impulse1' and s['age']==2)
     print(json.dumps({name:{k:v for k,v in values['3'].items() if k in ('n','down_pct','up_pct')}

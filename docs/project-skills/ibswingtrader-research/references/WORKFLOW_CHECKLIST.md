@@ -1,52 +1,31 @@
-# Workflow Checklist
+# Workflow checklist
 
-Daily loop:
+The user runs application commands, builds and tests. Codex analyzes saved
+artifacts and edits source/documentation within the repository boundary.
 
-1. Run `get-candidates`.
-2. Run `evaluate-candidates`.
-3. Run `build-research-dataset`.
-4. Compare:
-   - yesterday's scanner
-   - today's research
-5. Decide what kind of problem you have:
-   - `BellUp -> next-day research` miss
-   - recall
-   - wishlist-to-`BellUp`/`ReversalHook` promotion
-   - ranking
-   - `TradePlan`
+## Primary outcome loop
 
-## Decision guide
+Follow [success criteria](../../../guides/success-criteria.md).
 
-### If winners are absent from logs
+1. Inspect the original rank-1 playable row per scan, retaining group and
+   ranking scope. Record Win/Loss/Open/NoEntry without substituting another row.
+2. Join candidate snapshots and evaluation results by ticker and ScanTime.
+3. Report entered Win/Loss/Open, winning profit percentages and NoEntry
+   separately, with denominators and observation horizons.
+4. Compare saved DiagnosticsEstimatedHitRatePct with compatible resolved
+   outcomes; retain model/scope and plan-policy cohorts, calibration sample
+   sizes, unresolved Open and repeated ticker/date dependencies.
+5. Diagnose recognition, ranking, price freshness or execution problems and
+   validate the proposed change on later observations.
 
-Fix recall/universe/filtering.
+Minimum goal: a dependable rank-1 winner; 1.5% profit is sufficient. This is
+an objective, not proof of a guaranteed outcome.
 
-### If winners are in logs or `WishList` only
+## Additional research loop
 
-Fix promotion and gating.
-
-### If winners are in full candidates but not summary
-
-Fix ranking.
-
-### If `BellUp` summary names do not become research winners
-
-Fix scanner selection/ranking first.
-
-This is the top-priority feedback loop. Older reports may call it the
-`Runaway -> next-day research` loop; that wording refers to the former family
-split.
-
-### If winners are in summary but `NoEntry` with strong amplitude
-
-Fix `TradePlan`.
-
-### If summary names repeatedly show low amplitude
-
-Fix scanner ranking and stale-candidate suppression.
-
-### If many rows are `Loss`, `NoEntry`, or `Open` but amplitude is strong
-
-Fix `TradePlan`.
-
-The scanner found movement; execution failed to convert it.
+The user generates candidates, evaluates them later and builds the research
+dataset. Compare yesterday's scanner to today's movers as additional recall
+evidence. Identify fully missed symbols, seen-but-not-promoted cases and
+ranking gaps. Inspect saved series and rejection reasons before assigning a
+cause. Amplitude is useful for explaining movement but does not turn Loss,
+NoEntry or unresolved Open into a Win, or invalidate a modest profitable trade.

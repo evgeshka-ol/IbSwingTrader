@@ -2,8 +2,8 @@
 import json,math,collections
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-r=json.load(open(ROOT / 'docs/analysis-2026-10-05-half-profit-targets.json'))
-f=json.load(open(ROOT / 'docs/analysis-2026-10-05-win-features.json'))['samples'];ff={(x['ticker'],x['scan']):x['features'] for x in f}
+r=json.load(open(ROOT / 'docs/artifacts/analysis-2026-10-05-half-profit-targets.json'))
+f=json.load(open(ROOT / 'docs/artifacts/analysis-2026-10-05-win-features.json'))['samples'];ff={(x['ticker'],x['scan']):x['features'] for x in f}
 a=[x for x in r if x['status']=='consistent' and x['new'] in ('Win','Loss')]
 c=collections.Counter(x['ticker'] for x in a)
 def features(x):
@@ -20,7 +20,7 @@ for _ in range(12000):
  g[0]+=2*(1/(1+math.exp(-w[0]))-.5)
  for j in range(5):w[j]-=.01*g[j]
 print('N',len(a),'TICKERS',len(c),'COEF',w)
-(ROOT / 'docs/model-2026-10-05-bellup-win.json').write_text(json.dumps(dict(n=len(a),tickers=len(c),coefficients=w)))
+(ROOT / 'docs/artifacts/model-2026-10-05-bellup-win.json').write_text(json.dumps(dict(n=len(a),tickers=len(c),coefficients=w)))
 for x in r:
  if x['scan'].startswith('2026-10-02'):
   p=1/(1+math.exp(-sum(t*b for t,b in zip(w,[1]+features(x)))))

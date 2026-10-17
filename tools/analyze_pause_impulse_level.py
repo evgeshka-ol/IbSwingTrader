@@ -81,7 +81,7 @@ def bootstrap(rows):
 
 
 def main():
-    source=ROOT/'docs/analysis-2026-10-15-pause-upper-position.events.json.gz'
+    source=ROOT/'docs/artifacts/analysis-2026-10-15-pause-upper-position.events.json.gz'
     with gzip.open(source,'rt') as f:
         events=json.load(f)
     selected=[r for r in events if r['rise_type']=='Impulse1' and r['age'] in (2,3,4) and '1' in r['outcomes']]
@@ -146,7 +146,7 @@ def main():
                     for g in groups} for lo,hi in ((5,10),(10,20),(20,100000))},
                 first_pause_open_equals_impulse_close_pct=100*mean(r['first_pause_open_equals_impulse_close'] for r in base) if base else None,
                 bootstrap=bootstrap(base)))
-    output=ROOT/'docs/analysis-2026-10-16-pause-impulse-level.json'
+    output=ROOT/'docs/artifacts/analysis-2026-10-16-pause-impulse-level.json'
     result=dict(source=str(source.relative_to(ROOT)),matched=len(observations),excluded=dict(excluded),summaries=summaries,
         examples=[r for r in observations if r['ticker']=='NVAX' and r['time']=='2026-10-06T04:00:00'])
     output.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')

@@ -104,7 +104,7 @@ def main():
                 transitions=dict(Counter(x["scenarios"]["baseline"]["outcome"] + "->" + x["scenarios"][name]["outcome"] for x in subset)),
                 changed_stops=sum(x["stops"][name] != x["stops"]["baseline"] for x in subset))
     result = dict(statuses=dict(Counter(x["status"] for x in output)), summary=summary, rows=output)
-    (ROOT / "docs/analysis-2026-10-06-profit-relative-stops.json").write_text(json.dumps(result, indent=2) + "\n")
+    (ROOT / "docs/artifacts/analysis-2026-10-06-profit-relative-stops.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(dict(statuses=result["statuses"], summary=summary), indent=2))
 
 

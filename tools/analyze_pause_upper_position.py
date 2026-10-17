@@ -180,7 +180,7 @@ def cluster_difference(rows, horizon=3):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--asof', default='2026-10-15', help='Exclude this date and later on all timeframes')
-    parser.add_argument('--out', default=str(ROOT/'docs/analysis-2026-10-15-pause-upper-position.json'))
+    parser.add_argument('--out', default=str(ROOT/'docs/artifacts/analysis-2026-10-15-pause-upper-position.json'))
     parser.add_argument('--reuse-events', action='store_true', help='Rebuild summaries from saved events instead of rereading cache')
     args = parser.parse_args()
     events, examples = [], []

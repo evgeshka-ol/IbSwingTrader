@@ -39,7 +39,7 @@
 
 ## Main artifacts
 
-For user-installed automatic runs on Windows, see `docs/SCANNER_SCHEDULE.md`
+For user-installed automatic runs on Windows, see `docs/guides/scanner-schedule.md`
 and `tools/Register-ScannerSchedule.ps1`. Schedule times are local Windows
 wall-clock values, not ET. Scheduling invokes the existing get-candidates
 command, with no separate pattern-specific scan mode. The signed-in user's
@@ -53,22 +53,21 @@ TWS/Gateway session must already be available. Registration/runs are user-owned.
 
 ## Core idea
 
-The project tries to identify fat moves before the main expansion. Current
-candidate output groups are `BellUp`, `ReversalHook`, and `Other`; these are
-pattern groups, not the former below/above-Daily-mid families. `Other` keeps
-unconfirmed and non-ready cases available for analysis.
+The project aims for dependable playable winners, starting with rank 1 and
+profit of at least 1.5%. Follow the canonical
+[success criteria](../../../guides/success-criteria.md): entered-plan wins,
+winning profit percentages, then saved confidence-versus-outcome agreement.
+Amplitude and next-day research coverage provide additional diagnostic evidence.
 
-The most important feedback loop is:
+Current output groups are BellUp, ReversalHook and Other. These are pattern
+groups, not the old below/above-Daily-mid families. Other retains unconfirmed
+and non-ready cases for analysis; a zero plan is not a played trade.
 
-1. yesterday's scanner output
-2. today's `research_top_gainers.csv`
-3. today's `evaluation-dataset.csv`
-
-This tells you:
-
-- what the scanner caught early
-- what it saw but ranked too low
-- what it missed completely
+The feedback loop joins saved candidates to subsequent evaluation outcomes
+by ticker and ScanTime, examines rank 1 and the entered cohort, then uses
+research movers and source series to explain recognition/recall/ranking or
+execution failures. The requested dependable-winner goal is not yet an
+established guarantee.
 
 ## Main code zones
 

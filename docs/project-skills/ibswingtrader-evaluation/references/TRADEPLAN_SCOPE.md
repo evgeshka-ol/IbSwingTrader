@@ -1,24 +1,22 @@
 # TradePlan Scope
 
-`TradePlan` is downstream of the list.
+Candidate selection, ranking and TradePlan jointly serve the
+[current success criteria](../../../guides/success-criteria.md), updated
+2026-10-17. Keep their mechanisms distinguishable when locating a defect.
 
-## Minimal Near-Term Goal
+## Minimal near-term goal
 
-The project is currently optimizing for a simple playable loop:
+A dependable winner at rank 1, with profit of at least 1.5% sufficient.
+This supersedes the former minimum capture-more-than-10% goal. It is the
+user's requested target, not a demonstrated guarantee. Inspect Win among
+entered plans, winning profit percentages and saved confidence calibration.
+Do not defer needed execution fixes merely because amplitude is high/low.
 
-- the #1 current `BellUp` row should win consistently
-- the trade plan should capture more than 10% when that row has enough amplitude
-
-Analyze top-1 failures before broad aggregate metrics. If top-1 has strong
-amplitude but `NoEntry`, the entry model is too deep or mistimed. If top-1 has
-strong amplitude but captures less than 10%, the exit model is too conservative
-or the entry is too late. If top-1 has weak or negative amplitude, scanner
-ranking selected the wrong leader.
-
-## Concrete top-1 target: SECZ (2026-09-08 scan)
+## Historical positive example: SECZ (2026-09-08 scan)
 
 The user identified SECZ as the ideal minimum-goal example on 2026-09-09:
-regularly put one such playable winner at rank 1; one is enough. A long list
+regularly put one such playable winner at rank 1; one is enough. Its 10.93%
+profit is a historical example, not the current minimum. A long list
 or high amplitude alone does not satisfy this goal.
 
 Saved scan: `2026-09-08 07:51:20 America/New_York`. Evaluation on September 9:
@@ -46,34 +44,18 @@ so preserving this historical winner under the changed code is unresolved.
 See the scanner's `SERIES_PLAYBOOK.md` "SECZ chart clarification" before
 treating this example as a verified pass under the new gate.
 
-## Fix the scanner first when:
+## Diagnose selection, ranking and execution together
 
-- many top candidates have low amplitude
-- research winners are seen but not promoted
-- summary contains stale or weak names
-- `BellUp` summary names do not become next-day research winners
-- `ReversalHook` repeatedly produce amplitude below 10%
+Start with the actual rank-1 result and the entered-plan Win/Loss/Open
+cohort. Check whether selection missed a useful setup, ranking preferred a
+loser, prices were stale, entry was never reached, or the stop/target path
+failed after entry. Amplitude and research coverage help explain the path;
+neither overrides the actual result or the current minimum-profit objective.
 
-## Fix TradePlan first when:
-
-- amplitude is strong
-- scanner already found the right ticker
-- but entry/exit quality is poor
-- many strong rows end up `NoEntry`
-- many strong-amplitude rows are `Loss` or remain `Open`
-
-Large counts of `Loss` on strong-amplitude `BellUp` usually
-mean the entry was too early for the local structure. Do not treat this as a
-simple "lower the entry" problem. The trade plan needs to predict entry and exit
-from the same kind of series evidence used by the scanner.
-
-## Metric split
-
-Do not collapse scanner quality and trade-plan quality into one number.
-
-- `AmplitudePct` measures scanner quality.
-- Count of `Win` rows measures trade-plan conversion.
-- Count of `Loss`, `NoEntry`, and `Open` rows with strong amplitude exposes trade-plan failure.
+A high-amplitude NoEntry can reveal a deep/mistimed entry, but is not a Win.
+A Loss with high amplitude still hurts the primary metric. A modest 1.5% Win
+can meet the minimum goal. Profits below 10% do not by themselves establish
+an overly conservative exit, especially under final-target reduction.
 
 ## Series-driven TradePlan Direction
 
@@ -172,35 +154,16 @@ confidence and ambiguity checks:
 - Distance/width rows remain useful for diagnostics and compatibility, but new
   entry/exit decisions should move away from them.
 
-High-amplitude `NoEntry` rows usually mean the first two profiles are too deep.
-High-amplitude `Loss` rows usually mean `AvoidLateSpike` or exit placement is too loose.
-High-amplitude `Win` rows with large `ExitMissPct` or low captured percent mean
-the exit target is too conservative for that setup family. For explosive
-min-first rows, tune `DefaultProfitPct`; `MaxProfitPct` only caps the target and
-does not raise it by itself.
-
-When using evaluation rows for scanner feedback, split the series templates by
-amplitude. Rows with `AmplitudePct >= 10%` are positive templates. Rows with
-`SameDayContinuation` and `AmplitudePct < 10%` are negative ranking templates:
-they should lower summary priority for candidates whose rows look similar.
-
-When a daily report shows a clear high-amplitude majority and a low-amplitude
-minority, keep the majority as the trade-plan training pool. Use the minority
-as scanner rejection templates. The scanner should learn to avoid low-amplitude
-row families; the trade plan should learn different entries/exits inside the
-remaining high-amplitude row families.
+Use these profiles as diagnostic hypotheses, then validate entry/exit changes
+against entered-plan wins, profit and rank-1 results. High amplitude alone
+does not justify widening stops, raising exits or rejecting modest winners.
+Historical positive/negative amplitude template cohorts are research context;
+they are not the current target or instructions to restore removed literal
+series matching. Confidence calibration must follow the same plan policy.
 
 ## Current project principle
 
-The project should first produce:
-
-- a good `ReversalHook` list
-- a good `BellUp` list
-
-Only after that should entry/exit tuning become the main focus.
-
-## Dangerous anti-pattern
-
-Do not patch scanner ranking by overfitting `TradePlan`.
-
-That only hides list-quality problems.
+Improve the published playable list and its plan against the three ordered
+success criteria. Keep BellUp and ReversalHook cohorts identifiable. Changes
+must improve actual outcomes rather than merely relabeling a weak rank-1 row,
+raising its confidence, or finding a large future maximum.

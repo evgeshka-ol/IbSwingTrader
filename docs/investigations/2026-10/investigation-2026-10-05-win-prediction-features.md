@@ -68,4 +68,4 @@ Daily: 7 Win / 8 Loss / 13 Open / 1 NoEntry.
 также завышает лучшие наблюдаемые AUC. Порогов и весов в production не меняли.
 
 Воспроизведение: `python3 tools/analyze_bellup_win_features.py`.
-Построчные признаки и сводки: `analysis-2026-10-05-win-features.json`.
+Построчные признаки и сводки: `../../artifacts/analysis-2026-10-05-win-features.json`.

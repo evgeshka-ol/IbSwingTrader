@@ -53,12 +53,11 @@ Migration direction:
 - Distance/width rows can remain for compatibility and diagnostics, but should
   be removed from primary decision logic over time.
 
-Active cleanup supersedes that compatibility allowance for scanner similarity
-and `candidates.csv`: only real Bollinger upper/mid/lower, MACD
-line/signal/histogram, and RSI rows are admitted. There is no weighted
-cross-timeframe total or mean row distance. Daily and H4 are matched
-independently; the worst point of the worst real row controls each timeframe.
-Weekly rows remain context only.
+Literal scanner series-template matching was removed on 2026-09-01;
+there is no active cross-timeframe point-distance matching rule. See
+[model history](MODEL_HISTORY.md) for the former worst-point comparison.
+Current candidate fields and compatibility are documented in SETTINGS_MAP.md.
+Weekly remains context; confirmed patterns are evaluated on Daily/H4.
 
 ## Main interpretations
 
@@ -260,7 +259,7 @@ boundary has passed their close. Diagnostic errors do not reject a candidate.
 
 `PartialPhase` and gradual recovery are research fields only. They do not alter
 BellUp precedence, confirmed episodes, higher-timeframe support or fresh-price
-publication rules. See `docs/research-2026-10-10-reversal-recognition.md` for
+publication rules. See `docs/investigations/2026-10/research-2026-10-10-reversal-recognition.md` for
 the evidence and its retrospective cache-availability limitations.
 
 The reversal publication plan uses the fresh M5 price under reversal entry
@@ -309,7 +308,7 @@ the working example; the user identifies the October 13 upper-band bend as
 the useful preceding warning. The later chart comparison established that
 the sharp bend is clearest on the falling candle. The earlier slowdown is
 now diagnostic only, not a complete Л classifier or new output group.
-See `docs/investigation-2026-10-15-peng-l-pattern.md` for saved evidence.
+See `docs/investigations/2026-10/investigation-2026-10-15-peng-l-pattern.md` for saved evidence.
 
 ### П-Pattern and upper-band pause diagnostic (2026-10-15)
 
@@ -351,7 +350,7 @@ The much flatter 08:00 bar is already the falling candle. Yahoo's displayed
 13:00 rise must not be equated to a different native timestamp without
 interval alignment. Two examples and focused checks do not establish
 precision, recall or profitability. A match is a pause observation, not a
-forecast of a decline. See `docs/investigation-2026-10-15-nvax-p-pattern.md`.
+forecast of a decline. See `docs/investigations/2026-10/investigation-2026-10-15-nvax-p-pattern.md`.
 
 User-run checks: `dotnet run --project tests/BellUpUpperBandChecks`.
 
@@ -377,7 +376,7 @@ intersection, and continued upper growth on equal-age prefixes, including
 continuations and failures. Existing pause diagnostics/filters are unchanged.
 
 Cache study completed 2026-10-15:
-`docs/investigation-2026-10-15-pause-upper-position.md`. Primary H4 cohort
+`docs/investigations/2026-10/investigation-2026-10-15-pause-upper-position.md`. Primary H4 cohort
 (one-bar rise, two paused bars, next three bars) contains 4,254 observations.
 Down occurs in 30.9% when Upper < Low versus 29.5% when Upper has reached
 Low or higher; ticker-cluster bootstrap difference interval includes zero.
@@ -387,7 +386,7 @@ Upper < Low; PCVX falls with Upper > High. Preserve diagnostic-only status;
 do not turn upper/candle position into a trading veto from these examples.
 
 Body refinement (2026-10-16): see
-`docs/investigation-2026-10-16-pause-body-position.md`. In the same primary
+`docs/investigations/2026-10/investigation-2026-10-16-pause-body-position.md`. In the same primary
 H4 cohort Down is 29.9% with Upper below body vs 31.1% inside body. This
 does not establish safe admission on a body intersection. The user's proposed
 sequence (last closed H4, then last closed D1), directional crossing event,
@@ -398,7 +397,7 @@ status until a separately specified joint/prefix study provides evidence.
 Impulse-level refinement (2026-10-16): the user distinguishes flat bodies
 near the impulse Close (П/Л bridge) from upward steps whose bodies stay above
 that Close (continuation context). Cache study:
-`docs/investigation-2026-10-16-pause-impulse-level.md`. With a long one-bar
+`docs/investigations/2026-10/investigation-2026-10-16-pause-impulse-level.md`. With a long one-bar
 rise and two paused H4 bars, next-bar Open–Close <=−5% occurs in 5.04% of
 flat-at-top observations vs 2.17% of steps-above-top; sharp upside is also
 more common in the flat group. At three paused bars the downside difference
@@ -687,5 +686,8 @@ too far below current price. Cap the entry discount separately, then tune the
 profit target with the setup's default profit percent.
 
 Summary ranking no longer compares against positive/negative template rows
-(that mechanism is removed — see "Practical use and template sources" above);
-it runs on `RankingQualityScore` alone.
+(that mechanism is removed — see "Practical use and template sources" above).
+The existing sort combines qualityScore * 50 with legacy NextDayRank;
+DiagnosticsEstimatedHitRatePct is a separate confidence estimate. Validate
+changes against [current success criteria](../../../guides/success-criteria.md),
+not historical amplitude thresholds alone.

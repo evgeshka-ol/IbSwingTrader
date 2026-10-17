@@ -13,44 +13,24 @@ Codex only analyzes data/code, changes code, and creates or updates documentatio
 
 The user runs builds, the application, scanner/research/evaluation commands, and tests. Do not try to launch them unless the user explicitly asks to change this rule.
 
-## Core intent
+## Core intent and priority
 
-`research_top_gainers.csv` is the oracle for today's strongest moves.
+Follow the canonical [success criteria](../../guides/success-criteria.md),
+confirmed 2026-10-17: winners among entered plans, their profit percentages,
+and confidence-versus-outcome agreement. The minimum goal is a dependable
+rank-1 winner; 1.5% profit is sufficient. This is not an achieved guarantee.
 
-Its main job is to answer:
+research_top_gainers.csv supplies supporting evidence about strong moves
+and recall. Compare yesterday's scanner with today's movers, not today's
+scanner with today's winners. Coverage does not establish Win, execution
+profit or confidence calibration; absence from the strong-mover dataset does
+not invalidate a modest profitable trade.
 
-- which names were actually fat movers today
-- whether yesterday's scanner already saw and promoted them
-
-## Current top priority
-
-Priority #1 is next-day research coverage from the playable `BellUp` group.
-
-The nearest minimal target is top-1 quality:
-
-- the first current `BellUp` row in `candidates.csv`
-- should become a practical winner
-- should capture more than 10%
-
-Treat top-1 misses as the highest-signal feedback. A broad list is useful only
-after rank #1 is consistently good enough to play.
-
-The current scanner contract uses `BellUp`, `ReversalHook`, and `Other`
-groups. A detected post-spike consolidation (`Triangle`) is a separate
-diagnostic pattern and is
-routed to `Other`; research comparisons must therefore distinguish a genuine
-BellUp miss from a correctly rejected Triangle. Use `PatternVerdictReason` in
-the candidate snapshot to make that distinction explicit.
-
-Tickers that appear in today's `candidates.csv` current scan rows
-`BellUp` should appear in tomorrow's
-`research_top_gainers.csv`.
-
-When this does not happen, treat it as the primary scanner feedback loop:
-
-- if the BellUp names do not reach strong amplitude, fix scanner selection/ranking
-- if research winners were only in full data or wishlist, fix promotion/ranking
-- if research winners were absent entirely, fix recall/universe/filtering
+Current groups are BellUp, ReversalHook and Other. Triangle is diagnostic
+Other. Use saved group, source and PatternVerdictReason when distinguishing
+missed playable opportunities from rejected or unconfirmed diagnostics.
+NoEntry and zero-plan Other rows did not participate in a trade merely
+because later movement was large.
 
 ## Main command
 
@@ -75,19 +55,16 @@ Triangle output remains diagnostic Other.
 ## Practical workflow
 
 For the upper-band-versus-prior-candle hypothesis during post-rise pauses,
-see `docs/investigation-2026-10-15-pause-upper-position.md`. Its cache-only
+see `docs/investigations/2026-10/investigation-2026-10-15-pause-upper-position.md`. Its cache-only
 study found no useful primary H4 separation; it is not a trade-outcome or
 production-classifier replay. Upper below Low must not be treated as proof
 of an impending П/Л fall or inability to continue a Triangle-like pause.
 
-1. build today's research dataset
-2. compare it with yesterday's `candidates.csv`
-3. classify:
-   - caught in summary
-   - summary name failed to become a research winner
-   - seen but not promoted
-   - fully missed
-4. use series to decide whether the next fix belongs to:
-   - recall
-   - promotion
-   - ranking
+1. Inspect rank-1 outcome, entered Win/Loss/Open, winning profits and saved
+   confidence calibration using candidate/evaluation snapshots.
+2. Build today's research dataset and compare it with yesterday's scans
+   as an additional recall diagnostic.
+3. Classify movers as caught in playable summary, seen but not promoted,
+   or fully missed. Keep realized trading results separate from mover labels.
+4. Investigate recall, promotion or ranking gaps without replacing the
+   current success criteria with amplitude or next-day coverage.
