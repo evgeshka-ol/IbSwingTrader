@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../IbSwingTrader.csproj" />
+    <ProjectReference Include="../../IbSwingTrader/IbSwingTrader.csproj" />
   </ItemGroup>
 </Project>
