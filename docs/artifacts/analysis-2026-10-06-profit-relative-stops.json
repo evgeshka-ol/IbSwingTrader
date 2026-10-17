@@ -1,0 +1,3945 @@
+{
+  "statuses": {
+    "consistent": 85,
+    "ambiguous": 9,
+    "no_entry": 4
+  },
+  "summary": {
+    "all": {
+      "baseline": {
+        "n": 85,
+        "outcomes": {
+          "Open": 33,
+          "Loss": 13,
+          "Win": 39
+        },
+        "closed_sum": 129.6602,
+        "marked_sum": 111.0943,
+        "transitions": {
+          "Open->Open": 33,
+          "Loss->Loss": 13,
+          "Win->Win": 39
+        },
+        "changed_stops": 0
+      },
+      "risk_100": {
+        "n": 85,
+        "outcomes": {
+          "Open": 24,
+          "Loss": 27,
+          "Win": 34
+        },
+        "closed_sum": 41.1301,
+        "marked_sum": 47.2968,
+        "transitions": {
+          "Open->Open": 24,
+          "Open->Loss": 9,
+          "Loss->Loss": 13,
+          "Win->Loss": 5,
+          "Win->Win": 34
+        },
+        "changed_stops": 60
+      },
+      "risk_75": {
+        "n": 85,
+        "outcomes": {
+          "Open": 18,
+          "Loss": 37,
+          "Win": 30
+        },
+        "closed_sum": 13.2618,
+        "marked_sum": 20.8804,
+        "transitions": {
+          "Open->Open": 18,
+          "Open->Loss": 15,
+          "Loss->Loss": 13,
+          "Win->Loss": 9,
+          "Win->Win": 30
+        },
+        "changed_stops": 64
+      }
+    },
+    "oct5": {
+      "baseline": {
+        "n": 24,
+        "outcomes": {
+          "Open": 21,
+          "Loss": 2,
+          "Win": 1
+        },
+        "closed_sum": -3.2561,
+        "marked_sum": -16.8622,
+        "transitions": {
+          "Open->Open": 21,
+          "Loss->Loss": 2,
+          "Win->Win": 1
+        },
+        "changed_stops": 0
+      },
+      "risk_100": {
+        "n": 24,
+        "outcomes": {
+          "Open": 16,
+          "Loss": 8
+        },
+        "closed_sum": -36.5634,
+        "marked_sum": -38.9789,
+        "transitions": {
+          "Open->Open": 16,
+          "Open->Loss": 5,
+          "Loss->Loss": 2,
+          "Win->Loss": 1
+        },
+        "changed_stops": 16
+      },
+      "risk_75": {
+        "n": 24,
+        "outcomes": {
+          "Open": 13,
+          "Loss": 11
+        },
+        "closed_sum": -38.8561,
+        "marked_sum": -35.5246,
+        "transitions": {
+          "Open->Open": 13,
+          "Open->Loss": 8,
+          "Loss->Loss": 2,
+          "Win->Loss": 1
+        },
+        "changed_stops": 17
+      }
+    },
+    "reduced_targets": {
+      "baseline": {
+        "n": 53,
+        "outcomes": {
+          "Open": 18,
+          "Loss": 10,
+          "Win": 25
+        },
+        "closed_sum": 95.3796,
+        "marked_sum": 89.359,
+        "transitions": {
+          "Open->Open": 18,
+          "Loss->Loss": 10,
+          "Win->Win": 25
+        },
+        "changed_stops": 0
+      },
+      "risk_100": {
+        "n": 53,
+        "outcomes": {
+          "Loss": 17,
+          "Open": 14,
+          "Win": 22
+        },
+        "closed_sum": 41.5376,
+        "marked_sum": 47.3014,
+        "transitions": {
+          "Open->Loss": 4,
+          "Open->Open": 14,
+          "Loss->Loss": 10,
+          "Win->Win": 22,
+          "Win->Loss": 3
+        },
+        "changed_stops": 34
+      },
+      "risk_75": {
+        "n": 53,
+        "outcomes": {
+          "Loss": 23,
+          "Open": 10,
+          "Win": 20
+        },
+        "closed_sum": 19.149,
+        "marked_sum": 23.7194,
+        "transitions": {
+          "Open->Loss": 8,
+          "Open->Open": 10,
+          "Loss->Loss": 10,
+          "Win->Win": 20,
+          "Win->Loss": 5
+        },
+        "changed_stops": 37
+      }
+    },
+    "baseline_closed": {
+      "baseline": {
+        "n": 52,
+        "outcomes": {
+          "Loss": 13,
+          "Win": 39
+        },
+        "closed_sum": 129.6602,
+        "marked_sum": 129.6602,
+        "transitions": {
+          "Loss->Loss": 13,
+          "Win->Win": 39
+        },
+        "changed_stops": 0
+      },
+      "risk_100": {
+        "n": 52,
+        "outcomes": {
+          "Loss": 18,
+          "Win": 34
+        },
+        "closed_sum": 88.49,
+        "marked_sum": 88.49,
+        "transitions": {
+          "Loss->Loss": 13,
+          "Win->Loss": 5,
+          "Win->Win": 34
+        },
+        "changed_stops": 38
+      },
+      "risk_75": {
+        "n": 52,
+        "outcomes": {
+          "Loss": 22,
+          "Win": 30
+        },
+        "closed_sum": 71.9043,
+        "marked_sum": 71.9043,
+        "transitions": {
+          "Loss->Loss": 13,
+          "Win->Loss": 9,
+          "Win->Win": 30
+        },
+        "changed_stops": 40
+      }
+    }
+  },
+  "rows": [
+    {
+      "ticker": "PENG",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "61.3",
+      "target": "66.72",
+      "original_target": "66.72",
+      "stops": {
+        "baseline": "55.17",
+        "risk_100": "55.88",
+        "risk_75": "57.24"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7830342577487766,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7830342577487766,
+          "risk_pct": 8.841761827079935
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7830342577487766,
+          "risk_pct": 6.623164763458401
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "WOLF",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-2-boost-H4",
+      "entry": "34.6",
+      "target": "36.32",
+      "original_target": "36.32",
+      "stops": {
+        "baseline": "31.14",
+        "risk_100": "32.88",
+        "risk_75": "33.31"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.8534682080924854,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -4.971098265895954,
+          "marked": -4.971098265895954,
+          "risk_pct": 4.971098265895954
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.7283236994219653,
+          "marked": -3.7283236994219653,
+          "risk_pct": 3.7283236994219653
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "RXO",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-2-boost-H4",
+      "entry": "28.23",
+      "target": "29.28",
+      "original_target": "29.28",
+      "stops": {
+        "baseline": "25.41",
+        "risk_100": "27.18",
+        "risk_75": "27.45"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.7275947573503365,
+          "risk_pct": 9.989373007438894
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.7275947573503365,
+          "risk_pct": 3.7194473963868226
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.7275947573503365,
+          "risk_pct": 2.763018065887354
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "STM",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "56.47",
+      "target": "58.88",
+      "original_target": "58.88",
+      "stops": {
+        "baseline": "52.87",
+        "risk_100": "54.06",
+        "risk_75": "54.67"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.6385691517619976,
+          "risk_pct": 6.375066406941739
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.6385691517619976,
+          "risk_pct": 4.267752789091553
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 2.6385691517619976,
+          "risk_pct": 3.1875332034708697
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "FCEL",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum-profit-reduced",
+      "entry": "18.29",
+      "target": "19.29",
+      "original_target": "19.29",
+      "stops": {
+        "baseline": "16.46",
+        "risk_100": "17.29",
+        "risk_75": "17.54"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -1.202843083652269,
+          "risk_pct": 10.005467468562056
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:40:00",
+          "realized": -5.467468562055768,
+          "marked": -5.467468562055768,
+          "risk_pct": 5.467468562055768
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:35:00",
+          "realized": -4.1006014215418265,
+          "marked": -4.1006014215418265,
+          "risk_pct": 4.1006014215418265
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AAOI",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "115.13",
+      "target": "118.62",
+      "original_target": "118.62",
+      "stops": {
+        "baseline": "105.05",
+        "risk_100": "111.64",
+        "risk_75": "112.52"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:35:00",
+          "realized": 3.0313558585946323,
+          "marked": 3.0313558585946323,
+          "risk_pct": 8.755320072961
+        },
+        "risk_100": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-05T09:35:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 3.0313558585946323
+        },
+        "risk_75": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-05T09:35:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 2.2670025188916876
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AEHR",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "107.35",
+      "target": "112.98",
+      "original_target": "112.98",
+      "stops": {
+        "baseline": "99.4",
+        "risk_100": "101.72",
+        "risk_75": "103.13"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -1.7140195621797858,
+          "risk_pct": 7.405682347461575
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:45:00",
+          "realized": -5.2445272473218445,
+          "marked": -5.2445272473218445,
+          "risk_pct": 5.2445272473218445
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:35:00",
+          "realized": -3.9310666045645086,
+          "marked": -3.9310666045645086,
+          "risk_pct": 3.9310666045645086
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "FPS",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum-profit-reduced",
+      "entry": "40.3",
+      "target": "42.41",
+      "original_target": "42.41",
+      "stops": {
+        "baseline": "36.48",
+        "risk_100": "38.19",
+        "risk_75": "38.72"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.101736972704715,
+          "risk_pct": 9.478908188585608
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.101736972704715,
+          "risk_pct": 5.235732009925559
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T15:45:00",
+          "realized": -3.9205955334987594,
+          "marked": -3.9205955334987594,
+          "risk_pct": 3.9205955334987594
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "GFS",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-H4",
+      "entry": "49.05",
+      "target": "50.17",
+      "original_target": "50.17",
+      "stops": {
+        "baseline": "48.02",
+        "risk_100": "48.02",
+        "risk_75": "48.21"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -2.0998980632008153,
+          "marked": -2.0998980632008153,
+          "risk_pct": 2.0998980632008153
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -2.0998980632008153,
+          "marked": -2.0998980632008153,
+          "risk_pct": 2.0998980632008153
+        },
+        "risk_75": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-05T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 1.7125382262996942
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CRDO",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "218.75",
+      "target": "232.91",
+      "original_target": "232.91",
+      "stops": {
+        "baseline": "204.73",
+        "risk_100": "204.73",
+        "risk_75": "208.13"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.3085714285714287,
+          "risk_pct": 6.409142857142857
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.3085714285714287,
+          "risk_pct": 6.409142857142857
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:45:00",
+          "realized": -4.854857142857143,
+          "marked": -4.854857142857143,
+          "risk_pct": 4.854857142857143
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "ON",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "85",
+      "target": "90.71",
+      "original_target": "90.71",
+      "stops": {
+        "baseline": "76.5",
+        "risk_100": "79.29",
+        "risk_75": "80.72"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 1.3529411764705883,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 1.3529411764705883,
+          "risk_pct": 6.7176470588235295
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 1.3529411764705883,
+          "risk_pct": 5.035294117647059
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TTMI",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum-profit-reduced",
+      "entry": "133",
+      "target": "140.64",
+      "original_target": "140.64",
+      "stops": {
+        "baseline": "124.74",
+        "risk_100": "125.36",
+        "risk_75": "127.27"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7518796992481203,
+          "risk_pct": 6.2105263157894735
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7518796992481203,
+          "risk_pct": 5.7443609022556394
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.7518796992481203,
+          "risk_pct": 4.30827067669173
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "APH",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum-profit-reduced",
+      "entry": "86.91",
+      "target": "91.9",
+      "original_target": "91.9",
+      "stops": {
+        "baseline": "84.15",
+        "risk_100": "84.15",
+        "risk_75": "84.15"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.46024623173397766,
+          "risk_pct": 3.175698998964446
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.46024623173397766,
+          "risk_pct": 3.175698998964446
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.46024623173397766,
+          "risk_pct": 3.175698998964446
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "MRVL",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum-profit-reduced",
+      "entry": "272.44",
+      "target": "288.09",
+      "original_target": "288.09",
+      "stops": {
+        "baseline": "265.07",
+        "risk_100": "265.07",
+        "risk_75": "265.07"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.07708119218910586,
+          "risk_pct": 2.705182792541477
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.07708119218910586,
+          "risk_pct": 2.705182792541477
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.07708119218910586,
+          "risk_pct": 2.705182792541477
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "NBIS",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "242.63",
+      "target": "266.63",
+      "original_target": "266.63",
+      "stops": {
+        "baseline": "229.46",
+        "risk_100": "229.46",
+        "risk_75": "229.46"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.5980711371223673,
+          "risk_pct": 5.4280179697481765
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.5980711371223673,
+          "risk_pct": 5.4280179697481765
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.5980711371223673,
+          "risk_pct": 5.4280179697481765
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CRWV",
+      "scan": "2026-10-05 08:11:32",
+      "reported": "Loss",
+      "profile": "momentum-profit-reduced",
+      "entry": "89.89",
+      "target": "95.05",
+      "original_target": "95.05",
+      "stops": {
+        "baseline": "87.23",
+        "risk_100": "87.23",
+        "risk_75": "87.23"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -2.959172321726555,
+          "marked": -2.959172321726555,
+          "risk_pct": 2.959172321726555
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -2.959172321726555,
+          "marked": -2.959172321726555,
+          "risk_pct": 2.959172321726555
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -2.959172321726555,
+          "marked": -2.959172321726555,
+          "risk_pct": 2.959172321726555
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "PENG",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "NoEntry",
+      "profile": "bellup-1-boost-H4",
+      "entry": "62.4",
+      "target": "67.82",
+      "original_target": "67.82",
+      "stops": {
+        "baseline": "56.16",
+        "risk_100": "56.98",
+        "risk_75": "58.34"
+      },
+      "status": "no_entry",
+      "scenarios": {}
+    },
+    {
+      "ticker": "STM",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "56.25",
+      "target": "58.66",
+      "original_target": "58.66",
+      "stops": {
+        "baseline": "52.87",
+        "risk_100": "53.84",
+        "risk_75": "54.45"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.04,
+          "risk_pct": 6.0088888888888885
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.04,
+          "risk_pct": 4.2844444444444445
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.04,
+          "risk_pct": 3.2
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AAOI",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "116.5",
+      "target": "119.99",
+      "original_target": "119.99",
+      "stops": {
+        "baseline": "105.05",
+        "risk_100": "113.01",
+        "risk_75": "113.89"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T14:00:00",
+          "realized": 2.995708154506438,
+          "marked": 2.995708154506438,
+          "risk_pct": 9.82832618025751
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T10:35:00",
+          "realized": -2.995708154506438,
+          "marked": -2.995708154506438,
+          "risk_pct": 2.995708154506438
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:45:00",
+          "realized": -2.240343347639485,
+          "marked": -2.240343347639485,
+          "risk_pct": 2.240343347639485
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AEHR",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "108",
+      "target": "113.63",
+      "original_target": "113.63",
+      "stops": {
+        "baseline": "99.4",
+        "risk_100": "102.37",
+        "risk_75": "103.78"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.3055555555555554,
+          "risk_pct": 7.962962962962963
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:45:00",
+          "realized": -5.212962962962963,
+          "marked": -5.212962962962963,
+          "risk_pct": 5.212962962962963
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:35:00",
+          "realized": -3.9074074074074074,
+          "marked": -3.9074074074074074,
+          "risk_pct": 3.9074074074074074
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AXTI",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "86.61",
+      "target": "91.03",
+      "original_target": "91.03",
+      "stops": {
+        "baseline": "79.9",
+        "risk_100": "82.19",
+        "risk_75": "83.30"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.19628218450525345,
+          "risk_pct": 7.747373282530885
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.19628218450525345,
+          "risk_pct": 5.103336797136589
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.19628218450525345,
+          "risk_pct": 3.821729592425817
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "GFS",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-H4",
+      "entry": "49.18",
+      "target": "50.3",
+      "original_target": "50.3",
+      "stops": {
+        "baseline": "48.02",
+        "risk_100": "48.06",
+        "risk_75": "48.34"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -2.3586823912159414,
+          "marked": -2.3586823912159414,
+          "risk_pct": 2.3586823912159414
+        },
+        "risk_100": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-05T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 2.277348515656771
+        },
+        "risk_75": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-05T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 1.7080113867425784
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CRDO",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "220.57",
+      "target": "234.73",
+      "original_target": "234.73",
+      "stops": {
+        "baseline": "204.73",
+        "risk_100": "206.41",
+        "risk_75": "209.95"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.114657478351544,
+          "risk_pct": 7.181393661876048
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:50:00",
+          "realized": -6.41973069773768,
+          "marked": -6.41973069773768,
+          "risk_pct": 6.41973069773768
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:35:00",
+          "realized": -4.8147980233032595,
+          "marked": -4.8147980233032595,
+          "risk_pct": 4.8147980233032595
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CTRI",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "bellup-1-boost-H4",
+      "entry": "20.79",
+      "target": "21.1",
+      "original_target": "21.1",
+      "stops": {
+        "baseline": "20.02",
+        "risk_100": "20.48",
+        "risk_75": "20.56"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.3367003367003367,
+          "risk_pct": 3.7037037037037037
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.3367003367003367,
+          "risk_pct": 1.491101491101491
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:45:00",
+          "realized": -1.1063011063011063,
+          "marked": -1.1063011063011063,
+          "risk_pct": 1.1063011063011063
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TTMI",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "134.5",
+      "target": "142.23",
+      "original_target": "149.95",
+      "stops": {
+        "baseline": "124.74",
+        "risk_100": "126.77",
+        "risk_75": "128.71"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.37174721189591076,
+          "risk_pct": 7.256505576208179
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.37174721189591076,
+          "risk_pct": 5.74721189591078
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.37174721189591076,
+          "risk_pct": 4.304832713754647
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "MRVL",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "274.39",
+      "target": "290.15",
+      "original_target": "305.91",
+      "stops": {
+        "baseline": "265.07",
+        "risk_100": "265.07",
+        "risk_75": "265.07"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.6341338970079085,
+          "risk_pct": 3.396625241444659
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.6341338970079085,
+          "risk_pct": 3.396625241444659
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.6341338970079085,
+          "risk_pct": 3.396625241444659
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "NBIS",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "243.88",
+      "target": "268",
+      "original_target": "268",
+      "stops": {
+        "baseline": "229.46",
+        "risk_100": "229.46",
+        "risk_75": "229.46"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -4.092176480236182,
+          "risk_pct": 5.912743972445465
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -4.092176480236182,
+          "risk_pct": 5.912743972445465
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -4.092176480236182,
+          "risk_pct": 5.912743972445465
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CRWV",
+      "scan": "2026-10-05 05:50:29",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "90.2",
+      "target": "95.38",
+      "original_target": "100.56",
+      "stops": {
+        "baseline": "87.23",
+        "risk_100": "87.23",
+        "risk_75": "87.23"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -3.292682926829268,
+          "marked": -3.292682926829268,
+          "risk_pct": 3.292682926829268
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -3.292682926829268,
+          "marked": -3.292682926829268,
+          "risk_pct": 3.292682926829268
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T14:40:00",
+          "realized": -3.292682926829268,
+          "marked": -3.292682926829268,
+          "risk_pct": 3.292682926829268
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "DNA",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "12.52",
+      "target": "13.23",
+      "original_target": "13.94",
+      "stops": {
+        "baseline": "11.99",
+        "risk_100": "11.99",
+        "risk_75": "11.99"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:35:00",
+          "realized": 5.670926517571885,
+          "marked": 5.670926517571885,
+          "risk_pct": 4.233226837060703
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:35:00",
+          "realized": 5.670926517571885,
+          "marked": 5.670926517571885,
+          "risk_pct": 4.233226837060703
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:35:00",
+          "realized": 5.670926517571885,
+          "marked": 5.670926517571885,
+          "risk_pct": 4.233226837060703
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "VSH",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "34.81",
+      "target": "35.68",
+      "original_target": "35.68",
+      "stops": {
+        "baseline": "32.02",
+        "risk_100": "33.94",
+        "risk_75": "34.16"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:30:00",
+          "realized": 2.4992818155702383,
+          "marked": 2.4992818155702383,
+          "risk_pct": 8.01493823613904
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:30:00",
+          "realized": 2.4992818155702383,
+          "marked": 2.4992818155702383,
+          "risk_pct": 2.4992818155702383
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:30:00",
+          "realized": 2.4992818155702383,
+          "marked": 2.4992818155702383,
+          "risk_pct": 1.8672795173800631
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "WOLF",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "31.74",
+      "target": "33.65",
+      "original_target": "35.55",
+      "stops": {
+        "baseline": "28.57",
+        "risk_100": "29.83",
+        "risk_75": "30.31"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:55:00",
+          "realized": 6.017643352236925,
+          "marked": 6.017643352236925,
+          "risk_pct": 9.987397605545054
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:55:00",
+          "realized": 6.017643352236925,
+          "marked": 6.017643352236925,
+          "risk_pct": 6.017643352236925
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:55:00",
+          "realized": 6.017643352236925,
+          "marked": 6.017643352236925,
+          "risk_pct": 4.5053560176433525
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "AXTI",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "82.73",
+      "target": "87.28",
+      "original_target": "91.82",
+      "stops": {
+        "baseline": "76.34",
+        "risk_100": "78.18",
+        "risk_75": "79.32"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:45:00",
+          "realized": 5.499818687296023,
+          "marked": 5.499818687296023,
+          "risk_pct": 7.723921189411338
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:45:00",
+          "realized": 5.499818687296023,
+          "marked": 5.499818687296023,
+          "risk_pct": 5.499818687296023
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:45:00",
+          "realized": 5.499818687296023,
+          "marked": 5.499818687296023,
+          "risk_pct": 4.121842137072404
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "XXI",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "6.88",
+      "target": "7.26",
+      "original_target": "7.64",
+      "stops": {
+        "baseline": "6.37",
+        "risk_100": "6.50",
+        "risk_75": "6.60"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.0348837209302326,
+          "risk_pct": 7.412790697674419
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-02T11:50:00",
+          "realized": -5.523255813953488,
+          "marked": -5.523255813953488,
+          "risk_pct": 5.523255813953488
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-02T11:00:00",
+          "realized": -4.069767441860465,
+          "marked": -4.069767441860465,
+          "risk_pct": 4.069767441860465
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "MRAM",
+      "scan": "2026-10-02 05:50:43",
+      "reported": "Win",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "19.14",
+      "target": "19.43",
+      "original_target": "19.43",
+      "stops": {
+        "baseline": "17.79",
+        "risk_100": "18.85",
+        "risk_75": "18.93"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:35:00",
+          "realized": 1.5151515151515151,
+          "marked": 1.5151515151515151,
+          "risk_pct": 7.053291536050157
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-02T09:25:00",
+          "realized": -1.5151515151515151,
+          "marked": -1.5151515151515151,
+          "risk_pct": 1.5151515151515151
+        },
+        "risk_75": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-10-02T09:10:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 1.09717868338558
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "FORM",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "NoEntry",
+      "profile": "bellup-2-boost-H4",
+      "entry": "152.95",
+      "target": "157.89",
+      "original_target": "157.89",
+      "stops": {
+        "baseline": "137.66",
+        "risk_100": "148.01",
+        "risk_75": "149.25"
+      },
+      "status": "no_entry",
+      "scenarios": {}
+    },
+    {
+      "ticker": "DNA",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Win",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "12.85",
+      "target": "13.56",
+      "original_target": "14.27",
+      "stops": {
+        "baseline": "11.57",
+        "risk_100": "12.14",
+        "risk_75": "12.32"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:40:00",
+          "realized": 5.525291828793774,
+          "marked": 5.525291828793774,
+          "risk_pct": 9.961089494163424
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-01T14:05:00",
+          "realized": -5.525291828793774,
+          "marked": -5.525291828793774,
+          "risk_pct": 5.525291828793774
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T13:45:00",
+          "realized": -4.124513618677042,
+          "marked": -4.124513618677042,
+          "risk_pct": 4.124513618677042
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TRMD",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "37.77",
+      "target": "38.34",
+      "original_target": "38.34",
+      "stops": {
+        "baseline": "35.79",
+        "risk_100": "37.20",
+        "risk_75": "37.35"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:00:00",
+          "realized": 1.5091342335186657,
+          "marked": 1.5091342335186657,
+          "risk_pct": 5.242255758538523
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:00:00",
+          "realized": 1.5091342335186657,
+          "marked": 1.5091342335186657,
+          "risk_pct": 1.5091342335186657
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T08:50:00",
+          "realized": -1.1119936457505957,
+          "marked": -1.1119936457505957,
+          "risk_pct": 1.1119936457505957
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "HIMS",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "29.87",
+      "target": "31.44",
+      "original_target": "33",
+      "stops": {
+        "baseline": "28.21",
+        "risk_100": "28.30",
+        "risk_75": "28.70"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.23434884499497824,
+          "risk_pct": 5.55741546702377
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.23434884499497824,
+          "risk_pct": 5.256109809173084
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T10:05:00",
+          "realized": -3.916973552058922,
+          "marked": -3.916973552058922,
+          "risk_pct": 3.916973552058922
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "HPE",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "65.1",
+      "target": "69.23",
+      "original_target": "73.36",
+      "stops": {
+        "baseline": "60.39",
+        "risk_100": "60.97",
+        "risk_75": "62.01"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:55:00",
+          "realized": 6.344086021505376,
+          "marked": 6.344086021505376,
+          "risk_pct": 7.235023041474655
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:55:00",
+          "realized": 6.344086021505376,
+          "marked": 6.344086021505376,
+          "risk_pct": 6.344086021505376
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T10:00:00",
+          "realized": -4.746543778801843,
+          "marked": -4.746543778801843,
+          "risk_pct": 4.746543778801843
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "NAMS",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-H4",
+      "entry": "26.15",
+      "target": "26.82",
+      "original_target": "26.82",
+      "stops": {
+        "baseline": "23.57",
+        "risk_100": "25.48",
+        "risk_75": "25.65"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-02T11:05:00",
+          "realized": -9.866156787762906,
+          "marked": -9.866156787762906,
+          "risk_pct": 9.866156787762906
+        },
+        "risk_100": {
+          "outcome": "GapBelowStop",
+          "time": "2026-10-01T07:00:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 2.5621414913957934
+        },
+        "risk_75": {
+          "outcome": "GapBelowStop",
+          "time": "2026-10-01T07:00:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 1.9120458891013383
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "WOLF",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "28.63",
+      "target": "29.6",
+      "original_target": "29.6",
+      "stops": {
+        "baseline": "27.1",
+        "risk_100": "27.66",
+        "risk_75": "27.91"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.388054488298987,
+          "marked": 3.388054488298987,
+          "risk_pct": 5.344044708347887
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.388054488298987,
+          "marked": 3.388054488298987,
+          "risk_pct": 3.388054488298987
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.388054488298987,
+          "marked": 3.388054488298987,
+          "risk_pct": 2.5148445686342997
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "CAPR",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "9.32",
+      "target": "10.16",
+      "original_target": "10.99",
+      "stops": {
+        "baseline": "8.39",
+        "risk_100": "8.48",
+        "risk_75": "8.69"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:35:00",
+          "realized": -9.978540772532188,
+          "marked": -9.978540772532188,
+          "risk_pct": 9.978540772532188
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -9.012875536480687,
+          "marked": -9.012875536480687,
+          "risk_pct": 9.012875536480687
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -6.759656652360515,
+          "marked": -6.759656652360515,
+          "risk_pct": 6.759656652360515
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "IONQ",
+      "scan": "2026-10-01 06:48:30",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "44.56",
+      "target": "46.88",
+      "original_target": "49.19",
+      "stops": {
+        "baseline": "43.01",
+        "risk_100": "43.01",
+        "risk_75": "43.01"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.4784560143626573,
+          "marked": -3.4784560143626573,
+          "risk_pct": 3.4784560143626573
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.4784560143626573,
+          "marked": -3.4784560143626573,
+          "risk_pct": 3.4784560143626573
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.4784560143626573,
+          "marked": -3.4784560143626573,
+          "risk_pct": 3.4784560143626573
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "FORM",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Open",
+      "profile": "bellup-2-boost-H4",
+      "entry": "152",
+      "target": "156.94",
+      "original_target": "156.94",
+      "stops": {
+        "baseline": "136.8",
+        "risk_100": "147.06",
+        "risk_75": "148.30"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.960526315789474,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-01T09:30:00",
+          "realized": -3.25,
+          "marked": -3.25,
+          "risk_pct": 3.25
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T09:30:00",
+          "realized": -2.4342105263157894,
+          "marked": -2.4342105263157894,
+          "risk_pct": 2.4342105263157894
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "DNA",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Win",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "12.9",
+      "target": "13.61",
+      "original_target": "14.32",
+      "stops": {
+        "baseline": "11.61",
+        "risk_100": "12.19",
+        "risk_75": "12.37"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:45:00",
+          "realized": 5.503875968992248,
+          "marked": 5.503875968992248,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-01T14:00:00",
+          "realized": -5.503875968992248,
+          "marked": -5.503875968992248,
+          "risk_pct": 5.503875968992248
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T13:45:00",
+          "realized": -4.108527131782946,
+          "marked": -4.108527131782946,
+          "risk_pct": 4.108527131782946
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TRMD",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "37.5",
+      "target": "38.06",
+      "original_target": "38.06",
+      "stops": {
+        "baseline": "35.79",
+        "risk_100": "36.94",
+        "risk_75": "37.08"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-01T09:40:00",
+          "realized": 1.4933333333333334,
+          "marked": 1.4933333333333334,
+          "risk_pct": 4.56
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-01T09:40:00",
+          "realized": 1.4933333333333334,
+          "marked": 1.4933333333333334,
+          "risk_pct": 1.4933333333333334
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-01T09:40:00",
+          "realized": 1.4933333333333334,
+          "marked": 1.4933333333333334,
+          "risk_pct": 1.12
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "NAMS",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-H4",
+      "entry": "26.15",
+      "target": "26.82",
+      "original_target": "26.82",
+      "stops": {
+        "baseline": "23.57",
+        "risk_100": "25.48",
+        "risk_75": "25.65"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-02T11:05:00",
+          "realized": -9.866156787762906,
+          "marked": -9.866156787762906,
+          "risk_pct": 9.866156787762906
+        },
+        "risk_100": {
+          "outcome": "GapBelowStop",
+          "time": "2026-10-01T07:00:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 2.5621414913957934
+        },
+        "risk_75": {
+          "outcome": "GapBelowStop",
+          "time": "2026-10-01T07:00:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 1.9120458891013383
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "WOLF",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "28.6",
+      "target": "29.57",
+      "original_target": "29.57",
+      "stops": {
+        "baseline": "27.1",
+        "risk_100": "27.63",
+        "risk_75": "27.88"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.3916083916083917,
+          "marked": 3.3916083916083917,
+          "risk_pct": 5.244755244755245
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.3916083916083917,
+          "marked": 3.3916083916083917,
+          "risk_pct": 3.3916083916083917
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-01T10:55:00",
+          "realized": 3.3916083916083917,
+          "marked": 3.3916083916083917,
+          "risk_pct": 2.5174825174825175
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "IONQ",
+      "scan": "2026-10-01 05:02:56",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "44.44",
+      "target": "46.75",
+      "original_target": "49.06",
+      "stops": {
+        "baseline": "43.01",
+        "risk_100": "43.01",
+        "risk_75": "43.01"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.217821782178218,
+          "marked": -3.217821782178218,
+          "risk_pct": 3.217821782178218
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.217821782178218,
+          "marked": -3.217821782178218,
+          "risk_pct": 3.217821782178218
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -3.217821782178218,
+          "marked": -3.217821782178218,
+          "risk_pct": 3.217821782178218
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "IOVA",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Open",
+      "profile": "bellup-2-boost-H4",
+      "entry": "14.25",
+      "target": "15.01",
+      "original_target": "15.77",
+      "stops": {
+        "baseline": "12.83",
+        "risk_100": "13.49",
+        "risk_75": "13.68"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T12:15:00",
+          "realized": 5.333333333333333,
+          "marked": 5.333333333333333,
+          "risk_pct": 9.964912280701755
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T12:15:00",
+          "realized": 5.333333333333333,
+          "marked": 5.333333333333333,
+          "risk_pct": 5.333333333333333
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T12:15:00",
+          "realized": 5.333333333333333,
+          "marked": 5.333333333333333,
+          "risk_pct": 4.0
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "FORM",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "139.01",
+      "target": "147.00",
+      "original_target": "154.98",
+      "stops": {
+        "baseline": "129.2",
+        "risk_100": "131.02",
+        "risk_75": "133.02"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 5.747787928925977,
+          "marked": 5.747787928925977,
+          "risk_pct": 7.05704625566506
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 5.747787928925977,
+          "marked": 5.747787928925977,
+          "risk_pct": 5.747787928925977
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 5.747787928925977,
+          "marked": 5.747787928925977,
+          "risk_pct": 4.3090425149269835
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AXTI",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "79.11",
+      "target": "83.22",
+      "original_target": "87.33",
+      "stops": {
+        "baseline": "71.86",
+        "risk_100": "75.00",
+        "risk_75": "76.03"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.195297686765263,
+          "marked": 5.195297686765263,
+          "risk_pct": 9.164454556946025
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.195297686765263,
+          "marked": 5.195297686765263,
+          "risk_pct": 5.195297686765263
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.195297686765263,
+          "marked": 5.195297686765263,
+          "risk_pct": 3.8933131083301733
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "MCHP",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "78.22",
+      "target": "82.72",
+      "original_target": "87.21",
+      "stops": {
+        "baseline": "76.29",
+        "risk_100": "76.29",
+        "risk_75": "76.29"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T11:25:00",
+          "realized": 5.753004346714396,
+          "marked": 5.753004346714396,
+          "risk_pct": 2.4673996420352853
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T11:25:00",
+          "realized": 5.753004346714396,
+          "marked": 5.753004346714396,
+          "risk_pct": 2.4673996420352853
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T11:25:00",
+          "realized": 5.753004346714396,
+          "marked": 5.753004346714396,
+          "risk_pct": 2.4673996420352853
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TXN",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "280",
+      "target": "280.71",
+      "original_target": "280.71",
+      "stops": {
+        "baseline": "271.43",
+        "risk_100": "279.29",
+        "risk_75": "279.47"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T08:30:00",
+          "realized": 0.25357142857142856,
+          "marked": 0.25357142857142856,
+          "risk_pct": 3.0607142857142855
+        },
+        "risk_100": {
+          "outcome": "GapBelowStop",
+          "time": "2026-09-30T08:15:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 0.25357142857142856
+        },
+        "risk_75": {
+          "outcome": "GapBelowStop",
+          "time": "2026-09-30T08:15:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 0.18928571428571428
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "UMAC",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "24.8",
+      "target": "26.17",
+      "original_target": "27.53",
+      "stops": {
+        "baseline": "23.4",
+        "risk_100": "23.43",
+        "risk_75": "23.78"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-01T09:45:00",
+          "realized": -5.645161290322581,
+          "marked": -5.645161290322581,
+          "risk_pct": 5.645161290322581
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-01T09:45:00",
+          "realized": -5.524193548387097,
+          "marked": -5.524193548387097,
+          "risk_pct": 5.524193548387097
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-01T09:40:00",
+          "realized": -4.112903225806452,
+          "marked": -4.112903225806452,
+          "risk_pct": 4.112903225806452
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "AVPT",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "13.53",
+      "target": "14.39",
+      "original_target": "15.25",
+      "stops": {
+        "baseline": "13.17",
+        "risk_100": "13.17",
+        "risk_75": "13.17"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:05:00",
+          "realized": 6.356245380635625,
+          "marked": 6.356245380635625,
+          "risk_pct": 2.6607538802660753
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:05:00",
+          "realized": 6.356245380635625,
+          "marked": 6.356245380635625,
+          "risk_pct": 2.6607538802660753
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:05:00",
+          "realized": 6.356245380635625,
+          "marked": 6.356245380635625,
+          "risk_pct": 2.6607538802660753
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "CRWD",
+      "scan": "2026-09-30 05:31:26",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "263.5",
+      "target": "277.32",
+      "original_target": "291.14",
+      "stops": {
+        "baseline": "253.19",
+        "risk_100": "253.19",
+        "risk_75": "253.19"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.650853889943074,
+          "risk_pct": 3.9127134724857684
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.650853889943074,
+          "risk_pct": 3.9127134724857684
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.650853889943074,
+          "risk_pct": 3.9127134724857684
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AGEN",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "9.9",
+      "target": "10.23",
+      "original_target": "10.23",
+      "stops": {
+        "baseline": "8.91",
+        "risk_100": "9.57",
+        "risk_75": "9.66"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.3333333333333335,
+          "marked": 3.3333333333333335,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.3333333333333335,
+          "marked": 3.3333333333333335,
+          "risk_pct": 3.3333333333333335
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.3333333333333335,
+          "marked": 3.3333333333333335,
+          "risk_pct": 2.4242424242424243
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "KLAC",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "197.92",
+      "target": "208.30",
+      "original_target": "218.68",
+      "stops": {
+        "baseline": "184.5",
+        "risk_100": "187.54",
+        "risk_75": "190.14"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:15:00",
+          "realized": 5.244543249797898,
+          "marked": 5.244543249797898,
+          "risk_pct": 6.780517380759903
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:15:00",
+          "realized": 5.244543249797898,
+          "marked": 5.244543249797898,
+          "risk_pct": 5.244543249797898
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T10:15:00",
+          "realized": 5.244543249797898,
+          "marked": 5.244543249797898,
+          "risk_pct": 3.93088116410671
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "MXL",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "93.6",
+      "target": "98.75",
+      "original_target": "103.89",
+      "stops": {
+        "baseline": "87.6",
+        "risk_100": "88.45",
+        "risk_75": "89.74"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:35:00",
+          "realized": 5.502136752136752,
+          "marked": 5.502136752136752,
+          "risk_pct": 6.410256410256411
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-30T11:55:00",
+          "realized": -5.502136752136752,
+          "marked": -5.502136752136752,
+          "risk_pct": 5.502136752136752
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-30T09:50:00",
+          "realized": -4.1239316239316235,
+          "marked": -4.1239316239316235,
+          "risk_pct": 4.1239316239316235
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "SMTC",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "180.5",
+      "target": "191.32",
+      "original_target": "202.14",
+      "stops": {
+        "baseline": "169.29",
+        "risk_100": "169.68",
+        "risk_75": "172.39"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:55:00",
+          "realized": 5.9944598337950135,
+          "marked": 5.9944598337950135,
+          "risk_pct": 6.2105263157894735
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:55:00",
+          "realized": 5.9944598337950135,
+          "marked": 5.9944598337950135,
+          "risk_pct": 5.9944598337950135
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T08:55:00",
+          "realized": 5.9944598337950135,
+          "marked": 5.9944598337950135,
+          "risk_pct": 4.4930747922437675
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AXTI",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "79.18",
+      "target": "83.29",
+      "original_target": "87.4",
+      "stops": {
+        "baseline": "71.86",
+        "risk_100": "75.07",
+        "risk_75": "76.10"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.190704723415004,
+          "marked": 5.190704723415004,
+          "risk_pct": 9.244758777469057
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.190704723415004,
+          "marked": 5.190704723415004,
+          "risk_pct": 5.190704723415004
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.190704723415004,
+          "marked": 5.190704723415004,
+          "risk_pct": 3.8898711795908056
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "MCHP",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "79",
+      "target": "83.54",
+      "original_target": "88.08",
+      "stops": {
+        "baseline": "76.29",
+        "risk_100": "76.29",
+        "risk_75": "76.29"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.5949367088607596,
+          "risk_pct": 3.430379746835443
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.5949367088607596,
+          "risk_pct": 3.430379746835443
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 3.5949367088607596,
+          "risk_pct": 3.430379746835443
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TXN",
+      "scan": "2026-09-30 04:06:52",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "281.69",
+      "target": "282.4",
+      "original_target": "282.4",
+      "stops": {
+        "baseline": "271.43",
+        "risk_100": "280.98",
+        "risk_75": "281.16"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 0.252050126025063,
+          "marked": 0.252050126025063,
+          "risk_pct": 3.6423018211509106
+        },
+        "risk_100": {
+          "outcome": "EntryBarAmbiguous",
+          "time": "2026-09-30T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 0.252050126025063
+        },
+        "risk_75": {
+          "outcome": "Ambiguous",
+          "time": "2026-09-30T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 0.18815009407504704
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "AGEN",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "9.98",
+      "target": "10.31",
+      "original_target": "10.31",
+      "stops": {
+        "baseline": "8.98",
+        "risk_100": "9.65",
+        "risk_75": "9.74"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.306613226452906,
+          "marked": 3.306613226452906,
+          "risk_pct": 10.02004008016032
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.306613226452906,
+          "marked": 3.306613226452906,
+          "risk_pct": 3.306613226452906
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 3.306613226452906,
+          "marked": 3.306613226452906,
+          "risk_pct": 2.404809619238477
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "QMCO",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Loss",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "32.86",
+      "target": "34.90",
+      "original_target": "36.94",
+      "stops": {
+        "baseline": "30.69",
+        "risk_100": "30.82",
+        "risk_75": "31.33"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-10-02T07:40:00",
+          "realized": -6.60377358490566,
+          "marked": -6.60377358490566,
+          "risk_pct": 6.60377358490566
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-02T07:35:00",
+          "realized": -6.20815581253804,
+          "marked": -6.20815581253804,
+          "risk_pct": 6.20815581253804
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-02T07:30:00",
+          "realized": -4.6561168594035305,
+          "marked": -4.6561168594035305,
+          "risk_pct": 4.6561168594035305
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "DNA",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "11.96",
+      "target": "12.75",
+      "original_target": "13.54",
+      "stops": {
+        "baseline": "10.76",
+        "risk_100": "11.17",
+        "risk_75": "11.37"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 6.605351170568562,
+          "marked": 6.605351170568562,
+          "risk_pct": 10.033444816053512
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 6.605351170568562,
+          "marked": 6.605351170568562,
+          "risk_pct": 6.605351170568562
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:45:00",
+          "realized": 6.605351170568562,
+          "marked": 6.605351170568562,
+          "risk_pct": 4.933110367892977
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "SG",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "8.74",
+      "target": "9.32",
+      "original_target": "9.89",
+      "stops": {
+        "baseline": "8.12",
+        "risk_100": "8.16",
+        "risk_75": "8.31"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:30:00",
+          "realized": 6.636155606407323,
+          "marked": 6.636155606407323,
+          "risk_pct": 7.093821510297483
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:30:00",
+          "realized": 6.636155606407323,
+          "marked": 6.636155606407323,
+          "risk_pct": 6.636155606407323
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-05T09:30:00",
+          "realized": 6.636155606407323,
+          "marked": 6.636155606407323,
+          "risk_pct": 4.919908466819222
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "TWST",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Win",
+      "profile": "bellup-2-boost-Daily",
+      "entry": "186.13",
+      "target": "203.76",
+      "original_target": "203.76",
+      "stops": {
+        "baseline": "176.32",
+        "risk_100": "176.32",
+        "risk_75": "176.32"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:00:00",
+          "realized": 9.471874496319776,
+          "marked": 9.471874496319776,
+          "risk_pct": 5.270509858700908
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:00:00",
+          "realized": 9.471874496319776,
+          "marked": 9.471874496319776,
+          "risk_pct": 5.270509858700908
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-05T10:00:00",
+          "realized": 9.471874496319776,
+          "marked": 9.471874496319776,
+          "risk_pct": 5.270509858700908
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AXTI",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "78.18",
+      "target": "82.24",
+      "original_target": "86.3",
+      "stops": {
+        "baseline": "71.86",
+        "risk_100": "74.12",
+        "risk_75": "75.14"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.19314402660527,
+          "marked": 5.19314402660527,
+          "risk_pct": 8.083908928114607
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.19314402660527,
+          "marked": 5.19314402660527,
+          "risk_pct": 5.19314402660527
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.19314402660527,
+          "marked": 5.19314402660527,
+          "risk_pct": 3.8884625223842413
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "WBD",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "30.85",
+      "target": "32.62",
+      "original_target": "34.39",
+      "stops": {
+        "baseline": "30.52",
+        "risk_100": "30.52",
+        "risk_75": "30.52"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.4213938411669368,
+          "risk_pct": 1.0696920583468394
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.4213938411669368,
+          "risk_pct": 1.0696920583468394
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 0.4213938411669368,
+          "risk_pct": 1.0696920583468394
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "FORM",
+      "scan": "2026-09-29 16:19:38",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "136.25",
+      "target": "143.40",
+      "original_target": "150.54",
+      "stops": {
+        "baseline": "125.41",
+        "risk_100": "129.10",
+        "risk_75": "130.89"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.247706422018348,
+          "marked": 5.247706422018348,
+          "risk_pct": 7.955963302752294
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.247706422018348,
+          "marked": 5.247706422018348,
+          "risk_pct": 5.247706422018348
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 5.247706422018348,
+          "marked": 5.247706422018348,
+          "risk_pct": 3.9339449541284406
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "XERS",
+      "scan": "2026-09-29 07:20:05",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "9.67",
+      "target": "10.29",
+      "original_target": "10.29",
+      "stops": {
+        "baseline": "8.91",
+        "risk_100": "9.05",
+        "risk_75": "9.21"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-29T12:30:00",
+          "realized": 6.411582213029989,
+          "marked": 6.411582213029989,
+          "risk_pct": 7.859358841778697
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-29T12:30:00",
+          "realized": 6.411582213029989,
+          "marked": 6.411582213029989,
+          "risk_pct": 6.411582213029989
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-29T12:30:00",
+          "realized": 6.411582213029989,
+          "marked": 6.411582213029989,
+          "risk_pct": 4.756980351602896
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "ABCL",
+      "scan": "2026-09-29 07:20:05",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "14.29",
+      "target": "15.15",
+      "original_target": "16",
+      "stops": {
+        "baseline": "12.86",
+        "risk_100": "13.43",
+        "risk_75": "13.65"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -3.0279916025192444,
+          "risk_pct": 10.00699790062981
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-10-05T09:30:00",
+          "realized": -6.018194541637508,
+          "marked": -6.018194541637508,
+          "risk_pct": 6.018194541637508
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-10-05T04:50:00",
+          "realized": -4.478656403079076,
+          "marked": -4.478656403079076,
+          "risk_pct": 4.478656403079076
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AGEN",
+      "scan": "2026-09-29 07:20:05",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "9.61",
+      "target": "10.25",
+      "original_target": "10.88",
+      "stops": {
+        "baseline": "8.65",
+        "risk_100": "8.97",
+        "risk_75": "9.13"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 6.659729448491155,
+          "marked": 6.659729448491155,
+          "risk_pct": 9.989594172736732
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 6.659729448491155,
+          "marked": 6.659729448491155,
+          "risk_pct": 6.659729448491155
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:40:00",
+          "realized": 6.659729448491155,
+          "marked": 6.659729448491155,
+          "risk_pct": 4.994797086368366
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "BFLY",
+      "scan": "2026-09-29 07:20:05",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "9.45",
+      "target": "10.02",
+      "original_target": "10.58",
+      "stops": {
+        "baseline": "8.9",
+        "risk_100": "8.9",
+        "risk_75": "9.03"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-30T09:30:00",
+          "realized": -5.8201058201058204,
+          "marked": -5.8201058201058204,
+          "risk_pct": 5.8201058201058204
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-30T09:30:00",
+          "realized": -5.8201058201058204,
+          "marked": -5.8201058201058204,
+          "risk_pct": 5.8201058201058204
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-29T16:00:00",
+          "realized": -4.444444444444445,
+          "marked": -4.444444444444445,
+          "risk_pct": 4.444444444444445
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "P",
+      "scan": "2026-09-28 15:06:33",
+      "reported": "Win",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "130.03",
+      "target": "137.96",
+      "original_target": "137.96",
+      "stops": {
+        "baseline": "120.66",
+        "risk_100": "122.10",
+        "risk_75": "124.09"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:30:00",
+          "realized": 6.09859263246943,
+          "marked": 6.09859263246943,
+          "risk_pct": 7.206029377835884
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:30:00",
+          "realized": 6.09859263246943,
+          "marked": 6.09859263246943,
+          "risk_pct": 6.09859263246943
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-02T09:30:00",
+          "realized": 6.09859263246943,
+          "marked": 6.09859263246943,
+          "risk_pct": 4.568176574636622
+        }
+      },
+      "last_bar": "2026-10-02T19:55:00"
+    },
+    {
+      "ticker": "ABCL",
+      "scan": "2026-09-28 15:06:33",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "14.05",
+      "target": "14.82",
+      "original_target": "15.59",
+      "stops": {
+        "baseline": "12.65",
+        "risk_100": "13.28",
+        "risk_75": "13.48"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-29T09:40:00",
+          "realized": 5.480427046263345,
+          "marked": 5.480427046263345,
+          "risk_pct": 9.9644128113879
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-29T09:40:00",
+          "realized": 5.480427046263345,
+          "marked": 5.480427046263345,
+          "risk_pct": 5.480427046263345
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-29T09:40:00",
+          "realized": 5.480427046263345,
+          "marked": 5.480427046263345,
+          "risk_pct": 4.056939501779359
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "RBRK",
+      "scan": "2026-09-28 15:06:33",
+      "reported": "Win",
+      "profile": "bellup-1-boost-Daily",
+      "entry": "113.7",
+      "target": "119.09",
+      "original_target": "119.09",
+      "stops": {
+        "baseline": "103.97",
+        "risk_100": "108.31",
+        "risk_75": "109.66"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-05T07:30:00",
+          "realized": 4.740545294635004,
+          "marked": 4.740545294635004,
+          "risk_pct": 8.557607739665787
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-10-05T07:30:00",
+          "realized": 4.740545294635004,
+          "marked": 4.740545294635004,
+          "risk_pct": 4.740545294635004
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-10-05T07:30:00",
+          "realized": 4.740545294635004,
+          "marked": 4.740545294635004,
+          "risk_pct": 3.5532102022867194
+        }
+      },
+      "last_bar": "2026-10-05T19:55:00"
+    },
+    {
+      "ticker": "AGEN",
+      "scan": "2026-09-28 15:06:33",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "9.45",
+      "target": "10.08",
+      "original_target": "10.7",
+      "stops": {
+        "baseline": "8.51",
+        "risk_100": "8.82",
+        "risk_75": "8.98"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 6.666666666666667,
+          "marked": 6.666666666666667,
+          "risk_pct": 9.947089947089948
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 6.666666666666667,
+          "marked": 6.666666666666667,
+          "risk_pct": 6.666666666666667
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-30T09:30:00",
+          "realized": 6.666666666666667,
+          "marked": 6.666666666666667,
+          "risk_pct": 4.973544973544974
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "SECZ",
+      "scan": "2026-09-28 05:54:00",
+      "reported": "Win",
+      "profile": "bellup-2-boost-Daily",
+      "entry": "15.4",
+      "target": "16.18",
+      "original_target": "16.95",
+      "stops": {
+        "baseline": "14.68",
+        "risk_100": "14.68",
+        "risk_75": "14.82"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-28T08:35:00",
+          "realized": 5.064935064935065,
+          "marked": 5.064935064935065,
+          "risk_pct": 4.675324675324675
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-28T08:35:00",
+          "realized": 5.064935064935065,
+          "marked": 5.064935064935065,
+          "risk_pct": 4.675324675324675
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-28T08:35:00",
+          "realized": 5.064935064935065,
+          "marked": 5.064935064935065,
+          "risk_pct": 3.7662337662337664
+        }
+      },
+      "last_bar": "2026-09-29T04:05:00"
+    },
+    {
+      "ticker": "SMCI",
+      "scan": "2026-09-28 05:54:00",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "42.58",
+      "target": "45.03",
+      "original_target": "47.47",
+      "stops": {
+        "baseline": "40.91",
+        "risk_100": "40.91",
+        "risk_75": "40.91"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.9220291216533583,
+          "marked": -3.9220291216533583,
+          "risk_pct": 3.9220291216533583
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.9220291216533583,
+          "marked": -3.9220291216533583,
+          "risk_pct": 3.9220291216533583
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.9220291216533583,
+          "marked": -3.9220291216533583,
+          "risk_pct": 3.9220291216533583
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "SECZ",
+      "scan": "2026-09-28 05:06:34",
+      "reported": "Loss",
+      "profile": "bellup-2-boost-Daily",
+      "entry": "15.81",
+      "target": "17.36",
+      "original_target": "17.36",
+      "stops": {
+        "baseline": "14.68",
+        "risk_100": "14.68",
+        "risk_75": "14.68"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-30T10:10:00",
+          "realized": -7.147375079063884,
+          "marked": -7.147375079063884,
+          "risk_pct": 7.147375079063884
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-30T10:10:00",
+          "realized": -7.147375079063884,
+          "marked": -7.147375079063884,
+          "risk_pct": 7.147375079063884
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-30T10:10:00",
+          "realized": -7.147375079063884,
+          "marked": -7.147375079063884,
+          "risk_pct": 7.147375079063884
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "RSKD",
+      "scan": "2026-09-28 05:06:34",
+      "reported": "Loss",
+      "profile": "bellup-2-boost-Daily",
+      "entry": "7.94",
+      "target": "8.7",
+      "original_target": "8.7",
+      "stops": {
+        "baseline": "7.6",
+        "risk_100": "7.6",
+        "risk_75": "7.6"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-29T09:40:00",
+          "realized": -4.282115869017632,
+          "marked": -4.282115869017632,
+          "risk_pct": 4.282115869017632
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-29T09:40:00",
+          "realized": -4.282115869017632,
+          "marked": -4.282115869017632,
+          "risk_pct": 4.282115869017632
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-29T09:40:00",
+          "realized": -4.282115869017632,
+          "marked": -4.282115869017632,
+          "risk_pct": 4.282115869017632
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "SMCI",
+      "scan": "2026-09-28 05:06:34",
+      "reported": "Loss",
+      "profile": "momentum",
+      "entry": "42.45",
+      "target": "44.89",
+      "original_target": "47.33",
+      "stops": {
+        "baseline": "40.91",
+        "risk_100": "40.91",
+        "risk_75": "40.91"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.6277974087161367,
+          "marked": -3.6277974087161367,
+          "risk_pct": 3.6277974087161367
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.6277974087161367,
+          "marked": -3.6277974087161367,
+          "risk_pct": 3.6277974087161367
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-29T15:40:00",
+          "realized": -3.6277974087161367,
+          "marked": -3.6277974087161367,
+          "risk_pct": 3.6277974087161367
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "QMCO",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Win",
+      "profile": "momentum",
+      "entry": "30.4",
+      "target": "32.22",
+      "original_target": "34.04",
+      "stops": {
+        "baseline": "27.36",
+        "risk_100": "28.58",
+        "risk_75": "29.04"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-25T10:20:00",
+          "realized": 5.9868421052631575,
+          "marked": 5.9868421052631575,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-25T10:20:00",
+          "realized": 5.9868421052631575,
+          "marked": 5.9868421052631575,
+          "risk_pct": 5.9868421052631575
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-25T09:30:00",
+          "realized": -4.473684210526316,
+          "marked": -4.473684210526316,
+          "risk_pct": 4.473684210526316
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "TWST",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "188",
+      "target": "200.40",
+      "original_target": "212.79",
+      "stops": {
+        "baseline": "169.2",
+        "risk_100": "175.60",
+        "risk_75": "178.70"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.10638297872340426,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.10638297872340426,
+          "risk_pct": 6.595744680851064
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-25T09:35:00",
+          "realized": -4.946808510638298,
+          "marked": -4.946808510638298,
+          "risk_pct": 4.946808510638298
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "MRNA",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Win",
+      "profile": "bellup-1-boost-H4",
+      "entry": "196.31",
+      "target": "203.68",
+      "original_target": "203.68",
+      "stops": {
+        "baseline": "176.68",
+        "risk_100": "188.94",
+        "risk_75": "190.79"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-29T09:35:00",
+          "realized": 3.7542662116040955,
+          "marked": 3.7542662116040955,
+          "risk_pct": 9.999490601599511
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-29T09:35:00",
+          "realized": 3.7542662116040955,
+          "marked": 3.7542662116040955,
+          "risk_pct": 3.7542662116040955
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-28T05:10:00",
+          "realized": -2.811879170699404,
+          "marked": -2.811879170699404,
+          "risk_pct": 2.811879170699404
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "IONQ",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "45.05",
+      "target": "47.53",
+      "original_target": "50",
+      "stops": {
+        "baseline": "40.55",
+        "risk_100": "42.57",
+        "risk_75": "43.19"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-28T09:40:00",
+          "realized": 5.5049944506104325,
+          "marked": 5.5049944506104325,
+          "risk_pct": 9.988901220865705
+        },
+        "risk_100": {
+          "outcome": "Win",
+          "time": "2026-09-28T09:40:00",
+          "realized": 5.5049944506104325,
+          "marked": 5.5049944506104325,
+          "risk_pct": 5.5049944506104325
+        },
+        "risk_75": {
+          "outcome": "Win",
+          "time": "2026-09-28T09:40:00",
+          "realized": 5.5049944506104325,
+          "marked": 5.5049944506104325,
+          "risk_pct": 4.128745837957824
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "RKLB",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "75.2",
+      "target": "79.15",
+      "original_target": "83.09",
+      "stops": {
+        "baseline": "67.68",
+        "risk_100": "71.25",
+        "risk_75": "72.24"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -5.5186170212765955,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-29T04:00:00",
+          "realized": -5.252659574468085,
+          "marked": -5.252659574468085,
+          "risk_pct": 5.252659574468085
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-28T05:05:00",
+          "realized": -3.9361702127659575,
+          "marked": -3.9361702127659575,
+          "risk_pct": 3.9361702127659575
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "IRDM",
+      "scan": "2026-09-25 05:40:32",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "48.2",
+      "target": "50.73",
+      "original_target": "53.26",
+      "stops": {
+        "baseline": "46.82",
+        "risk_100": "46.82",
+        "risk_75": "46.82"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.9336099585062241,
+          "risk_pct": 2.863070539419087
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.9336099585062241,
+          "risk_pct": 2.863070539419087
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -0.9336099585062241,
+          "risk_pct": 2.863070539419087
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "WMT",
+      "scan": "2026-09-24 11:31:24",
+      "reported": "NoEntry",
+      "profile": "momentum",
+      "entry": "109.23",
+      "target": "114.96",
+      "original_target": "120.69",
+      "stops": {
+        "baseline": "108.4",
+        "risk_100": "108.4",
+        "risk_75": "108.4"
+      },
+      "status": "no_entry",
+      "scenarios": {}
+    },
+    {
+      "ticker": "P",
+      "scan": "2026-09-24 11:31:24",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "128.78",
+      "target": "136.50",
+      "original_target": "144.22",
+      "stops": {
+        "baseline": "115.9",
+        "risk_100": "121.06",
+        "risk_75": "122.99"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 4.635813014443237,
+          "risk_pct": 10.001553036185744
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": 4.635813014443237,
+          "risk_pct": 5.994719676968473
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-24T15:45:00",
+          "realized": -4.496039757726355,
+          "marked": -4.496039757726355,
+          "risk_pct": 4.496039757726355
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "A",
+      "scan": "2026-09-24 11:31:24",
+      "reported": "Open",
+      "profile": "momentum",
+      "entry": "170.86",
+      "target": "180.68",
+      "original_target": "190.49",
+      "stops": {
+        "baseline": "161.37",
+        "risk_100": "161.37",
+        "risk_75": "163.50"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.446447383823013,
+          "risk_pct": 5.554254945569472
+        },
+        "risk_100": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.446447383823013,
+          "risk_pct": 5.554254945569472
+        },
+        "risk_75": {
+          "outcome": "Open",
+          "time": "",
+          "realized": null,
+          "marked": -2.446447383823013,
+          "risk_pct": 4.307620273908463
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    },
+    {
+      "ticker": "P",
+      "scan": "2026-09-24 09:37:53",
+      "reported": "NoEntry",
+      "profile": "momentum",
+      "entry": "114.53",
+      "target": "121.40",
+      "original_target": "128.26",
+      "stops": {
+        "baseline": "106.03",
+        "risk_100": "107.66",
+        "risk_75": "109.38"
+      },
+      "status": "no_entry",
+      "scenarios": {}
+    },
+    {
+      "ticker": "INOD",
+      "scan": "2026-09-23 07:46:43",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "71.4",
+      "target": "73.77",
+      "original_target": "73.77",
+      "stops": {
+        "baseline": "64.26",
+        "risk_100": "69.03",
+        "risk_75": "69.63"
+      },
+      "status": "ambiguous",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-09-23T09:30:00",
+          "realized": 3.319327731092437,
+          "marked": 3.319327731092437,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Ambiguous",
+          "time": "2026-09-23T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 3.319327731092437
+        },
+        "risk_75": {
+          "outcome": "Ambiguous",
+          "time": "2026-09-23T09:30:00",
+          "realized": null,
+          "marked": null,
+          "risk_pct": 2.4789915966386555
+        }
+      },
+      "last_bar": "2026-09-24T19:55:00"
+    },
+    {
+      "ticker": "BFLY",
+      "scan": "2026-09-23 05:05:36",
+      "reported": "Loss",
+      "profile": "bellup-2-boost-H4",
+      "entry": "10.02",
+      "target": "10.72",
+      "original_target": "10.72",
+      "stops": {
+        "baseline": "9.02",
+        "risk_100": "9.32",
+        "risk_75": "9.50"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Loss",
+          "time": "2026-09-29T16:00:00",
+          "realized": -9.980039920159681,
+          "marked": -9.980039920159681,
+          "risk_pct": 9.980039920159681
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-23T09:40:00",
+          "realized": -6.986027944111776,
+          "marked": -6.986027944111776,
+          "risk_pct": 6.986027944111776
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-23T09:35:00",
+          "realized": -5.189620758483034,
+          "marked": -5.189620758483034,
+          "risk_pct": 5.189620758483034
+        }
+      },
+      "last_bar": "2026-09-30T19:55:00"
+    },
+    {
+      "ticker": "INOD",
+      "scan": "2026-09-23 05:05:36",
+      "reported": "Win",
+      "profile": "bellup-2-boost-H4",
+      "entry": "71.9",
+      "target": "74.27",
+      "original_target": "74.27",
+      "stops": {
+        "baseline": "64.71",
+        "risk_100": "69.53",
+        "risk_75": "70.13"
+      },
+      "status": "consistent",
+      "scenarios": {
+        "baseline": {
+          "outcome": "Win",
+          "time": "2026-10-01T13:35:00",
+          "realized": 3.2962447844228095,
+          "marked": 3.2962447844228095,
+          "risk_pct": 10.0
+        },
+        "risk_100": {
+          "outcome": "Loss",
+          "time": "2026-09-23T09:30:00",
+          "realized": -3.2962447844228095,
+          "marked": -3.2962447844228095,
+          "risk_pct": 3.2962447844228095
+        },
+        "risk_75": {
+          "outcome": "Loss",
+          "time": "2026-09-23T08:15:00",
+          "realized": -2.4617524339360224,
+          "marked": -2.4617524339360224,
+          "risk_pct": 2.4617524339360224
+        }
+      },
+      "last_bar": "2026-10-01T19:55:00"
+    }
+  ]
+}
