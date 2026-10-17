@@ -24,3 +24,7 @@ TWS/
 
 # Codex
 .codex
+
+#Investigations
+tools/
+docs/artifacts/
