@@ -25,53 +25,63 @@ be ready to trade in order to be watched.
 
 ### `GetCandidates.ReversalWatchList`
 
-- `Enabled=true`: read/save the persistent recall universe in
-  `Paths.WishListFile` (`Data/Tickers/wishlist.csv`). Disabled skips its loading,
-  enrollment and saving, leaving the file intact.
-- `ScanCodes=["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]`: since 2026-10-15,
-  enroll/renew only names passing the basic prefilter whose fresh current
-  price is strictly below the latest completed native D1 Bollinger mid.
-  History preparation precedes this check; recent-price floor, pattern and
-  entry admission follow it. No fresh price or reliable D1 means no enrollment
-  or renewal, with an explicit log reason. Existing records survive failures.
-- `RetentionCalendarDays=30`: expire at the scan start when the latest loser
-  sighting is at least 30 calendar dates old. `0` or negative disables expiry.
-  Direct monitoring does not renew this date; another loser sighting with
-  a fresh price below the closed D1 mid does.
-- `UseWishListFirst=true`: prepare watched names before current scanner-code
-  names. Classification still uses the shared current pattern pipeline.
-- `MaxWishListItems=0`: no scan limit; every active item is checked each run.
-  A positive limit checks oldest attempted evaluations first and retains the
-  remainder, without imposing a storage limit.
+The wishlist is exclusively an active watch for ReversalHook after a meaningful
+Daily-mid drop, not a general continuation/BellUp universe. The lifecycle was
+changed at the user's request on 2026-10-17. Exact behavior and migration are in
+[Reversal watch lifecycle](REVERSAL_WATCH_LIFECYCLE.md).
 
-`LastDropSeenAt`, `WatchCurrency`, `WatchStockType`, `FirstSeen`,
-`LastEvaluatedAt`, `LastStatusReason` and `LastStatusTime` survive CSV round trips.
-Status records the latest published pattern group, not a trading outcome;
-failed/no-output attempts retain the row with an explicit pending-result status.
-`IsFromWishlist` now means the ticker was active in the watch universe at run
-start; it no longer means the legacy below-Daily-mid family. Duplicate live
-and watched histories reuse the existing run caches; final output deduplicates
-by ticker. Enrollment persists even if a setup is Other or already recognized.
+- `Enabled=true`: load/save Paths.WishListFile (Data/Tickers/wishlist.csv) and
+  the adjacent wishlist.lifecycle.json ledger. Disabled leaves both intact.
+- `MinimumBelowDailyMidPct=5`: enroll or renew from a configured loser code
+  only if fresh current M5 price <= 0.95 * last completed native D1 Bollinger
+  mid. Exactly 5% qualifies. Values must be >0 and <100. This is the user's
+  universe rule, not an empirically calibrated admission or ranking threshold.
+- `ScanCodes=["TOP_OPEN_PERC_LOSE", "TOP_PERC_LOSE"]`: only current sightings
+  in these codes can enroll/renew. Watch-only processing never renews the
+  loser date. A shallow crossing, above-mid price or unavailable fresh price
+  does not enroll or renew.
+- `RetentionCalendarDays=30`: expire at scan start when the latest qualifying
+  loser sighting is at least this many calendar dates old. Nonpositive disables
+  expiry. Recognition ends the cycle independently of this maximum age.
+- `UseWishListFirst=true`: prepare watched names before live scanner names.
+- `MaxWishListItems=0`: process all active watches. Positive values rotate by
+  oldest attempted evaluation and retain overflow. Newly observed recent hooks
+  get a one-run publication attempt in addition to that watch budget.
 
-Existing loser-code wishlist rows migrate using their ScanTime as LastDropSeenAt.
-Other legacy rows remain in the file, but are not automatically enrolled.
-Legacy expected-target cleanup does not remove managed watch rows; explicit
-`LastStatus=Remove` still does. Watch expiry is owned by the scanner settings.
-More active symbols can increase scan duration; existing history retry/bridge
-bounds apply equally to direct monitoring.
-Each qualifying loser observation is checkpointed after its price check,
-with atomic CSV replacement; statuses are saved again at run completion.
-The price check requests a bounded ten-minute fresh M5 snapshot and accepts
-the current or immediately preceding M5 bucket via ExecutionPriceSnapshot.
-No historical close, H4 mid, provisional D1 or stale cached M5 substitutes
-for the comparison. At least 20 native completed D1 bars are required; the
-latest must match the last completed trading date from the local schedule,
-using the existing 16:00 D1 completion convention. Exact price, mid, D1 date
-and M5 source/time are logged. This adds a fresh-price request per eligible
-loser observation; publication validation remains separate. Existing watch
-rows are retained when above mid; this condition governs enrollment/renewal,
-not ReversalHook recognition or continuation after a mid crossing.
-Historical implementation notes: `docs/implementation/implementation-2026-10-10-reversal-watch-list.md`.
+A completed D1/H4 ReversalHook seed consumes its drop cycle even if readiness,
+price freshness or higher-scale support prevents a playable trade. Retired
+rows leave the active CSV. The separate ledger retains hook/cycle timestamps,
+rearm state and inspected history cursors, so inactive names make no direct
+broker requests merely to remember them. A new cycle requires a NEW excursion
+into the >=5%-below-mid zone after an observed exit from that zone, a current
+loser-code sighting and fresh M5 price. A repeated loser while still in the
+same consumed deep-drop zone cannot immediately re-enroll.
+
+Cache-only preflight recognizes historical seeds with the same shared
+classifier before requesting watched history. Indicator calculation uses the
+existing feature engine primitives in a single native-timeframe pass. Only
+completed bars establish a seed; partial bars, a guessed rebound, Win/Loss
+or later extrema do not. Recognition does not bypass publication checks.
+Current live scanner sources retain the normal BellUp-first pipeline;
+watch-only contexts cannot publish BellUp and are omitted when a live context
+already exists for the same ticker.
+
+Enrollment and legacy validation still require at least 20 native completed
+D1 bars with the latest date matching the local trading schedule (16:00 D1
+completion), and a bounded ten-minute fresh M5 request accepting current or
+immediately preceding bucket. No historical close, provisional D1, H4 mid,
+stale cached quote or live-quote fallback replaces this enrollment price.
+Price, source/time, Daily mid/date, threshold and qualification are logged.
+Existing validated active cycles may recover toward/above mid while awaiting
+a hook; current depth is an enrollment/renewal rule, not a hook admission gate.
+
+First-run migration drops legacy non-loser rows, consumes already-observed
+hook cycles from cached history and revalidates remaining legacy watches
+against fresh M5 and the new depth. Missing fresh data retains a pending row
+but skips watch-only candidate processing until it can be validated. Existing
+LastDropSeenAt is not renewed merely by validation. Files change only when
+the user runs the updated application. See the lifecycle reference for
+persistence boundaries and user-run checks.
 
 ### `GetCandidates.Finder.ReversalSupplementalDiagnostics`
 

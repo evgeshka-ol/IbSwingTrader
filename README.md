@@ -102,7 +102,8 @@ The important generated files are under `Data/`:
 
 - `Tickers/candidates.csv`: append/merge history of scanner candidates. It contains the candidate group, trade plan, ranking data, feature series, and `PatternVerdictReason` such as `BellUp confirmed on H4` or `BellUp confirmed on Daily` when the scanner identifies BellUp.
 - `datasets/evaluation-dataset.csv`: row-oriented historical evaluation data, including `DetectedPipeline`, `DetectedPattern`, `PatternVerdict`, `PatternVerdictReason`, signed amplitude, extrema timestamps, entry/exit outcomes, and derived timing metrics.
-- `Tickers/wishlist.csv`: merged scanner universe and wishlist state.
+- `Tickers/wishlist.csv`: active meaningful-drop cycles awaiting ReversalHook;
+  `Tickers/wishlist.lifecycle.json` retains consumed-hook and rearm state.
 - `datasets/trade_dataset.csv`: optional trade-history dataset produced by `build-dataset`.
 - `logs/`: application diagnostics and timing information.
 

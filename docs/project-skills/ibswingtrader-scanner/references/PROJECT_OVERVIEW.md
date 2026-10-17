@@ -13,8 +13,10 @@
   - builds scanner output
   - writes `Data/Tickers/candidates.csv`
   - writes/updates `Data/Tickers/wishlist.csv`
-  - watches losers from the two configured loser codes on subsequent scans
-    by ticker, independently of whether the current universe returns them
+  - watches meaningful (>=5% below closed Daily mid) loser-code drops for
+    ReversalHook on subsequent scans; a completed-bar hook retires the cycle
+  - persists inactive cycle memory in Data/Tickers/wishlist.lifecycle.json
+    without keeping those names in active broker-backed watch batches
 - `evaluate-candidates`
   - evaluates candidate outcomes
   - writes directly to `Data/datasets/evaluation-dataset.csv`

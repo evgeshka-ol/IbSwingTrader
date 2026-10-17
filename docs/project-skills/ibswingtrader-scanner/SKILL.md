@@ -47,9 +47,12 @@ next-day research coverage are supporting diagnostics, not the main oracle.
   bellup-win-ridge-2026-10-05-v1 after publication pricing; scope is
   WinGivenEntryAndResolution. Console uses Win~. Unsupported plans show n/a.
   This estimate is not the current ranking sort key or a guaranteed win.
-- Persistent loser watch enrollment/renewal needs fresh M5 strictly below
-  the last completed native D1 mid. Existing rows survive a mid reclaim;
-  this enrollment rule is not a ReversalHook recognition gate.
+- Wishlist exists only to catch ReversalHook after a meaningful drop. Loser
+  enrollment/renewal requires fresh M5 at least 5% below the last completed
+  native D1 mid. A recognized completed-bar hook consumes the cycle; a new
+  deep-drop excursion is needed to re-enroll. Watch-only contexts cannot
+  publish BellUp. See REVERSAL_WATCH_LIFECYCLE.md; current live sources retain
+  their normal pipeline. This watch rule is not a global hook admission gate.
 - Reversal M5 bridges are bounded; history/features are reused within a run.
   Final publication pricing remains fresh. Recognized reversals may use the
   configured IB live-quote fallback; delayed/frozen data cannot authorize entry.
@@ -121,6 +124,8 @@ performance. See [success criteria](../../guides/success-criteria.md).
   TWS readiness and source-code zones.
 - [Series Playbook](references/SERIES_PLAYBOOK.md): exact geometry, phases,
   cross-timeframe support, publication, timing and diagnostic boundaries.
+- [Reversal watch lifecycle](references/REVERSAL_WATCH_LIFECYCLE.md): 5% Daily-mid
+  enrollment, hook retirement, new-drop rearm, persistence and legacy migration.
 - [Settings map](references/SETTINGS_MAP.md): watch retention/enrollment,
   data guards, pricing fallback, output fields and execution controls.
 - [Scanner model](references/SCANNER_MODEL.md): failure modes, current score

@@ -34,7 +34,8 @@ or that the dependable-winner goal has been achieved.
 
 - BellUp timing, pauses and Triangle: [Series Playbook](project-skills/ibswingtrader-scanner/references/SERIES_PLAYBOOK.md),
   [latest impulse-level study](investigations/2026-10/investigation-2026-10-16-pause-impulse-level.md).
-- ReversalHook: [manual edge and history](project-skills/ibswingtrader-scanner/references/REVERSAL_EDGE.md),
+- ReversalHook: [active watch lifecycle](project-skills/ibswingtrader-scanner/references/REVERSAL_WATCH_LIFECYCLE.md),
+  [manual edge and history](project-skills/ibswingtrader-scanner/references/REVERSAL_EDGE.md),
   [recognition study](investigations/2026-10/research-2026-10-10-reversal-recognition.md),
   [BMNR timing case](investigations/2026-10/investigation-2026-10-16-bmnr-scan-timing.md).
 - Evaluation and confidence: [evaluation rules](project-skills/ibswingtrader-evaluation/references/EVALUATION_RULES.md),
@@ -80,6 +81,7 @@ in older notes are historical. Follow current skills and success criteria.
 These describe changes at their recorded date. Later behavior is maintained
 in project references, including subsequent overrides.
 
+- [Reversal-only watch cycles and meaningful Daily-mid drops](implementation/implementation-2026-10-17-reversal-watch-lifecycle.md)
 - [BellUp late-entry ranking penalty](implementation/BELLUP_LATE_ENTRY_PENALTY_2026-09-14.md)
 - [BellUp lower-band turn veto](implementation/BELLUP_LOWER_TURN_VETO_2026-09-11.md)
 - [BellUp exit from previous boosts](implementation/BELLUP_TWO_BOOST_EXIT_2026-09-11.md)
