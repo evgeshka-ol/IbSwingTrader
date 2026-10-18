@@ -2,6 +2,12 @@
 
 Main artifact:
 
+Since 2026-10-17, the evaluation dataset includes saved probability/model/scope,
+BrierLoss and trade-bounded target progress immediately after PlannedLossPct.
+Full rebuild and incremental merge refresh historical forecast rows as well as
+new evaluations. See [confidence feedback](CONFIDENCE_FEEDBACK.md) for formulas,
+coverage statuses and the forecast-history exception to report filters.
+
 Price contract since 2026-10-07: ScanPrice is the price saved by the scanner
 in candidates.csv, not a later M5 open. MaxPct, MinPct, ScanMovePct and
 scan-relative timing percentages use that reference. A saved historical

@@ -40,6 +40,7 @@ or that the dependable-winner goal has been achieved.
   [recognition study](investigations/2026-10/research-2026-10-10-reversal-recognition.md),
   [BMNR timing case](investigations/2026-10/investigation-2026-10-16-bmnr-scan-timing.md).
 - Evaluation and confidence: [evaluation rules](project-skills/ibswingtrader-evaluation/references/EVALUATION_RULES.md),
+  [confidence and target-progress feedback](project-skills/ibswingtrader-evaluation/references/CONFIDENCE_FEEDBACK.md),
   [Win model scope/settings](project-skills/ibswingtrader-scanner/references/SETTINGS_MAP.md),
   [confidence/outcome report](investigations/2026-10/investigation-2026-10-08-confidence-and-reevaluation.md).
 - Operations and performance: [schedule guide](guides/scanner-schedule.md),

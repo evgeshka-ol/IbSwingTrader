@@ -56,8 +56,10 @@ compatible observed frequency is Win/(Win+Loss). Report entered Open and
 NoEntry alongside it to expose selection and incomplete horizons. Do not
 present this conditional rate as unconditional success for every publication.
 Historical amplitude estimates and unavailable estimates form separate cohorts.
-Use probability buckets with sample sizes and calibration error (for example
-Brier score) alongside discrimination; AUC alone is not calibration.
+Use probability buckets with sample sizes and observed frequency gaps, alongside
+overall probability quality (mean Brier loss) and discrimination; neither Brier
+alone nor AUC alone isolates calibration. See the current
+[feedback contract](../project-skills/ibswingtrader-evaluation/references/CONFIDENCE_FEEDBACK.md).
 
 ## Supporting diagnostics and validation
 

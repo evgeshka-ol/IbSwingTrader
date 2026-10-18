@@ -131,6 +131,8 @@ scan path. See the `ibswingtrader-scanner` skill for the scanner side.
 
 - `references/EVALUATION_RULES.md`
 - `references/TRADEPLAN_SCOPE.md`
+- `references/CONFIDENCE_FEEDBACK.md`: saved forecasts, Brier contributions,
+  trade-bounded target progress, historical backfill and coverage statuses.
 
 ## Practical workflow
 
