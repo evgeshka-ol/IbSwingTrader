@@ -9,7 +9,7 @@ namespace IbSwingTrader.App.Bootstrap
         {
             // core settings
             services.AddSingleton<IAgentSettingsProvider>(
-                _ => new AgentSettingsProvider("agentsettings.json"));
+                _ => new AgentSettingsProvider(Path.Combine(AppContext.BaseDirectory, "agentsettings.json")));
 
             services.AddSingleton<IAgentPathService, AgentPathService>();
 

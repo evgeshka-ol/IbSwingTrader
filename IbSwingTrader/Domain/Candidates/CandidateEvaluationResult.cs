@@ -9,6 +9,10 @@ namespace IbSwingTrader.Domain.Candidates
         public required string PresetScanCode { get; set; }
         public string BollingerModel { get; set; } = string.Empty;
 
+        public decimal? DiagnosticsEstimatedHitRatePct { get; set; }
+        public string DiagnosticsEstimatedHitRateModel { get; set; } = string.Empty;
+        public string DiagnosticsEstimatedHitRateScope { get; set; } = string.Empty;
+
         public string CandidateSource { get; set; } = string.Empty;
         public string DetectedPipeline { get; set; } = string.Empty;
         public string DetectedPattern { get; set; } = string.Empty;

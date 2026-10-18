@@ -31,6 +31,15 @@ namespace IbSwingTrader.Domain.Dataset
 
         public decimal PlannedLossPct { get; set; }
 
+        public decimal? DiagnosticsEstimatedHitRatePct { get; set; }
+        public string DiagnosticsEstimatedHitRateModel { get; set; } = string.Empty;
+        public string DiagnosticsEstimatedHitRateScope { get; set; } = string.Empty;
+        public decimal? BrierLoss { get; set; }
+        public string ConfidenceEvaluationStatus { get; set; } = string.Empty;
+        public decimal? TradeMfePct { get; set; }
+        public decimal? TargetProgressPct { get; set; }
+        public string TargetProgressStatus { get; set; } = string.Empty;
+
         public decimal? MaxPct { get; set; }
 
         public decimal? MaxPrice { get; set; }

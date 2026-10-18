@@ -126,7 +126,9 @@ namespace IbSwingTrader.Application.Dataset
             foreach (var row in rows)
             {
                 var values = properties
-                    .Select(x => Escape(FormatValue(x.GetValue(row))))
+                    .Select(x => Escape(x.Name == nameof(EvaluationDatasetRow.BrierLoss) && x.GetValue(row) is decimal loss
+                        ? loss.ToString("0.##########", CultureInfo.InvariantCulture)
+                        : FormatValue(x.GetValue(row))))
                     .ToList();
 
                 sb.AppendLine(string.Join(",", values));

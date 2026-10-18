@@ -16,6 +16,7 @@
         logger.Info("  build-research-dataset");
         logger.Info("  get-candidates");
         logger.Info("  evaluate-candidates");
+        logger.Info("  refresh-evaluation-feedback");
         logger.Info("  normalize-reports");
         logger.Info("  clean-up");
         logger.Info("  get-scanner-params");
@@ -49,6 +50,12 @@
             await services
                 .GetRequiredService<EvaluateCandidatesCommand>()
                 .RunAsync();
+            break;
+
+        case "refresh-evaluation-feedback":
+            await services
+                .GetRequiredService<IEvaluationDatasetBuilder>()
+                .RefreshFeedbackAsync();
             break;
 
         case "normalize-reports":

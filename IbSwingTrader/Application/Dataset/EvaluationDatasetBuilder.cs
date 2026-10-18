@@ -32,6 +32,23 @@ namespace IbSwingTrader.Application.Dataset
         private readonly ICandidatePatternVerdictService _patternVerdictService = patternVerdictService;
         private readonly ITextLogger _logger = logger;
 
+        public async Task RefreshFeedbackAsync()
+        {
+            var path = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+            var rows = await _evaluationDatasetCsvService.ReadAsync(path);
+            if (rows.Count == 0)
+            {
+                _logger.Info("No evaluation dataset rows available for confidence feedback.");
+                return;
+            }
+            var candidates = await LoadCurrentCandidatesAsync();
+            var candidateIndex = candidates.ToDictionary(x => BuildCandidateKey(x.Candidate),
+                x => x, StringComparer.OrdinalIgnoreCase);
+            RefreshFeedback(rows, candidateIndex, await LoadFeedbackEvaluationsAsync([]));
+            await _evaluationDatasetCsvService.WriteAsync(path, rows);
+            _logger.Info($"Evaluation confidence feedback saved: {path}; rows={rows.Count}. No report date filters applied.");
+        }
+
         public async Task<List<EvaluationDatasetRow>> ReadCurrentAsync()
         {
             var outputPath = Path.GetFullPath(
@@ -101,6 +118,9 @@ namespace IbSwingTrader.Application.Dataset
                     .First())
                 .ToList();
 
+            var feedbackEvaluations = await LoadFeedbackEvaluationsAsync(evaluations);
+            RefreshFeedback(mergedRows, candidateIndex, feedbackEvaluations);
+
             if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
             {
                 // Anchor the rolling window to the dataset's own prior coverage, not wall-clock
@@ -111,17 +131,17 @@ namespace IbSwingTrader.Application.Dataset
                     ? existingRows.Max(x => x.ScanTime.Date)
                     : MarketTime.Now().Date;
                 var recentCutoff = priorReferenceDate.AddDays(-settings.RecentScanDays.Value);
-                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= recentCutoff)];
+                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= recentCutoff || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
             if (settings.MinScanTime.HasValue)
             {
-                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= settings.MinScanTime.Value)];
+                mergedRows = [.. mergedRows.Where(x => x.ScanTime >= settings.MinScanTime.Value || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
             if (settings.MinAmplitudePct.HasValue)
             {
-                mergedRows = [.. mergedRows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value)];
+                mergedRows = [.. mergedRows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
             EnsureDerivedFields(mergedRows);
@@ -153,22 +173,32 @@ namespace IbSwingTrader.Application.Dataset
                     .First())
                 .ToList();
 
+            var feedbackEvaluations = evaluations.ToList();
+            var activeCandidates = await LoadCurrentCandidatesAsync();
+            var existingRows = await ReadCurrentAsync();
+            var confidenceHistoryKeys = activeCandidates
+                .Where(x => x.Candidate.Diagnostics?.EstimatedHitRatePct.HasValue == true)
+                .Select(x => BuildCandidateKey(x.Candidate))
+                .Concat(evaluations.Where(x => x.DiagnosticsEstimatedHitRatePct.HasValue).Select(BuildEvaluationKey))
+                .Concat(existingRows.Where(x => x.DiagnosticsEstimatedHitRatePct.HasValue).Select(BuildDatasetKey))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
             {
                 var recentCutoff = MarketTime.Now().Date.AddDays(-settings.RecentScanDays.Value);
                 evaluations = evaluations
-                    .Where(x => x.ScanTime >= recentCutoff)
+                    .Where(x => x.ScanTime >= recentCutoff || confidenceHistoryKeys.Contains(BuildEvaluationKey(x)))
                     .ToList();
             }
 
             if (settings.MinScanTime.HasValue)
             {
                 evaluations = evaluations
-                    .Where(x => x.ScanTime >= settings.MinScanTime.Value)
+                    .Where(x => x.ScanTime >= settings.MinScanTime.Value || confidenceHistoryKeys.Contains(BuildEvaluationKey(x)))
                     .ToList();
             }
 
-            if (evaluations.Count == 0)
+            if (evaluations.Count == 0 && !existingRows.Any(x => confidenceHistoryKeys.Contains(BuildDatasetKey(x))))
             {
                 _logger.Error(
                     $"No evaluations found. " +
@@ -186,7 +216,6 @@ namespace IbSwingTrader.Application.Dataset
             if (settings.MinAmplitudePct.HasValue)
                 _logger.Info($"MinAmplitudePct filter: {settings.MinAmplitudePct.Value:0.##}");
 
-            var activeCandidates = await LoadCurrentCandidatesAsync();
             var candidateIndex = activeCandidates
                 .GroupBy(x => BuildCandidateKey(x.Candidate), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
@@ -198,7 +227,6 @@ namespace IbSwingTrader.Application.Dataset
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var existingRows = await _evaluationDatasetCsvService.ReadAsync(outputPath);
             existingRows = [.. existingRows
                 .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -235,7 +263,8 @@ namespace IbSwingTrader.Application.Dataset
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var rows = existingRows
-                .Where(x => evaluationKeys.Contains(BuildDatasetKey(x)) &&
+                .Where(x => (evaluationKeys.Contains(BuildDatasetKey(x)) ||
+                             confidenceHistoryKeys.Contains(BuildDatasetKey(x))) &&
                             !rebuildKeys.Contains(BuildDatasetKey(x)))
                 .ToList();
 
@@ -265,9 +294,12 @@ namespace IbSwingTrader.Application.Dataset
                     .ThenByDescending(r => r.EvaluatedAt)
                     .First())];
 
+            RefreshFeedback(rows, candidateIndex, feedbackEvaluations);
+
             if (settings.MinAmplitudePct.HasValue)
             {
-                rows = [.. rows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value)];
+                rows = [.. rows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value ||
+                    x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
             EnsureDerivedFields(rows);
@@ -286,6 +318,80 @@ namespace IbSwingTrader.Application.Dataset
                 $"Evaluations={evaluations.Count}, " +
                 $"Rows={rows.Count}, " +
                 $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
+        }
+
+        private async Task<List<CandidateEvaluationResult>> LoadFeedbackEvaluationsAsync(
+            List<CandidateEvaluationResult> latest)
+        {
+            var saved = await _evaluationCsvService.ReadAsync(_pathService.GetEvaluationsFile());
+            saved.AddRange(await _evaluationCsvService.ReadAsync(_pathService.GetEvaluationsArchiveFile()));
+            saved.AddRange(latest);
+            return saved;
+        }
+
+        private void RefreshFeedback(
+            List<EvaluationDatasetRow> rows,
+            Dictionary<string, RankedCandidateSnapshot> candidateIndex,
+            List<CandidateEvaluationResult> evaluations)
+        {
+            var index = evaluations.GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.OrderByDescending(y => y.EvaluatedAt)
+                    .ThenByDescending(y => y.EvaluationEndTime).First(), StringComparer.OrdinalIgnoreCase);
+            var scored = 0;
+            var processedTickers = 0;
+            // One cache load per ticker; no historical downloads and no outcome reevaluation.
+            foreach (var group in rows.GroupBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase))
+            {
+                List<Candle>? m5 = null;
+                List<Candle>? m1 = null;
+                if (group.Any(x => x.EntryTime.HasValue && (x.Outcome is "Loss" or "Open")))
+                {
+                    _historicalCache.TryLoad(group.Key, Timeframe.M5, out m5);
+                    if (m5 is { Count: > 0 })
+                        _historicalCache.TryLoad(group.Key, Timeframe.M1, out m1);
+                }
+                foreach (var row in group)
+                {
+                    var key = BuildDatasetKey(row);
+                    candidateIndex.TryGetValue(key, out var snapshot);
+                    index.TryGetValue(key, out var evaluation);
+                    var diagnostics = snapshot?.Candidate.Diagnostics;
+                    if (diagnostics?.EstimatedHitRatePct.HasValue == true)
+                    {
+                        row.DiagnosticsEstimatedHitRatePct = diagnostics.EstimatedHitRatePct;
+                        row.DiagnosticsEstimatedHitRateModel = diagnostics.EstimatedHitRateModel;
+                        row.DiagnosticsEstimatedHitRateScope = diagnostics.EstimatedHitRateScope;
+                    }
+                    else if (evaluation?.DiagnosticsEstimatedHitRatePct.HasValue == true)
+                    {
+                        row.DiagnosticsEstimatedHitRatePct = evaluation.DiagnosticsEstimatedHitRatePct;
+                        row.DiagnosticsEstimatedHitRateModel = evaluation.DiagnosticsEstimatedHitRateModel;
+                        row.DiagnosticsEstimatedHitRateScope = evaluation.DiagnosticsEstimatedHitRateScope;
+                    }
+                    EvaluationConfidenceMetrics.ScoreForecast(row);
+                    if (row.BrierLoss.HasValue)
+                        scored++;
+                    var observationEnd = evaluation?.EvaluationEndTime ?? evaluation?.EvaluatedAt ?? row.EvaluatedAt;
+                    var stopTime = evaluation?.StopTime;
+                    if (!stopTime.HasValue && row.Outcome == "Loss" && row.EntryTime.HasValue)
+                    {
+                        // Dataset-only legacy rows do not carry StopTime. Recover a conservative
+                        // first stop-touch boundary from cache, never use a later market maximum.
+                        var upperBound = row.ExitTime ?? observationEnd;
+                        var stopBar = m5?.Where(x => x.Time.AddMinutes(5) > row.EntryTime.Value &&
+                                x.Time <= upperBound && x.Time <= observationEnd && x.Low <= row.StopLoss)
+                            .OrderBy(x => x.Time).FirstOrDefault();
+                        if (stopBar != null)
+                            stopTime = stopBar.Time < row.EntryTime.Value ? row.EntryTime : stopBar.Time;
+                    }
+                    EvaluationConfidenceMetrics.MeasureProgress(row,
+                        observationEnd, stopTime, m5 ?? [], m1 ?? []);
+                }
+                if (++processedTickers % 100 == 0)
+                    _logger.Info($"Confidence feedback progress: tickers={processedTickers}, scored={scored}");
+            }
+            _logger.Info($"Confidence feedback: rows={rows.Count}, forecasts={rows.Count(x => x.DiagnosticsEstimatedHitRatePct.HasValue)}, " +
+                $"scored={scored}, unsupportedScope={rows.Count(x => x.ConfidenceEvaluationStatus == "UnsupportedScope")}");
         }
 
         private async Task<List<RankedCandidateSnapshot>> LoadCurrentCandidatesAsync()

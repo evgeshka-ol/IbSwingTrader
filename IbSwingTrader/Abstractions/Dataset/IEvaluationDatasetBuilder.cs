@@ -4,6 +4,8 @@ namespace IbSwingTrader.Abstractions.Dataset
     {
         Task RunAsync();
 
+        Task RefreshFeedbackAsync();
+
         Task<List<EvaluationDatasetRow>> ReadCurrentAsync();
 
         Task UpsertAsync(List<CandidateEvaluationResult> evaluations);

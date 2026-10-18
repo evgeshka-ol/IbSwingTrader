@@ -426,6 +426,9 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 Ticker = candidate.Ticker,
                 BollingerModel = candidate.Scan.BollingerModel,
+                DiagnosticsEstimatedHitRatePct = candidate.Diagnostics?.EstimatedHitRatePct,
+                DiagnosticsEstimatedHitRateModel = candidate.Diagnostics?.EstimatedHitRateModel ?? string.Empty,
+                DiagnosticsEstimatedHitRateScope = candidate.Diagnostics?.EstimatedHitRateScope ?? string.Empty,
                 ScanTime = candidate.Scan.ScanTime,
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
@@ -487,6 +490,9 @@ namespace IbSwingTrader.Application.Evaluation
             {
                 Ticker = candidate.Ticker,
                 BollingerModel = candidate.Scan.BollingerModel,
+                DiagnosticsEstimatedHitRatePct = candidate.Diagnostics?.EstimatedHitRatePct,
+                DiagnosticsEstimatedHitRateModel = candidate.Diagnostics?.EstimatedHitRateModel ?? string.Empty,
+                DiagnosticsEstimatedHitRateScope = candidate.Diagnostics?.EstimatedHitRateScope ?? string.Empty,
                 ScanTime = candidate.Scan.ScanTime,
                 EvaluatedAt = MarketTime.Now(),
                 PresetScanCode = candidate.Scan.PresetScanCode,
