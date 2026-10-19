@@ -1,0 +1,89 @@
+# Completed reversal impulses
+
+Current admission rule, adopted 2026-10-19 after the CRGY review. Recognition
+and readiness remain separate: a completed ReversalHook stays recognized but
+cannot authorize a new ReversalHook plan from the same impulse.
+
+## Upper-band completion within an episode
+
+For each closed native bar from the recognized seed through the last completed
+bar, compare its high with its own Bollinger upper and mid:
+
+```text
+Upper[t] > Mid[t] > 0 and High[t] >= Upper[t]
+```
+
+Equality counts. No near-touch percentage or price tolerance was introduced.
+Use full-precision feature values; CSV/chart rounding is not a new threshold.
+Use completed close as proof when high is unavailable. A touch before the seed
+does not count. Search from the newest recognized seed, including its own bar:
+an entire reversal impulse can occur within that bar.
+
+Once any bar in that episode has touched upper, phase is Completed despite a
+later pullback, moving upper band, or improving fresh H4 MACD. Completion is
+reconstructed from the episode's closed history; it is not a permanent symbol
+blacklist or a new lifecycle file. A new recognized seed has a new boundary.
+The existing six-bar recognition window and seed rules are unchanged.
+
+The older live/current-price upper test remains available for the local phase.
+An unclosed quote/provisional candle alone cannot provide historical H4 evidence
+for the cross-frame rule below. Completed native inputs are filtered at the
+decision time; no future forming-bar high is accepted as historical completion.
+
+## A completed H4 inside the Daily episode
+
+Before selecting the preferred D1/H4 admission frame, if:
+
+- D1 is recognized and its local phase is Active or MidCrossed;
+- H4 is recognized and Completed with a historical closed-bar touch;
+- that H4 signal started at or after the current D1 signal bar's start;
+
+then mark D1 admission phase Completed as well. This prevents the same impulse
+from being admitted again solely because the last closed Daily bar still has
+age zero, or because Weekly has a supportive regime. Publication rejects this
+phase before checking weekly support or constructing a fresh admitted plan.
+
+The temporal containment rule intentionally does not infer that an H4 episode
+starting before the D1 seed belongs to the same impulse. An older completed H4
+does not veto a newer D1 signal. A newly recognized active H4 has its own seed
+and does not inherit a prior episode's completion. Normal BellUp precedence,
+higher-timeframe support, price freshness and plan validity still apply.
+
+## Saved evidence and reports
+
+`PatternVerdictReason` and the reversal-episode log carry:
+
+- `UpperReached`, `UpperTouchBarsAgo`, `UpperTouchHigh`, `UpperTouchUpper`,
+  and `UpperTouchSource` for the local mid-bend phase;
+- `ReversalImpulseCompleted(Timeframe, SignalBar, TouchBar, ConfirmedAt,
+  High, Upper, Source)` for historical completion, including strict-hook seeds;
+- `NotReady=H4-impulse-already-completed-in-D1-episode` when that evidence
+  blocks Daily readmission, retaining its original local phase as context.
+
+Confirmation time is native H4 start+4h or D1 date16:00. It is bar confirmation,
+not an invented intrabar tick time. Completed sources are CompletedHigh or
+CompletedClose. The evidence remains in Other and follows existing reason
+preservation through evaluations and evaluation datasets. No new probability
+model, score, or numeric report column was introduced.
+
+For CRGY's saved October19 scan: Daily Friday high13.80 remained below the
+saved Daily upper about13.87. H4 Friday12:00 high13.80 exceeded its upper
+about13.51 and confirmed at16:00, after an H4 seed at08:00 inside that day's
+Daily seed. This meets the new containment rule. The previous frozen candidate
+and dated investigation remain unchanged. A full broker-backed replay was not
+performed; the prepared checks exercise the policy and boundary conditions.
+
+Source: ReversalImpulseCompletion.cs, ReversalHookPhaseClassifier.cs,
+CandidateFinder.BuildReversalPhaseDiagnosis (initial and publication decisions).
+No additional broker requests are made by this rule.
+
+User-run checks:
+
+```powershell
+dotnet run --project tests/ReversalRecoveryChecks
+dotnet run --project tests/ReversalWatchListChecks
+```
+
+Measure effects on later entered Win/Loss/Open, profit and missed opportunities;
+a completed band excursion does not claim that later price cannot rise. FWDI's
+renewed downward Daily-mid slope is a separate issue, not solved by this rule.

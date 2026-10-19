@@ -40,6 +40,10 @@ freshness and migration rules in
   even with sufficient D1 history and after price crosses mid. Recognition
   and readiness are distinct. Publication needs an Active/MidCrossed episode,
   higher-timeframe support and a fresh valid plan. Other has no active plan.
+- A completed-bar upper-band touch consumes the current reversal impulse even
+  after a pullback. A completed H4 seeded inside the current D1 episode blocks
+  readmission through that D1 signal. See REVERSAL_IMPULSE_COMPLETION.md for
+  exact boundaries, saved evidence and independent-signal exceptions.
 - TWS-native completed bars are canonical. Never substitute a chart's
   session grid, final forming-bar values or future outcomes for scan-time data.
   Weekly supplies context; confirmed Bell patterns use H4/Daily.
@@ -139,6 +143,8 @@ performance. See [success criteria](../../guides/success-criteria.md).
   formula, metadata, current H4 MACD support and preserved publication checks.
 - [Reversal watch lifecycle](references/REVERSAL_WATCH_LIFECYCLE.md): 5% Daily-mid
   enrollment, hook retirement, new-drop rearm, persistence and legacy migration.
+- [Completed reversal impulses](references/REVERSAL_IMPULSE_COMPLETION.md):
+  historical upper-band touches and same-episode H4/D1 admission guards.
 - [Settings map](references/SETTINGS_MAP.md): watch retention/enrollment,
   data guards, pricing fallback, output fields and execution controls.
 - [Scanner model](references/SCANNER_MODEL.md): failure modes, current score

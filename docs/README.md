@@ -35,6 +35,7 @@ or that the dependable-winner goal has been achieved.
 - BellUp timing, pauses and Triangle: [Series Playbook](project-skills/ibswingtrader-scanner/references/SERIES_PLAYBOOK.md),
   [latest impulse-level study](investigations/2026-10/investigation-2026-10-16-pause-impulse-level.md).
 - ReversalHook: [EMA / fresh H4 recovery contract](project-skills/ibswingtrader-scanner/references/BOLLINGER_EMA_AND_RECOVERY.md),
+  [completed impulse admission guard](project-skills/ibswingtrader-scanner/references/REVERSAL_IMPULSE_COMPLETION.md),
   [active watch lifecycle](project-skills/ibswingtrader-scanner/references/REVERSAL_WATCH_LIFECYCLE.md),
   [manual edge and history](project-skills/ibswingtrader-scanner/references/REVERSAL_EDGE.md),
   [recognition study](investigations/2026-10/research-2026-10-10-reversal-recognition.md),

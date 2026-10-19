@@ -50,6 +50,12 @@ reasons, including phases and NotReady details. A recognition Match on Other
 is not trade admission. Reversal episodes can remain recognized above mid;
 do not reintroduce a latest-price-below-mid gate during evaluation.
 
+Since 2026-10-19, saved reasons can include ReversalImpulseCompleted and
+NotReady=H4-impulse-already-completed-in-D1-episode. Preserve their scan-time
+touch and confirmation evidence in Other and datasets; do not reinterpret the
+recognized pattern as an admitted trade or rerun old outcomes with later bars.
+See scanner [completion rules](../ibswingtrader-scanner/references/REVERSAL_IMPULSE_COMPLETION.md).
+
 For current metric definitions and denominators, use the success criteria above.
 
 **Current category contract (since 2026-09-23):** candidate groups are

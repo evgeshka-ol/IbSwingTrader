@@ -65,6 +65,12 @@ or improving provisional current H4 histogram. It still requires:
 - the pre-bend close below its mid;
 - the existing upper-target-completion and price-invalidation checks.
 
+Since 2026-10-19, upper completion includes earlier closed highs against their
+own bars' bands and persists for that episode. A completed H4 seeded inside
+the current D1 episode also blocks D1 readmission. Fresh MACD support cannot
+revive these completed impulses; see
+[completion rules](REVERSAL_IMPULSE_COMPLETION.md).
+
 Historical strict-hook seeds without a discrete bend retain their existing
 local continuation checks. The new momentum observation does not itself
 establish any seed. Preparing/unrecognized patterns do not become admitted
