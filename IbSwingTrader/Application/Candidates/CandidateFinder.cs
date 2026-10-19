@@ -109,6 +109,7 @@ namespace IbSwingTrader.Application.Candidates
                 }
                 await _reversalWatchList.SaveAsync();
             }
+            await RetryPendingReversalDropsAsync(preparedForRun, contractResolveTimeout, contractResolveMaxAttempts);
             var watchBatches = _reversalWatchList.GetScanBatches()
                 .Select(x => (x.Preset, SavedStocks: (List<StockInfo>?)x.Stocks)).ToList();
             var liveBatches = _scannerPresets.GetAll()
@@ -294,7 +295,7 @@ namespace IbSwingTrader.Application.Candidates
                         }
                         else if (batch.SavedStocks == null && _reversalWatchList.CapturesCode(preset.ScanCode))
                             await ObserveReversalDropBelowDailyMid(stock, preset, contract,
-                                dailyCandles, contractResolveTimeout, contractResolveMaxAttempts);
+                                dailyCandles, contractResolveTimeout, contractResolveMaxAttempts, sightingAt: receivedAt);
 
                         if (TryRejectByRecentDailyPriceFloor(stock.Ticker,
                             dailyCandles ?? BuildDailyBars(candles), out var recentPriceFloorReason))
@@ -362,6 +363,7 @@ namespace IbSwingTrader.Application.Candidates
                 }
 
                 stageMetric.Stop();
+                await RetryPendingReversalDropsAsync(preparedForRun, contractResolveTimeout, contractResolveMaxAttempts);
             }
 
             var liveContextTickers = allScannedWishListContexts.Where(x => !x.IsWatchOnly)
@@ -389,6 +391,7 @@ namespace IbSwingTrader.Application.Candidates
             rankingStageMetric.Input = contextsForOutput.Count;
             foreach (var ctx in contextsForOutput)
             {
+                await RetryPendingReversalDropsAsync(preparedForRun, contractResolveTimeout, contractResolveMaxAttempts);
                 rankingStageMetric.Processed++;
                 rankingStageMetric.UniqueTickers.Add(ctx.Stock.Ticker);
                 var rankingTickerMetric = performance.BeginTicker("Ranking/Rebuild", ctx.Stock.Ticker);
@@ -520,6 +523,8 @@ namespace IbSwingTrader.Application.Candidates
 
             foreach (var ctx in contextsForOutput.Where(x => _reversalWatchList.IsActive(x.Stock.Ticker)))
                 InspectReversalWatchHistory(ctx.Stock.Ticker, ctx.DailyCandles, ctx.Candles, MarketTime.Now());
+            await RetryPendingReversalDropsAsync(preparedForRun, contractResolveTimeout, contractResolveMaxAttempts);
+            _logger.Info($"Reversal watch pending checks retained: {_reversalWatchList.PendingChecks.Count}");
             _reversalWatchList.RecordResults(finalCandidates.Concat(sameDayCandidates), MarketTime.Now());
             await _reversalWatchList.SaveAsync();
             return new CandidateSearchResult
@@ -540,17 +545,61 @@ namespace IbSwingTrader.Application.Candidates
                 GetCompletedCandlesForRun(h4 ?? [], Timeframe.H4, now));
         }
 
+        private (bool Open, DateTime RetryAt, DateTime ExpiresAt)? ResolveWatchRetryWindow(DateTime now)
+        {
+            var timezone = _marketSettingsProvider.Get().Timezone;
+            var schedule = _localMarketScheduleProvider.BuildSchedule(
+                MarketTime.ToUtc(now.Date, timezone), MarketTime.ToUtc(now.Date.AddDays(14), timezone));
+            return ReversalWatchPendingChecks.Window(schedule, now, timezone);
+        }
+
+        private async Task RetryPendingReversalDropsAsync(Dictionary<string, PreparedTickerData> prepared,
+            TimeSpan contractTimeout, int contractAttempts)
+        {
+            if (!_reversalWatchList.Enabled) return;
+            var now = MarketTime.Now();
+            var window = ResolveWatchRetryWindow(now);
+            if (window?.Open != true) return;
+            foreach (var pending in _reversalWatchList.PendingChecks.Due(now))
+            {
+                if (!_reversalWatchList.CapturesCode(pending.ScanCode) || !_preFilter.Pass(pending.ToStock()))
+                {
+                    await _reversalWatchList.PendingChecks.CompleteAsync(pending.Ticker);
+                    continue;
+                }
+                if (!_reversalWatchList.PendingChecks.BeginAttempt(pending.Ticker, MarketTime.Now())) continue;
+                prepared.TryGetValue(pending.Ticker, out var data);
+                var daily = data?.Daily;
+                var h4 = data?.H4;
+                if (daily == null) _historicalCache.TryLoad(pending.Ticker, Timeframe.D1, out daily);
+                if (h4 == null) _historicalCache.TryLoad(pending.Ticker, Timeframe.H4, out h4);
+                InspectReversalWatchHistory(pending.Ticker, daily, h4, MarketTime.Now());
+                _logger.Info($"Reversal watch deferred check retry: {pending.Ticker}, SeenAt={pending.SeenAt:O}");
+                await ObserveReversalDropBelowDailyMid(pending.ToStock(),
+                    new PresetScanCode(pending.ScanCode, pending.Description), data?.Contract, daily,
+                    contractTimeout, contractAttempts, pending.ValidateExisting, pending);
+            }
+        }
+
         private async Task<bool> ObserveReversalDropBelowDailyMid(
             StockInfo stock, PresetScanCode preset, Contract? contract, List<Candle>? dailyCandles,
-            TimeSpan contractTimeout, int contractAttempts, bool validateExisting = false)
+            TimeSpan contractTimeout, int contractAttempts, bool validateExisting = false,
+            PendingReversalWatchCheck? pending = null, DateTime? sightingAt = null)
         {
+            var now = MarketTime.Now();
+            var seenAt = pending?.SeenAt ?? sightingAt ?? now;
+            var window = ResolveWatchRetryWindow(now);
             var qualified = false;
             var validatedExisting = false;
-            try
+            string? deferredReason = null;
+            // Keep persistence outside the data-request catch. A failed queue/ledger write is fatal.
+            async Task CheckAsync()
             {
-                var now = MarketTime.Now();
-                // Native completed D1 only: neither an unfinished daily bar nor an
-                // H4-derived proxy establishes the watch enrollment threshold.
+                if (window == null || !window.Value.Open)
+                {
+                    deferredReason = "outside-trading-session";
+                    return;
+                }
                 var completed = BellUpEntryTiming.GetCompletedCandles(
                     dailyCandles ?? [], Timeframe.D1, now).OrderBy(x => x.Time).ToList();
                 var schedule = _localMarketScheduleProvider.BuildSchedule(
@@ -561,14 +610,14 @@ namespace IbSwingTrader.Application.Candidates
                     .Where(x => x.AddHours(16) <= now).DefaultIfEmpty(DateTime.MinValue).Max();
                 if (completed.Count < 20 || completed[^1].Time.Date != expectedDate)
                 {
-                    _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=missing-or-stale-closed-D1");
-                    return false;
+                    deferredReason = "missing-or-stale-closed-D1";
+                    return;
                 }
                 var mid = CalculateRunFeature(completed, completed.Count).DailyBollingerMidBand;
                 if (mid <= 0m)
                 {
                     _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=invalid-D1-mid");
-                    return false;
+                    return;
                 }
                 contract ??= await _contractResolver.ResolveStockAsync(stock.Ticker, contractTimeout, contractAttempts);
                 var requestedAt = MarketTime.Now();
@@ -577,8 +626,8 @@ namespace IbSwingTrader.Application.Candidates
                 var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
                 if (quote == null)
                 {
-                    _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=no-fresh-M5-price");
-                    return false;
+                    deferredReason = "no-fresh-M5-price";
+                    return;
                 }
                 _logger.Info($"Reversal watch enrollment check: {stock.Ticker}, " +
                     $"Price={_fmt.Generic(quote.Price)}, PriceSource={quote.Source}, PriceTime={quote.PriceTime:O}, " +
@@ -591,19 +640,34 @@ namespace IbSwingTrader.Application.Candidates
                     _reversalWatchList.ValidateExisting(stock.Ticker, quote.ObservedAt, quote.Price, mid);
                     validatedExisting = true;
                 }
-                if (validateExisting)
-                {
-                    qualified = _reversalWatchList.IsActive(stock.Ticker);
-                }
-                else
-                    qualified = _reversalWatchList.ObserveDrop(stock, preset, quote.ObservedAt, quote.Price, mid);
+                qualified = validateExisting ? _reversalWatchList.IsActive(stock.Ticker)
+                    : _reversalWatchList.ObserveDrop(stock, preset, quote.ObservedAt, quote.Price, mid,
+                        seenAt);
             }
+            try { await CheckAsync(); }
             catch (Exception ex) when (ex is not TwsConnectionException)
             {
-                _logger.Info($"Reversal watch enrollment skipped: {stock.Ticker}, Reason=price-check-failed. {ex.Message}");
+                deferredReason = "price-check-failed";
+                _logger.Info($"Reversal watch price check failed: {stock.Ticker}. {ex.Message}");
             }
-            // Persistence errors must propagate rather than masquerade as missing price.
-            // Checkpoint qualified observations without waiting for ranking/publication.
+            if (deferredReason != null && window.HasValue)
+            {
+                var expiry = pending?.ExpiresAt ?? window.Value.ExpiresAt;
+                var nextBucket = ReversalWatchPendingChecks.NextBucket(MarketTime.Now());
+                var retryAt = window.Value.RetryAt > nextBucket ? window.Value.RetryAt : nextBucket;
+                if (retryAt < expiry)
+                {
+                    await _reversalWatchList.PendingChecks.DeferAsync(stock, preset, seenAt,
+                        retryAt, expiry, validateExisting, deferredReason);
+                    _logger.Info($"Reversal watch enrollment deferred: {stock.Ticker}, Reason={deferredReason}, " +
+                        $"RetryNotBefore={retryAt:O}, ExpiresAt={expiry:O}");
+                }
+                else await _reversalWatchList.PendingChecks.CompleteAsync(stock.Ticker);
+            }
+            else if (deferredReason == null)
+                await _reversalWatchList.PendingChecks.CompleteAsync(stock.Ticker);
+            else
+                _logger.Warning($"Reversal watch could not schedule retry: {stock.Ticker}, Reason=no-configured-trading-session");
             if (qualified || validatedExisting)
                 await _reversalWatchList.SaveAsync();
             return qualified;

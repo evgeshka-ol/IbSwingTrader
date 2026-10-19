@@ -13,6 +13,8 @@ namespace IbSwingTrader.Application.WishList
         private readonly Dictionary<string, WishListItem> _newSignals = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, ReversalWatchState> _states = new(StringComparer.OrdinalIgnoreCase);
         private string StatePath => Path.ChangeExtension(paths.GetWishListFile(), ".lifecycle.json");
+        public ReversalWatchPendingChecks PendingChecks { get; } =
+            new(Path.ChangeExtension(paths.GetWishListFile(), ".pending.json"));
         public decimal MinimumBelowDailyMidPct => Settings.MinimumBelowDailyMidPct;
         private ReversalWatchState State(string ticker)
         {
@@ -37,6 +39,7 @@ namespace IbSwingTrader.Application.WishList
             _states.Clear();
             if (!Enabled)
                 return;
+            await PendingChecks.LoadAsync(now);
             if (MinimumBelowDailyMidPct <= 0m || MinimumBelowDailyMidPct >= 100m)
                 throw new InvalidOperationException("ReversalWatchList.MinimumBelowDailyMidPct must be between 0 and 100 (exclusive).");
             if (File.Exists(StatePath))
@@ -99,7 +102,7 @@ namespace IbSwingTrader.Application.WishList
         }
 
         public bool ObserveDrop(StockInfo stock, PresetScanCode preset, DateTime now,
-            decimal currentPrice, decimal closedDailyMid)
+            decimal currentPrice, decimal closedDailyMid, DateTime? dropSeenAt = null)
         {
             if (!CapturesCode(preset.ScanCode) || !IsDeepBelowMid(currentPrice, closedDailyMid))
                 return false;
@@ -124,7 +127,9 @@ namespace IbSwingTrader.Application.WishList
             if (!state.CycleStartedAt.HasValue)
                 state.StartCycle(now);
             item.FirstSeen ??= now;
-            item.LastDropSeenAt = now;
+            var seenAt = dropSeenAt ?? now;
+            if (!item.LastDropSeenAt.HasValue || seenAt > item.LastDropSeenAt.Value)
+                item.LastDropSeenAt = seenAt;
             item.WatchCurrency = stock.Currency;
             item.WatchStockType = stock.StockType ?? string.Empty;
             item.Scan = new ScanInfo
