@@ -5517,7 +5517,7 @@ namespace IbSwingTrader.Application.Candidates
                 .Where(x => x.AddHours(4) <= now).DefaultIfEmpty(DateTime.MinValue).Max();
             var h4Momentum = ReversalH4Momentum.Evaluate(
                 GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now), quote, now, expectedLastClosedH4);
-            (bool Recognized, string Timeframe, string Phase, string Reason) Analyze(List<Candle> source, Timeframe timeframe)
+            ReversalFrameEpisode Analyze(List<Candle> source, Timeframe timeframe)
             {
                 var completed = GetCompletedCandlesForRun(source, timeframe, now);
                 var series = new RecentFeatureSeries();
@@ -5534,24 +5534,33 @@ namespace IbSwingTrader.Application.Candidates
                     series.DailyMacdSignalSeries.Add(daily ? features.DailyMACDSignal : features.MACDSignal);
                     series.DailyMacdHistogramSeries.Add(daily ? features.DailyMACDHistogram : features.MACDHistogram);
                 }
+                var high = completed.TakeLast(series.DailyCloseSeries.Count).Select(x => x.High).ToList();
                 var phase = ReversalHookPhaseClassifier.Analyze(series.DailyCloseSeries,
                     series.DailyBbMidBandSeries, series.DailyMacdHistogramSeries, currentPrice,
-                    series.DailyBbUpperBandSeries, h4Momentum);
-                var recognized = IsReversalHookPattern(series, out var recognition);
+                    series.DailyBbUpperBandSeries, h4Momentum, high);
+                var recognized = IsReversalHookPattern(series, out var signalAge, out var recognition);
+                var age = phase.BarsSinceBend >= 0 ? phase.BarsSinceBend : signalAge;
+                var touch = recognized ? ReversalImpulseCompletion.FindTouch(series.DailyCloseSeries,
+                    series.DailyBbMidBandSeries, series.DailyBbUpperBandSeries, age, high) : null;
+                DateTime? signalBar = recognized && age >= 0 && age < completed.Count
+                    ? completed[completed.Count - 1 - age].Time : null;
+                var label = timeframe == Timeframe.D1 ? "D1" : "H4";
+                var completion = touch.HasValue && signalBar.HasValue
+                    ? ReversalImpulseCompletion.FromClosedBar(label, signalBar.Value,
+                        completed[completed.Count - 1 - touch.Value.BarsAgo].Time, touch.Value, now) : null;
                 var name = phase.Name;
                 // The historical strict hook can precede the discrete middle-band bend.
                 if (recognized && phase.BarsSinceBend < 0 && series.DailyCloseSeries.Count >= 3)
                 {
                     var recovering = series.DailyCloseSeries[^1] > series.DailyCloseSeries.TakeLast(3).Min() &&
                                      series.DailyMacdHistogramSeries[^1] >= series.DailyMacdHistogramSeries[^2];
-                    name = currentPrice >= series.DailyBbUpperBandSeries[^1] ? "Completed"
+                    name = touch.HasValue || currentPrice >= series.DailyBbUpperBandSeries[^1] ? "Completed"
                         : !recovering ? "Stalled"
                         : currentPrice >= series.DailyBbMidBandSeries[^1] ? "MidCrossed" : "Active";
                 }
                 var bendTime = phase.BarsSinceBend >= 0
                     ? completed[completed.Count - 1 - phase.BarsSinceBend].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
                 var lastTime = completed.Count > 0 ? completed[^1].Time.ToString("yyyy-MM-dd HH:mm:ss") : "none";
-                var label = timeframe == Timeframe.D1 ? "D1" : "H4";
                 var candleContext = string.Empty;
                 if (_getCandidatesSettingsProvider.Get().Finder.ReversalSupplementalDiagnostics)
                 {
@@ -5567,12 +5576,14 @@ namespace IbSwingTrader.Application.Candidates
                         _logger.Info($"Reversal lower-band/body diagnosis failed: {ctx.Stock.Ticker}. {ex.Message}");
                     }
                 }
-                return (recognized, label, name,
+                return new ReversalFrameEpisode(recognized, label, name,
                     $"{label}={name}, Recognized={recognized}, {phase.Diagnostics}, BendBar={bendTime}, " +
-                    $"LastCompletedBar={lastTime}, {recognition}{candleContext}");
+                    $"LastCompletedBar={lastTime}, {recognition}{candleContext}" +
+                    (completion == null ? string.Empty : $"; {completion.Diagnostics}"), signalBar, completion);
             }
             var daily = Analyze(ctx.DailyCandles ?? BuildDailyBars(ctx.Candles), Timeframe.D1);
             var h4 = Analyze(ctx.Candles, Timeframe.H4);
+            daily = ReversalImpulseCompletion.ApplyH4Completion(daily, h4);
             var both = new[] { daily, h4 };
             var selected = both.OrderByDescending(x => x.Recognized && (x.Phase is "Active" or "MidCrossed"))
                 .ThenByDescending(x => x.Recognized)
@@ -6149,6 +6160,11 @@ namespace IbSwingTrader.Application.Candidates
 
         private static bool IsReversalHookPattern(
             RecentFeatureSeries recentSeries,
+            out string diagnostics) => IsReversalHookPattern(recentSeries, out _, out diagnostics);
+
+        private static bool IsReversalHookPattern(
+            RecentFeatureSeries recentSeries,
+            out int barsSinceSignal,
             out string diagnostics)
         {
             var upper = recentSeries.DailyBbUpperBandSeries;
@@ -6156,7 +6172,7 @@ namespace IbSwingTrader.Application.Candidates
             var lower = recentSeries.DailyBbLowerBandSeries;
             var macdHistogram = recentSeries.DailyMacdHistogramSeries;
 
-            var result = BellPatternClassifier.IsReversalHookPattern(
+            var result = BellPatternClassifier.TryFindReversalHookSignal(
                 recentSeries.DailyCloseSeries,
                 upper,
                 mid,
@@ -6165,6 +6181,7 @@ namespace IbSwingTrader.Application.Candidates
                 recentSeries.DailyMacdLineSeries,
                 recentSeries.DailyMacdSignalSeries,
                 macdHistogram,
+                out barsSinceSignal,
                 out diagnostics);
 
             if (upper.Count >= 6 && mid.Count >= 6 && lower.Count >= 6 && macdHistogram.Count >= 4)

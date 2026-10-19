@@ -25,7 +25,8 @@ namespace IbSwingTrader.Application.Candidates
             IReadOnlyList<decimal> histogram,
             decimal snapshotPrice,
             IReadOnlyList<decimal>? upper = null,
-            ReversalRecoveryMomentum? recoveryMomentum = null)
+            ReversalRecoveryMomentum? recoveryMomentum = null,
+            IReadOnlyList<decimal>? high = null)
         {
             var count = Math.Min(close.Count, Math.Min(mid.Count, histogram.Count));
             if (count < 7)
@@ -71,16 +72,18 @@ namespace IbSwingTrader.Application.Candidates
             }
             if (bend >= 0 && currentPrice <= prices[bend - 1])
                 recovering = false;
-            var upperReached = upper is { Count: > 0 } && upper[^1] > bands[^1] &&
-                               Math.Max(currentPrice, prices[^1]) >= upper[^1];
+            var age = bend < 0 ? -1 : count - 1 - bend;
+            var touch = upper == null ? null : ReversalImpulseCompletion.FindTouch(prices, bands, upper, age, high);
+            var upperReached = touch.HasValue || (upper is { Count: > 0 } && upper[^1] > bands[^1] &&
+                               Math.Max(currentPrice, prices[^1]) >= upper[^1]);
             var name = bend < 0 ? (recovering ? "Preparing" : "None")
                 : upperReached ? "Completed"
                 : !recovering ? "Stalled"
                 : Math.Max(currentPrice, prices[^1]) >= bands[^1] ? "MidCrossed" : "Active";
-            var age = bend < 0 ? -1 : count - 1 - bend;
             return new(name, age,
                 $"BarsSinceBend={age}, Recovering={recovering}, Mid={bands[^1]}, " +
-                $"CompletedClose={prices[^1]}, SnapshotPrice={snapshotPrice}" +
+                $"CompletedClose={prices[^1]}, SnapshotPrice={snapshotPrice}, UpperReached={upperReached}" +
+                (touch.HasValue ? $", {touch.Value.Diagnostics}" : string.Empty) +
                 (recoveryMomentum.HasValue ? $", {recoveryMomentum.Value.Diagnostics}" : string.Empty));
         }
     }

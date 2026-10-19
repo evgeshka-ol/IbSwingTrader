@@ -65,4 +65,70 @@ var native = FeatureEngine.CalculateNativeReversalHistory([.. closed,
 Check(point.Histogram == native[^1].MACDHistogram && point.PreviousHistogram == native[^2].MACDHistogram,
     "Close-only provisional MACD agrees exactly with the existing MACD engine");
 Check(before.SequenceEqual(closed.Select(x => (x.Time, x.Close))), "Do not mutate cache candles");
+
+// A completed upper-band excursion belongs to the episode even after price and bands move away.
+var high = price.ToList();
+high[4] = upper[4];
+var finished = ReversalHookPhaseClassifier.Analyze(price, mid, hist, 8.11m, upper, recoveringH4, high);
+Check(finished.Name == "Completed", "A wick touching upper at the seed consumes the impulse");
+Check(finished.Diagnostics.Contains("UpperTouchSource=CompletedHigh") &&
+    finished.Diagnostics.Contains("UpperTouchBarsAgo=5"), "Record touch evidence rather than just a Completed label");
+var expandedUpper = upper.ToList();
+expandedUpper[^1] = 20m;
+Check(ReversalHookPhaseClassifier.Analyze(price, mid, hist, 8.11m, expandedUpper, recoveringH4, high).Name == "Completed",
+    "Later band expansion and a fresh recovering quote cannot revive the completed episode");
+var beforeSeedHigh = price.ToList();
+beforeSeedHigh[3] = upper[3] + 1m;
+Check(ReversalHookPhaseClassifier.Analyze(price, mid, hist, 8.11m, upper, recoveringH4, beforeSeedHigh).Name == "MidCrossed",
+    "A touch before this signal does not consume it");
+var closeTouchUpper = upper.ToList();
+closeTouchUpper[4] = 8.20m;
+Check(ReversalHookPhaseClassifier.Analyze(price, mid, hist, 8.11m, closeTouchUpper, recoveringH4).Name == "Completed",
+    "Saved close alone proves an earlier touch when highs are unavailable");
+var invalidUpper = upper.ToList();
+invalidUpper[4] = mid[4];
+Check(ReversalHookPhaseClassifier.Analyze(price, mid, hist, 8.11m, invalidUpper, recoveringH4, high).Name == "MidCrossed",
+    "Invalid zero-width band cannot establish completion");
+Check(ReversalImpulseCompletion.FindTouch(price, mid, upper, 0, high) == null,
+    "A new signal boundary excludes the preceding impulse's touch");
+
+List<decimal> newPrice = [.. price, 7.6m, 7.4m, 7.2m, 7.5m];
+List<decimal> newMid = [.. mid, 7.85m, 7.75m, 7.65m, 7.60m];
+List<decimal> newHist = [.. hist, -0.07m, -0.08m, -0.09m, -0.06m];
+List<decimal> newHigh = [.. high, 7.6m, 7.4m, 7.2m, 7.5m];
+var newUpper = newMid.Select(x => x + 1m).ToList();
+var independent = ReversalHookPhaseClassifier.Analyze(newPrice, newMid, newHist, 7.5m, newUpper, null, newHigh);
+Check(independent.BarsSinceBend == 0 && independent.Name == "Active",
+    "A newly recognized independent bend is not permanently blacklisted by an earlier completion");
+
+var friday = new DateTime(2026, 10, 16);
+var touch = new ReversalUpperTouch(1, 13.80m, 13.51m, "CompletedHigh");
+Check(ReversalImpulseCompletion.FindTouch([13.77m], [13.22m], [13.87m], 0, [13.80m]) == null,
+    "CRGY Daily near-touch is not rounded into a true upper-band touch");
+Check(ReversalImpulseCompletion.FromClosedBar("H4", friday.AddHours(8), friday.AddHours(12),
+    touch, friday.AddHours(15)) == null, "A forming H4 cannot establish historical completion");
+var crgyH4 = ReversalImpulseCompletion.FromClosedBar("H4", friday.AddHours(8), friday.AddHours(12),
+    touch, friday.AddHours(16))!;
+Check(crgyH4.ConfirmedAt == friday.AddHours(16) && crgyH4.High == 13.80m && crgyH4.Upper == 13.51m,
+    "CRGY-like closed H4 retains native completion time and exact band evidence");
+Check(ReversalImpulseCompletion.FromClosedBar("H4", friday.AddHours(8), friday.AddHours(12),
+    touch with { Source = "LivePrice" }, friday.AddHours(16)) == null,
+    "A live or provisional touch is not a completed historical H4 event");
+var dailyEpisode = new ReversalFrameEpisode(true, "D1", "MidCrossed", "saved D1 episode", friday, null);
+var h4Episode = new ReversalFrameEpisode(true, "H4", "Completed", "saved H4 episode", friday.AddHours(8), crgyH4);
+var consumedDaily = ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode);
+Check(consumedDaily.Phase == "Completed" && consumedDaily.Recognized,
+    "Same-episode H4 completion blocks D1 readmission while retaining recognition");
+Check(consumedDaily.Reason.Contains("H4-impulse-already-completed-in-D1-episode") &&
+    consumedDaily.Reason.Contains("ConfirmedAt=2026-10-16T16:00:00"), "Admission reason carries auditable H4 evidence");
+Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode with { SignalBar = friday.AddDays(3) }, h4Episode).Phase == "MidCrossed",
+    "An older completed H4 does not veto a newer Daily episode");
+Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode with
+    { Completion = crgyH4 with { SignalBar = friday.AddDays(-1) } }).Phase == "MidCrossed",
+    "A pre-existing H4 episode is not silently treated as contained in the new Daily one");
+Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode with
+    { Phase = "Active", Completion = null, SignalBar = friday.AddDays(3).AddHours(4) }).Phase == "MidCrossed",
+    "A new independent H4 signal remains eligible for normal admission");
+Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode with { Recognized = false }).Phase == "MidCrossed",
+    "Unrecognized H4 evidence cannot veto a Daily episode");
 Console.WriteLine($"Passed {checks} reversal recovery checks.");

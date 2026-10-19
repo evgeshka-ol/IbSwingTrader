@@ -13,6 +13,7 @@
     <Compile Include="../../IbSwingTrader/Application/Candidates/BellPatternClassifier.cs" Link="BellPatternClassifier.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/BollingerFigureAnalyzer.cs" Link="BollingerFigureAnalyzer.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalHookPhaseClassifier.cs" Link="ReversalHookPhaseClassifier.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalImpulseCompletion.cs" Link="ReversalImpulseCompletion.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/BellUpEntryTiming.cs" Link="BellUpEntryTiming.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
