@@ -24,6 +24,40 @@ Pattern readiness and entry checks follow enrollment; a fallen name need
 not already be ready to trade to be watched. A current direct watch attempt
 does not renew the 30-calendar-day loser-sighting retention window.
 
+### Deferred enrollment checks (2026-10-19)
+
+Before a configured trading session, do not request an inevitably empty live
+M5 window for watch enrollment. Persist the loser observation separately in
+`wishlist.pending.json`. Missing fresh M5, stale/missing closed D1 and transient
+price-check failures also defer the observation. Pending rows are not active
+wishlist entries and do not authorize a trade, bypass depth, or bypass consumed
+hook memory. Invalid D1 mid and definitive depth/cycle results are not retried.
+
+Use the local trading calendar, configured sessions and market timezone. Before
+opening, the earliest retry is five minutes after the next session starts;
+while open, defer to the next five-minute bucket. Expire the observation at
+the end of that eligible trading day's configured sessions. Retries preserve
+the original loser-sighting time, including LastDropSeenAt on enrollment;
+they do not turn each quote refresh into a new loser sighting. Legacy-row
+validation retains its original non-renewal behavior.
+
+Retry at scan start, after universe batches, between ranking contexts and before
+final persistence, whenever the next attempt is due and a session is open.
+There is no sleep/wait for the market. A run ending before opening leaves the
+queue for another run in the eligible day; it does not create a scheduler job.
+At most three deferred attempts per ticker per run, across distinct M5 buckets;
+retries after long requests wait for the next bucket after request completion.
+Recheck enabled loser codes, basic instrument eligibility, completed history,
+fresh M5, depth and lifecycle before enrollment. Missing history for retry uses
+prepared/native cached D1/H4 and remains pending rather than launching a new
+full historical scan. Each actual price retry uses a bounded fresh M5 request.
+
+Atomic pending-file writes happen outside the data-request exception handler;
+persistence failures abort. Malformed pending JSON also aborts rather than
+silently discarding observations. Definitive results remove the pending record.
+Keep this sidecar alongside the wishlist when moving watch data. Retired ledger
+entries are not themselves a pending enrollment universe.
+
 ## Consume the cycle when a hook occurs
 
 Use the existing shared ReversalHook classifier on completed native D1/H4
@@ -104,6 +138,7 @@ User-run commands:
 
 ```text
 dotnet run --project tests/ReversalWatchListChecks
+dotnet run --project tests/ReversalWatchRetryChecks
 dotnet run --project tests/ScannerTimingChecks
 ```
 

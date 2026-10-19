@@ -55,6 +55,7 @@ in older notes are historical. Follow current skills and success criteria.
 
 ### 2026-10
 
+- [Empty wishlist and CRGY/FWDI reversal admission](investigations/2026-10/investigation-2026-10-19-empty-watch-and-reversal-admission.md)
 - [VSTM: recognized Daily hook rejected as Stalled](investigations/2026-10/investigation-2026-10-17-vstm-stalled-reclaim.md)
 
 - [ReversalHook: частичная H4 и ограничения распознавания](investigations/2026-10/research-2026-10-10-reversal-recognition.md)

@@ -60,6 +60,10 @@ freshness and migration rules in
   deep-drop excursion is needed to re-enroll. Watch-only contexts cannot
   publish BellUp. See REVERSAL_WATCH_LIFECYCLE.md; current live sources retain
   their normal pipeline. This watch rule is not a global hook admission gate.
+- Before-session/missing-price loser observations persist in wishlist.pending.json
+  and retry at in-run checkpoints after the configured session opens. They remain
+  outside active wishlist.csv until fresh-price/depth/lifecycle checks pass.
+  See REVERSAL_WATCH_LIFECYCLE.md for expiry, bounded retries and persistence.
 - Reversal M5 bridges are bounded; history/features are reused within a run.
   Final publication pricing remains fresh. Recognized reversals may use the
   configured IB live-quote fallback; delayed/frozen data cannot authorize entry.
