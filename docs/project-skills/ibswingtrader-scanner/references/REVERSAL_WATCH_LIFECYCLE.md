@@ -50,7 +50,18 @@ retries after long requests wait for the next bucket after request completion.
 Recheck enabled loser codes, basic instrument eligibility, completed history,
 fresh M5, depth and lifecycle before enrollment. Missing history for retry uses
 prepared/native cached D1/H4 and remains pending rather than launching a new
-full historical scan. Each actual price retry uses a bounded fresh M5 request.
+full historical scan. Since 2026-10-20, if prepared/cache D1 still lacks the
+expected closed date, a retry can refresh only the last four calendar days
+plus the expected date from native D1, merge it with existing history and
+inspect newly available Daily hooks before enrollment. This also covers a
+scan crossing the regular close. Each actual price retry uses bounded fresh M5.
+
+The D1 request endpoint must preserve its actual market time at/after16:00;
+rounding it down to the same date's midnight made IB omit the just-closed day
+and blocked every aftermarket watch check on October19. Before16:00 keep the
+previous midnight request boundary to avoid caching a forming Daily candle.
+The native completion filter remains mandatory. Both initial loads and deferred
+tail refreshes use this corrected range contract; no stale-D1 fallback is allowed.
 
 Atomic pending-file writes happen outside the data-request exception handler;
 persistence failures abort. Malformed pending JSON also aborts rather than

@@ -29,6 +29,20 @@ evidence and does not replace Win, profit or confidence calibration.
 
 ## Main rule
 
+Since 2026-10-21, AmplitudePct uses EntryPrice for rows with EntryTime.
+Unentered diagnostics (including Other) use the minimum when MinTime is
+strictly before MaxTime and that minimum is below ScanPrice, otherwise
+ScanPrice. The legacy negative max-first
+marker remains only for unentered rows. Equal/missing extrema times use
+ScanPrice without inferring intrabar order. See EVALUATION_RULES.md for
+formulas, historical refresh and the distinction from trade-bounded MFE.
+
+Since 2026-10-20 scheduled morning scans chain evaluate-candidates after a
+successful scan, using the wrapper's local morning window. Evaluation still
+defers current exchange-day scans until the next day; it is not an intraday
+evaluation-policy change. CandidateDisplayRank reconstruction follows saved
+confidence descending within each scan/group, matching candidate CSV/console.
+
 Since 2026-10-17, new scanner BollingerModel is
 ema20-sma-seed20-popstd20-v1. Preserve it through evaluations/datasets;
 legacy blanks must not be relabeled with the current model. A saved recovery

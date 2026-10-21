@@ -71,6 +71,18 @@ the current D1 episode also blocks D1 readmission. Fresh MACD support cannot
 revive these completed impulses; see
 [completion rules](REVERSAL_IMPULSE_COMPLETION.md).
 
+Since 2026-10-21, an established bend can also resume **below** mid when a
+fresh price strictly exceeds all last three completed closes and the pre-bend
+close, fresh provisional H4 momentum is improving, and the latest closed
+episode histogram is at least its bend value. The pre-bend close must be
+below its own mid. This addresses a closed after-hours pause masking a fresh
+early recovery (RCUS, 2026-10-20). Diagnostics record FreshEarlyRecovery.
+The six-bar seed search, price invalidation, upper completion and separate
+higher-timeframe admission gates still apply. The phase correction alone
+does not bypass RCUS's saved D1 Down support rejection. Since 2026-10-21 a
+separate [H4-led support path](REVERSAL_H4_DAILY_SUPPORT.md) can address that
+gate with completed and fresh H4 recovery evidence; D1 Collapse still vetoes.
+
 Historical strict-hook seeds without a discrete bend retain their existing
 local continuation checks. The new momentum observation does not itself
 establish any seed. Preparing/unrecognized patterns do not become admitted

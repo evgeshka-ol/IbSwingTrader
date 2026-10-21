@@ -55,6 +55,47 @@ outcomes. Minimum: a dependable rank-1 winner, with 1.5% profit sufficient.
 
 ## Recent project behavior
 
+### Amplitude reference (2026-10-21)
+
+User-selected AmplitudePct formula, rounded to two decimals:
+
+- Entered (`EntryTime` present): `(MaxPrice / EntryPrice - 1) * 100`.
+  Do not infer participation from nonzero plan prices. Extrema order does
+  not invert this entry-relative result.
+- Unentered diagnostics, including Other: if `MinTime < MaxTime` and the
+  minimum is below ScanPrice, use
+  `(MaxPrice / MinPrice - 1) * 100`. If `MaxTime < MinTime`, use ScanPrice
+  as reference and retain the existing negative max-first order marker.
+  The marker describes path order, not a realized loss.
+  A minimum above ScanPrice is not a drop below the scan reference: use
+  ScanPrice even when that minimum occurs before the maximum (SMCI's
+  2026-10-20 morning row: scan31.53, min31.54, max37.66 gives19.44%).
+- Equal or missing extrema times cannot prove min-first: use ScanPrice,
+  with no order-based sign inversion. This does not reconstruct the first
+  post-scan tick; extrema timestamps are the available path proxy.
+- Prefer saved positive MaxPrice/MinPrice. If absent, reconstruct from
+  ScanPrice and MaxPct/MinPct. Missing minimum falls back to ScanPrice;
+  missing maximum or invalid required reference yields zero.
+
+This changes the reference, not the saved observation horizon: MaxPrice is
+still the scan-wide observed maximum, which may precede entry or follow a
+stop/exit. Amplitude is not actual profit or a claim of executable upside.
+Use TradeMfePct and TargetProgressPct for conservative post-entry,
+stop-bounded excursion. Win/Loss/Open/NoEntry and BrierLoss are unchanged.
+
+BuildRow, incremental merge, full rebuild and historical row normalization
+use the same helper. `refresh-evaluation-feedback` also recalculates
+AmplitudePct and GroupLabel for every saved report row, without date or
+amplitude filtering, new broker requests or outcome replay. It preserves
+row ordering. This permits historical refresh from existing price/time
+fields; dated investigations retain their original values and definitions.
+
+Prepared user-run regression command:
+
+```text
+dotnet run --project tests/EvaluationAmplitudeChecks
+```
+
 ### Entry and target in one M5 (2026-10-14)
 
 The first entry bar can contain a target high that occurred before entry,
@@ -87,7 +128,8 @@ can undercount a genuine intraminute winner, rather than inventing one.
 Replay candles are in-memory bounds, never replacement market bars in cache.
 Post-entry excursion metrics and the final correction loop use this same
 replay, so the original parent high cannot silently restore a rejected Win.
-Scan-wide amplitude retains its original market-history calculation.
+Scan-wide extrema retain their market-history calculation; AmplitudePct
+uses the reference policy above.
 
 Logs: `Entry-bar M1 window`, `Entry-bar sequence replay/unresolved/unavailable`,
 `Entry-bar target not confirmed`, `Entry-minute exit/stop order unresolved`.

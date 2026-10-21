@@ -87,6 +87,7 @@ in older notes are historical. Follow current skills and success criteria.
 These describe changes at their recorded date. Later behavior is maintained
 in project references, including subsequent overrides.
 
+- [Report order, morning evaluation and closed Daily history](implementation/implementation-2026-10-20-report-order-morning-evaluation-daily-history.md)
 - [EMA Bollinger and fresh H4 support for recognized reversals](implementation/implementation-2026-10-17-bollinger-ema-h4-recovery.md)
 - [Reversal-only watch cycles and meaningful Daily-mid drops](implementation/implementation-2026-10-17-reversal-watch-lifecycle.md)
 - [BellUp late-entry ranking penalty](implementation/BELLUP_LATE_ENTRY_PENALTY_2026-09-14.md)

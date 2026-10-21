@@ -209,9 +209,11 @@ limit; fallback prices are checked again after plan construction. This quote
 fallback applies only to already recognized ReversalHook publication, not
 BellUp, diagnostic universe probing, or historical bar reconstruction.
 
-No historical-price fallback authorizes a ReversalHook entry. Higher-timeframe
-Down/Collapse veto and the existing support conditions remain unchanged.
-Thus recognition improvements do not guarantee admission for every rebound.
+No historical-price fallback authorizes a ReversalHook entry. Since
+2026-10-21 an active H4 recovery may bypass D1 Down/lagging Daily MACD through
+the bounded [H4-led support rule](REVERSAL_H4_DAILY_SUPPORT.md). D1 Collapse
+still vetoes; D1 hooks retain their Weekly checks. Recognition alone does
+not guarantee admission.
 
 ### Supplemental closed/partial H4 diagnostics (2026-10-10)
 

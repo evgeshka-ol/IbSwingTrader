@@ -40,6 +40,10 @@ freshness and migration rules in
   even with sufficient D1 history and after price crosses mid. Recognition
   and readiness are distinct. Publication needs an Active/MidCrossed episode,
   higher-timeframe support and a fresh valid plan. Other has no active plan.
+  Since 2026-10-21, H4-led recovery can supply support below D1 mid despite
+  D1 Down/negative MACD when completed H4 bands and momentum plus fresh H4
+  momentum turn up. D1 Collapse remains a veto. See
+  [H4-led admission](references/REVERSAL_H4_DAILY_SUPPORT.md) for exact gates.
 - A completed-bar upper-band touch consumes the current reversal impulse even
   after a pullback. A completed H4 seeded inside the current D1 episode blocks
   readmission through that D1 signal. See REVERSAL_IMPULSE_COMPLETION.md for
@@ -57,7 +61,11 @@ freshness and migration rules in
 - DiagnosticsEstimatedHitRatePct uses experimental BellUp model
   bellup-win-ridge-2026-10-05-v1 after publication pricing; scope is
   WinGivenEntryAndResolution. Console uses Win~. Unsupported plans show n/a.
-  This estimate is not the current ranking sort key or a guaranteed win.
+  Since 2026-10-20 report order is ScanTime descending, then group
+  BellUp/ReversalHook/Other, then saved confidence descending inside the group
+  (missing last). DisplayRank, console and dataset rank reconstruction follow
+  that order; internal quality scores remain tie-breakers, not recalibrated
+  probabilities or a guaranteed win.
 - Wishlist exists only to catch ReversalHook after a meaningful drop. Loser
   enrollment/renewal requires fresh M5 at least 5% below the last completed
   native D1 mid. A recognized completed-bar hook consumes the cycle; a new
@@ -145,6 +153,8 @@ performance. See [success criteria](../../guides/success-criteria.md).
   enrollment, hook retirement, new-drop rearm, persistence and legacy migration.
 - [Completed reversal impulses](references/REVERSAL_IMPULSE_COMPLETION.md):
   historical upper-band touches and same-episode H4/D1 admission guards.
+- [H4-led admission](references/REVERSAL_H4_DAILY_SUPPORT.md): alternative
+  support below the Daily mid without waiting for Daily MACD positivity.
 - [Settings map](references/SETTINGS_MAP.md): watch retention/enrollment,
   data guards, pricing fallback, output fields and execution controls.
 - [Scanner model](references/SCANNER_MODEL.md): failure modes, current score
