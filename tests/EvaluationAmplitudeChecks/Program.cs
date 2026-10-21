@@ -1,24 +1,57 @@
 using IbSwingTrader.Application.Dataset;
 
-var max = new DateTime(2026, 9, 10, 6, 50, 0);
-var min = new DateTime(2026, 9, 11, 4, 5, 0);
-var cases = new (string Name, decimal Value, DateTime? Min, DateTime? Max, decimal Expected)[]
+var first = new DateTime(2026, 10, 20, 8, 35, 0);
+var second = first.AddHours(2);
+var checks = 0;
+void Check(string name, decimal expected, decimal scan, decimal entry, DateTime? entered,
+    decimal? high, decimal? highPct, DateTime? highTime,
+    decimal? low, decimal? lowPct, DateTime? lowTime)
 {
-    ("SMR max before min is negative", 11.68m, min, max, -11.68m),
-    ("Min before max", 11.68m, max, min, 11.68m),
-    ("Repeated normalization is idempotent", -11.68m, min, max, -11.68m),
-    ("Extrema order replaces stale sign", -11.68m, max, min, 11.68m),
-    ("Same bar has unknown order", 11.68m, min, min, 11.68m),
-    ("Missing minimum time", 11.68m, null, max, 11.68m),
-    ("Missing maximum time", 11.68m, min, null, 11.68m),
-    ("Both timestamps missing", 11.68m, null, null, 11.68m),
-    ("Zero range", 0m, min, max, 0m),
-    ("Same-day decline", 5m, max.AddHours(1), max, -5m)
-};
-foreach (var test in cases)
-{
-    var actual = EvaluationAmplitude.WithDirection(test.Value, test.Min, test.Max);
-    if (actual != test.Expected)
-        throw new InvalidOperationException($"{test.Name}: expected {test.Expected}, got {actual}");
+    checks++;
+    var actual = EvaluationAmplitude.Calculate(scan, entry, entered,
+        high, highPct, highTime, low, lowPct, lowTime);
+    if (actual != expected)
+        throw new InvalidOperationException($"{name}: expected {expected}, got {actual}");
 }
-Console.WriteLine($"Passed {cases.Length} signed-amplitude checks.");
+
+Check("Entered uses entry instead of low or scan", 20m, 110m, 100m, first,
+    120m, null, second, 80m, null, first);
+Check("Entered max-first does not invert entry-relative growth", 20m, 110m, 100m, first,
+    120m, null, first, 80m, null, second);
+Check("Entered maximum below entry remains negative", -5m, 110m, 100m, first,
+    95m, null, second, 80m, null, first);
+Check("Nonzero plan without EntryTime is not participation", 50m, 100m, 90m, null,
+    120m, null, second, 80m, null, first);
+Check("Other min-first uses low", 50m, 100m, 0m, null,
+    120m, null, second, 80m, null, first);
+Check("Other max-first uses scan and retains negative order marker", -20m, 100m, 0m, null,
+    120m, null, first, 80m, null, second);
+Check("RCUS retains min-first diagnostic range", 37.22m, 22.26m, 0m, null,
+    24.70m, 10.96m, second, 18m, -19.14m, first);
+Check("SMCI minimum above scan is not a pullback below scan", 19.44m, 31.53m, 0m, null,
+    37.66m, null, second, 31.54m, null, first);
+Check("Same M5 cannot prove min-first", 20m, 100m, 0m, null,
+    120m, null, first, 80m, null, first);
+Check("Missing minimum time uses scan", 20m, 100m, 0m, null,
+    120m, null, second, 80m, null, null);
+Check("Missing maximum time uses scan", 20m, 100m, 0m, null,
+    120m, null, null, 80m, null, first);
+Check("Historical percentages reconstruct missing prices", 50m, 100m, 0m, null,
+    null, 20m, second, null, -20m, first);
+Check("Historical percentage maximum with entry reference", 20m, 110m, 100m, first,
+    null, 120m / 110m * 100m - 100m, second, null, -20m, first);
+Check("Exact prices take priority over rounded percentages", 37.22m, 22.26m, 0m, null,
+    24.70m, 11m, second, 18m, -19m, first);
+Check("Missing low cannot manufacture min-first range", 20m, 100m, 0m, null,
+    120m, null, second, null, null, first);
+Check("Missing maximum yields zero", 0m, 100m, 0m, null,
+    null, null, second, 80m, null, first);
+Check("Invalid entered reference yields zero", 0m, 100m, 0m, first,
+    120m, null, second, 80m, null, first);
+Check("Zero scan still permits valid entry-relative calculation", 20m, 0m, 100m, first,
+    120m, null, second, 80m, null, first);
+Check("Invalid scan cannot support max-first calculation", 0m, 0m, 0m, null,
+    120m, null, first, 80m, null, second);
+Check("Zero range", 0m, 100m, 100m, first,
+    100m, null, second, 100m, null, first);
+Console.WriteLine($"Passed {checks} evaluation amplitude checks.");

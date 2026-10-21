@@ -46,4 +46,27 @@ Check(table.Rows.Single(x => x["Ticker"] == "H4")["DisplayRank"] == "1" &&
 Check(table.Rows.Single(x => x["Ticker"] == "DAILY")["PatternVerdictReason"] ==
     "BellUp confirmed on Daily; Recent boost", "Preserve concise scanner rejection reason");
 
+var olderBell = Candidate("OLDER_BELL", "BellUp", "BellUp confirmed on H4", 999m);
+olderBell.Scan.ScanTime = scan.AddDays(-1);
+olderBell.Diagnostics!.EstimatedHitRatePct = 100m;
+var low = Candidate("LOW", "BellUp", "BellUp confirmed on H4", 999m);
+low.Diagnostics!.EstimatedHitRatePct = 9m;
+var high = Candidate("HIGH", "BellUp", "BellUp confirmed on H4", 1m);
+high.Diagnostics!.EstimatedHitRatePct = 80m;
+var missing = Candidate("MISSING", "BellUp", "BellUp confirmed on H4", 500m);
+missing.Diagnostics!.EstimatedHitRatePct = null;
+var zero = Candidate("ZERO", "BellUp", "BellUp confirmed on H4", 0m);
+zero.Diagnostics!.EstimatedHitRatePct = 0m;
+var otherHigh = Candidate("OTHER_HIGH", "Other", "", 5000m);
+otherHigh.Diagnostics!.EstimatedHitRatePct = 99m;
+var ordered = builder.Build([Candidate("REV", "ReversalHook", "", 0m)],
+    [olderBell, low, missing, high, zero, otherHigh], new HashSet<string>());
+Check(ordered.Rows.Select(x => x["Ticker"]).SequenceEqual(
+    new[] { "HIGH", "LOW", "ZERO", "MISSING", "REV", "OTHER_HIGH", "OLDER_BELL" }),
+    "ScanTime descending, then group, then numeric confidence descending with missing last");
+Check(ordered.Rows.Single(x => x["Ticker"] == "HIGH")["DisplayRank"] == "1" &&
+    ordered.Rows.Single(x => x["Ticker"] == "LOW")["DisplayRank"] == "2", "DisplayRank follows confidence within the scan/group");
+Check(CandidateDisplayOrder.Order([olderBell, low, high]).Select(x => x.Ticker)
+    .SequenceEqual(new[] { "HIGH", "LOW", "OLDER_BELL" }), "Console and dataset rank reconstruction use the same order");
+
 Console.WriteLine($"Passed {assertions} candidate CSV checks.");

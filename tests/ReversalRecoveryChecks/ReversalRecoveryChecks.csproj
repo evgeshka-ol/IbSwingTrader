@@ -14,6 +14,7 @@
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalHookPhaseClassifier.cs" Link="ReversalHookPhaseClassifier.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalImpulseCompletion.cs" Link="ReversalImpulseCompletion.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4Momentum.cs" Link="ReversalH4Momentum.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4DailySupport.cs" Link="ReversalH4DailySupport.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ExecutionPriceSnapshot.cs" Link="ExecutionPriceSnapshot.cs" />
     <Compile Include="../../IbSwingTrader/Application/Dataset/FeatureEngine.cs" Link="FeatureEngine.cs" />
     <Compile Include="../../IbSwingTrader/Abstractions/Dataset/IFeatureEngine.cs" Link="IFeatureEngine.cs" />

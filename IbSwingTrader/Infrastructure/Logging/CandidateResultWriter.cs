@@ -23,6 +23,16 @@ namespace IbSwingTrader.Infrastructure.Logging
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
             ArgumentNullException.ThrowIfNull(result);
 
+            var marketSettings = _marketSettingsProvider.Get();
+            var scanTime = GetMarketNow(marketSettings.Timezone);
+            // One publication run has one ScanTime. Set it before sorting, so per-ticker
+            // detection times cannot outrank confidence in the console's current-run groups.
+            foreach (var candidate in result.Candidates.Concat(result.SameDayCandidates))
+            {
+                candidate.Scan.ScanTime = scanTime;
+                candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+            }
+
             var candidates = OrderPrimaryForDisplay(result.Candidates);
             var admittedCandidates = candidates.Where(x => !CandidateGroups.IsOther(x)).ToList();
             var sameDayCandidates = OrderSameDayForDisplay(result.SameDayCandidates);
@@ -36,9 +46,6 @@ namespace IbSwingTrader.Infrastructure.Logging
             var folder = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(folder))
                 Directory.CreateDirectory(folder);
-
-            var marketSettings = _marketSettingsProvider.Get();
-            var scanTime = GetMarketNow(marketSettings.Timezone);
 
             if (admittedSameDayCandidates.Count > 0)
                 WriteConsoleSectionHeader("BellUp");
@@ -189,24 +196,10 @@ namespace IbSwingTrader.Infrastructure.Logging
         }
 
         private static List<CandidateDetails> OrderPrimaryForDisplay(IEnumerable<CandidateDetails> candidates)
-        {
-            return candidates
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.Score)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+            => CandidateDisplayOrder.Order(candidates).ToList();
 
         private static List<CandidateDetails> OrderSameDayForDisplay(IEnumerable<CandidateDetails> candidates)
-        {
-            return candidates
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.Score)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+            => CandidateDisplayOrder.Order(candidates).ToList();
 
         private CandidateSummaryItem BuildSummaryItem(CandidateDetails candidate, bool includeSameDayMarker)
         {

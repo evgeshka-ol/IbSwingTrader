@@ -131,4 +131,69 @@ Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode with
     "A new independent H4 signal remains eligible for normal admission");
 Check(ReversalImpulseCompletion.ApplyH4Completion(dailyEpisode, h4Episode with { Recognized = false }).Phase == "MidCrossed",
     "Unrecognized H4 evidence cannot veto a Daily episode");
+// RCUS-like early H4 recovery after three declining closed after-hours prices.
+List<decimal> earlyPrice = [22m, 21.9m, 21.8m, 21.6m, 22.21m, 22.15m, 22.14m];
+List<decimal> earlyMid = [23.6m, 23.4m, 23.2m, 23m, 22.9m, 22.8m, 22.72m];
+List<decimal> earlyHist = [-.1m, -.12m, -.13m, -.14m, -.04m, -.02m, -.001m];
+var earlyUpper = earlyMid.Select(x => x + 1m).ToList();
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 22.26m,
+    earlyUpper).Name == "Stalled", "Closed declining prices alone do not prove resumed recovery");
+var early = ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 22.26m,
+    earlyUpper, recoveringH4);
+Check(early.Name == "Active" && early.BarsSinceBend == 2 &&
+    early.Diagnostics.Contains("FreshEarlyRecovery=True"),
+    "Fresh improving H4 above recent closes can resume the recognized episode below mid");
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 22.26m,
+    earlyUpper, weakH4).Name == "Stalled", "Early recovery requires improving fresh H4 momentum");
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 22.21m,
+    earlyUpper, recoveringH4).Name == "Stalled", "A quote merely touching the recent high is insufficient");
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 21.59m,
+    earlyUpper, recoveringH4).Name == "Stalled", "Fresh momentum cannot override episode price invalidation");
+var fadedHist = earlyHist.ToList();
+fadedHist[^1] = -.05m;
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, fadedHist, 22.26m,
+    earlyUpper, recoveringH4).Name == "Stalled", "Early recovery retains closed episode momentum support");
+var earlyHigh = earlyPrice.ToList();
+earlyHigh[4] = earlyUpper[4];
+Check(ReversalHookPhaseClassifier.Analyze(earlyPrice, earlyMid, earlyHist, 22.26m,
+    earlyUpper, recoveringH4, earlyHigh).Name == "Completed", "Early recovery cannot revive an upper-completed impulse");
+// A weak Daily MACD need not veto a recovery already established on native H4.
+List<decimal> rcusMid = [22.85072698m, 22.78399108m, 22.72265859m];
+List<decimal> rcusLower = [21.1m, 21.13064223m, 21.22809483m];
+List<decimal> rcusHistogram = [-.0196862955m, -.00130027987m];
+bool H4Support(string phase = "Active", string regime = "Neutral", bool recognized = true,
+    decimal priceNow = 22.26m, ReversalRecoveryMomentum? fresh = null,
+    IReadOnlyList<decimal>? mids = null, IReadOnlyList<decimal>? lowers = null,
+    IReadOnlyList<decimal>? histograms = null, IReadOnlyList<decimal>? dailyMids = null)
+    => ReversalH4DailySupport.Allows(recognized, phase, regime, priceNow,
+        dailyMids ?? [24.15007708m], mids ?? rcusMid, lowers ?? rcusLower,
+        histograms ?? rcusHistogram, fresh ?? recoveringH4, out _);
+Check(H4Support(), "RCUS-like active H4 can support a below-Daily-mid recovery with negative histogram");
+Check(ReversalH4DailySupport.Allows(true, "MidCrossed", "Neutral", 36.59m,
+    [37.99503527m], [34.549m, 34.321m, 34.144m],
+    [29.34237913m, 29.37939521m, 29.64370227m],
+    [.01200394m, .10450058m], recoveringH4, out var h4SupportReason),
+    "SMCI-like evening H4 recovery does not wait for Daily MACD positivity");
+Check(h4SupportReason.Contains("H4-led recovery") && h4SupportReason.Contains("FreshPriceProvisionalH4"),
+    "Alternative support retains evidence and a distinct auditable admission reason");
+Check(!H4Support(regime: "Collapse"), "Daily Collapse is still a hard veto");
+Check(!H4Support(recognized: false), "Fresh momentum cannot manufacture hook recognition");
+foreach (var inactivePhase in new[] { "None", "Preparing", "Stalled", "Completed", "TargetReached" })
+    Check(!H4Support(phase: inactivePhase), $"{inactivePhase} cannot use H4-led admission");
+Check(!H4Support(fresh: weakH4), "A weakening fresh H4 cannot bypass Daily support");
+Check(!H4Support(fresh: new(false, "RecoveryMomentum(Source=Unavailable, Reason=stale-or-misaligned-price)")),
+    "Unavailable or stale quote momentum cannot bypass Daily support");
+Check(!H4Support(histograms: [-.001m, -.002m]), "Closed H4 deterioration blocks alternative support");
+Check(!H4Support(histograms: [-.001m, -.001m]), "Flat closed momentum does not prove recovery");
+Check(!H4Support(lowers: [21.2m, 21.1m]), "A falling lower band is not an upward H4 hook");
+Check(!H4Support(lowers: [21.1m, 21.1m]), "A flat lower band is insufficient");
+Check(!H4Support(mids: [23m, 22.9m, 22.7m]), "Renewed downward mid acceleration blocks support");
+Check(H4Support(mids: [22.9m, 22.8m, 22.8m]), "A flattened mid can support a rising lower-band hook");
+Check(H4Support(mids: [22.730m, 22.725m, 22.722m], lowers: [21.101m, 21.102m],
+    histograms: [-.0012m, -.0011m]), "Sub-cent band and histogram improvements retain full precision");
+Check(!H4Support(priceNow: 24m), "Insufficient remaining room to Daily mid cannot use alternative support");
+Check(H4Support(priceNow: 100m, dailyMids: [102m]), "The existing two-percent room boundary remains inclusive");
+Check(!H4Support(priceNow: 24.2m), "Above-Daily-mid setups use the ordinary support path");
+Check(!H4Support(mids: []), "Missing native H4 geometry cannot be replaced with fresh price alone");
+Check(!H4Support(dailyMids: [0m]), "Invalid Daily reference cannot authorize support");
 Console.WriteLine($"Passed {checks} reversal recovery checks.");

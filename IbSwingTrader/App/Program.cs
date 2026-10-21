@@ -17,6 +17,7 @@
         logger.Info("  get-candidates");
         logger.Info("  evaluate-candidates");
         logger.Info("  refresh-evaluation-feedback");
+        logger.Info("  sort-candidates");
         logger.Info("  normalize-reports");
         logger.Info("  clean-up");
         logger.Info("  get-scanner-params");
@@ -56,6 +57,11 @@
             await services
                 .GetRequiredService<IEvaluationDatasetBuilder>()
                 .RefreshFeedbackAsync();
+            break;
+
+        case "sort-candidates":
+            await services.GetRequiredService<ICandidateFileService>()
+                .NormalizeAsync(services.GetRequiredService<IAgentPathService>().GetCandidatesFile());
             break;
 
         case "normalize-reports":

@@ -107,6 +107,13 @@ try
     row = Row();
     row.DiagnosticsEstimatedHitRatePct = null;
     row.DiagnosticsEstimatedHitRateModel = row.DiagnosticsEstimatedHitRateScope = "";
+    row.ScanPrice = 11m;
+    row.MaxPrice = 12m;
+    row.MinPrice = 8m;
+    row.MaxTime = start.AddHours(1);
+    row.MinTime = start;
+    row.DaysToMaxUpFromScan = 0;
+    row.AmplitudePct = 50m;
     await csv.WriteAsync(output, [row]);
     var candidate = new CandidateDetails
     {
@@ -136,15 +143,23 @@ try
     var refreshed = (await csv.ReadAsync(output)).Single();
     Check(refreshed.BrierLoss == 0.039601m && refreshed.Outcome == "Win" && refreshed.EntryTime == row.EntryTime,
         "Offline feedback refresh works without source evaluations and preserves the saved trade");
+    Check(refreshed.AmplitudePct == 20m && refreshed.GroupLabel == "TradeCandidate",
+        "Historical refresh rebases entered amplitude from minimum to entry and updates its label");
+    await builder.RefreshFeedbackAsync();
+    Check((await csv.ReadAsync(output)).Single().AmplitudePct == 20m,
+        "Repeated historical refresh does not compound amplitude rebasing");
     await builder.RunAsync();
     var backfilled = (await csv.ReadAsync(output)).Single();
     Check(backfilled.DiagnosticsEstimatedHitRatePct == 80.1m && backfilled.BrierLoss == 0.039601m,
         "Backfill saved forecast without rerunning evaluation");
+    Check(backfilled.AmplitudePct == 20m, "Full rebuild retains the entry-based amplitude");
     Check(backfilled.ScanTime == start.AddMinutes(-5) && backfilled.TargetProgressPct == 100m,
         "Historical forecast survives time/amplitude filters and derives Win progress");
     await builder.UpsertAsync([]);
     Check((await csv.ReadAsync(output)).Single().BrierLoss == 0.039601m,
         "Incremental merge also retains historical confidence feedback");
+    Check((await csv.ReadAsync(output)).Single().AmplitudePct == 20m,
+        "Incremental merge retains the entry-based amplitude");
 }
 finally { directory.Delete(true); }
 Console.WriteLine($"Passed {checks} evaluation confidence checks.");

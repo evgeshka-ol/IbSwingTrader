@@ -34,8 +34,10 @@ namespace IbSwingTrader.Infrastructure.Logging
             {
                 Headers = headers,
                 Rows = rows
-                    .OrderBy(x => GetCandidateGroupOrder(x.GetValueOrDefault("CandidateGroup")))
-                    .ThenByDescending(x => ParseDateTime(x.GetValueOrDefault("ScanTime")))
+                    .OrderByDescending(x => ParseDateTime(x.GetValueOrDefault("ScanTime")))
+                    .ThenBy(x => GetCandidateGroupOrder(x.GetValueOrDefault("CandidateGroup")))
+                    .ThenByDescending(x => decimal.TryParse(x.GetValueOrDefault("DiagnosticsEstimatedHitRatePct"),
+                        NumberStyles.Number, CultureInfo.InvariantCulture, out var probability) ? probability : decimal.MinValue)
                     .ThenBy(x => ParseInt(x.GetValueOrDefault("DisplayRank")) ?? int.MaxValue)
                     .ThenBy(x => x.GetValueOrDefault("Ticker"), StringComparer.OrdinalIgnoreCase)
                     .ToList()
@@ -187,18 +189,7 @@ namespace IbSwingTrader.Infrastructure.Logging
         }
 
         private static List<CandidateDetails> OrderForDisplay(IEnumerable<CandidateDetails> candidates)
-        {
-            return candidates
-                .OrderByDescending(x => CandidateGroups.IsOther(x) &&
-                    (x.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase) ||
-                     x.PatternVerdictReason.StartsWith("DailyTransitionBellUp detected on Daily", StringComparison.OrdinalIgnoreCase) ||
-                     x.PatternVerdictReason.StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase)))
-                .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.Score)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+            => CandidateDisplayOrder.Order(candidates).ToList();
 
         private void Add(Dictionary<string, string> row, List<string> headers, string name, string value)
         {

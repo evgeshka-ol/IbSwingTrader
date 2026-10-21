@@ -62,6 +62,14 @@ namespace IbSwingTrader.Application.Candidates
                              prices[^1] > prices.TakeLast(3).Min();
             }
             var currentPrice = snapshotPrice > 0m ? snapshotPrice : prices[^1];
+            // An established early reversal can resume BELOW mid. A closed after-hours
+            // pause must not hide a fresh break above the recent closes with improving H4 momentum.
+            var freshEarlyRecovery = bend >= 0 && snapshotPrice > 0m &&
+                currentPrice < bands[^1] && recoveryMomentum?.IsImproving == true &&
+                prices[bend - 1] < bands[bend - 1] && currentPrice > prices[bend - 1] &&
+                currentPrice > prices.TakeLast(3).Max() && momentum[^1] >= momentum[bend];
+            if (freshEarlyRecovery)
+                recovering = true;
             if (bend >= 0 && snapshotPrice > 0m && currentPrice > bands[^1] &&
                 prices[bend - 1] < bands[bend - 1] && currentPrice > prices[bend - 1] &&
                 (momentum[^1] >= momentum[bend] || recoveryMomentum?.IsImproving == true))
@@ -83,6 +91,7 @@ namespace IbSwingTrader.Application.Candidates
             return new(name, age,
                 $"BarsSinceBend={age}, Recovering={recovering}, Mid={bands[^1]}, " +
                 $"CompletedClose={prices[^1]}, SnapshotPrice={snapshotPrice}, UpperReached={upperReached}" +
+                $", FreshEarlyRecovery={freshEarlyRecovery}" +
                 (touch.HasValue ? $", {touch.Value.Diagnostics}" : string.Empty) +
                 (recoveryMomentum.HasValue ? $", {recoveryMomentum.Value.Diagnostics}" : string.Empty));
         }

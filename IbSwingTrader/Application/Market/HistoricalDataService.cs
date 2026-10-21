@@ -506,7 +506,8 @@ namespace IbSwingTrader.Application.Market
                 Timeframe.M15 => RoundDown(value, TimeSpan.FromMinutes(15)),
                 Timeframe.M5 => RoundDown(value, TimeSpan.FromMinutes(5)),
                 Timeframe.M1 => RoundDown(value, TimeSpan.FromMinutes(1)),
-                Timeframe.D1 => value.Date,
+                // Before close exclude forming D1; after close midnight would hide today's completed bar at IB.
+                Timeframe.D1 => value.TimeOfDay >= TimeSpan.FromHours(16) ? value : value.Date,
                 Timeframe.W1 => StartOfWeek(value.Date),
                 _ => value
             };

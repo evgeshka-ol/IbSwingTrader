@@ -45,8 +45,10 @@ namespace IbSwingTrader.Application.Dataset
             var candidateIndex = candidates.ToDictionary(x => BuildCandidateKey(x.Candidate),
                 x => x, StringComparer.OrdinalIgnoreCase);
             RefreshFeedback(rows, candidateIndex, await LoadFeedbackEvaluationsAsync([]));
+            foreach (var row in rows)
+                NormalizeAmplitude(row);
             await _evaluationDatasetCsvService.WriteAsync(path, rows);
-            _logger.Info($"Evaluation confidence feedback saved: {path}; rows={rows.Count}. No report date filters applied.");
+            _logger.Info($"Evaluation confidence feedback saved: {path}; rows={rows.Count}. Amplitude and group labels refreshed. No report date filters applied.");
         }
 
         public async Task<List<EvaluationDatasetRow>> ReadCurrentAsync()
@@ -495,12 +497,12 @@ namespace IbSwingTrader.Application.Dataset
 
             var positivePotentialPct = Round(Math.Max(maxPct ?? 0m, 0m));
             var negativePotentialPct = Round(Math.Abs(Math.Min(minPct ?? 0m, 0m)));
-            var amplitudePct = Round(CalculateAmplitudePct(
+            var amplitudePct = EvaluationAmplitude.Calculate(
                 evaluation.ScanPrice,
-                maxPct,
-                maxTime,
-                minPct,
-                minTime));
+                evaluation.EntryPrice,
+                evaluation.EntryTime,
+                maxPrice, maxPct, maxTime,
+                minPrice, minPct, minTime);
 
             var daysToMaxUpFromScan = DiffDays(evaluation.ScanTime, maxTime);
             var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, maxTime);
@@ -704,7 +706,10 @@ namespace IbSwingTrader.Application.Dataset
 
         private static void NormalizeAmplitude(EvaluationDatasetRow row)
         {
-            row.AmplitudePct = EvaluationAmplitude.WithDirection(row.AmplitudePct, row.MinTime, row.MaxTime);
+            row.AmplitudePct = EvaluationAmplitude.Calculate(
+                row.ScanPrice, row.EntryPrice, row.EntryTime,
+                row.MaxPrice, row.MaxPct, row.MaxTime,
+                row.MinPrice, row.MinPct, row.MinTime);
             row.GroupLabel = Classify(row.AmplitudePct, row.DaysToMaxUpFromScan);
         }
 
@@ -1415,14 +1420,7 @@ namespace IbSwingTrader.Application.Dataset
         }
 
         private static List<CandidateDetails> OrderForDisplay(IEnumerable<CandidateDetails> candidates)
-        {
-            return candidates
-                .OrderByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
-                .ThenByDescending(x => x.TradePlan.ProfitPercent)
-                .ThenByDescending(x => x.Score.Score)
-                .ThenBy(x => x.Ticker, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+            => CandidateDisplayOrder.Order(candidates).ToList();
 
         private static int CompareNullableInt(int? left, int? right)
         {
@@ -1475,26 +1473,6 @@ namespace IbSwingTrader.Application.Dataset
                 return 0m;
 
             return ((to - from) / from) * 100m;
-        }
-
-        private static decimal CalculateAmplitudePct(
-            decimal scanPrice,
-            decimal? maxPct,
-            DateTime? maxTime,
-            decimal? minPct,
-            DateTime? minTime)
-        {
-            if (scanPrice <= 0m)
-                return 0m;
-
-            var highPrice = maxPct.HasValue
-                ? scanPrice * (1m + maxPct.Value / 100m)
-                : scanPrice;
-            var lowPrice = minPct.HasValue
-                ? scanPrice * (1m + minPct.Value / 100m)
-                : scanPrice;
-
-            return EvaluationAmplitude.WithDirection(Round(CalcPct(lowPrice, highPrice)), minTime, maxTime);
         }
 
         private static string GetMinDepthGroup(decimal? minPct)
