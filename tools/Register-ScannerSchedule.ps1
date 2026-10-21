@@ -9,7 +9,10 @@ param(
     [string] $TaskName = 'IbSwingTrader-GetCandidates',
     [string] $LogDirectory = (Join-Path $PSScriptRoot '..\Data\logs\scheduled-scans'),
     [System.DayOfWeek[]] $DaysOfWeek = @(),
-    [switch] $WakeComputer
+    [switch] $WakeComputer,
+    [ValidatePattern('^([01][0-9]|2[0-3]):[0-5][0-9]$')] [string] $MorningStartLocal = '06:00',
+    [ValidatePattern('^([01][0-9]|2[0-3]):[0-5][0-9]$')] [string] $MorningEndLocal = '12:00',
+    [switch] $SkipMorningEvaluation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +20,9 @@ $scannerExe = (Resolve-Path -LiteralPath $ExePath).ProviderPath
 $scannerDirectory = Split-Path -Parent $scannerExe
 $runnerPath = Join-Path $PSScriptRoot 'Invoke-ScheduledScanner.ps1'
 $resolvedLogs = [System.IO.Path]::GetFullPath($LogDirectory)
+$morningStart = [TimeSpan]::ParseExact($MorningStartLocal, 'hh\:mm', [Globalization.CultureInfo]::InvariantCulture)
+$morningEnd = [TimeSpan]::ParseExact($MorningEndLocal, 'hh\:mm', [Globalization.CultureInfo]::InvariantCulture)
+if ($morningStart -ge $morningEnd) { throw 'MorningStartLocal must be earlier than MorningEndLocal.' }
 if (-not (Test-Path -LiteralPath $scannerExe -PathType Leaf)) { throw "Executable not found: $scannerExe" }
 if (-not (Test-Path -LiteralPath (Join-Path $scannerDirectory 'agentsettings.json') -PathType Leaf)) {
     throw "agentsettings.json must be beside the executable: $scannerDirectory"
@@ -41,6 +47,8 @@ $triggers = @(foreach ($timeText in ($AtLocal | Select-Object -Unique)) {
 
 $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $actionArguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -ExePath "{1}" -LogDirectory "{2}"' -f $runnerPath, $scannerExe, $resolvedLogs
+$actionArguments += ' -MorningStartLocal "{0}" -MorningEndLocal "{1}"' -f $MorningStartLocal, $MorningEndLocal
+if ($SkipMorningEvaluation) { $actionArguments += ' -SkipMorningEvaluation' }
 $action = New-ScheduledTaskAction -Execute $powershellExe -Argument $actionArguments -WorkingDirectory $scannerDirectory
 $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
 $settingsParameters = @{
@@ -51,7 +59,7 @@ $settingsParameters = @{
     WakeToRun = $WakeComputer.IsPresent
 }
 $settings = New-ScheduledTaskSettingsSet @settingsParameters
-$description = 'Runs get-candidates at local Windows times {0}. TWS/Gateway must already be running in the signed-in user session.' -f ($AtLocal -join ', ')
+$description = 'Runs get-candidates at local Windows times {0}; evaluates after a successful morning invocation ({1}-{2}, disabled={3}). TWS/Gateway must already be running.' -f ($AtLocal -join ', '), $MorningStartLocal, $MorningEndLocal, $SkipMorningEvaluation.IsPresent
 
 if ($PSCmdlet.ShouldProcess($TaskName, "Register/update scanner schedule at local Windows times: $($AtLocal -join ', ')")) {
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers -Principal $principal -Settings $settings -Description $description -Force | Out-Null
