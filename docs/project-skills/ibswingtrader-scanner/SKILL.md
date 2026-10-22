@@ -33,6 +33,10 @@ freshness and migration rules in
 
 - Output groups are BellUp, ReversalHook and Other. The former Daily-mid
   Runaway/Reversal split is historical; it does not determine current groups.
+  Since2026-10-22 PatternVerdictReason starts with PostBellUpRecovery,
+  DeepDeclineRecovery or Unclassified for analyzed reversals, with no extra
+  columns. This describes origin inside those groups; it does not alter
+  admission or signal phase. See [origin rules](references/REVERSAL_ORIGINS.md).
 - BellUp has precedence. A recognized BellUp rejected by timing/readiness
   remains Other, rather than being relabeled ReversalHook. Triangle is a
   diagnostic fallback and must not hide BellUp confirmed on another timeframe.

@@ -29,6 +29,14 @@ evidence and does not replace Win, profit or confidence calibration.
 
 ## Main rule
 
+Since2026-10-22 preserve the saved origin prefix in PatternVerdictReason
+through evaluation and dataset/feedback refresh. PostBellUpRecovery,
+DeepDeclineRecovery and Unclassified precede the original ReversalHook
+verdict; they add no CSV columns and do not change groups/outcomes. Interpret
+the verdict after stripping that known prefix, but retain its original text.
+Historical unprefixed rows remain unchanged; do not classify from future cache.
+See scanner [origin rules](../ibswingtrader-scanner/references/REVERSAL_ORIGINS.md).
+
 Since 2026-10-21, AmplitudePct uses EntryPrice for rows with EntryTime.
 Unentered diagnostics (including Other) use the minimum when MinTime is
 strictly before MaxTime and that minimum is below ScanPrice, otherwise

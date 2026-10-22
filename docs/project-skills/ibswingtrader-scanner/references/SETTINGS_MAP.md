@@ -14,6 +14,19 @@ metadata, fresh H4 momentum and watch-ledger migration.
 
 ## High-impact scanner settings
 
+### TWS universe price and volume filters
+
+Since 2026-10-21, TwsStockUniverseProvider sends no `priceBelow` filter for
+any live scan code. The former hardcoded $300 ceiling excluded expensive
+tickers such as DELL before local pattern recognition. The lower `priceAbove`
+filter remains $5 and `avgVolumeAbove` remains 1,000,000. RowsPerScan and
+the TWS preset ranking still limit coverage; removing the ceiling does not
+guarantee that any particular ticker is returned.
+
+These request filters live in TwsStockUniverseProvider.cs. The legacy
+`Market.MaxPrice` field is not consumed by this scanner provider or another
+active price ceiling; it must not be interpreted as the live scan limit.
+
 ### `GetCandidates.PreFilter`
 
 Use for universe hygiene and garbage filtering.
