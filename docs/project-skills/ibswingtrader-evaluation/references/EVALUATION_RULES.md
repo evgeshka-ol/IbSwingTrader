@@ -55,6 +55,26 @@ outcomes. Minimum: a dependable rank-1 winner, with 1.5% profit sufficient.
 
 ## Recent project behavior
 
+### Report group ordering (2026-10-22)
+
+BuildEvaluationDataset.SortColumns in agentsettings.json explicitly orders
+CandidateGroup as BellUp, ReversalHook, Other, followed by legacy Runaway and
+Reversal. The former configuration only listed the legacy names, so modern
+groups fell back to alphabetical BellUp/Other/ReversalHook despite correct
+class defaults. ScanTime descending remains the first key. Subtype prefixes
+are not group keys. Other's existing BellUp-diagnostic/amplitude ordering and
+CandidateDisplayRank ordering within admitted groups remain unchanged.
+
+To reorder an existing evaluation dataset without broker calls, metric or
+outcome recalculation, row deduplication or report filters, run:
+
+```powershell
+dotnet run --project IbSwingTrader -- sort-evaluation-dataset
+```
+
+The user runs this command/builds. The regression in EvaluationConfidenceChecks
+loads the shipped settings to catch a configuration/default mismatch.
+
 ### Amplitude reference (2026-10-21)
 
 User-selected AmplitudePct formula, rounded to two decimals:
