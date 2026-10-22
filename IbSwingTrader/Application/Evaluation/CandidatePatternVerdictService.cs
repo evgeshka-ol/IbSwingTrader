@@ -34,9 +34,10 @@ namespace IbSwingTrader.Application.Evaluation
 
         private static CandidatePatternVerdict? SavedReversalVerdict(string reason)
         {
-            var recognized = reason.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
-                             reason.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal);
-            var rejected = reason.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal);
+            var bare = ReversalHookPhaseClassifier.StripOriginPrefix(reason);
+            var recognized = bare.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
+                             bare.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal);
+            var rejected = bare.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal);
             return recognized || rejected
                 ? new CandidatePatternVerdict("ReversalHook", recognized ? "ReversalHook" : "None",
                     recognized ? "Match" : "Mismatch", reason)

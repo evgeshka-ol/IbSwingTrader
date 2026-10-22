@@ -6,8 +6,28 @@ namespace IbSwingTrader.Application.Candidates
 
     public static class ReversalHookPhaseClassifier
     {
+        public static string StripOriginPrefix(string reason)
+        {
+            foreach (var kind in new[] { "PostBellUpRecovery", "DeepDeclineRecovery", "Unclassified" })
+            {
+                var prefix = kind + "; ";
+                if (reason.StartsWith(prefix, StringComparison.Ordinal))
+                    return reason[prefix.Length..];
+            }
+            return reason;
+        }
+
+        public static string WithOriginPrefix(string reason, string kind)
+        {
+            var bare = StripOriginPrefix(reason);
+            return (kind is "PostBellUpRecovery" or "DeepDeclineRecovery" or "Unclassified") &&
+                   bare.StartsWith("ReversalHook", StringComparison.Ordinal)
+                ? $"{kind}; {bare}" : bare;
+        }
+
         public static bool TryGetSavedPattern(string reason, out string pattern)
         {
+            reason = StripOriginPrefix(reason);
             foreach (var phase in new[] { "Preparing", "Active", "MidCrossed", "Completed", "TargetReached", "Stalled" })
             {
                 pattern = $"ReversalHook{phase}";

@@ -16,8 +16,6 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
         // Было TOP_PERC_GAIN TOP_PERC_LOSE
         private double MinPrice { get; set; } = 5;
-        // 200 was clipping legitimate live winners like AAOI/NBIS before they even reached scanner logic.
-        private double MaxPrice { get; set; } = 300;
 
         private int MinAvgVolume { get; set; } = 1_000_000;
 
@@ -43,9 +41,6 @@ namespace IbSwingTrader.Infrastructure.Brokers.InteractiveBrokers
 
             if (MinPrice > 0)
                 filters.Add(new TagValue("priceAbove", MinPrice.ToString(CultureInfo.InvariantCulture)));
-
-            if (MaxPrice > 0)
-                filters.Add(new TagValue("priceBelow", MaxPrice.ToString(CultureInfo.InvariantCulture)));
 
             if (MinAvgVolume > 0)
                 filters.Add(new TagValue("avgVolumeAbove", MinAvgVolume.ToString(CultureInfo.InvariantCulture)));

@@ -697,6 +697,7 @@ namespace IbSwingTrader.Application.Candidates
 
         private async Task RefreshReversalForPublication(CandidateDetails candidate, WishListContext ctx)
         {
+            ReversalOrigin? reversalOrigin = null;
             candidate.PatternVerdictReason = candidate.PatternVerdictReason.Replace("; PublicationPending=True", string.Empty);
             void Reject(string reason)
             {
@@ -816,6 +817,12 @@ namespace IbSwingTrader.Application.Candidates
                     candidate.RecentDailyMacdSignalSeries = dailySeries.DailyMacdSignalSeries;
                     candidate.RecentDailyMacdHistogramSeries = dailySeries.DailyMacdHistogramSeries;
                     var nativeCompletedDaily = BellUpEntryTiming.GetCompletedCandles(dailySource, Timeframe.D1, MarketTime.Now());
+                    if (episode.Recognized && ctx.DailyCandles is { Count: > 0 })
+                    {
+                        reversalOrigin = ReversalOriginClassifier.Analyze(nativeCompletedDaily);
+                        candidate.PatternVerdictReason = ReversalHookPhaseClassifier.WithOriginPrefix(
+                            $"{candidate.PatternVerdictReason}; {reversalOrigin.Diagnostics}", reversalOrigin.Kind);
+                    }
                     if (nativeCompletedDaily.Count > 0)
                         recoveryDailyMid = CalculateRunFeature(nativeCompletedDaily, nativeCompletedDaily.Count).DailyBollingerMidBand;
                     var completed = nativeCompletedDaily.TakeLast(RecentDailySeriesLength).ToList();
@@ -859,6 +866,9 @@ namespace IbSwingTrader.Application.Candidates
                     ? "ReversalLiveQuoteFallback" : "ReversalFreshM5";
                 candidate.TradePlan = plan;
                 candidate.PatternVerdictReason = $"ReversalHook confirmed on {episode.Timeframe}; {episode.Reason}; Support={support}";
+                if (reversalOrigin != null)
+                    candidate.PatternVerdictReason = ReversalHookPhaseClassifier.WithOriginPrefix(
+                        $"{candidate.PatternVerdictReason}; {reversalOrigin.Diagnostics}", reversalOrigin.Kind);
             }
             catch (Exception ex)
             {

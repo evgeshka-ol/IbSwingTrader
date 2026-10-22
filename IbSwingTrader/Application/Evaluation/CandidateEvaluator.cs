@@ -551,12 +551,13 @@ namespace IbSwingTrader.Application.Evaluation
             CandidateEvaluationResult result,
             CandidateDetails candidate)
         {
-            if (candidate.PatternVerdictReason.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
-                candidate.PatternVerdictReason.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal) ||
-                candidate.PatternVerdictReason.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal))
+            var bareReason = ReversalHookPhaseClassifier.StripOriginPrefix(candidate.PatternVerdictReason);
+            if (bareReason.StartsWith("ReversalHook recognized on ", StringComparison.Ordinal) ||
+                bareReason.StartsWith("ReversalHook confirmed on ", StringComparison.Ordinal) ||
+                bareReason.StartsWith("ReversalHook unconfirmed on D1/H4", StringComparison.Ordinal))
             {
                 result.DetectedPipeline = "ReversalHook";
-                var matched = !candidate.PatternVerdictReason.StartsWith("ReversalHook unconfirmed", StringComparison.Ordinal);
+                var matched = !bareReason.StartsWith("ReversalHook unconfirmed", StringComparison.Ordinal);
                 result.DetectedPattern = matched ? "ReversalHook" : "None";
                 result.PatternVerdict = matched ? "Match" : "Mismatch";
                 result.PatternVerdictReason = candidate.PatternVerdictReason;
@@ -649,7 +650,8 @@ namespace IbSwingTrader.Application.Evaluation
                 ? candidate.PatternVerdictReason["Reason=".Length..]
                 : candidate.PatternVerdictReason;
             return sourceIsOther &&
-                   reason.StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase);
+                   ReversalHookPhaseClassifier.StripOriginPrefix(reason)
+                       .StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsOtherTriangleCandidate(CandidateDetails candidate)

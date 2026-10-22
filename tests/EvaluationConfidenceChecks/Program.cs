@@ -114,6 +114,7 @@ try
     row.MinTime = start;
     row.DaysToMaxUpFromScan = 0;
     row.AmplitudePct = 50m;
+    row.PatternVerdictReason = "PostBellUpRecovery; ReversalHook confirmed on H4";
     await csv.WriteAsync(output, [row]);
     var candidate = new CandidateDetails
     {
@@ -130,9 +131,12 @@ try
     {
         Ticker = "TEST", PresetScanCode = "CODE", ScanTime = start,
         EvaluatedAt = start.AddHours(1), DiagnosticsEstimatedHitRatePct = 80.1m,
-        DiagnosticsEstimatedHitRateModel = "saved-v1", DiagnosticsEstimatedHitRateScope = "WinGivenEntryAndResolution"
+        DiagnosticsEstimatedHitRateModel = "saved-v1", DiagnosticsEstimatedHitRateScope = "WinGivenEntryAndResolution",
+        PatternVerdictReason = "DeepDeclineRecovery; ReversalHook confirmed on H4"
     }]);
     var savedEvaluation = (await evaluationCsv.ReadAsync(evaluationPath)).Single();
+    Check(savedEvaluation.PatternVerdictReason == "DeepDeclineRecovery; ReversalHook confirmed on H4",
+        "Evaluation CSV retains the origin-prefixed verdict");
     Check(savedEvaluation.DiagnosticsEstimatedHitRatePct == 80.1m &&
         savedEvaluation.DiagnosticsEstimatedHitRateModel == "saved-v1" &&
         savedEvaluation.DiagnosticsEstimatedHitRateScope == "WinGivenEntryAndResolution",
@@ -141,6 +145,8 @@ try
         new EmptyCache(), null!, paths, new Settings(), new Verdict(), new SilentLogger());
     await builder.RefreshFeedbackAsync();
     var refreshed = (await csv.ReadAsync(output)).Single();
+    Check(refreshed.PatternVerdictReason == "PostBellUpRecovery; ReversalHook confirmed on H4",
+        "Historical refresh preserves the saved origin prefix without reconstructing from later cache");
     Check(refreshed.BrierLoss == 0.039601m && refreshed.Outcome == "Win" && refreshed.EntryTime == row.EntryTime,
         "Offline feedback refresh works without source evaluations and preserves the saved trade");
     Check(refreshed.AmplitudePct == 20m && refreshed.GroupLabel == "TradeCandidate",

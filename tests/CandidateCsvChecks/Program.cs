@@ -69,4 +69,12 @@ Check(ordered.Rows.Single(x => x["Ticker"] == "HIGH")["DisplayRank"] == "1" &&
 Check(CandidateDisplayOrder.Order([olderBell, low, high]).Select(x => x.Ticker)
     .SequenceEqual(new[] { "HIGH", "LOW", "OLDER_BELL" }), "Console and dataset rank reconstruction use the same order");
 
+var originCandidate = Candidate("ORIGIN", "ReversalHook", "ReversalHook confirmed on H4", 1m);
+originCandidate.PatternVerdictReason = "PostBellUpRecovery; ReversalHook confirmed on H4";
+var originTable = builder.Build([originCandidate], [], new HashSet<string>());
+Check(originTable.Rows.Single()["CandidateGroup"] == "ReversalHook" &&
+    originTable.Rows.Single()["PatternVerdictReason"] == "PostBellUpRecovery; ReversalHook confirmed on H4",
+    "Origin prefixes the verdict without creating another candidate group");
+Check(!originTable.Headers.Contains("ReversalOrigin") && !originTable.Headers.Contains("ReversalOriginReason"),
+    "Origin does not add report columns");
 Console.WriteLine($"Passed {assertions} candidate CSV checks.");

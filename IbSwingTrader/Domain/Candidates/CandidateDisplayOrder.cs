@@ -8,7 +8,8 @@ namespace IbSwingTrader.Domain.Candidates
             .ThenByDescending(x => CandidateGroups.IsOther(x) &&
                 (x.PatternVerdictReason.StartsWith("BellUp confirmed on ", StringComparison.OrdinalIgnoreCase) ||
                  x.PatternVerdictReason.StartsWith("DailyTransitionBellUp detected on Daily", StringComparison.OrdinalIgnoreCase) ||
-                 x.PatternVerdictReason.StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase)))
+                 ReversalHookPhaseClassifier.StripOriginPrefix(x.PatternVerdictReason)
+                     .StartsWith("ReversalHookPreparing detected on D1", StringComparison.OrdinalIgnoreCase)))
             .ThenByDescending(x => x.Score.NextDayRank ?? decimal.MinValue)
             .ThenByDescending(x => x.TradePlan.ProfitPercent)
             .ThenByDescending(x => x.Score.Score)
