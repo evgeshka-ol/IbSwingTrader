@@ -5,6 +5,7 @@ namespace IbSwingTrader.Abstractions.Dataset
         Task RunAsync();
 
         Task RefreshFeedbackAsync();
+        Task SortReportAsync();
 
         Task<List<EvaluationDatasetRow>> ReadCurrentAsync();
 

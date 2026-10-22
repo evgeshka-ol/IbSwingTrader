@@ -166,6 +166,35 @@ try
         "Incremental merge also retains historical confidence feedback");
     Check((await csv.ReadAsync(output)).Single().AmplitudePct == 20m,
         "Incremental merge retains the entry-based amplitude");
+
+    // Use the shipped configuration: its legacy ordered-values list caused Other before ReversalHook.
+    var settingsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+        "../../../../../IbSwingTrader/agentsettings.json"));
+    var reportSettings = System.Text.Json.JsonSerializer.Deserialize<AgentSettings>(
+        await File.ReadAllTextAsync(settingsPath))!.BuildEvaluationDataset;
+    reportSettings.MinScanTime = new DateTime(2099, 1, 1);
+    reportSettings.MinAmplitudePct = 999m;
+    var sortRows = new List<EvaluationDatasetRow>();
+    foreach (var (ticker, group) in new[] { ("Z_REV", "ReversalHook"), ("A_OTHER", "Other"), ("B_BELL", "BellUp") })
+    {
+        var item = Row(); item.Ticker = ticker; item.CandidateGroup = group;
+        item.AmplitudePct = 12.34m; item.BrierLoss = 0.123456789m;
+        item.PatternVerdictReason = "PostBellUpRecovery; ReversalHook confirmed on H4";
+        sortRows.Add(item);
+    }
+    var older = Row(); older.Ticker = "OLDER_BELL"; older.ScanTime = start.AddDays(-1);
+    sortRows.Add(older);
+    await csv.WriteAsync(output, sortRows);
+    var sorter = new EvaluationDatasetBuilder(new EmptyEvaluations(), csv, new SavedCandidates(candidate),
+        new EmptyCache(), null!, paths, new ReportSortSettings(reportSettings), new Verdict(), new SilentLogger());
+    await sorter.SortReportAsync();
+    var sortedReport = await csv.ReadAsync(output);
+    Check(sortedReport.Select(x => x.Ticker).SequenceEqual(new[] { "B_BELL", "Z_REV", "A_OTHER", "OLDER_BELL" }),
+        "Shipped report configuration sorts by descending scan then BellUp/ReversalHook/Other");
+    Check(sortedReport.Count == 4 && sortedReport.Take(3).All(x => x.AmplitudePct == 12.34m &&
+        x.BrierLoss == 0.123456789m && x.Outcome == "Win" &&
+        x.PatternVerdictReason == "PostBellUpRecovery; ReversalHook confirmed on H4"),
+        "Sort-only command ignores report filters and retains metrics, outcomes and subtype prefixes");
 }
 finally { directory.Delete(true); }
 Console.WriteLine($"Passed {checks} evaluation confidence checks.");
@@ -193,6 +222,10 @@ sealed class Settings : IBuildEvaluationDatasetSettingsProvider
 {
     public BuildEvaluationDatasetSettings Get() => new()
         { MinScanTime = new DateTime(2099, 1, 1), RecentScanDays = 1, MinAmplitudePct = 99 };
+}
+sealed class ReportSortSettings(BuildEvaluationDatasetSettings settings) : IBuildEvaluationDatasetSettingsProvider
+{
+    public BuildEvaluationDatasetSettings Get() => settings;
 }
 sealed class EmptyEvaluations : ICandidateEvaluationCsvService
 {

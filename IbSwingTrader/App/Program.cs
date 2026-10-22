@@ -18,6 +18,7 @@
         logger.Info("  evaluate-candidates");
         logger.Info("  refresh-evaluation-feedback");
         logger.Info("  sort-candidates");
+        logger.Info("  sort-evaluation-dataset");
         logger.Info("  normalize-reports");
         logger.Info("  clean-up");
         logger.Info("  get-scanner-params");
@@ -57,6 +58,10 @@
             await services
                 .GetRequiredService<IEvaluationDatasetBuilder>()
                 .RefreshFeedbackAsync();
+            break;
+
+        case "sort-evaluation-dataset":
+            await services.GetRequiredService<IEvaluationDatasetBuilder>().SortReportAsync();
             break;
 
         case "sort-candidates":

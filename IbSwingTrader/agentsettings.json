@@ -139,6 +139,9 @@
             {
                 "Column": "CandidateGroup",
                 "OrderedValues": [
+                    "BellUp",
+                    "ReversalHook",
+                    "Other",
                     "Runaway",
                     "Reversal"
                 ]

@@ -32,6 +32,17 @@ namespace IbSwingTrader.Application.Dataset
         private readonly ICandidatePatternVerdictService _patternVerdictService = patternVerdictService;
         private readonly ITextLogger _logger = logger;
 
+        public async Task SortReportAsync()
+        {
+            var path = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
+            // Read directly: sorting must not rebase amplitude, score forecasts or replay outcomes.
+            var rows = await _evaluationDatasetCsvService.ReadAsync(path);
+            var settings = _buildEvaluationDatasetSettingsProvider.Get();
+            rows.Sort((left, right) => CompareRows(left, right, settings));
+            await _evaluationDatasetCsvService.WriteAsync(path, rows);
+            _logger.Info($"Evaluation dataset sorted: {path}; rows={rows.Count}. No report filters or metric recalculation applied.");
+        }
+
         public async Task RefreshFeedbackAsync()
         {
             var path = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
