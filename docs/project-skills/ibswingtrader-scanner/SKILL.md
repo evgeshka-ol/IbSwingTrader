@@ -35,8 +35,9 @@ freshness and migration rules in
   Runaway/Reversal split is historical; it does not determine current groups.
   Since2026-10-22 PatternVerdictReason starts with PostBellUpRecovery,
   DeepDeclineRecovery or Unclassified for analyzed reversals, with no extra
-  columns. This describes origin inside those groups; it does not alter
-  admission or signal phase. See [origin rules](references/REVERSAL_ORIGINS.md).
+  columns. Since2026-10-23 PostBellUpRecovery completes at the Daily mid,
+  before the ordinary upper-band boundary; DeepDeclineRecovery retains the
+  existing continuation rules. See [origin rules](references/REVERSAL_ORIGINS.md).
 - BellUp has precedence. A recognized BellUp rejected by timing/readiness
   remains Other, rather than being relabeled ReversalHook. Triangle is a
   diagnostic fallback and must not hide BellUp confirmed on another timeframe.
@@ -59,6 +60,9 @@ freshness and migration rules in
   against the median of five preceding ranges (default multiplier 2).
   Confirmed Daily timing can veto an H4 signal; absent Daily confirmation
   cannot. Exit boost selection remains body-based. Do not merge these rules.
+- Since2026-10-23 an isolated Daily RSI rollover from a recent overbought peak
+  no longer rejects BellUp as Late phase. The combined H4 momentum/terminal
+  expansion guards remain; 80/20 are not new automatic admission thresholds.
 - Final BellUp profit targets >=10% are divided by two by default, preserving
   the existing 1.5% floor. This is execution policy, not a success requirement
   to capture >10%. See SETTINGS_MAP.md for exact rounding and controls.

@@ -286,6 +286,12 @@ Reversal buckets on the strength of a score that has no shown signal.
 
 ## Band-kink / RSI-rollover investigation (2026-08-11)
 
+Current-policy override,2026-10-23: the user removed the standalone Daily
+RSI rollover veto after SPT's80.04->77.99 decline blocked continuing Daily
+band/MACD expansion. The August study and reported AUC below remain historical
+evidence, not the current rejection policy. Combined H4 RSI+MACD and H4
+terminal-band branches remain in BellUpLatePhase; no80/20 rule was added.
+
 Origin: the user's working heuristic from live chart reading on 2026-08-10 —
 a band's slope decelerating/kinking is an early reversal warning, symmetric on
 the upper and lower bands, with a kink/break of the **mid** band treated as
@@ -300,7 +306,7 @@ Win/Loss rows) by decomposing the heuristic into independent pieces:
 
 - **Daily RSI rolled over from its own recent peak: AUC=0.61** — real,
   comparable in strength to the Daily/H4 slope features already driving
-  `RankingQualityScore`. **Implemented**: `IsLateBellUpPhase` now checks this
+  `RankingQualityScore`. **Implemented in August, retired October23**: `IsLateBellUpPhase` checked this
   directly (`recentDailyRsiPeak >= 70m && dailyRsi[^1] < dailyRsi[^2]`),
   independent of the H4-based branches and of whether H4 bands are still
   expanding — this is exactly the HELP gap, closed.
@@ -314,8 +320,8 @@ Win/Loss rows) by decomposing the heuristic into independent pieces:
   MACD/RSI series, no raw H4 OHLC, and the pattern needs candle-level detail.
   Not implemented; would need raw candle history to properly test.
 
-**How to apply:** the RSI-rollover piece is real and now live in
-`IsLateBellUpPhase`. Do not also add a standalone "any band slope kink" filter
+**Historical application:** the RSI-rollover piece drove the former standalone
+`IsLateBellUpPhase` branch. It is no longer a standalone veto. Do not add an "any band slope kink" filter
 — that piece tested at chance level on its own. If `ChannelReclaim` comes up
 again, it still needs raw H4 candle data before it can be tested, not just
 more evaluation-dataset rows.

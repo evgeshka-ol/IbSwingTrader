@@ -1,8 +1,9 @@
 # ReversalHook origin subcategories
 
-Current descriptive output since2026-10-22, following the user's GRAL chart
-review. Main candidate groups remain BellUp/ReversalHook/Other. Origin is
-independent of signal timeframe, phase, readiness, ranking and confidence.
+Origin output since2026-10-22, following the user's GRAL chart review.
+Main candidate groups remain BellUp/ReversalHook/Other. Origin describes
+the setup independently of frame/phase. Since2026-10-23 PostBellUpRecovery
+also determines its earlier Daily-mid completion boundary, below.
 
 ## User intent
 
@@ -41,6 +42,42 @@ The meaningful-depth5% value reuses the user's wishlist depth convention;
 it does not make origin an enrollment or readiness gate. Deep takes precedence
 over a much older BellUp when a prolonged meaningful decline has intervened.
 These are initial transparent semantic rules, not profit-validated thresholds.
+
+## Post-BellUp completion at Daily mid (2026-10-23)
+
+User clarification after DHT, October22 17:19:12: a post-BellUp pullback's
+return to Daily mid completes that hook for a new ReversalHook entry.
+Do not wait for Daily upper or rely on further MACD room. DeepDeclineRecovery
+retains its existing possibility of continuing past mid toward upper; this
+is not a guarantee that it will do so. Unclassified is not silently assigned
+the post-BellUp policy.
+
+At publication, after computing origin from the same completed native D1
+prefix, PostBellUpRecovery becomes admission Phase=Completed if:
+
+- A completed Daily bar **strictly after RunStart** reaches its own EMA mid
+  with its high (or close if high is missing). Equality counts, with full
+  precision. Exclude the initial downward-cross candle: it passed through
+  mid on the way down and cannot prove a subsequent return.
+- Or the accepted fresh publication price reaches the last completed D1 mid.
+
+A historical touch remains consumed after a pullback or later band movement.
+Search is tied to the latest below-mid run; an independent new pullback has
+a new boundary, rather than a permanent ticker blacklist. Never substitute
+a future/forming Daily bar or chart SMA for native completed EMA evidence.
+
+Reject before higher-frame support and trade-plan construction, keeping the
+origin prefix, saved local diagnosis and explicit CompletionRule=
+PostBellUpReturnToDailyMid/PostBellUpMidCompleted evidence in Other. No new
+report columns or outcome backfill are introduced. The log includes
+Reversal post-BellUp completed with the touch evidence.
+
+For DHT, October21 Close24.16 exceeds its EMA mid23.59642; October22
+ScanPrice24.52 therefore cannot be treated as an unfinished return-to-mid
+entry. Earlier wick touches also count under the scanner's EMA model:
+October16 High24.52 versus mid23.61224 already meets the touch rule after
+RunStart October15. A body-close-only proof first arrives October21. This
+does not force the earlier Yahoo/SMA chart interpretation into EMA dates.
 
 ## Evidence and model distinction
 

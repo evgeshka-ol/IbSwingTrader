@@ -512,6 +512,15 @@ Bell pair:
   point while H4 RSI is elevated and the last two H4 rows show terminal band
   expansion. (This is the Daily-timeframe counterpart to the KMI H4
   terminal-pullback rejection above.)
+  Since2026-10-23 the separate Daily-RSI-only rejection was removed following
+  SPT: RSI80.04->77.99 cannot alone mark continuing Daily expansion as Late
+  phase, even if H4 has cooled. The two combined branches above remain.
+  Daily RSI stays in diagnostics/other existing model inputs; no new80/20
+  hard gate or probability recalibration is implied. The removed Daily-RSI
+  bypass branch is also gone; fresh H4 continuation still serves the separate
+  Daily recent-boost override. BellUpLatePhaseChecks covers SPT-like admission
+  through this guard and retained combined-rejection controls. It is not a
+  full SPT plan/outcome replay.
 - After loading the current M15 rows, reject a BellUp candidate when its latest
   closed H4 close was above the H4 Bollinger mid but live M15 price has crossed
   below that same mid. This is a structural invalidation of the saved setup,

@@ -6,6 +6,12 @@ cannot authorize a new ReversalHook plan from the same impulse.
 
 ## Upper-band completion within an episode
 
+Since2026-10-23 PostBellUpRecovery has an earlier **Daily-mid** completion
+boundary; see [origin/completion rules](REVERSAL_ORIGINS.md). Its target is
+the post-BellUp return to mid. The upper-band rule below still applies to
+the other origins and cannot revive a post-BellUp episode already consumed
+at mid.
+
 For each closed native bar from the recognized seed through the last completed
 bar, compare its high with its own Bollinger upper and mid:
 
