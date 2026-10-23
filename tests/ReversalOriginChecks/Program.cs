@@ -74,4 +74,36 @@ Check(ReversalHookPhaseClassifier.WithOriginPrefix("BellUp confirmed on H4", "Po
 Check(verdicts.Analyze(new CandidateEvaluationResult { Ticker = "OLD", PresetScanCode = "CODE",
     PatternVerdictReason = "ReversalHook recognized on D1; Phase=Stalled" }).PatternVerdict == "Match",
     "Old unprefixed recognized rows remain readable");
+var dht = JsonSerializer.Deserialize<List<Candle>>(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "Fixtures", "dht-october22-daily.json")))!;
+var dhtOrigin = ReversalOriginClassifier.Analyze(dht);
+var decision = new DateTime(2026, 10, 22, 17, 6, 26);
+Check(dhtOrigin.Kind == "PostBellUpRecovery" && dhtOrigin.RunStart == new DateTime(2026, 10, 15),
+    "DHT retains its recent post-BellUp Daily pullback boundary");
+var dhtCompletion = ReversalPostBellUpCompletion.Find(dhtOrigin, dht, 24.52m, decision);
+Check(dhtCompletion != null && dhtCompletion.Contains("PostBellUpMidCompleted") &&
+    dhtCompletion.Contains("Source=CompletedHigh"), "DHT's already reached Daily mid consumes the post-BellUp episode");
+var closesOnly = dht.Select(x => new Candle { Time = x.Time, Open = x.Open, Close = x.Close }).ToList();
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, closesOnly, 0m, decision) is { } closedReclaim &&
+    closedReclaim.Contains("TouchBar=2026-10-21") && closedReclaim.Contains("Source=CompletedClose"),
+    "DHT October21 closed reclaim alone proves completion when highs are unavailable");
+var crossingOnly = dht.Where(x => x.Time <= new DateTime(2026, 10, 15)).ToList();
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, crossingOnly, 0m, decision) == null,
+    "The initial downward-cross candle cannot consume its own episode");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, dht, 1m, decision) == dhtCompletion,
+    "A later quote pullback cannot revive an already completed mean-return episode");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin with { Kind = "DeepDeclineRecovery" }, dht, 24.52m, decision) == null,
+    "Deep recovery can continue beyond Daily mid under its existing admission rules");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin with { Kind = "Unclassified" }, dht, 24.52m, decision) == null,
+    "Origin-specific completion does not invent an origin for unclassified setups");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin with { RunStart = new DateTime(2026, 10, 22) },
+    dht, 0m, decision) == null, "A prior run's touch cannot blacklist a new independent pullback");
+var crossingMid = IbSwingTrader.Application.Dataset.FeatureEngine.CalculateNativeReversalHistory(crossingOnly)[^1].DailyBollingerMidBand;
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, crossingOnly, crossingMid,
+    new DateTime(2026, 10, 16, 10, 0, 0))?.Contains("Source=FreshPrice") == true,
+    "A fresh current price reaching the last completed Daily mid also consumes the episode");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, crossingOnly, crossingMid - .0001m,
+    new DateTime(2026, 10, 16, 10, 0, 0)) == null, "Do not round a near-touch into completion");
+Check(ReversalPostBellUpCompletion.Find(dhtOrigin, dht, 0m, new DateTime(2026, 10, 22, 15, 0, 0)) == null,
+    "A forming Daily bar cannot be treated as completed historical evidence");
 Console.WriteLine($"Passed {checks} reversal origin checks.");

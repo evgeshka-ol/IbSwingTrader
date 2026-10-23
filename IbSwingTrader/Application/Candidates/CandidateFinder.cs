@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using IBApi;
 using IbSwingTrader.Common.Time;
 using IbSwingTrader.Domain.Settings;
@@ -820,6 +820,16 @@ namespace IbSwingTrader.Application.Candidates
                     if (episode.Recognized && ctx.DailyCandles is { Count: > 0 })
                     {
                         reversalOrigin = ReversalOriginClassifier.Analyze(nativeCompletedDaily);
+                        var midCompletion = ReversalPostBellUpCompletion.Find(reversalOrigin,
+                            nativeCompletedDaily, quote.Price, MarketTime.Now());
+                        if (midCompletion != null)
+                        {
+                            episode.Phase = "Completed";
+                            episode.Reason = $"ReversalHook recognized on {episode.Timeframe}; Phase=Completed; " +
+                                $"CompletionRule=PostBellUpReturnToDailyMid; {midCompletion}; PriorDiagnosis=({episode.Reason})";
+                            candidate.PatternVerdictReason = episode.Reason;
+                            _logger.Info($"Reversal post-BellUp completed: {candidate.Ticker}. {midCompletion}");
+                        }
                         candidate.PatternVerdictReason = ReversalHookPhaseClassifier.WithOriginPrefix(
                             $"{candidate.PatternVerdictReason}; {reversalOrigin.Diagnostics}", reversalOrigin.Kind);
                     }
@@ -1726,33 +1736,12 @@ namespace IbSwingTrader.Application.Candidates
 
             if (IsLateBellUpPhase(bellPatternSignal, recentSeries, out var latePhaseReason))
             {
-                var h4RsiRolloverOverrideReason = string.Empty;
-                var h4RsiRolloverOverride =
-                    latePhaseReason.Equals(
-                        "Daily RSI has already rolled over from a recent peak",
-                        StringComparison.OrdinalIgnoreCase) &&
-                    bellPatternSignal.Timeframe == BellPatternTimeframe.Daily &&
-                    IsFreshH4BellUpContinuation(
-                        bbState,
-                        recentSeries,
-                        ctx,
-                        out h4RsiRolloverOverrideReason);
-
-                if (h4RsiRolloverOverride)
-                {
-                    _logger.Info(
-                        $"TodayResearchLike Daily RSI rollover veto relaxed: {ctx.Stock.Ticker}. " +
-                        $"DailyReason={latePhaseReason}, H4={h4RsiRolloverOverrideReason}");
-                }
-                else
-                {
-                    shortReason = "Late phase";
-                    _logger.Info(
-                        $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
-                        $"Reason={latePhaseReason}, " +
-                        $"BellTimeframe={bellPatternSignal.Timeframe}");
-                    return false;
-                }
+                shortReason = "Late phase";
+                _logger.Info(
+                    $"TodayResearchLike pattern rejected: {ctx.Stock.Ticker}. " +
+                    $"Reason={latePhaseReason}, " +
+                    $"BellTimeframe={bellPatternSignal.Timeframe}");
+                return false;
             }
 
             if (IsH4BellUpTerminalPullback(
@@ -2507,54 +2496,15 @@ namespace IbSwingTrader.Application.Candidates
                 ResolveSeriesDirection(recentSeries.DailyBbMidBandSeries.SkipLast(1)),
                 BellPatternTimeframe.Daily);
 
-            // Validated 2026-08-11 against evaluation-dataset.csv (AUC=0.61 for Runaway Win/Loss,
-            // n=285): a Daily RSI rollover from its own recent peak is a real signal on its own,
-            // independent of the H4-based checks below and of whether H4 bands are still expanding.
-            // The band-slope deceleration itself tested weak (AUC=0.54) - RSI is what carries this.
-            var dailyRsi = recentSeries.DailyRsiSeries;
-            if (dailyRsi.Count >= 2)
-            {
-                var recentDailyRsiPeak = dailyRsi.TakeLast(Math.Min(4, dailyRsi.Count)).Max();
-                var dailyRsiRollingOver = dailyRsi[^1] < dailyRsi[^2];
-
-                if (recentDailyRsiPeak >= 70m && dailyRsiRollingOver)
-                {
-                    reason = "Daily RSI has already rolled over from a recent peak";
-                    return true;
-                }
-            }
-
-            var h4Rsi = recentSeries.H4RsiSeries;
-            var h4Histogram = recentSeries.H4MacdHistogramSeries;
-            if (h4Rsi.Count < 2 || h4Histogram.Count < 2)
-                return false;
-
-            var h4RsiRollingOver = h4Rsi[^1] < h4Rsi[^2];
-            var h4HistogramRollingOver = h4Histogram[^1] < h4Histogram[^2];
-            var recentH4RsiPeak = h4Rsi.TakeLast(Math.Min(4, h4Rsi.Count)).Max();
-
-            if (previousDailyBellUp != BellPatternKind.BellUp &&
-                recentH4RsiPeak >= 70m &&
-                h4RsiRollingOver &&
-                h4HistogramRollingOver)
-            {
-                reason = "Daily BellUp appeared only after H4 momentum had already rolled over";
-                return true;
-            }
-
-            if (previousDailyBellUp == BellPatternKind.BellUp &&
-                h4Rsi[^1] >= 75m &&
-                CalculateTerminalBandOpeningPct(
-                    recentSeries.H4BbUpperBandSeries,
-                    recentSeries.H4BbMidBandSeries,
-                    recentSeries.H4BbLowerBandSeries,
-                    2) >= 4m)
-            {
-                reason = "Daily BellUp is no longer new and H4 bands are already in terminal expansion";
-                return true;
-            }
-
-            return false;
+            // Daily RSI rollover alone is not a phase boundary (SPT, 2026-10-22).
+            // Preserve the separate, combined H4 exhaustion/terminal-expansion guards.
+            return BellUpLatePhase.IsLate(
+                previousDailyBellUp == BellPatternKind.BellUp,
+                recentSeries.H4RsiSeries,
+                recentSeries.H4MacdHistogramSeries,
+                CalculateTerminalBandOpeningPct(recentSeries.H4BbUpperBandSeries,
+                    recentSeries.H4BbMidBandSeries, recentSeries.H4BbLowerBandSeries, 2),
+                out reason);
         }
 
         private static bool IsH4BellUpTerminalPullback(

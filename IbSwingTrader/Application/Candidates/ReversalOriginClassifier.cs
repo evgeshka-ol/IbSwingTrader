@@ -1,7 +1,7 @@
 namespace IbSwingTrader.Application.Candidates
 {
     public sealed record ReversalOrigin(string Kind, int BelowMidBars, decimal MaxDepthPct,
-        DateTime? PriorBellUpBar, string Diagnostics);
+        DateTime? PriorBellUpBar, string Diagnostics, DateTime? RunStart = null, DateTime? RunEnd = null);
 
     // Describes a recognized hook's origin, never recognizes or admits a trade.
     public static class ReversalOriginClassifier
@@ -64,7 +64,7 @@ namespace IbSwingTrader.Application.Candidates
             var sinceSlope = Pct(features[beforeEnd].DailyBollingerMidBand, features[^1].DailyBollingerMidBand);
             var diagnostics = FormattableString.Invariant(
                 $"ReversalOrigin(Kind={kind}, ContextBars={ContextBars}, BelowMidBars={length}, MaxDepthPct={depth:0.####}, RunStart={bars[start].Time:yyyy-MM-dd}, RunEnd={bars[end].Time:yyyy-MM-dd}, Ongoing={end == bars.Count - 1}, AllContextBelow={allContextBelow}, LeftCensored={start == 19}, PriorBellUpBar={priorBellUp:yyyy-MM-dd}, PriorSearchBars={PriorBellUpSearchBars}, MidSlopeBeforeCrossPct={priorSlope:0.####}, MidSlopeSinceCrossPct={sinceSlope:0.####}, Model={FeatureEngine.BollingerModel})");
-            return new(kind, length, depth, priorBellUp, diagnostics);
+            return new(kind, length, depth, priorBellUp, diagnostics, bars[start].Time, bars[end].Time);
         }
     }
 }
