@@ -55,7 +55,7 @@ Existing saved candidates, evaluation outcomes, confidence estimates and
 dated studies remain unchanged. Evaluation already preserves confirmed
 ReversalHook reasons, including the new explicit anticipatory evidence.
 
-## Prepared verification
+## Verification
 
 ReversalRecoveryChecks adds exact slope-boundary, single-step-drop, missing/
 future/stale data, non-deep/H4-only/unrecognized/completed, momentum, room,
@@ -70,9 +70,12 @@ ReversalEntryChecks additionally passes that frozen H4 history and14.43
 reference through the real TradeBuilder's direct-entry path. This is plan
 construction, not a complete CandidateFinder/broker replay.
 
-Only source/documentation edits and static diff/XML/fixture/link review were
-performed by Codex. Builds, tests, application commands and broker requests
-were not run. User-run commands:
+Codex performed source/documentation edits and static diff/XML/fixture/link
+review. On2026-10-29 the user reported successful completion of all four
+commands below: application build, ReversalRecoveryChecks, ReversalEntryChecks
+and ReversalWatchListChecks. This is user-reported verification; console output
+and check counts were not supplied. Codex did not run these commands or make
+broker requests.
 
 ```powershell
 dotnet build IbSwingTrader/IbSwingTrader.csproj
@@ -80,6 +83,10 @@ dotnet run --project tests/ReversalRecoveryChecks
 dotnet run --project tests/ReversalEntryChecks
 dotnet run --project tests/ReversalWatchListChecks
 ```
+
+These results confirm the user-run build and prepared regressions, including
+the frozen SOFI support/plan checks. Live scanner publication and subsequent
+trade outcomes under the new policy remain to be observed.
 
 The exploratory evidence has missing coverage, dependent repeated tickers and
 a selected favorable case date. The new narrower guards are not a fitted

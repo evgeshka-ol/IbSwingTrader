@@ -114,12 +114,16 @@ October27 candles, actual EMA/MACD primitives, weak-but-available fresh H4,
 unchanged local Stalled phase, boundary and rejection controls, and same-episode
 completion. ReversalEntryChecks additionally builds a direct14.43 plan from
 the frozen H4 with the real TradeBuilder. These are not full broker publication
-replays. Codex has not run builds/tests/application. User-run commands:
+replays. On2026-10-29 the user reported that the application build,
+ReversalRecoveryChecks, ReversalEntryChecks and ReversalWatchListChecks all
+passed. Codex did not execute them; detailed output/counts were not supplied.
+User-run commands:
 
 ```powershell
 dotnet build IbSwingTrader/IbSwingTrader.csproj
 dotnet run --project tests/ReversalRecoveryChecks
 dotnet run --project tests/ReversalEntryChecks
+dotnet run --project tests/ReversalWatchListChecks
 ```
 
 Assess subsequent entered Win/Loss/Open, profit and original rank1 outcomes.
