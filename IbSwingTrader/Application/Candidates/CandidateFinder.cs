@@ -790,6 +790,13 @@ namespace IbSwingTrader.Application.Candidates
                 candidate.RecentH4MacdLineSeries = series.H4MacdLineSeries;
                 candidate.RecentH4MacdSignalSeries = series.H4MacdSignalSeries;
                 candidate.RecentH4MacdHistogramSeries = series.H4MacdHistogramSeries;
+                candidate.RecentWeeklyBbUpperBandSeries = series.WeeklyBbUpperBandSeries;
+                candidate.RecentWeeklyBbMidBandSeries = series.WeeklyBbMidBandSeries;
+                candidate.RecentWeeklyBbLowerBandSeries = series.WeeklyBbLowerBandSeries;
+                candidate.RecentWeeklyRsiSeries = series.WeeklyRsiSeries;
+                candidate.RecentWeeklyMacdLineSeries = series.WeeklyMacdLineSeries;
+                candidate.RecentWeeklyMacdSignalSeries = series.WeeklyMacdSignalSeries;
+                candidate.RecentWeeklyMacdHistogramSeries = series.WeeklyMacdHistogramSeries;
                 var dailySource = ctx.DailyCandles ?? BuildDailyBars(ctx.Candles);
                 var dailySeries = BuildReversalPatternSeries(dailySource);
                 if (dailySeries != null)
@@ -840,9 +847,42 @@ namespace IbSwingTrader.Application.Candidates
                     candidate.RecentDailyHighSeries = completed.Select(x => x.High).ToList();
                     candidate.RecentDailyLowSeries = completed.Select(x => x.Low).ToList();
                 }
-                if (!episode.Recognized || episode.Phase is not ("Active" or "MidCrossed"))
+                var publicationState = BuildBollingerStateSet(series);
+                string? gentleWeeklySupport = null;
+                string? gentleWeeklyFailure = null;
+                if (episode.Recognized && episode.Timeframe is ("D1" or "Daily") &&
+                    reversalOrigin?.Kind == "DeepDeclineRecovery" && ctx.DailyCandles is { Count: > 0 } &&
+                    episode.Phase is ("Active" or "MidCrossed" or "Stalled"))
                 {
-                    Reject($"EpisodeRecognized={episode.Recognized}, Phase={episode.Phase}");
+                    var decisionAt = MarketTime.Now();
+                    var nativeDaily = GetCompletedCandlesForRun(ctx.DailyCandles, Timeframe.D1, decisionAt);
+                    var schedule = _localMarketScheduleProvider.BuildSchedule(
+                        DateTime.SpecifyKind(decisionAt.Date.AddDays(-14), DateTimeKind.Utc),
+                        DateTime.SpecifyKind(decisionAt.Date.AddDays(2), DateTimeKind.Utc));
+                    var expectedDailyDate = schedule.Days.Where(x => x.IsTradingDay &&
+                            x.Date.ToDateTime(new TimeOnly(16, 0)) <= decisionAt)
+                        .Select(x => x.Date.ToDateTime(TimeOnly.MinValue)).DefaultIfEmpty(DateTime.MinValue).Max();
+                    var weeklyMid = BuildRecentWeeklySeries(completedH4, completedH4.Count - 1,
+                        x => x.WeeklyBollingerMidBand, roundValues: false);
+                    if (ReversalGentleWeeklySupport.Allows(episode.Timeframe, reversalOrigin.Kind,
+                        episode.Recognized, episode.Phase, publicationState.Weekly.Regime, weeklyMid,
+                        nativeDaily, expectedDailyDate, recoveryH4Features, quote.Price, episode.Momentum,
+                        decisionAt, out var evidence))
+                    {
+                        gentleWeeklySupport = evidence +
+                            $"; WeeklySource=CompletedNativeH4Prefixes; WeeklyObservationConfirmedAt={completedH4[^1].Time.AddHours(4):O}";
+                        _logger.Info($"Reversal gentle weekly support: {candidate.Ticker}. {gentleWeeklySupport}");
+                    }
+                    else
+                        gentleWeeklyFailure = evidence;
+                }
+                // Anticipatory publication explicitly preserves LocalPhase=Stalled.
+                // It does not manufacture Active recognition or bypass completion checks above.
+                if (!episode.Recognized || (episode.Phase is not ("Active" or "MidCrossed") &&
+                    gentleWeeklySupport == null))
+                {
+                    Reject($"EpisodeRecognized={episode.Recognized}, Phase={episode.Phase}" +
+                        (gentleWeeklyFailure != null ? $"; {gentleWeeklyFailure}" : string.Empty));
                     return;
                 }
                 if (IsRunawayBellUpPattern(ClassifyBellPatternSignal(BuildBollingerStateSet(series), series)))
@@ -850,10 +890,9 @@ namespace IbSwingTrader.Application.Candidates
                     Reject("BellUp appeared in refreshed history; preserve BellUp precedence");
                     return;
                 }
-                var publicationState = BuildBollingerStateSet(series);
-                string? weeklyRecoverySupport = null;
+                string? weeklyRecoverySupport = gentleWeeklySupport;
                 string? weeklyRecoveryFailure = null;
-                if (episode.Timeframe is ("D1" or "Daily") && reversalOrigin?.Kind == "DeepDeclineRecovery" &&
+                if (weeklyRecoverySupport == null && episode.Timeframe is ("D1" or "Daily") && reversalOrigin?.Kind == "DeepDeclineRecovery" &&
                     ctx.DailyCandles is { Count: > 0 })
                 {
                     if (ReversalDailyWeeklySupport.Allows(reversalOrigin.Kind, episode.Recognized,
@@ -869,7 +908,8 @@ namespace IbSwingTrader.Application.Candidates
                         episode.Recognized, episode.Phase, episode.Momentum,
                         recoveryH4Features, recoveryDailyMid, weeklyRecoverySupport, out var support))
                 {
-                    Reject(support + (weeklyRecoveryFailure != null ? $"; {weeklyRecoveryFailure}" : string.Empty));
+                    Reject(support + (weeklyRecoveryFailure != null ? $"; {weeklyRecoveryFailure}" : string.Empty) +
+                        (gentleWeeklyFailure != null ? $"; {gentleWeeklyFailure}" : string.Empty));
                     return;
                 }
                 var plan = await BuildTradePlan(ctx, quote, reversalPublication: true);
@@ -5841,7 +5881,8 @@ namespace IbSwingTrader.Application.Candidates
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
             int scanIndex,
-            Func<FeatureSet, decimal?> selector)
+            Func<FeatureSet, decimal?> selector,
+            bool roundValues = true)
         {
             var indexes = new List<int>();
             var usedWeeks = new HashSet<DateTime>();
@@ -5862,7 +5903,7 @@ namespace IbSwingTrader.Application.Candidates
             return [.. indexes
                 .Select(i => selector(CalculateRunFeature(candles, i + 1)))
                 .Where(x => x.HasValue)
-                .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
+                .Select(x => roundValues ? decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero) : x!.Value)];
         }
 
         private List<decimal> BuildRecentH4Series(

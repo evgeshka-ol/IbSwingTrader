@@ -7,5 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../IbSwingTrader/IbSwingTrader.csproj" />
+    <None Include="../ReversalRecoveryChecks/Fixtures/sofi-2026-10-26-prefix.json"
+          Link="Fixtures/sofi-2026-10-26-prefix.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

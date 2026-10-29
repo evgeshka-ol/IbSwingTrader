@@ -244,4 +244,110 @@ outOfOrderDaily.Reverse();
 Check(!WeeklySupport(daily: outOfOrderDaily), "Nonchronological history is rejected");
 Check(nnDaily[^1].Close == 10.08m && nnDaily[^1].Time.Date == nnAt.Date,
     "Support analysis leaves the frozen prefix unchanged and contains no October26 peak");
+// A gentle weekly decline is a local geometry measurement, separate from the old long-tail sign.
+Check(WeeklyMidSlope.Analyze([16.78m, 16.57m, 16.37m]).IsGentleDecline,
+    "SOFI's weekly tail is gently declining");
+Check(WeeklyMidSlope.Analyze([100m, 98.5m, 97.0225m]).IsGentleDecline,
+    "The exact1.5-percent per-step and geometric boundaries are inclusive");
+Check(!WeeklyMidSlope.Analyze([100m, 98.5m, 97.022499999m]).IsGentleDecline,
+    "Full precision rejects a decline just beyond the boundary despite identical rounded display");
+Check(!WeeklyMidSlope.Analyze([100m, 101m, 98m]).IsGentleDecline,
+    "An acceptable two-step average cannot hide one steep downward step");
+Check(WeeklyMidSlope.Analyze([100m, 100m, 100m]).IsGentleDecline,
+    "An exactly horizontal weekly mid is usable");
+Check(!WeeklyMidSlope.Analyze([100m, 101m, 102m]).IsGentleDecline,
+    "Rising weekly context keeps its ordinary support route");
+Check(!WeeklyMidSlope.Analyze([0m, 100m, 100m]).Available &&
+      !WeeklyMidSlope.Analyze([100m, 99m]).Available, "Invalid or short geometry is unavailable");
+
+using var sofiFixture = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "Fixtures", "sofi-2026-10-26-prefix.json")));
+var sofiRoot = sofiFixture.RootElement;
+var sofiDaily = System.Text.Json.JsonSerializer.Deserialize<List<Candle>>(sofiRoot.GetProperty("D1"))!;
+var sofiH4 = System.Text.Json.JsonSerializer.Deserialize<List<Candle>>(sofiRoot.GetProperty("H4"))!;
+var sofiAt = sofiRoot.GetProperty("DecisionAt").GetDateTime();
+var sofiPrice = sofiRoot.GetProperty("Price").GetDecimal();
+var sofiQuote = new ExecutionPriceSnapshot(sofiPrice,
+    sofiRoot.GetProperty("PriceTime").GetDateTime(), sofiRoot.GetProperty("ObservedAt").GetDateTime(),
+    "M5PartialClose", null, null);
+var sofiMomentum = ReversalH4Momentum.Evaluate(sofiH4, sofiQuote, sofiAt, sofiAt.Date.AddHours(12));
+Check(sofiMomentum.IsAvailable && !sofiMomentum.IsImproving,
+    "SOFI has a valid fresh H4 observation even though its provisional histogram weakens");
+Check(!ReversalH4Momentum.Evaluate(sofiH4, sofiQuote with { PriceTime = sofiAt.AddMinutes(-11) },
+    sofiAt, sofiAt.Date.AddHours(12)).IsAvailable, "Stale H4 observation is unavailable, not merely weak");
+var sofiNative = FeatureEngine.CalculateNativeReversalHistory(sofiDaily);
+var sofiLocal = ReversalHookPhaseClassifier.Analyze(sofiDaily.Select(x => x.Close).ToList(),
+    sofiNative.Select(x => x.DailyBollingerMidBand).ToList(),
+    sofiNative.Select(x => x.DailyMACDHistogram).ToList(), sofiPrice,
+    sofiNative.Select(x => x.DailyBollingerUpperBand).ToList(), sofiMomentum,
+    sofiDaily.Select(x => x.High).ToList());
+Check(sofiLocal.Name == "Stalled" && sofiLocal.BarsSinceBend == 3,
+    "The actual SOFI native D1 prefix retains its local Stalled phase and October21 seed");
+DateTime Week(DateTime t) => t.Date.AddDays(-((int)t.DayOfWeek + 6) % 7);
+var sofiEngine = new FeatureEngine();
+var sofiWeekly = sofiH4.Select((bar, i) => (bar, i)).GroupBy(x => Week(x.bar.Time))
+    .Select(g => sofiEngine.Calculate(sofiH4, g.Last().i + 1))
+    .Where(x => x.WeeklyBollingerMidBand.HasValue).TakeLast(16).ToList();
+var sofiWeeklyMid = sofiWeekly.Select(x => x.WeeklyBollingerMidBand!.Value).ToList();
+var sofiWeeklyState = new BollingerFigureAnalyzer().Analyze(new BollingerFeatureSeries
+{
+    UpperSeries = sofiWeekly.Select(x => decimal.Round(x.WeeklyBollingerUpperBand!.Value, 2)).ToList(),
+    MidSeries = sofiWeeklyMid.Select(x => decimal.Round(x, 2)).ToList(),
+    LowerSeries = sofiWeekly.Select(x => decimal.Round(x.WeeklyBollingerLowerBand!.Value, 2)).ToList()
+});
+var sofiClosedH4 = FeatureEngine.CalculateNativeReversalHistory(sofiH4).TakeLast(3).ToList();
+bool GentleSupport(string phase = "Stalled", string regime = "Neutral", string origin = "DeepDeclineRecovery",
+    string timeframe = "D1", bool recognized = true, IReadOnlyList<decimal>? weekly = null,
+    List<Candle>? daily = null, decimal? quotePrice = null, ReversalRecoveryMomentum? fresh = null,
+    DateTime? expectedDate = null, DateTime? at = null, IReadOnlyList<FeatureSet>? h4 = null)
+    => ReversalGentleWeeklySupport.Allows(timeframe, origin, recognized, phase, regime,
+        weekly ?? sofiWeeklyMid, daily ?? sofiDaily, expectedDate ?? sofiAt.Date,
+        h4 ?? sofiClosedH4, quotePrice ?? sofiPrice, fresh ?? sofiMomentum, at ?? sofiAt, out _);
+Check(GentleSupport(regime: sofiWeeklyState.Regime.ToString()),
+    "The SOFI prefix qualifies for anticipatory support at its14.43 fresh price");
+Check(ReversalGentleWeeklySupport.Allows("D1", "DeepDeclineRecovery", true, sofiLocal.Name,
+    sofiWeeklyState.Regime.ToString(), sofiWeeklyMid, sofiDaily, sofiAt.Date, sofiClosedH4,
+    sofiPrice, sofiMomentum, sofiAt, out var sofiAdmission) &&
+    sofiAdmission.Contains("Admission=AnticipatoryD1Recovery") && sofiAdmission.Contains("LocalPhase=Stalled") &&
+    sofiAdmission.Contains("WeeklyMidSlope") && sofiAdmission.Contains(sofiMomentum.Diagnostics),
+    "Record the anticipatory exception, full slope and fresh provenance without relabeling the phase");
+Check(!GentleSupport(regime: "Collapse"), "Gentle geometry never overrides W1 Collapse");
+Check(!GentleSupport(weekly: [100m, 96m, 92m]), "A steep W1 cannot authorize either new branch");
+Check(!GentleSupport(fresh: sofiMomentum with { IsAvailable = false }),
+    "Unavailability cannot be inferred away by parsing diagnostic strings");
+Check(!GentleSupport(fresh: recoveringH4), "A true flag without typed fresh availability is insufficient");
+Check(!GentleSupport(quotePrice: 14.399m), "A fresh new low below the latest closed Daily low blocks anticipation");
+Check(GentleSupport(quotePrice: 14.4m), "A touch of the latest Daily low does not constitute a break");
+Check(!GentleSupport(quotePrice: 15m), "Anticipation needs at least2-percent remaining room to the Daily mid");
+Check(!GentleSupport(weekly: [14.5m, 14.5m, 14.5m]), "Insufficient W1 room blocks new support");
+Check(!GentleSupport(expectedDate: sofiAt.Date.AddDays(-3)), "Native D1 must match the expected completed exchange day");
+Check(!GentleSupport(at: sofiAt.Date.AddHours(15)), "The final October26 Daily bar is unavailable before16:00");
+Check(!GentleSupport(daily: sofiDaily.Take(20).ToList()), "Short native Daily history cannot authorize anticipation");
+var sofiOutOfOrder = sofiDaily.ToList();
+sofiOutOfOrder.Reverse();
+Check(!GentleSupport(daily: sofiOutOfOrder), "Nonchronological Daily inputs are rejected");
+foreach (var disallowedPhase in new[] { "Completed", "Preparing", "None", "Invalidated" })
+    Check(!GentleSupport(phase: disallowedPhase), $"{disallowedPhase} never acquires anticipatory support");
+Check(!GentleSupport(recognized: false) && !GentleSupport(timeframe: "H4") &&
+    !GentleSupport(origin: "PostBellUpRecovery") && !GentleSupport(origin: "Unclassified"),
+    "Only an already recognized deep-decline Daily episode can use the new support");
+var decliningDaily = sofiDaily.Select(x => new Candle
+    { Time = x.Time, Open = x.Open, High = x.High, Low = x.Low, Close = x.Close }).ToList();
+decliningDaily[^1].Close = 14.4m;
+Check(!GentleSupport(daily: decliningDaily), "A renewed D1 momentum decline blocks the anticipatory branch");
+var activeFresh = sofiMomentum with { IsImproving = true };
+List<FeatureSet> activeClosed = [new() { MACDHistogram = -.02m }, new() { MACDHistogram = -.01m }];
+Check(GentleSupport(phase: "Active", fresh: activeFresh, h4: activeClosed),
+    "An active Daily hook can use gentle W1 on Monday with closed and fresh H4 improvement");
+Check(GentleSupport(phase: "MidCrossed", fresh: activeFresh, h4: activeClosed),
+    "Mid-crossed deep-decline hooks retain the active weekly-support route");
+Check(!GentleSupport(phase: "Active", h4: activeClosed), "Active support still requires fresh H4 improvement");
+Check(!GentleSupport(phase: "Active", fresh: activeFresh), "Active support still requires closed H4 improvement");
+Check(!GentleSupport(phase: "Active", fresh: activeFresh, h4: []), "Missing H4 evidence cannot authorize active support");
+var stalledInsideCompletedH4 = dailyEpisode with { Phase = "Stalled" };
+Check(ReversalImpulseCompletion.ApplyH4Completion(stalledInsideCompletedH4, h4Episode).Phase == "Completed",
+    "Same-episode H4 completion also blocks the new anticipatory Stalled admission");
+Check(sofiDaily[^1].Close == 14.46m && sofiH4[^1].Time == sofiAt.Date.AddHours(12) &&
+    sofiDaily.All(x => x.Time.Date <= sofiAt.Date) && sofiH4.All(x => x.Time.AddHours(4) <= sofiAt),
+    "Frozen fixture and support inputs remain immutable and contain no October27 boost");
 Console.WriteLine($"Passed {checks} reversal recovery checks.");

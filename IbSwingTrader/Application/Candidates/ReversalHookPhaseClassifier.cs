@@ -2,7 +2,8 @@ namespace IbSwingTrader.Application.Candidates
 {
     // Alternative recognition only. These phases do not authorize an entry or rank a ticker.
     public readonly record struct ReversalHookPhase(string Name, int BarsSinceBend, string Diagnostics);
-    public readonly record struct ReversalRecoveryMomentum(bool IsImproving, string Diagnostics);
+    public readonly record struct ReversalRecoveryMomentum(bool IsImproving, string Diagnostics,
+        bool IsAvailable = false);
 
     public static class ReversalHookPhaseClassifier
     {

@@ -57,7 +57,7 @@ namespace IbSwingTrader.Application.Candidates
 
         public static ReversalFrameEpisode ApplyH4Completion(ReversalFrameEpisode daily, ReversalFrameEpisode h4)
         {
-            if (!daily.Recognized || daily.Phase is not ("Active" or "MidCrossed") ||
+            if (!daily.Recognized || daily.Phase is not ("Active" or "MidCrossed" or "Stalled") ||
                 !h4.Recognized || h4.Phase != "Completed" || !BlocksDaily(daily.SignalBar, h4.Completion))
                 return daily;
             return daily with

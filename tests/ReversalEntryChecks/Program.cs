@@ -64,6 +64,16 @@ var directWithoutM15 = builder.Build(History(100m), [], scanPriceOverride: 100m,
     entryPatternFamily: TradeEntryPatternFamily.ReversalHook, useScanPriceEntry: true);
 Check(directWithoutM15.Entry == 100m && directWithoutM15.Exit > 100m,
     "Fresh reversal entry and rebuilt target do not require M15 entry forecasting");
+using var sofiFixture = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "Fixtures", "sofi-2026-10-26-prefix.json")));
+var sofiH4 = System.Text.Json.JsonSerializer.Deserialize<List<Candle>>(sofiFixture.RootElement.GetProperty("H4"))!;
+var sofiPrice = sofiFixture.RootElement.GetProperty("Price").GetDecimal();
+var sofiPlan = builder.Build(sofiH4, [], scanPriceOverride: sofiPrice,
+    entryDiscountOverridePct: .07m, entryPatternFamily: TradeEntryPatternFamily.ReversalHook,
+    useScanPriceEntry: true);
+Check(sofiPlan.Entry == 14.43m && sofiPlan.Exit > sofiPlan.Entry &&
+    sofiPlan.Stop > 0m && sofiPlan.Stop < sofiPlan.Entry && sofiPlan.StopLimit < sofiPlan.Stop,
+    "SOFI's actual frozen completed H4 history builds a valid direct14.43 plan after anticipatory support");
 Console.WriteLine($"Passed {checks} reversal entry checks.");
 
 sealed class SavedSettings(GetCandidatesSettings settings) : IGetCandidatesSettingsProvider

@@ -16,6 +16,9 @@
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4Momentum.cs" Link="ReversalH4Momentum.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4DailySupport.cs" Link="ReversalH4DailySupport.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalDailyWeeklySupport.cs" Link="ReversalDailyWeeklySupport.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalGentleWeeklySupport.cs" Link="ReversalGentleWeeklySupport.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/WeeklyMidSlope.cs" Link="WeeklyMidSlope.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/BollingerFigureAnalyzer.cs" Link="BollingerFigureAnalyzer.cs" />
     <None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ExecutionPriceSnapshot.cs" Link="ExecutionPriceSnapshot.cs" />
     <Compile Include="../../IbSwingTrader/Application/Dataset/FeatureEngine.cs" Link="FeatureEngine.cs" />

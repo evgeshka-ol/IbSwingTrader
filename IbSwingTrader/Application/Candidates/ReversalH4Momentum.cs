@@ -36,7 +36,7 @@ namespace IbSwingTrader.Application.Candidates
                 $"LastClosedH4={completed[^1].Time:O}, PriceSource={quote.Source}, " +
                 $"PriceTime={quote.PriceTime:O}, ObservedAt={quote.ObservedAt:O}, " +
                 $"Price={N(quote.Price)}, PreviousHistogram={N(m.PreviousHistogram)}, " +
-                $"MacdLine={N(m.Line)}, MacdSignal={N(m.Signal)}, Histogram={N(m.Histogram)})");
+                $"MacdLine={N(m.Line)}, MacdSignal={N(m.Signal)}, Histogram={N(m.Histogram)})", true);
         }
     }
 }
