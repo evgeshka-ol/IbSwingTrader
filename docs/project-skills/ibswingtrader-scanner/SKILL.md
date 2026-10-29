@@ -43,8 +43,9 @@ freshness and migration rules in
   diagnostic fallback and must not hide BellUp confirmed on another timeframe.
 - ReversalHook recognizes recent completed episodes independently on D1/H4,
   even with sufficient D1 history and after price crosses mid. Recognition
-  and readiness are distinct. Publication needs an Active/MidCrossed episode,
-  higher-timeframe support and a fresh valid plan. Other has no active plan.
+  and readiness are distinct. Ordinary publication needs an Active/MidCrossed
+  episode, higher-timeframe support and a fresh valid plan. Since2026-10-29,
+  the bounded anticipatory D1 path below may admit local Stalled. Other has no active plan.
   Since 2026-10-21, H4-led recovery can supply support below D1 mid despite
   D1 Down/negative MACD when completed H4 bands and momentum plus fresh H4
   momentum turn up. D1 Collapse remains a veto. See
@@ -59,6 +60,15 @@ freshness and migration rules in
   entry forecasts cannot move this entry. Target/stop are rebuilt from that
   reference; publication rejects a mismatched entry. See
   [direct reversal entry](references/REVERSAL_SCAN_PRICE_ENTRY.md).
+- Since2026-10-29, a gentle W1 decline (last three full-precision observations,
+  at most1.5% per transition with no steeper individual drop) can support a
+  recognized DeepDeclineRecovery on D1 with improving native Daily MACD and
+  at least2% room to W1 mid. Active/MidCrossed requires improving closed/fresh
+  H4 momentum. AnticipatoryD1Recovery retains local Stalled, requires valid
+  fresh H4 evidence, at least2% room to D1 mid and price at/above the last
+  completed D1 low; H4 improvement/pre-bend-price reclaim are not required.
+  W1 Collapse and completed impulses remain vetoes. See
+  [gentle weekly support](references/WEEKLY_MID_SLOPE.md).
 - A completed-bar upper-band touch consumes the current reversal impulse even
   after a pullback. A completed H4 seeded inside the current D1 episode blocks
   readmission through that D1 signal. See REVERSAL_IMPULSE_COMPLETION.md for
@@ -177,6 +187,9 @@ performance. See [success criteria](../../guides/success-criteria.md).
   data guards, pricing fallback, output fields and execution controls.
 - [Scanner model](references/SCANNER_MODEL.md): failure modes, current score
   implementation and historical feature-validation results.
+- [Weekly mid slope](references/WEEKLY_MID_SLOPE.md): user meaning of gentle
+  decline, full-precision measurement, active support and bounded anticipatory
+  Stalled admission, with source/quote/completion guards.
 - [Reversal edge](references/REVERSAL_EDGE.md): the user's manual trigger,
   worked examples and historical/unvalidated research proposals.
 - [Model history](references/MODEL_HISTORY.md): former family split,

@@ -40,7 +40,7 @@ decision time; no future forming-bar high is accepted as historical completion.
 
 Before selecting the preferred D1/H4 admission frame, if:
 
-- D1 is recognized and its local phase is Active or MidCrossed;
+- D1 is recognized and its local phase is Active, MidCrossed or Stalled;
 - H4 is recognized and Completed with a historical closed-bar touch;
 - that H4 signal started at or after the current D1 signal bar's start;
 
@@ -48,6 +48,8 @@ then mark D1 admission phase Completed as well. This prevents the same impulse
 from being admitted again solely because the last closed Daily bar still has
 age zero, or because Weekly has a supportive regime. Publication rejects this
 phase before checking weekly support or constructing a fresh admitted plan.
+Stalled is included since2026-10-29 so the new anticipatory support cannot
+readmit a completed impulse. See [gentle weekly support](WEEKLY_MID_SLOPE.md).
 
 The temporal containment rule intentionally does not infer that an H4 episode
 starting before the D1 seed belongs to the same impulse. An older completed H4

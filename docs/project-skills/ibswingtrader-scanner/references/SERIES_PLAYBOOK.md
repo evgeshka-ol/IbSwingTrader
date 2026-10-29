@@ -192,8 +192,14 @@ do not apply. Target and stop are rebuilt from that entry. See
 Before publication, only the deduplicated recognized shortlist refreshes H4,
 Daily and fresh M5. Recognition and phase are recalculated. Admission requires
 an Active/MidCrossed episode, existing higher-timeframe support and a valid
-fresh-price plan. Stalled/Completed, missing fresh quote, lost recognition or
-failed support produces Other with zero trade levels and explicit `NotReady`.
+fresh-price plan. Since2026-10-29, a recognized D1 DeepDeclineRecovery with
+gentle W1 and improving native D1 MACD may instead receive the bounded
+[AnticipatoryD1Recovery admission](WEEKLY_MID_SLOPE.md), retaining LocalPhase=Stalled.
+It requires fresh valid H4 evidence, at least2% room to both D1/W1 mids and
+price at/above the last completed D1 low; H4 momentum improvement is not
+required. Ordinary active gentle-W1 support still requires closed/fresh H4
+improvement. W1 Collapse, Completed, unsupported Stalled, missing fresh quote,
+lost recognition or failed support produces Other with zero trade levels and explicit `NotReady`.
 If refreshed history newly recognizes BellUp, the pending reversal is retained
 as Other with the precedence reason, rather than publishing a reversal plan
 for that BellUp. The next scan can apply the normal BellUp pipeline.

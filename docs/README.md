@@ -32,6 +32,8 @@ or that the dependable-winner goal has been achieved.
 
 ## Topic entry points
 
+- Gentle W1 and anticipatory D1 recovery: [current publication rules](project-skills/ibswingtrader-scanner/references/WEEKLY_MID_SLOPE.md),
+  [October26 Other study](investigations/2026-10/investigation-2026-10-29-other-weekly-slope.md).
 - BellUp timing, pauses and Triangle: [Series Playbook](project-skills/ibswingtrader-scanner/references/SERIES_PLAYBOOK.md),
   [latest impulse-level study](investigations/2026-10/investigation-2026-10-16-pause-impulse-level.md).
 - ReversalHook: [EMA / fresh H4 recovery contract](project-skills/ibswingtrader-scanner/references/BOLLINGER_EMA_AND_RECOVERY.md),
@@ -56,6 +58,8 @@ in older notes are historical. Follow current skills and success criteria.
 
 ### 2026-10
 
+- [October26 Other and gentle weekly-mid slope](investigations/2026-10/investigation-2026-10-29-other-weekly-slope.md)
+- [SOFI: Stalled перед бустом 27 октября](investigations/2026-10/investigation-2026-10-29-sofi-stalled-before-boost.md)
 - [Empty wishlist and CRGY/FWDI reversal admission](investigations/2026-10/investigation-2026-10-19-empty-watch-and-reversal-admission.md)
 - [VSTM: recognized Daily hook rejected as Stalled](investigations/2026-10/investigation-2026-10-17-vstm-stalled-reclaim.md)
 
@@ -87,6 +91,7 @@ in older notes are historical. Follow current skills and success criteria.
 These describe changes at their recorded date. Later behavior is maintained
 in project references, including subsequent overrides.
 
+- [Gentle weekly support and anticipatory D1 admission](implementation/implementation-2026-10-29-gentle-weekly-anticipatory-reversal.md)
 - [Report order, morning evaluation and closed Daily history](implementation/implementation-2026-10-20-report-order-morning-evaluation-daily-history.md)
 - [EMA Bollinger and fresh H4 support for recognized reversals](implementation/implementation-2026-10-17-bollinger-ema-h4-recovery.md)
 - [Reversal-only watch cycles and meaningful Daily-mid drops](implementation/implementation-2026-10-17-reversal-watch-lifecycle.md)

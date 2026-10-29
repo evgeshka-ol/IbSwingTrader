@@ -14,6 +14,17 @@ metadata, fresh H4 momentum and watch-ledger migration.
 
 ## High-impact scanner settings
 
+### Gentle weekly-mid support (2026-10-29)
+
+WeeklyMidSlope.MaximumDeclinePctPerWeek=1.5 and
+ReversalGentleWeeklySupport.MinimumRoomPct=2 are code-level publication rules,
+not a global redefinition of Up/Down/Flat or new probability coefficients.
+The active-D1 and anticipatory-Stalled paths use full-precision weekly tails,
+native D1 MACD, fresh H4 availability and the existing direct ScanPrice entry.
+The anticipatory branch additionally needs2% room to D1 mid and no fresh break
+of the last completed D1 low. See [exact rules](WEEKLY_MID_SLOPE.md).
+The study's proxy1.5% target/3% stop are not live-plan settings.
+
 ### TWS universe price and volume filters
 
 Since 2026-10-21, TwsStockUniverseProvider sends no `priceBelow` filter for

@@ -35,9 +35,11 @@ must be positive and below entry. Existing risk caps, stop-limit ordering and
 target calculation remain in force. Exit-profile classification is distinct
 from the retired pullback entry policy for admitted hooks.
 
-The rule applies to every admitted origin and H4/D1 timeframe. It does not
-admit Stalled, Completed, unsupported or stale-price diagnostics. BellUp retains
-its existing publication entry behavior. Historical saved plans/outcomes are
+The rule applies to every admitted origin and H4/D1 timeframe, including
+the user-authorized2026-10-29 [anticipatory D1 support](WEEKLY_MID_SLOPE.md)
+that can admit selected local Stalled episodes. Entry policy itself does not
+authorize a phase: unsupported Stalled, Completed and stale-price diagnostics
+remain rejected. BellUp retains its existing publication entry behavior. Historical saved plans/outcomes are
 not rewritten; refreshing evaluation feedback does not replay them.
 
 ScanPrice is a reference for the published plan, not a guaranteed broker fill.

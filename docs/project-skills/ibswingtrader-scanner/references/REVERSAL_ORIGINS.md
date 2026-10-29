@@ -47,6 +47,9 @@ Since2026-10-28, DeepDeclineRecovery also limits the separate
 [current-week MACD support exception](REVERSAL_D1_WEEKLY_SUPPORT.md) for
 active D1 hooks during W1 Down. PostBellUpRecovery and Unclassified do not
 use that exception. Ordinary recognition, completion and fresh-plan checks remain.
+Since2026-10-29 DeepDeclineRecovery also limits the separate
+[gentle-W1 active/anticipatory D1 admission](WEEKLY_MID_SLOPE.md). It does not
+give PostBellUpRecovery or Unclassified the new support path.
 
 ## Post-BellUp completion at Daily mid (2026-10-23)
 

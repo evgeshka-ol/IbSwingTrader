@@ -17,6 +17,8 @@ Scripts reproduce the original studies, not the new project success criteria.
 | Pause / impulse level | [analysis-2026-10-16-pause-impulse-level.events.json.gz](analysis-2026-10-16-pause-impulse-level.events.json.gz), [analysis-2026-10-16-pause-impulse-level.json](analysis-2026-10-16-pause-impulse-level.json) |
 | H4 preserved Bell-like correction (ARLO hypothesis) | [analysis-2026-10-28-h4-preserved-bell-correction.csv](analysis-2026-10-28-h4-preserved-bell-correction.csv), [analysis-2026-10-28-h4-preserved-bell-correction.json](analysis-2026-10-28-h4-preserved-bell-correction.json) |
 | ReversalHook deep entries / frozen NoEntry audit | [analysis-2026-10-28-reversal-entry-audit.json](analysis-2026-10-28-reversal-entry-audit.json) |
+| SOFI Stalled before October27 boost | [analysis-2026-10-29-sofi-reversal-rejection.json](analysis-2026-10-29-sofi-reversal-rejection.json) |
+| October26 Other / gentle weekly-mid slope | [analysis-2026-10-29-other-weekly-slope.json](analysis-2026-10-29-other-weekly-slope.json), [analysis-2026-10-29-other-weekly-slope.csv.gz](analysis-2026-10-29-other-weekly-slope.csv.gz) |
 | Frozen BellUp Win model v1 | [model-2026-10-05-bellup-win.json](model-2026-10-05-bellup-win.json) |
 
 For study methods and limitations, use the [documentation map](../README.md).

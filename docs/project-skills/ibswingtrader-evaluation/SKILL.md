@@ -29,6 +29,14 @@ evidence and does not replace Win, profit or confidence calibration.
 
 ## Main rule
 
+Since2026-10-29 a playable D1 DeepDeclineRecovery may retain Phase=Stalled
+with Support containing Admission=AnticipatoryD1Recovery/LocalPhase=Stalled.
+This is an explicitly admitted plan under the scanner's
+[gentle-W1 policy](../ibswingtrader-scanner/references/WEEKLY_MID_SLOPE.md),
+not a diagnostic Other solely because that local phase remains Stalled.
+Preserve the complete saved reason and group; EntryTime still establishes
+participation. Historical Stalled/Other rows are not retrospectively admitted.
+
 Since2026-10-22 preserve the saved origin prefix in PatternVerdictReason
 through evaluation and dataset/feedback refresh. PostBellUpRecovery,
 DeepDeclineRecovery and Unclassified precede the original ReversalHook

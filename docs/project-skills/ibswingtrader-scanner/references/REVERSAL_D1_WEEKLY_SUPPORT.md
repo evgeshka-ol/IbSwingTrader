@@ -2,6 +2,9 @@
 
 Current publication policy, adopted2026-10-28 following NN's October23 scan.
 It adds a bounded alternative to Weekly support for selected D1 episodes.
+Since2026-10-29 there is also a separate [gentle weekly-mid support rule](WEEKLY_MID_SLOPE.md),
+including a bounded anticipatory Stalled path. That geometric rule can operate
+on Monday; it does not change the same-week comparison defined here.
 
 ## Same-week observation, not week-over-week crossover
 
