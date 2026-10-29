@@ -39,9 +39,14 @@ contemporaneous EMA mid within that run; it is not future drawdown or amplitude.
    below-mid episode, or a short dip without an identified preceding BellUp.
 
 The meaningful-depth5% value reuses the user's wishlist depth convention;
-it does not make origin an enrollment or readiness gate. Deep takes precedence
+it does not by itself admit a trade or change wishlist enrollment. Deep takes precedence
 over a much older BellUp when a prolonged meaningful decline has intervened.
 These are initial transparent semantic rules, not profit-validated thresholds.
+
+Since2026-10-28, DeepDeclineRecovery also limits the separate
+[current-week MACD support exception](REVERSAL_D1_WEEKLY_SUPPORT.md) for
+active D1 hooks during W1 Down. PostBellUpRecovery and Unclassified do not
+use that exception. Ordinary recognition, completion and fresh-plan checks remain.
 
 ## Post-BellUp completion at Daily mid (2026-10-23)
 

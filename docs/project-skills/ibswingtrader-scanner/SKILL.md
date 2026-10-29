@@ -49,6 +49,16 @@ freshness and migration rules in
   D1 Down/negative MACD when completed H4 bands and momentum plus fresh H4
   momentum turn up. D1 Collapse remains a veto. See
   [H4-led admission](references/REVERSAL_H4_DAILY_SUPPORT.md) for exact gates.
+- Since2026-10-28, an active DeepDeclineRecovery on D1 can pass W1 Down
+  when the current week's MACD line and histogram improve between two
+  completed native D1 observations, with improving D1/closed H4/fresh H4
+  momentum and at least2% remaining room to D1 mid. W1 Collapse remains a
+  veto. See [weekly recovery support](references/REVERSAL_D1_WEEKLY_SUPPORT.md).
+- Since2026-10-28, an admitted ReversalHook enters at the fresh published
+  ScanPrice exactly. DeepPullback discounts, Bollinger entry floors and M15
+  entry forecasts cannot move this entry. Target/stop are rebuilt from that
+  reference; publication rejects a mismatched entry. See
+  [direct reversal entry](references/REVERSAL_SCAN_PRICE_ENTRY.md).
 - A completed-bar upper-band touch consumes the current reversal impulse even
   after a pullback. A completed H4 seeded inside the current D1 episode blocks
   readmission through that D1 signal. See REVERSAL_IMPULSE_COMPLETION.md for

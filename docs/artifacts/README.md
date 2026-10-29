@@ -15,6 +15,8 @@ Scripts reproduce the original studies, not the new project success criteria.
 | Pause / upper position | [analysis-2026-10-15-pause-upper-position.csv.gz](analysis-2026-10-15-pause-upper-position.csv.gz), [analysis-2026-10-15-pause-upper-position.events.json.gz](analysis-2026-10-15-pause-upper-position.events.json.gz), [analysis-2026-10-15-pause-upper-position.json](analysis-2026-10-15-pause-upper-position.json) |
 | Pause / body position | [analysis-2026-10-16-pause-body-position.json](analysis-2026-10-16-pause-body-position.json) |
 | Pause / impulse level | [analysis-2026-10-16-pause-impulse-level.events.json.gz](analysis-2026-10-16-pause-impulse-level.events.json.gz), [analysis-2026-10-16-pause-impulse-level.json](analysis-2026-10-16-pause-impulse-level.json) |
+| H4 preserved Bell-like correction (ARLO hypothesis) | [analysis-2026-10-28-h4-preserved-bell-correction.csv](analysis-2026-10-28-h4-preserved-bell-correction.csv), [analysis-2026-10-28-h4-preserved-bell-correction.json](analysis-2026-10-28-h4-preserved-bell-correction.json) |
+| ReversalHook deep entries / frozen NoEntry audit | [analysis-2026-10-28-reversal-entry-audit.json](analysis-2026-10-28-reversal-entry-audit.json) |
 | Frozen BellUp Win model v1 | [model-2026-10-05-bellup-win.json](model-2026-10-05-bellup-win.json) |
 
 For study methods and limitations, use the [documentation map](../README.md).

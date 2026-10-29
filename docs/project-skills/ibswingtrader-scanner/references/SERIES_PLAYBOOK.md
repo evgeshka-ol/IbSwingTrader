@@ -184,6 +184,11 @@ Final fresh-M5 publication validation remains separate. The bridge adds
 possible missing-data requests for the non-BellUp pool, not an unconditional
 download of all M5 history. BellUp timing is unchanged.
 
+Since2026-10-28, admitted ReversalHook EntryPrice equals the fresh published
+ScanPrice exactly; legacy DeepPullback/series discounts and M15 entry forecasts
+do not apply. Target and stop are rebuilt from that entry. See
+[direct reversal entry](REVERSAL_SCAN_PRICE_ENTRY.md) for the publication contract.
+
 Before publication, only the deduplicated recognized shortlist refreshes H4,
 Daily and fresh M5. Recognition and phase are recalculated. Admission requires
 an Active/MidCrossed episode, existing higher-timeframe support and a valid
@@ -500,7 +505,9 @@ Bell pair:
 - A higher-timeframe `BellUp` still needs H4 not to contradict it for today's
   trade-ready list. ReversalHook checks support at the next higher available
   scale: Daily context supports the recent-IPO H4 fallback; Weekly context
-  supports a Daily hook. Higher-scale support is a readiness check, not a
+  supports a Daily hook, including the bounded
+  [current-week recovery exception](REVERSAL_D1_WEEKLY_SUPPORT.md) for active
+  DeepDeclineRecovery. Higher-scale support is a readiness check, not a
   substitute for the confirmed pattern.
 - When the Daily BellUp geometry is strong but the long-lookback Daily mid is
   still descending, classify it as `DailyTransitionBellUp`. This is a

@@ -39,8 +39,8 @@ history; taking the last three feature points does not restart its seed.
 
 Daily MACD positivity and the D1 mid-slope floor are not required by this
 alternative. If it does not qualify, the original Daily-support path still
-applies, including its Down/Collapse checks. D1 hooks retain their existing
-Weekly support rules; BellUp precedence remains unchanged. This does not
+applies, including its Down/Collapse checks. D1 hooks retain their Weekly support path, with the separate
+[October28 current-week recovery exception](REVERSAL_D1_WEEKLY_SUPPORT.md); BellUp precedence remains unchanged. This does not
 admit every recognized hook or every quote above its last closed price.
 
 Publication uses refreshed completed native D1 series for both this support

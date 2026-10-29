@@ -59,6 +59,12 @@ an overly conservative exit, especially under final-target reduction.
 
 ## Series-driven TradePlan Direction
 
+User-selected exception since2026-10-28: a freshly admitted ReversalHook enters
+at its published ScanPrice exactly, with target/stop rebuilt at that reference.
+Legacy deep-pullback discounts do not apply to its entry. The exploratory
+series-driven directions below do not override this current policy. See the
+scanner [entry contract](../../ibswingtrader-scanner/references/REVERSAL_SCAN_PRICE_ENTRY.md).
+
 The trade plan should use available rows/series from both:
 
 - `evaluation-dataset.csv`

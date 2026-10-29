@@ -75,14 +75,20 @@ dotnet run --project IbSwingTrader -- sort-evaluation-dataset
 The user runs this command/builds. The regression in EvaluationConfidenceChecks
 loads the shipped settings to catch a configuration/default mismatch.
 
-### Amplitude reference (2026-10-21)
+### Amplitude reference (updated 2026-10-28)
 
 User-selected AmplitudePct formula, rounded to two decimals:
 
-- Entered (`EntryTime` present): `(MaxPrice / EntryPrice - 1) * 100`.
+- Other (CandidateGroup, or CandidateSource when group is missing): always
+  `(MaxPrice / ScanPrice - 1) * 100`, rounded to two decimals. Ignore minimum
+  price/time and do not invert the sign based on extrema order. A maximum
+  below ScanPrice is naturally negative. NN Oct23 is27.82% from10.10 to12.91,
+  rather than32.27% from the later9.76 low. This supersedes the October21
+  min-first formula for Other only; historical notes retain the old values.
+- Entered playable (`EntryTime` present): `(MaxPrice / EntryPrice - 1) * 100`.
   Do not infer participation from nonzero plan prices. Extrema order does
   not invert this entry-relative result.
-- Unentered diagnostics, including Other: if `MinTime < MaxTime` and the
+- Unfilled playable rows (BellUp/ReversalHook, and ungrouped legacy rows): if `MinTime < MaxTime` and the
   minimum is below ScanPrice, use
   `(MaxPrice / MinPrice - 1) * 100`. If `MaxTime < MinTime`, use ScanPrice
   as reference and retain the existing negative max-first order marker.

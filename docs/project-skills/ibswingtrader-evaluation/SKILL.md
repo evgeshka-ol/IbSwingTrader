@@ -37,13 +37,12 @@ the verdict after stripping that known prefix, but retain its original text.
 Historical unprefixed rows remain unchanged; do not classify from future cache.
 See scanner [origin rules](../ibswingtrader-scanner/references/REVERSAL_ORIGINS.md).
 
-Since 2026-10-21, AmplitudePct uses EntryPrice for rows with EntryTime.
-Unentered diagnostics (including Other) use the minimum when MinTime is
-strictly before MaxTime and that minimum is below ScanPrice, otherwise
-ScanPrice. The legacy negative max-first
-marker remains only for unentered rows. Equal/missing extrema times use
-ScanPrice without inferring intrabar order. See EVALUATION_RULES.md for
-formulas, historical refresh and the distinction from trade-bounded MFE.
+Since 2026-10-28, Other AmplitudePct is always `(MaxPrice / ScanPrice - 1) * 100`,
+independent of the later minimum and extrema order. A maximum below ScanPrice
+produces a negative value naturally. Entered playable rows still use EntryPrice;
+unfilled playable rows retain the prior min-first/max-first policy. The offline
+`refresh-evaluation-feedback` command updates existing report rows without
+replaying outcomes. See EVALUATION_RULES.md for fallback and MFE distinctions.
 
 Since 2026-10-20 scheduled morning scans chain evaluate-candidates after a
 successful scan, using the wrapper's local morning window. Evaluation still

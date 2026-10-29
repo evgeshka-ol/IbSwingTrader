@@ -44,6 +44,14 @@ Legacy scoring/filter settings; they do not gate enrollment in the persistent
 loser watch universe restored on 2026-10-10. A fallen name must not already
 be ready to trade in order to be watched.
 
+### `GetCandidates.TradePlan`: ReversalHook publication entry
+
+Admitted ReversalHook execution since2026-10-28 always uses the fresh ScanPrice.
+Legacy TradePlan DeepPullback/SeriesEntryProfile entry discounts and recovery
+discount caps cannot move its final publication entry. Exit/risk-profile
+parameters still build target/stop from that reference. See
+[direct reversal entry](REVERSAL_SCAN_PRICE_ENTRY.md).
+
 ### `GetCandidates.ReversalWatchList`
 
 The wishlist is exclusively an active watch for ReversalHook after a meaningful
