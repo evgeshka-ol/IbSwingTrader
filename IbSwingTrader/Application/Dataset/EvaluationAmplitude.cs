@@ -5,11 +5,17 @@ namespace IbSwingTrader.Application.Dataset
         public static decimal Calculate(
             decimal scanPrice, decimal entryPrice, DateTime? entryTime,
             decimal? maxPrice, decimal? maxPct, DateTime? maxTime,
-            decimal? minPrice, decimal? minPct, DateTime? minTime)
+            decimal? minPrice, decimal? minPct, DateTime? minTime,
+            string? candidateGroup = null)
         {
             var high = ResolvePrice(maxPrice, maxPct, scanPrice);
             if (!high.HasValue)
                 return 0m;
+
+            // Other has no executable plan: measure upside from the published
+            // reference, without inferring a later entry or an extrema-order sign.
+            if (string.Equals(candidateGroup, "Other", StringComparison.OrdinalIgnoreCase))
+                return Percent(scanPrice, high.Value);
 
             // Participation is established by EntryTime, not by nonzero plan levels.
             if (entryTime.HasValue)

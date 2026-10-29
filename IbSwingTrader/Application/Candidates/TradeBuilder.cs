@@ -26,6 +26,9 @@ namespace IbSwingTrader.Application.Candidates
 
             if (candles == null || candles.Count < settings.MinimumCandles)
                 throw new ArgumentException("Not enough candles");
+            if (useScanPriceEntry && entryPatternFamily == TradeEntryPatternFamily.ReversalHook &&
+                scanPriceOverride is not > 0m)
+                throw new ArgumentException("Confirmed ReversalHook requires a positive fresh scan reference");
 
             var last = candles[^1];
 
@@ -34,7 +37,7 @@ namespace IbSwingTrader.Application.Candidates
                 .Min(x => x.Low);
 
             var entry = useScanPriceEntry
-                ? ResolveScanPriceEntry(last.Close, scanPriceOverride)
+                ? ResolveScanPriceEntry(last.Close, scanPriceOverride, entryPatternFamily)
                 : BuildEntryPrice(
                     last.Close,
                     entryCandles,
@@ -139,14 +142,15 @@ namespace IbSwingTrader.Application.Candidates
             };
         }
 
-        private decimal ResolveScanPriceEntry(decimal fallbackEntry, decimal? scanPriceOverride)
+        private decimal ResolveScanPriceEntry(decimal fallbackEntry, decimal? scanPriceOverride,
+            TradeEntryPatternFamily family)
         {
             var scanPrice = scanPriceOverride.GetValueOrDefault();
             var entry = scanPrice > 0m ? scanPrice : fallbackEntry;
 
             _logger.Info(
                 $"Trade entry forced to scan price. " +
-                $"Reason=Confirmed BellUp passed entry timing, entering without discount or pattern pullback. " +
+                $"Reason=Confirmed {family} uses scan reference, entering without discount or pattern pullback. " +
                 $"Entry={_fmt.Price(entry)}");
 
             return entry;

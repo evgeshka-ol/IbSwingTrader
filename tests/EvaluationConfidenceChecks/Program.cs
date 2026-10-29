@@ -167,11 +167,36 @@ try
     Check((await csv.ReadAsync(output)).Single().AmplitudePct == 20m,
         "Incremental merge retains the entry-based amplitude");
 
+    var otherRow = new EvaluationDatasetRow
+    {
+        Ticker = "NN", ScanTime = new DateTime(2026, 10, 23, 17, 19, 46),
+        PresetScanCode = "TOP_PERC_GAIN", GroupLabel = "Wishlist",
+        CandidateGroup = "Other", CandidateSource = "Other", Outcome = "NoEntry",
+        ScanPrice = 10.1m, MaxPrice = 12.91m, MinPrice = 9.76m,
+        MaxTime = new DateTime(2026, 10, 26, 13, 10, 0),
+        MinTime = new DateTime(2026, 10, 26, 9, 55, 0), AmplitudePct = 32.27m
+    };
+    await csv.WriteAsync(output, [otherRow]);
+    await builder.RefreshFeedbackAsync();
+    var refreshedOther = (await csv.ReadAsync(output)).Single();
+    Check(refreshedOther.AmplitudePct == 27.82m && refreshedOther.Outcome == "NoEntry" &&
+        refreshedOther.MinPrice == 9.76m && refreshedOther.MaxPrice == 12.91m,
+        "Offline refresh rebases historical Other from scan while preserving extrema and outcome");
+    await builder.RefreshFeedbackAsync();
+    Check((await csv.ReadAsync(output)).Single().AmplitudePct == 27.82m,
+        "Other historical amplitude refresh is idempotent");
+    otherRow.CandidateGroup = "";
+    await csv.WriteAsync(output, [otherRow]);
+    await builder.RefreshFeedbackAsync();
+    Check((await csv.ReadAsync(output)).Single().AmplitudePct == 27.82m,
+        "Legacy missing group uses saved Other source for amplitude");
+    await csv.WriteAsync(output, [refreshed]);
+
     // Use the shipped configuration: its legacy ordered-values list caused Other before ReversalHook.
     var settingsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
         "../../../../../IbSwingTrader/agentsettings.json"));
-    var reportSettings = System.Text.Json.JsonSerializer.Deserialize<AgentSettings>(
-        await File.ReadAllTextAsync(settingsPath))!.BuildEvaluationDataset;
+    var reportSettings = new IbSwingTrader.Infrastructure.Settings.AgentSettingsProvider(settingsPath)
+        .Get().BuildEvaluationDataset;
     reportSettings.MinScanTime = new DateTime(2099, 1, 1);
     reportSettings.MinAmplitudePct = 999m;
     var sortRows = new List<EvaluationDatasetRow>();

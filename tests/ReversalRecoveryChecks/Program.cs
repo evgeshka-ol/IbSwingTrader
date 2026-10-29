@@ -196,4 +196,52 @@ Check(H4Support(priceNow: 100m, dailyMids: [102m]), "The existing two-percent ro
 Check(!H4Support(priceNow: 24.2m), "Above-Daily-mid setups use the ordinary support path");
 Check(!H4Support(mids: []), "Missing native H4 geometry cannot be replaced with fresh price alone");
 Check(!H4Support(dailyMids: [0m]), "Invalid Daily reference cannot authorize support");
+var nnDaily = System.Text.Json.JsonSerializer.Deserialize<List<Candle>>(
+    File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "nn-october23-daily.json")))!;
+var nnAt = new DateTime(2026, 10, 23, 17, 13, 14);
+List<FeatureSet> nnH4 = [new() { MACDHistogram = .08742711606870982m },
+    new() { MACDHistogram = .12952010230659362m }];
+var nnFresh = new ReversalRecoveryMomentum(true,
+    "RecoveryMomentum(Source=FreshPriceProvisionalH4, PriceSource=M5PartialClose, PriceTime=2026-10-23T17:13:12, Improving=True)");
+bool WeeklySupport(string origin = "DeepDeclineRecovery", bool recognized = true,
+    string phase = "Active", string regime = "Neutral", List<Candle>? daily = null,
+    List<FeatureSet>? h4 = null, decimal quote = 10.1m,
+    ReversalRecoveryMomentum? fresh = null, DateTime? at = null)
+    => ReversalDailyWeeklySupport.Allows(origin, recognized, phase, regime, daily ?? nnDaily,
+        h4 ?? nnH4, quote, fresh ?? nnFresh, at ?? nnAt, out _);
+Check(WeeklySupport(), "NN frozen scan-time D1 prefix supports a weekly recovery exception");
+Check(ReversalDailyWeeklySupport.Allows("DeepDeclineRecovery", true, "Active", "Neutral",
+    nnDaily, nnH4, 10.1m, nnFresh, nnAt, out var nnEvidence) &&
+    nnEvidence.Contains("WeekStart=2026-10-19") && nnEvidence.Contains("PreviousObservation=2026-10-22") &&
+    nnEvidence.Contains("LatestObservation=2026-10-23") && nnEvidence.Contains("Source=CompletedNativeD1") &&
+    nnEvidence.Contains(nnFresh.Diagnostics), "Weekly evidence records same-week observations and fresh H4 provenance");
+Check(!WeeklySupport(regime: "Collapse"), "W1 Collapse still blocks the exception");
+Check(!WeeklySupport(origin: "PostBellUpRecovery"), "Post-BellUp does not borrow deep-decline support");
+Check(!WeeklySupport(origin: "Unclassified"), "Unknown origins cannot bypass W1 Down");
+Check(!WeeklySupport(recognized: false), "Weekly recovery never recognizes a new hook");
+foreach (var phase in new[] { "Completed", "Stalled", "Invalidated" })
+    Check(!WeeklySupport(phase: phase), $"{phase} cannot borrow weekly recovery");
+Check(!WeeklySupport(fresh: new(false, "Unavailable")), "Stale or weak fresh H4 cannot authorize weekly recovery");
+Check(!WeeklySupport(h4: []), "Missing closed H4 evidence cannot authorize weekly recovery");
+Check(!WeeklySupport(h4: [new() { MACDHistogram = .2m }, new() { MACDHistogram = .1m }]),
+    "Closed H4 deterioration blocks the exception");
+Check(!WeeklySupport(quote: 11.44m), "Room to Daily mid is required");
+Check(!WeeklySupport(at: nnAt.Date.AddHours(15)), "The final Daily close cannot be used before session close");
+Check(!WeeklySupport(at: nnAt.AddDays(3)), "A previous week's observation is not current-week momentum");
+Check(!WeeklySupport(daily: nnDaily.Take(100).ToList()), "Short or old history cannot prove weekly recovery");
+var mondayPrefix = nnDaily.Where(x => x.Time.Date <= new DateTime(2026, 10, 19)).ToList();
+Check(!WeeklySupport(daily: mondayPrefix, at: new DateTime(2026, 10, 19, 17, 0, 0)),
+    "Monday cannot compare two completed closes from the same week");
+var weakerDaily = nnDaily.Select(x => new Candle { Time = x.Time, Close = x.Close }).ToList();
+weakerDaily[^1].Close = weakerDaily[^2].Close - .01m;
+Check(!WeeklySupport(daily: weakerDaily), "A renewed decline cannot masquerade as weekly recovery");
+Check(!ReversalDailyWeeklySupport.Allows("DeepDeclineRecovery", true, "Active", "Neutral",
+    weakerDaily, nnH4, 10.1m, nnFresh, nnAt, out var weakWeeklyReason) &&
+    weakWeeklyReason.Contains("current-week-MACD-not-improving"),
+    "Daily momentum improvement alone cannot replace same-week MACD improvement");
+var outOfOrderDaily = nnDaily.ToList();
+outOfOrderDaily.Reverse();
+Check(!WeeklySupport(daily: outOfOrderDaily), "Nonchronological history is rejected");
+Check(nnDaily[^1].Close == 10.08m && nnDaily[^1].Time.Date == nnAt.Date,
+    "Support analysis leaves the frozen prefix unchanged and contains no October26 peak");
 Console.WriteLine($"Passed {checks} reversal recovery checks.");

@@ -513,7 +513,8 @@ namespace IbSwingTrader.Application.Dataset
                 evaluation.EntryPrice,
                 evaluation.EntryTime,
                 maxPrice, maxPct, maxTime,
-                minPrice, minPct, minTime);
+                minPrice, minPct, minTime,
+                candidateSnapshot?.GroupName ?? candidateSource);
 
             var daysToMaxUpFromScan = DiffDays(evaluation.ScanTime, maxTime);
             var daysToMaxUpFromEntry = DiffDays(evaluation.EntryTime, maxTime);
@@ -720,7 +721,8 @@ namespace IbSwingTrader.Application.Dataset
             row.AmplitudePct = EvaluationAmplitude.Calculate(
                 row.ScanPrice, row.EntryPrice, row.EntryTime,
                 row.MaxPrice, row.MaxPct, row.MaxTime,
-                row.MinPrice, row.MinPct, row.MinTime);
+                row.MinPrice, row.MinPct, row.MinTime,
+                string.IsNullOrWhiteSpace(row.CandidateGroup) ? row.CandidateSource : row.CandidateGroup);
             row.GroupLabel = Classify(row.AmplitudePct, row.DaysToMaxUpFromScan);
         }
 

@@ -850,12 +850,26 @@ namespace IbSwingTrader.Application.Candidates
                     Reject("BellUp appeared in refreshed history; preserve BellUp precedence");
                     return;
                 }
-                if (!IsReversalHookHigherTimeframeSupportive(episode.Timeframe,
-                        BuildBollingerStateSet(series), series, quote.Price,
-                        episode.Recognized, episode.Phase, episode.Momentum,
-                        recoveryH4Features, recoveryDailyMid, out var support))
+                var publicationState = BuildBollingerStateSet(series);
+                string? weeklyRecoverySupport = null;
+                string? weeklyRecoveryFailure = null;
+                if (episode.Timeframe is ("D1" or "Daily") && reversalOrigin?.Kind == "DeepDeclineRecovery" &&
+                    ctx.DailyCandles is { Count: > 0 })
                 {
-                    Reject(support);
+                    if (ReversalDailyWeeklySupport.Allows(reversalOrigin.Kind, episode.Recognized,
+                        episode.Phase, publicationState.Weekly.Regime,
+                        BellUpEntryTiming.GetCompletedCandles(ctx.DailyCandles, Timeframe.D1, MarketTime.Now()),
+                        recoveryH4Features, quote.Price, episode.Momentum, MarketTime.Now(), out var weeklyEvidence))
+                        weeklyRecoverySupport = weeklyEvidence;
+                    else
+                        weeklyRecoveryFailure = weeklyEvidence;
+                }
+                if (!IsReversalHookHigherTimeframeSupportive(episode.Timeframe,
+                        publicationState, series, quote.Price,
+                        episode.Recognized, episode.Phase, episode.Momentum,
+                        recoveryH4Features, recoveryDailyMid, weeklyRecoverySupport, out var support))
+                {
+                    Reject(support + (weeklyRecoveryFailure != null ? $"; {weeklyRecoveryFailure}" : string.Empty));
                     return;
                 }
                 var plan = await BuildTradePlan(ctx, quote, reversalPublication: true);
@@ -865,7 +879,7 @@ namespace IbSwingTrader.Application.Candidates
                     Reject("Live quote expired while building publication plan");
                     return;
                 }
-                if (plan.EntryPrice <= 0m || plan.ExitPrice <= plan.EntryPrice ||
+                if (plan.EntryPrice != quote.Price || plan.EntryPrice <= 0m || plan.ExitPrice <= plan.EntryPrice ||
                     plan.StopLoss <= 0m || plan.StopLoss >= plan.EntryPrice)
                 {
                     Reject("Invalid fresh trade plan structure");
@@ -875,6 +889,7 @@ namespace IbSwingTrader.Application.Candidates
                 plan.PublicationRefreshStatus = quote.Source.StartsWith("IBLive", StringComparison.Ordinal)
                     ? "ReversalLiveQuoteFallback" : "ReversalFreshM5";
                 candidate.TradePlan = plan;
+                candidate.NeedsDeeperEntry = false;
                 candidate.PatternVerdictReason = $"ReversalHook confirmed on {episode.Timeframe}; {episode.Reason}; Support={support}";
                 if (reversalOrigin != null)
                     candidate.PatternVerdictReason = ReversalHookPhaseClassifier.WithOriginPrefix(
@@ -1552,6 +1567,7 @@ namespace IbSwingTrader.Application.Candidates
             ReversalRecoveryMomentum momentum,
             IReadOnlyList<FeatureSet> recoveryH4Features,
             decimal recoveryDailyMid,
+            string? weeklyRecoverySupport,
             out string reason)
         {
             var isH4Hook = reversalTimeframe.Equals("H4", StringComparison.OrdinalIgnoreCase);
@@ -1562,6 +1578,13 @@ namespace IbSwingTrader.Application.Candidates
             var rsi = isH4Hook ? recentSeries.DailyRsiSeries : recentSeries.WeeklyRsiSeries;
             var histogram = isH4Hook ? recentSeries.DailyMacdHistogramSeries : recentSeries.WeeklyMacdHistogramSeries;
             var state = isH4Hook ? bbState.Daily : bbState.Weekly;
+
+            if (!isH4Hook && state.Regime != nameof(BollingerFigureRegime.Collapse) &&
+                weeklyRecoverySupport != null)
+            {
+                reason = weeklyRecoverySupport;
+                return true;
+            }
 
             var h4RecoveryReason = string.Empty;
             if (isH4Hook && ReversalH4DailySupport.Allows(recognized, phase, state.Regime,
@@ -3384,7 +3407,8 @@ namespace IbSwingTrader.Application.Candidates
             var needsDeeperEntry = ResolveNeedsDeeperEntry(ctx.Snapshot, diagnostics);
             var needsMomentumExit = ResolveNeedsMomentumExit(ctx.Snapshot, diagnostics, entryScore);
             var isConstructiveDeepMinFirst = IsConstructiveDeepMinFirstProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
-            var entryDiscountOverridePct = ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles, diagnostics, isConstructiveDeepMinFirst);
+            var entryDiscountOverridePct = reversalPublication ? null :
+                ResolveDeepPullbackEntryDiscountPct(ctx.Snapshot, ctx.Candles, diagnostics, isConstructiveDeepMinFirst);
             var momentumExit = needsMomentumExit ? tradeSettings.MomentumExit : null;
             var isParabolicExpansion = IsParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry, needsMomentumExit);
             var isDeepParabolicExpansion = IsDeepParabolicExpansionProxy(ctx.Snapshot, diagnostics, needsDeeperEntry);
@@ -3412,7 +3436,7 @@ namespace IbSwingTrader.Application.Candidates
             var scanPrice = isBellUpPhaseReadyToday
                 ? (bellUpPublicationEntry ?? liveReferencePrice)
                 : (reversalPublication ? liveReferencePrice : historicalPrice);
-            var scanPriceFloorOverride = ResolveSeriesBasedScanPriceFloor(
+            var scanPriceFloorOverride = reversalPublication ? null : ResolveSeriesBasedScanPriceFloor(
                 scanPrice,
                 recentSeries,
                 bbState,
@@ -3708,111 +3732,120 @@ namespace IbSwingTrader.Application.Candidates
                     $"EntryDiscountPct={_fmt.Percent(tradeSettings.MomentumExit.EntryDiscountPct)}");
             }
 
-            var bbEntryDiscountOverridePct = ResolveBollingerEntryDiscountOverridePct(
-                bbState,
-                entryDiscountOverridePct);
-
-            if (bbEntryDiscountOverridePct != entryDiscountOverridePct)
+            // A confirmed reversal is played at its fresh reference. Legacy entry
+            // discounts, Bollinger floors and M15 pullback forecasts cannot move it.
+            if (!reversalPublication)
             {
-                _logger.Info(
-                    $"Trade plan H4 BB entry adjustment applied for {ctx.Stock.Ticker}. " +
-                    $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
-                    $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
-                    $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
-                    $"EntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}, " +
-                    $"H4MidSlope={_fmt.Percent(bbState.H4.MidSlope)}");
-            }
+                var bbEntryDiscountOverridePct = ResolveBollingerEntryDiscountOverridePct(
+                    bbState,
+                    entryDiscountOverridePct);
 
-            if (isExplosiveMinFirst &&
-                tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct >= 0m)
-            {
-                var explosiveEntryDiscountOverridePct = CapDiscount(
-                    bbEntryDiscountOverridePct,
-                    tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct);
-
-                if (explosiveEntryDiscountOverridePct != bbEntryDiscountOverridePct)
+                if (bbEntryDiscountOverridePct != entryDiscountOverridePct)
                 {
                     _logger.Info(
-                        $"Trade plan explosive MinFirst entry cap applied for {ctx.Stock.Ticker}. " +
-                        $"EntryDiscountPct={_fmt.Percent(explosiveEntryDiscountOverridePct ?? 0m)}, " +
-                        $"PreviousEntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}");
+                        $"Trade plan H4 BB entry adjustment applied for {ctx.Stock.Ticker}. " +
+                        $"W={bbState.Weekly.Regime}/{bbState.Weekly.Direction}, " +
+                        $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                        $"H4={bbState.H4.Regime}/{bbState.H4.Direction}, " +
+                        $"EntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}, " +
+                        $"H4MidSlope={_fmt.Percent(bbState.H4.MidSlope)}");
                 }
 
-                bbEntryDiscountOverridePct = explosiveEntryDiscountOverridePct;
-            }
+                if (isExplosiveMinFirst &&
+                    tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct >= 0m)
+                {
+                    var explosiveEntryDiscountOverridePct = CapDiscount(
+                        bbEntryDiscountOverridePct,
+                        tradeSettings.ExplosiveMinFirstExit.MaxEntryDiscountPct);
 
-            entryDiscountOverridePct = bbEntryDiscountOverridePct;
+                    if (explosiveEntryDiscountOverridePct != bbEntryDiscountOverridePct)
+                    {
+                        _logger.Info(
+                            $"Trade plan explosive MinFirst entry cap applied for {ctx.Stock.Ticker}. " +
+                            $"EntryDiscountPct={_fmt.Percent(explosiveEntryDiscountOverridePct ?? 0m)}, " +
+                            $"PreviousEntryDiscountPct={_fmt.Percent(bbEntryDiscountOverridePct ?? 0m)}");
+                    }
 
-            var triangleEntryDiscountOverridePct = ResolveH4TriangleEntryDiscountOverridePct(
-                ctx.Candles,
-                entryCandles,
-                tradeSettings.H4BollingerEntry.Triangle,
-                entryDiscountOverridePct);
+                    bbEntryDiscountOverridePct = explosiveEntryDiscountOverridePct;
+                }
 
-            if (triangleEntryDiscountOverridePct != entryDiscountOverridePct)
-            {
-                _logger.Info(
-                    $"Trade plan H4 triangle entry adjustment applied for {ctx.Stock.Ticker}. " +
-                    $"EntryDiscountPct={_fmt.Percent(triangleEntryDiscountOverridePct ?? 0m)}");
-            }
+                entryDiscountOverridePct = bbEntryDiscountOverridePct;
 
-            entryDiscountOverridePct = triangleEntryDiscountOverridePct;
+                var triangleEntryDiscountOverridePct = ResolveH4TriangleEntryDiscountOverridePct(
+                    ctx.Candles,
+                    entryCandles,
+                    tradeSettings.H4BollingerEntry.Triangle,
+                    entryDiscountOverridePct);
 
-            var seriesEntryProfile = ResolveSeriesEntryProfileDiscountOverridePct(
-                ctx.Snapshot,
-                diagnostics,
-                recentSeries,
-                bbState,
-                tradeSettings.SeriesEntryProfile,
-                entryDiscountOverridePct);
-
-            if (seriesEntryProfile.EntryDiscountPct != entryDiscountOverridePct)
-            {
-                _logger.Info(
-                    $"Trade plan series entry profile applied for {ctx.Stock.Ticker}. " +
-                    $"Profile={seriesEntryProfile.Profile}, " +
-                    $"EntryDiscountPct={_fmt.Percent(seriesEntryProfile.EntryDiscountPct ?? 0m)}, " +
-                    $"DailyMidSlope={_fmt.Percent(seriesEntryProfile.DailyMidSlope / 100m)}, " +
-                    $"DailyRsiSlope={seriesEntryProfile.DailyRsiSlope:0.##}, " +
-                    $"H4MidSlope={_fmt.Percent(seriesEntryProfile.H4MidSlope / 100m)}, " +
-                    $"H4RsiSlope={seriesEntryProfile.H4RsiSlope:0.##}, " +
-                    $"H4MacdSlope={seriesEntryProfile.H4MacdSlope:0.####}, " +
-                    $"ATRRatio={diagnostics.ATRRatio:0.##}, " +
-                    $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
-                    $"H4={bbState.H4.Regime}/{bbState.H4.Direction}");
-            }
-
-            entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
-
-            if ((isReversalRecovery || isReversalNearTermEntry) &&
-                (isReversalRecovery
-                    ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
-                    : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct) >= 0m)
-            {
-                var maxRecoveryEntryDiscountPct = isReversalRecovery
-                    ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
-                    : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct;
-                var cappedRecoveryEntryDiscountPct = CapDiscount(
-                    entryDiscountOverridePct,
-                    maxRecoveryEntryDiscountPct);
-
-                if (cappedRecoveryEntryDiscountPct != entryDiscountOverridePct)
+                if (triangleEntryDiscountOverridePct != entryDiscountOverridePct)
                 {
                     _logger.Info(
-                        $"Trade plan reversal entry cap applied for {ctx.Stock.Ticker}. " +
-                        $"EntryDiscountPct={_fmt.Percent(cappedRecoveryEntryDiscountPct ?? 0m)}, " +
-                        $"PreviousEntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
+                        $"Trade plan H4 triangle entry adjustment applied for {ctx.Stock.Ticker}. " +
+                        $"EntryDiscountPct={_fmt.Percent(triangleEntryDiscountOverridePct ?? 0m)}");
                 }
 
-                entryDiscountOverridePct = cappedRecoveryEntryDiscountPct;
+                entryDiscountOverridePct = triangleEntryDiscountOverridePct;
+
+                var seriesEntryProfile = ResolveSeriesEntryProfileDiscountOverridePct(
+                    ctx.Snapshot,
+                    diagnostics,
+                    recentSeries,
+                    bbState,
+                    tradeSettings.SeriesEntryProfile,
+                    entryDiscountOverridePct);
+
+                if (seriesEntryProfile.EntryDiscountPct != entryDiscountOverridePct)
+                {
+                    _logger.Info(
+                        $"Trade plan series entry profile applied for {ctx.Stock.Ticker}. " +
+                        $"Profile={seriesEntryProfile.Profile}, " +
+                        $"EntryDiscountPct={_fmt.Percent(seriesEntryProfile.EntryDiscountPct ?? 0m)}, " +
+                        $"DailyMidSlope={_fmt.Percent(seriesEntryProfile.DailyMidSlope / 100m)}, " +
+                        $"DailyRsiSlope={seriesEntryProfile.DailyRsiSlope:0.##}, " +
+                        $"H4MidSlope={_fmt.Percent(seriesEntryProfile.H4MidSlope / 100m)}, " +
+                        $"H4RsiSlope={seriesEntryProfile.H4RsiSlope:0.##}, " +
+                        $"H4MacdSlope={seriesEntryProfile.H4MacdSlope:0.####}, " +
+                        $"ATRRatio={diagnostics.ATRRatio:0.##}, " +
+                        $"D={bbState.Daily.Regime}/{bbState.Daily.Direction}, " +
+                        $"H4={bbState.H4.Regime}/{bbState.H4.Direction}");
+                }
+
+                entryDiscountOverridePct = seriesEntryProfile.EntryDiscountPct;
+
+                if ((isReversalRecovery || isReversalNearTermEntry) &&
+                    (isReversalRecovery
+                        ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
+                        : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct) >= 0m)
+                {
+                    var maxRecoveryEntryDiscountPct = isReversalRecovery
+                        ? tradeSettings.ReversalRecoveryExit.MaxEntryDiscountPct
+                        : tradeSettings.ReversalRecoveryExit.NearTermMaxEntryDiscountPct;
+                    var cappedRecoveryEntryDiscountPct = CapDiscount(
+                        entryDiscountOverridePct,
+                        maxRecoveryEntryDiscountPct);
+
+                    if (cappedRecoveryEntryDiscountPct != entryDiscountOverridePct)
+                    {
+                        _logger.Info(
+                            $"Trade plan reversal entry cap applied for {ctx.Stock.Ticker}. " +
+                            $"EntryDiscountPct={_fmt.Percent(cappedRecoveryEntryDiscountPct ?? 0m)}, " +
+                            $"PreviousEntryDiscountPct={_fmt.Percent(entryDiscountOverridePct ?? 0m)}");
+                    }
+
+                    entryDiscountOverridePct = cappedRecoveryEntryDiscountPct;
+                }
+            }
+            else
+            {
+                _logger.Info($"Trade plan ReversalHook scan-price entry applied for {ctx.Stock.Ticker}. Entry={scanPrice}");
             }
 
             var trade = _tradeBuilder.Build(
                 ctx.Candles,
                 entryCandles,
                 scanPrice,
-                scanPriceFloorOverride,
-                entryDiscountOverridePct,
+                reversalPublication ? null : scanPriceFloorOverride,
+                reversalPublication ? null : entryDiscountOverridePct,
                 reversalPublication || ClassifyDailyFamily(ctx, log: false) == DailyFamilySplit.Reversal
                     ? TradeEntryPatternFamily.ReversalHook
                     : TradeEntryPatternFamily.BellUp,
@@ -3820,7 +3853,7 @@ namespace IbSwingTrader.Application.Candidates
                 minProfitPctOverride,
                 maxProfitPctOverride,
                 maxLossPctOverride,
-                isBellUpPhaseReadyToday);
+                isBellUpPhaseReadyToday || reversalPublication);
 
             if (isBellUpPhaseReadyToday)
             {
