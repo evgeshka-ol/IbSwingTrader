@@ -74,6 +74,10 @@ Progress statuses:
 - `Final` / `FinalConservative`: closed Loss, with exact/bounded observations.
 - `Provisional` / `ProvisionalConservative`: still-open observation horizon.
 - `InsufficientData`, `NoEntry`, `InvalidPlan`, `Unresolved`: no numeric progress.
+- Since2026-10-30 `EntryObservationUnconfirmed`: a saved Loss/Open entry lacks
+  a valid positive-volume parent touch; no numeric progress. Zero-volume M1/M5
+  cannot contribute an excursion or prove stop/target order. Saved Win still
+  uses FinalFromOutcome; feedback refresh never replays a saved outcome.
 - `HistoryConflict`: the reconstructed path reaches the target despite a saved
   non-Win. Keep the original outcome and expose the conflict for investigation.
 

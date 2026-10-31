@@ -55,6 +55,40 @@ outcomes. Minimum: a dependable rank-1 winner, with 1.5% profit sufficient.
 
 ## Recent project behavior
 
+### Traded observations and incomplete regular history (2026-10-30, StrategyVersion=8)
+
+New evaluations require Volume>0 and valid positive OHLC for M5/M1 entry,
+exit and stop touches. Zero-volume carry bars can cover a timestamp slot but
+cannot establish participation, extrema or a fill. Only completed M5 through
+the available horizon are evaluated. Scanner quotes use the same trade guard.
+
+Check each configured regular-session5min slot using the local market calendar,
+including holidays/early closes. Missing data triggers one direct bounded M5
+repair from first to last missing slot per affected session (at most its RTH
+length), bypassing inferred sparse-cache coverage. If gaps remain, evaluate
+only the covered prefix before the first gap; EvaluationEndTime reflects that
+cutoff. No entry before it yields IncompleteHistory; confirmed but unresolved
+entry remains Open. Never award a target after an unobserved possible stop.
+All-zero-volume covered windows yield NoEntry/NoTradedPriceAfterScan.
+
+Playable positive valid plans with no EntryTime and NoEntry/IncompleteHistory
+are reconsidered until the original ForwardEvaluationDays window expires,
+including older scans with original snapshots outside recent scan dates.
+Other/zero plans and resolved Win/Loss are excluded from this waiting policy.
+Current-day deferral remains. Existing separate Open/outcome settings apply.
+
+Both stop and target in a later M5 use exactly its five M1 bars even with
+legacy default timeframe metadata. Entry is already active, so those minutes
+need not cross entry again. Missing M1 or both barriers in the same minute
+conservatively prefer stop; candle colour/proximity cannot establish order.
+The first-entry M5 keeps its separate post-entry suffix replay described below.
+
+Version8 is retained when a fresh evaluation replaces a canonical row; it is
+not overwritten with that row's old version. Historical saved plans and closed
+outcomes are not automatically replayed or assigned the new scanner targets.
+The [original audit](../../../investigations/2026-10/investigation-2026-10-30-exits-readiness-and-data.md)
+records the prior zero-volume/coverage defects and remains historical evidence.
+
 ### Report group ordering (2026-10-22)
 
 BuildEvaluationDataset.SortColumns in agentsettings.json explicitly orders

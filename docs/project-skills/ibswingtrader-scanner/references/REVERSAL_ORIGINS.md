@@ -55,10 +55,11 @@ give PostBellUpRecovery or Unclassified the new support path.
 
 User clarification after DHT, October22 17:19:12: a post-BellUp pullback's
 return to Daily mid completes that hook for a new ReversalHook entry.
-Do not wait for Daily upper or rely on further MACD room. DeepDeclineRecovery
-retains its existing possibility of continuing past mid toward upper; this
-is not a guarantee that it will do so. Unclassified is not silently assigned
-the post-BellUp policy.
+Do not wait for Daily upper or rely on further MACD room. Since2026-10-30 all newly published origins use the
+[Daily-mid/10% exit](REVERSAL_SCAN_PRICE_ENTRY.md), with the additional
+[first-return completion guard](REVERSAL_IMPULSE_COMPLETION.md). The former
+DeepDeclineRecovery continuation past mid is no longer a new admission policy.
+Origin classification itself remains unchanged.
 
 At publication, after computing origin from the same completed native D1
 prefix, PostBellUpRecovery becomes admission Phase=Completed if:

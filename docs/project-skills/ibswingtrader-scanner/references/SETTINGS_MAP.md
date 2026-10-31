@@ -59,9 +59,16 @@ be ready to trade in order to be watched.
 
 Admitted ReversalHook execution since2026-10-28 always uses the fresh ScanPrice.
 Legacy TradePlan DeepPullback/SeriesEntryProfile entry discounts and recovery
-discount caps cannot move its final publication entry. Exit/risk-profile
-parameters still build target/stop from that reference. See
+discount caps cannot move its final publication entry. Since2026-10-30 its exit is the nearer of the completed native Daily EMA20
+and+10% from entry, rounded down to cents. Generic5%/8% floors and momentum
+buffering cannot override it. Existing risk parameters still build the stop. See
 [direct reversal entry](REVERSAL_SCAN_PRICE_ENTRY.md).
+
+Publication has a final freshness gate (M5 age<=5min; checked Reversal IB live
+age<=Finder.ReversalLiveQuoteMaxAgeSeconds) after one bounded stale-plan retry.
+BellUp historical ScanPrice fallback is removed; absent/expired trade references
+become zero-plan Other. Volume>0 is required for an M5 execution reference.
+These are correctness rules, with no new tuning setting.
 
 ### `GetCandidates.ReversalWatchList`
 
@@ -287,13 +294,17 @@ skill for the legacy score formulas used by those pools.
 
 ### `GetCandidates.TradePlan`
 
-Since 2026-10-07, BellUp Recent boost timing uses
-`BellUpRecentBoostRangeLookbackBars=5` and `BellUpRecentBoostRangeMultiplier=2`.
-A green latest completed candle with High-Low >= multiplier * median of
-previous N completed ranges blocks entry. N+1 bars are required. Both values
-must be positive. These controls affect timing, including the existing Daily
-veto, not the body-based boost selection used to calculate exit targets.
-See SERIES_PLAYBOOK.md for overrides, missing-data handling and provenance.
+BellUp Recent boost uses `BellUpRecentBoostRangeLookbackBars=5` and
+`BellUpRecentBoostRangeMultiplier=2` (range model since2026-10-07). Since
+2026-10-31 its checked candle is the latest observation, including a separately
+built as-of forming H4/Daily when available. Green and High-Low>=multiplier *
+median(previous N closed ranges) still veto. The checked observation is excluded
+from the median. With a current observation, N native closed bars suffice;
+without one, N+1 closed bars are required as before. Both settings must be positive.
+The same policy serves confirmed-Daily cross-frame timing and the selected frame.
+Recognition and body-based exit boost selection remain closed/native. No new
+threshold or reentry setting was added. See SERIES_PLAYBOOK.md for coverage,
+missing-current fallback, as-of evidence and final publication recheck.
 
 Since 2026-10-07, evaluation ScanPrice preserves the same saved
 TradePlan.LiveReferencePrice exported as candidates.csv ScanPrice. The first

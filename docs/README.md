@@ -58,6 +58,8 @@ in older notes are historical. Follow current skills and success criteria.
 
 ### 2026-10
 
+- [CDNA: повторный буст после паузы; TMUS почти достиг цели](investigations/2026-10/investigation-2026-10-31-cdna-continuation-tmus-near-exit.md)
+- [Выходы, AMD/TMUS/CDNA и блок BellUp Other в отчёте30 октября](investigations/2026-10/investigation-2026-10-30-exits-readiness-and-data.md)
 - [October26 Other and gentle weekly-mid slope](investigations/2026-10/investigation-2026-10-29-other-weekly-slope.md)
 - [SOFI: Stalled перед бустом 27 октября](investigations/2026-10/investigation-2026-10-29-sofi-stalled-before-boost.md)
 - [Empty wishlist and CRGY/FWDI reversal admission](investigations/2026-10/investigation-2026-10-19-empty-watch-and-reversal-admission.md)
@@ -91,6 +93,8 @@ in older notes are historical. Follow current skills and success criteria.
 These describe changes at their recorded date. Later behavior is maintained
 in project references, including subsequent overrides.
 
+- [BellUp timing includes an observed forming candle](implementation/implementation-2026-10-31-bellup-current-candle-timing.md)
+- [Reversal Daily-mid exits, traded observations and coverage](implementation/implementation-2026-10-30-reversal-mid-exits-and-traded-observations.md)
 - [Gentle weekly support and anticipatory D1 admission](implementation/implementation-2026-10-29-gentle-weekly-anticipatory-reversal.md)
 - [Report order, morning evaluation and closed Daily history](implementation/implementation-2026-10-20-report-order-morning-evaluation-daily-history.md)
 - [EMA Bollinger and fresh H4 support for recognized reversals](implementation/implementation-2026-10-17-bollinger-ema-h4-recovery.md)

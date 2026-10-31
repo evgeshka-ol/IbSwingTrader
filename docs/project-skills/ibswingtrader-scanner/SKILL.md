@@ -36,8 +36,8 @@ freshness and migration rules in
   Since2026-10-22 PatternVerdictReason starts with PostBellUpRecovery,
   DeepDeclineRecovery or Unclassified for analyzed reversals, with no extra
   columns. Since2026-10-23 PostBellUpRecovery completes at the Daily mid,
-  before the ordinary upper-band boundary; DeepDeclineRecovery retains the
-  existing continuation rules. See [origin rules](references/REVERSAL_ORIGINS.md).
+  before the ordinary upper-band boundary; Since2026-10-30 all origins also reject an already completed first
+  Daily-mid return and target the nearer of native Daily EMA20 and+10%. See [origin rules](references/REVERSAL_ORIGINS.md).
 - BellUp has precedence. A recognized BellUp rejected by timing/readiness
   remains Other, rather than being relabeled ReversalHook. Triangle is a
   diagnostic fallback and must not hide BellUp confirmed on another timeframe.
@@ -76,10 +76,14 @@ freshness and migration rules in
 - TWS-native completed bars are canonical. Never substitute a chart's
   session grid, final forming-bar values or future outcomes for scan-time data.
   Weekly supplies context; confirmed Bell patterns use H4/Daily.
-- BellUp Recent boost timing uses the latest green completed candle's range
-  against the median of five preceding ranges (default multiplier 2).
-  Confirmed Daily timing can veto an H4 signal; absent Daily confirmation
-  cannot. Exit boost selection remains body-based. Do not merge these rules.
+- Since2026-10-31 BellUp Recent boost timing checks the latest observed candle,
+  including an explicit forming H4/Daily built from an as-of completed-M5 prefix.
+  A previous closed boost moves into history when that current observation is
+  available. The green/range>=2*median(previous5) predicate is unchanged; a
+  boosting current candle still vetoes. Missing partial evidence retains closed
+  timing. Confirmed Daily timing can veto H4; absent Daily confirmation cannot.
+  Recognition, lower-turn checks and body-based exit selection stay closed/native.
+  See SERIES_PLAYBOOK.md for coverage, session boundaries and saved evidence.
 - Since2026-10-23 an isolated Daily RSI rollover from a recent overbought peak
   no longer rejects BellUp as Late phase. The combined H4 momentum/terminal
   expansion guards remain; 80/20 are not new automatic admission thresholds.
@@ -154,6 +158,14 @@ Before adding or reweighting a ranking feature, validate the declared
 Win/profit target and rank-1 results using saved scan-time features and later
 outcomes. Historical amplitude AUC above does not validate present Win
 performance. See [success criteria](../../guides/success-criteria.md).
+
+Since2026-10-30 publication requires a positive-volume valid-OHLC current or
+adjacent M5 reference (or the existing checked live fallback for ReversalHook).
+BellUp historical ScanPrice fallback is removed. A bounded stale-plan retry is
+followed by a writer freshness gate: M5 at most5min, live quote at the configured
+age limit. An expired plan becomes zero-plan Other before ordering/saving.
+`IsVerticalSpikeExpansion` checks the latest completed transition only; old
+spikes cannot permanently veto a later BellUp. RecentBoost protection remains.
 
 ## Main code
 

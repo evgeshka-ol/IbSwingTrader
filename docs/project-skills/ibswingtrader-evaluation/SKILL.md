@@ -27,6 +27,13 @@ This is a target, not an established guarantee. Keep recognition/ranking and
 execution mechanics distinguishable for diagnosis. Amplitude is supporting
 evidence and does not replace Win, profit or confidence calibration.
 
+Since2026-10-30 new evaluations use StrategyVersion=8: positive-volume valid
+trade observations, bounded regular-session M5 gap repair and covered-prefix
+outcomes. Waiting NoEntry/IncompleteHistory playable plans are retried within
+their forward window. See [evaluation rules](references/EVALUATION_RULES.md).
+New ReversalHook plans target min(native Daily EMA20, entry*1.10); historical
+plans, origin reasons and resolved outcomes retain their saved contract.
+
 ## Main rule
 
 Since2026-10-29 a playable D1 DeepDeclineRecovery may retain Phase=Stalled

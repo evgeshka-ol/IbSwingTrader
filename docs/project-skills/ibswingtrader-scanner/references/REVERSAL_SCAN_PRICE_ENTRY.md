@@ -28,12 +28,33 @@ reference for direct ReversalHook entry, instead of falling back to history.
 Publication also verifies exact entry/reference equality and sets the admitted
 candidate's NeedsDeeperEntry to false.
 
-Targets and stops are rebuilt by TradeBuilder using the new entry and existing
-exit/risk-profile parameters. This is not replacement of an old EntryPrice
-while retaining old absolute target/stop levels. Exit must exceed entry, stop
-must be positive and below entry. Existing risk caps, stop-limit ordering and
-target calculation remain in force. Exit-profile classification is distinct
-from the retired pullback entry policy for admitted hooks.
+Since2026-10-30 every newly published ReversalHook, on either D1 or H4 and
+for every origin, uses the last completed **native Daily EMA20** as its exit
+reference. This is the shared Bollinger EMA20 center, not Weekly/H4 mid or SMA.
+The Daily history must contain at least20 bars and its latest completed date
+must match the configured trading calendar under the existing16:00 convention.
+
+```text
+ExitPrice = floor_to_cent(min(DailyEMA20, EntryPrice * 1.10))
+```
+
+The target is fixed in the publication snapshot. This change does not implement
+a moving trailing exit. A mean nearer than10% wins, including targets below1.5%;
+1.5% sufficient in the success criteria is not a universal plan minimum.
+Targets at exactly10% use `ExitProfile=reversal-daily-mid`; farther means use
+`reversal-10pct-cap`. The former generic5%/momentum8% defaults, minimum-profit
+floors, risk/reward target cap and momentum exit buffer cannot override this
+structural exit. Stops and stop limits are rebuilt from the fresh entry with
+existing risk caps; fast-trade loss-to-target protection uses the new target.
+`NeedsMomentumExit` is cleared for this structural plan. The reason saves
+`ExitRule=DailyMidOr10Pct`, full-precision `ExitDailyMid` and `ExitTarget`.
+
+A missing/stale native Daily mean, mean at/below fresh entry, or no positive
+cent-sized target room rejects publication; it must not manufacture a10% target.
+A completed first return to the Daily mid also consumes the recognized episode,
+even if a later pullback or age-zero EMA bend appears promising (AMD). See
+[completion rules](REVERSAL_IMPULSE_COMPLETION.md). Recognition may still exist
+above mid; it is distinct from a new playable return-to-mid plan.
 
 The rule applies to every admitted origin and H4/D1 timeframe, including
 the user-authorized2026-10-29 [anticipatory D1 support](WEEKLY_MID_SLOPE.md)
@@ -44,8 +65,8 @@ not rewritten; refreshing evaluation feedback does not replay them.
 
 ScanPrice is a reference for the published plan, not a guaranteed broker fill.
 Evaluation continues to use post-publication market candles and its existing
-entry/target/stop ordering rules. The separate NoEntry reevaluation policy is
-not changed by this execution-policy update.
+entry/target/stop ordering rules. Since2026-10-30 unentered valid playable plans with NoEntry/IncompleteHistory
+are retried within their original forward window; see the evaluation rules.
 
 ## Prepared verification
 

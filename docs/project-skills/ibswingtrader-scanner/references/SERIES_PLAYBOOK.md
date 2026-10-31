@@ -21,6 +21,14 @@ silently start looking at different amounts of history for the same ticker.
 
 ## Primary series
 
+Since2026-10-30 IsVerticalSpikeExpansion checks only the latest completed
+transition, retaining its dominance/momentum thresholds. A spike elsewhere in
+the export tail no longer vetoes today's readiness (PRCH/CDNA). Logs and saved
+Not ready reasons distinguish LatestCompletedSpikeExpansion, local Direction/
+Collapse and H4ContradictsDailyBellUp. RecentBoost remains a separate guard;
+Weekly-only continuation remains a research hypothesis. See the
+[dated audit](../../../investigations/2026-10/investigation-2026-10-30-exits-readiness-and-data.md).
+
 Prefer real chart-like indicator lines for pattern detection and confidence.
 New prediction, filter, promotion, ranking, and trade-plan logic should be
 built on these rows first:
@@ -226,6 +234,15 @@ the bounded [H4-led support rule](REVERSAL_H4_DAILY_SUPPORT.md). D1 Collapse
 still vetoes; D1 hooks retain their Weekly checks. Recognition alone does
 not guarantee admission.
 
+Since2026-10-30 both groups require traded M5 observations: Volume>0 and valid
+OHLC. Zero-volume carry bars cannot supply publication quotes, body forecasts
+or execution touches. BellUp's historical ScanPrice fallback is removed.
+After sequential work, one bounded retry refreshes stale playable plans; the
+writer rejects any remaining expiry to Other before sorting/saving. M5 age is
+at most5min; IB live references use ReversalLiveQuoteMaxAgeSeconds. Unknown,
+M15-history and indicator-fallback sources cannot authorize a published plan.
+This may reduce participation when no fresh trade/quote is observable.
+
 ### Supplemental closed/partial H4 diagnostics (2026-10-10)
 
 Since 2026-10-16, the same supplemental switch also records
@@ -291,8 +308,10 @@ saved recognition/phase/readiness reasons instead of inventing a later signal.
 
 `ReversalHook` is the current return-to-mid pattern for the pattern-first
 `ReversalHook` output group. Since the 2026-09-23 migration, it is evaluated
-independently of the former below-Daily-mid family split. The Daily mid can
-still provide context, but it is not a hard ReversalHook admission gate.
+independently of the former below-Daily-mid family split. Recognition can still exist above the Daily mid. Since2026-10-30 a newly
+published first-return plan requires an unreached native Daily EMA20 above
+fresh entry and exits at the nearer of that mean and+10%; see
+[execution policy](REVERSAL_SCAN_PRICE_ENTRY.md).
 BBNX is a transition exemplar; do not treat this single example as validation
 of general predictive performance.
 
@@ -579,25 +598,60 @@ at the right moment before the boost. Recognizing the BellUp shape and
 deciding whether entry is already late are separate checks. Setups matching
 neither playable family belong in `Other`.
 
-### Current timing rule (2026-10-07)
+### Current timing rule (updated2026-10-31)
 
-On the confirmed BellUp timeframe (Daily or H4), T-1 is the latest completed
-candle. It blocks entry as Recent boost when Close > Open and its High-Low
-range is at least the configured multiplier times the median range of the
-previous N completed candles. Defaults: N=5 and multiplier=2. The current
-candle is excluded from the median. An older impulse followed by ordinary
-consolidation does not veto entry by itself.
+The user clarified that a forming current candle must shift a previous completed
+boost back into history for this timing check. The implementation now checks
+**the latest observed candle**, including an explicit forming H4/Daily observation
+when available. It does not simply append a cached final native candle or change
+`GetCompletedCandles`, pattern recognition or confirmed lower-band turn checks.
 
-The selected-timeframe check and the existing confirmed-Daily cross-timeframe
-veto use this same rule. Existing H4 continuation overrides and other readiness
-checks remain in force. Only closed candles establish the timing veto; Daily
-completion is 16:00 and H4 completion is start+4h in market-local timestamps.
-Native D1 is preferred, with H4-derived Daily bars as the existing fallback.
+The same predicate remains: Close>Open and High-Low>=configured multiplier *
+median of previous N closed ranges. Defaults N=5, multiplier=2. The checked
+observation is excluded from its own baseline. A boosting current candle still
+rejects; an ordinary current candle is no longer rejected solely because the
+preceding closed candle was a boost. This does not classify every forming boost
+as exhausted or capture every intrabar profit opportunity; it preserves the
+existing boost threshold while changing the observation being checked.
 
-The check needs N+1 completed candles (six by default). Invalid settings,
-negative ranges or a non-positive median produce an explicit non-ready reason.
-A veto reports timeframe, T-1 time, range, prior median, ratio, window and
-threshold. Missing-history rejection is not a boost.
+Current H4 is built on the native04/08/12/16 grid. Current Daily uses RTH09:30
+through16:00; pre/aftermarket does not invent a native current Daily. Only M5
+completed by decision time are included, so this observation can lag the latest
+tick by up to five minutes. Require valid OHLC, complete aligned M5 slots from
+the interval open to the last completed slot, known opening-slot coverage and at least
+one positive-volume observation. Open is the first actual traded open;
+leading empty slots do not invent an earlier trade. Zero-volume slots may cover the grid; their
+extremes do not contribute OHLC. A final forming cached M5/native H4, later bars,
+unknown open, grid gaps or all-zero-volume input cannot construct the observation.
+
+If unavailable, use the existing closed-only timing (N+1 bars), preserving a
+closed boost veto rather than fabricating a pause. With a current observation,
+use N preceding closed bars plus that observation. Short history, invalid
+settings and nonpositive baseline still reject. Native recognition input is
+frozen at its acquisition decision; using a later H4 interval with missing
+intervening native history rejects until history is refreshed.
+
+Only recognized live-source BellUp contexts load the bounded current M5 window;
+watch-only reversal contexts do not acquire a BellUp admission path. In-run
+reuse is limited to the same ticker/five-minute request bucket. Before final
+publication, the existing fresh M5 request also covers the current interval(s),
+rebuilds the observation and rechecks selected-frame timing. A current boost
+that appeared during the scan can therefore reject publication. Fresh-price
+and structure guards remain independent; a ready timing candle is not a fill.
+
+Reasons retain `BellUpTiming(State=Forming, Timeframe, BarTime, DecisionAt,
+CoveredThrough, Source=CompletedM5, Open, High, Low, Close, Ready)` with the
+ordinary range-veto details when applicable. This applies to selected-frame and
+confirmed-Daily cross-frame timing; the existing fresh-H4 Daily-veto override
+remains. It adds no provisional pattern seed, ranking weight or Win forecast.
+
+The [CDNA audit](../../../investigations/2026-10/investigation-2026-10-31-cdna-continuation-tmus-near-exit.md)
+records the earlier closed-only rejection and future path. The frozen morning
+fixture contains six native H4 and only M5 through04:30 (completed04:35), before
+the04:36:52 rejection. Its observed H4 O81.95/H83.8817/L81/C82.55 clears this
+veto; neither the eventual07:50 low76 nor the later second boost is an input.
+This is a timing regression, not a full historical admission or winning plan.
+No pending BellUp lifecycle or scheduled retry service is added by this change.
 
 `BellUpEntryTiming.IsReady` implements range timing. Its separate legacy
 `IsBoost(candle, preceding)` remains a body-based predicate solely for

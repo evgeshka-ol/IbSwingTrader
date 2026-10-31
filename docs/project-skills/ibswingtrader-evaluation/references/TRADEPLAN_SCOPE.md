@@ -46,6 +46,15 @@ treating this example as a verified pass under the new gate.
 
 ## Diagnose selection, ranking and execution together
 
+The [October30 report audit](../../../investigations/2026-10/investigation-2026-10-30-exits-readiness-and-data.md)
+identified generic5%/8% ReversalHook exits beyond a much nearer Daily mid.
+Since2026-10-30 new plans use min(native Daily EMA20, entry*1.10), with prior
+return completion blocking late entry. New evaluation excludes zero-volume
+execution, repairs regular M5 gaps and truncates unresolved history. Historical
+outcomes are preserved. BellUp boost-body exit phase validation and independent
+Weekly continuation/reentry remain research work; no blanket target divisor or
+Weekly-only admission was added.
+
 Start with the actual rank-1 result and the entered-plan Win/Loss/Open
 cohort. Check whether selection missed a useful setup, ranking preferred a
 loser, prices were stale, entry was never reached, or the stop/target path

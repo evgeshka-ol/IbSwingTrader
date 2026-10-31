@@ -7,6 +7,7 @@ Scripts reproduce the original studies, not the new project success criteria.
 
 | Study / model | Files |
 | --- | --- |
+| October30 exit/readiness/data audit | [analysis-2026-10-30-exit-report.json](analysis-2026-10-30-exit-report.json) |
 | Half-profit targets | [analysis-2026-10-05-half-profit-targets.json](analysis-2026-10-05-half-profit-targets.json) |
 | Win features | [analysis-2026-10-05-win-features.json](analysis-2026-10-05-win-features.json) |
 | Profit-relative stops | [analysis-2026-10-06-profit-relative-stops.json](analysis-2026-10-06-profit-relative-stops.json) |
@@ -19,6 +20,7 @@ Scripts reproduce the original studies, not the new project success criteria.
 | ReversalHook deep entries / frozen NoEntry audit | [analysis-2026-10-28-reversal-entry-audit.json](analysis-2026-10-28-reversal-entry-audit.json) |
 | SOFI Stalled before October27 boost | [analysis-2026-10-29-sofi-reversal-rejection.json](analysis-2026-10-29-sofi-reversal-rejection.json) |
 | October26 Other / gentle weekly-mid slope | [analysis-2026-10-29-other-weekly-slope.json](analysis-2026-10-29-other-weekly-slope.json), [analysis-2026-10-29-other-weekly-slope.csv.gz](analysis-2026-10-29-other-weekly-slope.csv.gz) |
+| CDNA repeat boost / TMUS near exit | [analysis-2026-10-31-cdna-continuation-tmus-near-exit.json](analysis-2026-10-31-cdna-continuation-tmus-near-exit.json) |
 | Frozen BellUp Win model v1 | [model-2026-10-05-bellup-win.json](model-2026-10-05-bellup-win.json) |
 
 For study methods and limitations, use the [documentation map](../README.md).

@@ -4,13 +4,35 @@ Current admission rule, adopted 2026-10-19 after the CRGY review. Recognition
 and readiness remain separate: a completed ReversalHook stays recognized but
 cannot authorize a new ReversalHook plan from the same impulse.
 
+## First Daily-mid return (2026-10-30)
+
+New publication for every origin and both D1/H4 uses the
+[Daily-mid/10% exit](REVERSAL_SCAN_PRICE_ENTRY.md). It therefore also rejects a
+recognized episode whose first Daily-mid return is already proven by completed
+native D1 history. This supersedes the former permission for DeepDeclineRecovery
+to publish a continuation beyond mid. It does not remove diagnostic recognition.
+
+Starting at the selected seed's confirmation (D1 date16:00; H4 start+4h), compare
+each completed Daily bar with its own full-precision EMA20. A close at/above mid
+proves return after confirmation, including a D1 seed's own close (AMD October28).
+A high at/above mid is accepted only when the entire Daily bar starts at/after
+seed confirmation. A seed-day wick can precede the trigger and is not sufficient
+by itself. No final forming Daily bars are accepted. Earlier episodes do not
+consume a newer seed. Existing post-BellUp and upper-band guards also remain.
+
+The rejection reason contains `CompletionRule=ReversalDailyMidExitAlreadyReached`
+and `ReversalDailyMidCompleted` with signal, confirmation, Daily evidence,
+mean and proof source. A fresh quote already at/above the latest Daily mid is
+rejected separately as `DailyMidAlreadyReachedByFreshPrice`. Weekly potential
+does not reopen the completed first-return plan; a later independent signal
+needs fresh admission. No weekly-holding execution profile is added here.
+
 ## Upper-band completion within an episode
 
 Since2026-10-23 PostBellUpRecovery has an earlier **Daily-mid** completion
 boundary; see [origin/completion rules](REVERSAL_ORIGINS.md). Its target is
-the post-BellUp return to mid. The upper-band rule below still applies to
-the other origins and cannot revive a post-BellUp episode already consumed
-at mid.
+the post-BellUp return to mid. The upper-band rule remains an additional completion guard and cannot
+revive an episode consumed at mid under the current policy.
 
 For each closed native bar from the recognized seed through the last completed
 bar, compare its high with its own Bollinger upper and mid:
