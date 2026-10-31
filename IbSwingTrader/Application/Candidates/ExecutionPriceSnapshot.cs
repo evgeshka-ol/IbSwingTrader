@@ -14,7 +14,7 @@ namespace IbSwingTrader.Application.Candidates
             IEnumerable<Candle> candles, DateTime requestedAt, DateTime observedAt)
         {
             var bucket = requestedAt.AddTicks(-(requestedAt.Ticks % TimeSpan.FromMinutes(5).Ticks));
-            var bars = candles.Where(x => x.Time <= requestedAt && x.Open > 0m && x.Close > 0m)
+            var bars = candles.Where(x => x.Time <= requestedAt && TradeObservation.IsTrade(x))
                 .OrderBy(x => x.Time).ToList();
             var current = bars.LastOrDefault(x => x.Time == bucket);
             var previous = bars.LastOrDefault(x => x.Time == bucket.AddMinutes(-5));

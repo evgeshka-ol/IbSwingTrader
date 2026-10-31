@@ -350,4 +350,31 @@ Check(ReversalImpulseCompletion.ApplyH4Completion(stalledInsideCompletedH4, h4Ep
 Check(sofiDaily[^1].Close == 14.46m && sofiH4[^1].Time == sofiAt.Date.AddHours(12) &&
     sofiDaily.All(x => x.Time.Date <= sofiAt.Date) && sofiH4.All(x => x.Time.AddHours(4) <= sofiAt),
     "Frozen fixture and support inputs remain immutable and contain no October27 boost");
+Check(ReversalMidExit.FindCompletedReturn("D1", new DateTime(2026, 10, 21), sofiDaily, sofiAt) == null,
+    "SOFI's frozen October26 anticipatory hook still has an unreached Daily mid");
+using var amdFixture = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "Fixtures", "amd-2026-10-28-prefix.json")));
+var amdDaily = System.Text.Json.JsonSerializer.Deserialize<List<Candle>>(amdFixture.RootElement.GetProperty("D1"))!;
+var amdEnd = new DateTime(2026, 10, 28, 16, 0, 0);
+var amdCompletion = ReversalMidExit.FindCompletedReturn("D1", amdEnd.Date, amdDaily, amdEnd);
+Check(amdDaily[^1].Close == 578.44m && amdDaily.All(x => x.Time.Date <= amdEnd.Date) &&
+    amdCompletion != null && amdCompletion.Contains("CompletedClose"),
+    "AMD's seed-day close proves the return already completed before October29 entry, without future failure data");
+var stageStart = new DateTime(2026, 9, 1);
+var stageBars = Enumerable.Range(0, 25).Select(i => new Candle {
+    Time = stageStart.AddDays(i), Open = 90m, Close = i < 20 ? 100m : 90m,
+    High = i < 20 ? 101m : 91m, Low = 89m, Volume = 100 }).ToList();
+var stageSeed = stageBars[23].Time;
+stageBars[23].High = 120m;
+Check(ReversalMidExit.FindCompletedReturn("D1", stageSeed, stageBars, stageBars[^1].Time.AddHours(16)) == null,
+    "A seed-day wick before confirmation does not consume a below-mid closing hook");
+stageBars[24].High = 120m;
+Check(ReversalMidExit.FindCompletedReturn("D1", stageSeed, stageBars, stageBars[^1].Time.AddHours(16)) != null,
+    "A completed post-confirmation day touching its own mid consumes the first return");
+Check(ReversalMidExit.FindCompletedReturn("D1", stageBars[^1].Time, stageBars, stageBars[^1].Time.AddHours(16)) == null,
+    "A newer seed does not inherit a preceding impulse's completed wick");
+var futureRejected = false;
+try { ReversalMidExit.FindCompletedReturn("D1", stageSeed, stageBars, stageBars[^1].Time.AddHours(15)); }
+catch (ArgumentException) { futureRejected = true; }
+Check(futureRejected, "A forming Daily candle cannot provide completed return evidence");
 Console.WriteLine($"Passed {checks} reversal recovery checks.");

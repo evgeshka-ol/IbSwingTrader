@@ -8,7 +8,7 @@ namespace IbSwingTrader.Application.Evaluation
         {
             if (scannerPrice <= 0m)
                 return;
-            evaluation.StrategyVersion = 7;
+            evaluation.StrategyVersion = Math.Max(7, evaluation.StrategyVersion);
             if (evaluation.ScanPrice == scannerPrice)
                 return;
             var previous = evaluation.ScanPrice;

@@ -104,7 +104,8 @@ namespace IbSwingTrader.App.Commands
             var selectedScanCandidates = selectedDateCandidates
                 .Where(x => !canonicalByScanKey.TryGetValue(BuildScanKey(x), out var row) ||
                             (IsAllowedOutcome(row, allowedOutcomes) &&
-                             IsWithinOpenEvaluationWindow(row, evaluationSettings, marketToday)))
+                             IsWithinOpenEvaluationWindow(row, evaluationSettings, marketToday)) ||
+                            IsWaitingForEntry(row, evaluationSettings, marketToday))
                 .ToList();
             var newestSelectedScanDate = selectedScanDates.Max();
             var oldestSelectedScanDate = selectedScanDates.Min();
@@ -129,6 +130,14 @@ namespace IbSwingTrader.App.Commands
                 .GroupBy(BuildScanKey, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
 
+            // A morning NoEntry does not end a playable plan's forward window.
+            // Include older pending scans too, using their exact original snapshots.
+            var waitingCandidates = eligibleCandidates.Where(x => canonicalByScanKey.TryGetValue(BuildScanKey(x), out var row) &&
+                IsWaitingForEntry(row, evaluationSettings, marketToday)).ToList();
+            foreach (var waiting in waitingCandidates)
+                candidatesToEvaluate.TryAdd(BuildScanKey(waiting), waiting);
+            _logger.Info($"Waiting-for-entry reevaluation: candidates={waitingCandidates.Count}");
+
             if (evaluationSettings.ReevaluateAllCandidatesWithSeries)
             {
                 var candidatesWithSeries = selectedScanCandidates
@@ -137,12 +146,12 @@ namespace IbSwingTrader.App.Commands
                     .Select(x => x.First())
                     .ToList();
 
-                candidatesToEvaluate = candidatesWithSeries
-                    .ToDictionary(BuildScanKey, x => x, StringComparer.OrdinalIgnoreCase);
+                foreach (var withoutSeries in selectedScanCandidates.Where(x => !HasRecentSeries(x)))
+                    candidatesToEvaluate.Remove(BuildScanKey(withoutSeries));
 
                 _logger.Info(
                     $"Selected-date reevaluation with series enabled: selected={candidatesToEvaluate.Count}, " +
-                    $"ignoredWithoutSeries={selectedScanCandidates.Count - candidatesToEvaluate.Count}, " +
+                    $"ignoredWithoutSeries={selectedScanCandidates.Count - candidatesWithSeries.Count}, " +
                     $"skippedOtherSeriesCandidates={candidates.Count - selectedScanCandidates.Count}");
             }
 
@@ -216,7 +225,6 @@ namespace IbSwingTrader.App.Commands
             {
                 if (canonicalByScanKey.TryGetValue(BuildScanKey(result), out var canonical))
                 {
-                    result.StrategyVersion = canonical.StrategyVersion;
                     result.CandidateScore = canonical.CandidateScore ?? result.CandidateScore;
                 }
             }
@@ -303,6 +311,7 @@ namespace IbSwingTrader.App.Commands
             var losses = results.Count(x => x.Outcome == "Loss");
             var open = results.Count(x => x.Outcome == "Open");
             var noEntry = results.Count(x => x.Outcome == "NoEntry");
+            var incomplete = results.Count(x => x.Outcome == "IncompleteHistory");
             var noData = results.Count(x =>
                 x.Outcome == "NoData" ||
                 x.Outcome == "NoDataAfterScan");
@@ -311,7 +320,7 @@ namespace IbSwingTrader.App.Commands
                 x.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase));
 
             _logger.Info(
-                $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} NoData={noData} Errors={errors}");
+                $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} IncompleteHistory={incomplete} NoData={noData} Errors={errors}");
         }
 
         private static bool ShouldSkipDatasetMergeDueToDataFailures(
@@ -474,6 +483,11 @@ namespace IbSwingTrader.App.Commands
             return !string.IsNullOrWhiteSpace(row.Outcome) &&
                    allowedOutcomes.Contains(row.Outcome);
         }
+
+        private static bool IsWaitingForEntry(EvaluationDatasetRow row, CandidateEvaluationSettings settings,
+            DateTime marketToday) => EvaluationScanPolicy.IsWaitingForEntry(row.Outcome, row.CandidateGroup,
+                row.EntryPrice > 0m && row.ExitPrice > row.EntryPrice && row.StopLoss > 0m && row.StopLoss < row.EntryPrice,
+                row.EntryTime.HasValue, row.ScanTime, marketToday, settings.ForwardEvaluationDays);
 
         private static bool IsWithinOpenEvaluationWindow(
             EvaluationDatasetRow row,

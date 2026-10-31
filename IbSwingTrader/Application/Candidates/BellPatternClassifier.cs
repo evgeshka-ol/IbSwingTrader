@@ -432,19 +432,14 @@ namespace IbSwingTrader.Application.Candidates
             var rsiDeltas = CalculateDeltas(rsi.TakeLast(count).ToList());
             var histogramDeltas = CalculateDeltas(macdHistogram.TakeLast(count).ToList());
 
-            for (var i = 1; i < upperDeltas.Count; i++)
-            {
-                var priorUpperMoveSum = upperDeltas.Take(i).Select(Math.Abs).Sum();
-                var priorWidthMoveSum = widthDeltas.Take(i).Select(Math.Abs).Sum();
-                var upperJumpDominates = upperDeltas[i] > 0m && upperDeltas[i] > priorUpperMoveSum;
-                var widthJumpDominates = widthDeltas[i] > 0m && widthDeltas[i] > priorWidthMoveSum;
-                var momentumJump = rsiDeltas[i] > 0m && histogramDeltas[i] > 0m;
-
-                if (upperJumpDominates && widthJumpDominates && momentumJump)
-                    return true;
-            }
-
-            return false;
+            // Readiness concerns the latest completed transition. A spike near the
+            // beginning of a sliding export window must not veto a later episode.
+            var i = upperDeltas.Count - 1;
+            var priorUpperMoveSum = upperDeltas.Take(i).Select(Math.Abs).Sum();
+            var priorWidthMoveSum = widthDeltas.Take(i).Select(Math.Abs).Sum();
+            return upperDeltas[i] > 0m && upperDeltas[i] > priorUpperMoveSum &&
+                   widthDeltas[i] > 0m && widthDeltas[i] > priorWidthMoveSum &&
+                   rsiDeltas[i] > 0m && histogramDeltas[i] > 0m;
         }
 
         public static bool IsBelowPreviousClosedDailyMid(

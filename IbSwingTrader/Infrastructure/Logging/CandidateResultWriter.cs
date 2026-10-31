@@ -31,6 +31,9 @@ namespace IbSwingTrader.Infrastructure.Logging
             {
                 candidate.Scan.ScanTime = scanTime;
                 candidate.Scan.ScanTimeZone = marketSettings.Timezone;
+                if (PublicationPriceGuard.RejectIfStale(candidate, scanTime,
+                    _getCandidatesSettingsProvider.Get().Finder.ReversalLiveQuoteMaxAgeSeconds))
+                    _logger.Info($"Publication plan rejected: {candidate.Ticker}. NotReady=PublicationPriceExpired");
             }
 
             var candidates = OrderPrimaryForDisplay(result.Candidates);

@@ -20,7 +20,8 @@ namespace IbSwingTrader.Application.Candidates
             decimal? minProfitPctOverride = null,
             decimal? maxProfitPctOverride = null,
             decimal? maxLossPctOverride = null,
-            bool useScanPriceEntry = false)
+            bool useScanPriceEntry = false,
+            decimal? reversalDailyMid = null)
         {
             var settings = _settingsProvider.Get().TradePlan;
 
@@ -46,6 +47,10 @@ namespace IbSwingTrader.Application.Candidates
                     scanPriceFloorOverride,
                     entryDiscountOverridePct,
                     entryPatternFamily);
+            if (reversalDailyMid.HasValue && (!useScanPriceEntry || entryPatternFamily != TradeEntryPatternFamily.ReversalHook))
+                throw new ArgumentException("A reversal mid exit requires direct ReversalHook entry");
+            ReversalMidExitTarget? structuralExit = reversalDailyMid.HasValue
+                ? ReversalMidExit.Calculate(entry, reversalDailyMid.Value) : null;
             var stop = recentLow * settings.StopBufferMultiplier;
             var riskFloor = CalculateRiskFloor(entry, entryCandles, settings);
 
@@ -61,7 +66,7 @@ namespace IbSwingTrader.Application.Candidates
                 stop = maxAllowedStop;
             }
 
-            var targetProfitPct = ResolveTargetProfitPct(
+            var targetProfitPct = structuralExit.HasValue ? structuralExit.Value.Price / entry - 1m : ResolveTargetProfitPct(
                 candles,
                 entry,
                 settings,
@@ -109,13 +114,13 @@ namespace IbSwingTrader.Application.Candidates
             // (defaultProfitPctOverride), use it directly instead of also capping it to a multiple of
             // risk - otherwise the tighter the stop, the more the RiskRewardRatio floor undercuts the
             // profile's own target, which defeats profiles built to capture a bigger explosive move.
-            var exit = defaultProfitPctOverride.HasValue
+            var exit = structuralExit.HasValue ? structuralExit.Value.Price : defaultProfitPctOverride.HasValue
                 ? cappedExit
                 : Math.Min(rawExit, cappedExit);
 
             var momentumSettings = settings.MomentumExit;
             var isMomentumExit = defaultProfitPctOverride.HasValue;
-            if (isMomentumExit && momentumSettings.ExitPriceBufferPct > 0m)
+            if (!structuralExit.HasValue && isMomentumExit && momentumSettings.ExitPriceBufferPct > 0m)
             {
                 var bufferedExit = exit * (1m - momentumSettings.ExitPriceBufferPct);
                 if (bufferedExit > entry)
@@ -138,7 +143,7 @@ namespace IbSwingTrader.Application.Candidates
                 Stop = stop,
                 StopLimit = stopLimit,
                 Exit = exit,
-                ExitProfile = defaultProfitPctOverride.HasValue ? "momentum" : "standard"
+                ExitProfile = structuralExit?.Profile ?? (defaultProfitPctOverride.HasValue ? "momentum" : "standard")
             };
         }
 

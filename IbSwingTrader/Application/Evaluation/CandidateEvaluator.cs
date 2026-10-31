@@ -9,7 +9,8 @@ namespace IbSwingTrader.Application.Evaluation
         IAmbiguousBarResolver ambiguousBarResolver,
         ICandidateEvaluationSettingsProvider candidateEvaluationSettingsProvider,
         ICandidatePatternVerdictService patternVerdictService,
-        ITextLogger logger) : ICandidateEvaluator
+        ITextLogger logger,
+        ILocalMarketScheduleProvider localMarketScheduleProvider) : ICandidateEvaluator
     {
         private readonly IContractResolver _contractResolver = contractResolver;
         private readonly IHistoricalDataService _historicalDataService = historicalDataService;
@@ -17,6 +18,7 @@ namespace IbSwingTrader.Application.Evaluation
         private readonly ICandidateEvaluationSettingsProvider _candidateEvaluationSettingsProvider = candidateEvaluationSettingsProvider;
         private readonly ICandidatePatternVerdictService _patternVerdictService = patternVerdictService;
         private readonly ITextLogger _logger = logger;
+        private readonly ILocalMarketScheduleProvider _localMarketScheduleProvider = localMarketScheduleProvider;
 
         public async Task<List<CandidateEvaluationResult>> EvaluateAsync(
             List<CandidateDetails> candidates)
@@ -184,15 +186,45 @@ namespace IbSwingTrader.Application.Evaluation
                 return result;
             }
 
-            var ordered = candles
-                .Where(x => x.Time >= start && x.Time <= end)
+            var grid = candles
+                .Where(x => x.Time >= start && x.Time.AddMinutes(5) <= end && TradeObservation.HasValidOhlc(x))
                 .OrderBy(x => x.Time)
                 .ToList();
+            var timezone = string.IsNullOrWhiteSpace(candidate.Scan.ScanTimeZone)
+                ? MarketTime.DefaultTimeZoneId : candidate.Scan.ScanTimeZone;
+            var schedule = _localMarketScheduleProvider.BuildSchedule(
+                MarketTime.ToUtc(start, timezone), MarketTime.ToUtc(end, timezone));
+            var missing = EvaluationHistoryCoverage.MissingRegularRanges(grid, schedule, start, end);
+            foreach (var range in missing)
+            {
+                // One bounded direct load per affected session, avoiding a sparse-cache
+                // coverage inference that previously skipped entire regular sessions.
+                try
+                {
+                    _logger.Info($"Evaluation regular M5 repair: {candidate.Ticker}, Start={range.Start:O}, End={range.End:O}");
+                    var repaired = await _historicalDataService.GetFreshM5Snapshot(candidate.Ticker, contract,
+                        range.Start, range.End);
+                    grid = grid.Concat(repaired.Where(x => x.Time >= start && x.Time.AddMinutes(5) <= end &&
+                            TradeObservation.HasValidOhlc(x)))
+                        .GroupBy(x => x.Time).Select(x => x.Last()).OrderBy(x => x.Time).ToList();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warning($"Evaluation regular M5 repair failed: {candidate.Ticker}. {ex.Message}");
+                }
+            }
+            var remaining = EvaluationHistoryCoverage.MissingRegularRanges(grid, schedule, start, end);
+            var coverageEnd = remaining.Count > 0 ? remaining[0].Start : end;
+            result.EvaluationEndTime = coverageEnd;
+            if (remaining.Count > 0)
+                _logger.Warning($"Evaluation incomplete regular M5: {candidate.Ticker}, FirstMissing={coverageEnd:O}; evaluating only the preceding covered prefix");
+            var ordered = grid.Where(x => x.Time.AddMinutes(5) <= coverageEnd && TradeObservation.IsTrade(x)).ToList();
 
             if (ordered.Count == 0)
             {
-                result.Outcome = "NoDataAfterScan";
-                _logger.Info($"Evaluation step: no post-scan candles for {candidate.Ticker}");
+                result.Outcome = remaining.Count > 0 ? "IncompleteHistory" : "NoEntry";
+                result.EntryMissReason = remaining.Count > 0 ? "MissingRegularM5" : "NoTradedPriceAfterScan";
+                _logger.Info($"Evaluation step: no covered post-scan trade observations for {candidate.Ticker}");
                 return result;
             }
 
@@ -217,7 +249,7 @@ namespace IbSwingTrader.Application.Evaluation
                 result.EntryTouched = false;
                 result.EntryMissReason = ResolveNoEntryMissReason(result.ReachedTargetBeforeEntry, ordered, entryPrice);
                 LogNoEntryDiagnostics(candidate, ordered, entryPrice);
-                result.Outcome = "NoEntry";
+                result.Outcome = remaining.Count > 0 ? "IncompleteHistory" : "NoEntry";
                 _logger.Info($"Evaluation step: entry not touched for {candidate.Ticker}");
                 return result;
             }
@@ -323,50 +355,13 @@ namespace IbSwingTrader.Application.Evaluation
                         return result;
                     }
 
-                    if (candle.Close > candle.Open)
-                    {
-                        result.ExitTouched = true;
-                        result.ExitTime = candle.Time;
-                        FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
-                        result.ExitBeforeStop = true;
-                        result.StopBeforeExit = false;
-                        result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
-                        result.Outcome = "Win";
-                    }
-                    else if (candle.Close < candle.Open)
-                    {
-                        result.StopTouched = true;
-                        result.StopTime = candle.Time;
-                        result.StopBeforeExit = true;
-                        result.ExitBeforeStop = false;
-                        result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
-                        result.Outcome = "Loss";
-                    }
-                    else
-                    {
-                        var closeToExit = Math.Abs(candle.Close - exitPrice);
-                        var closeToStop = Math.Abs(candle.Close - stopPrice);
-
-                        if (closeToExit < closeToStop)
-                        {
-                            result.ExitTouched = true;
-                            result.ExitTime = candle.Time;
-                            FillAfterExitStats(result, afterEntry, exitPrice, candle.Time);
-                            result.ExitBeforeStop = true;
-                            result.StopBeforeExit = false;
-                            result.RealizedPct = RoundPct(CalcPct(entryPrice, exitPrice));
-                            result.Outcome = "Win";
-                        }
-                        else
-                        {
-                            result.StopTouched = true;
-                            result.StopTime = candle.Time;
-                            result.StopBeforeExit = true;
-                            result.ExitBeforeStop = false;
-                            result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
-                            result.Outcome = "Loss";
-                        }
-                    }
+                    _logger.Warning($"Exit/stop order unresolved: {candidate.Ticker}, Time={candle.Time:O}; conservative stop outcome");
+                    result.StopTouched = true;
+                    result.StopTime = candle.Time;
+                    result.StopBeforeExit = true;
+                    result.ExitBeforeStop = false;
+                    result.RealizedPct = RoundPct(CalcPct(entryPrice, stopPrice));
+                    result.Outcome = "Loss";
 
                     return result;
                 }
@@ -473,7 +468,7 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbDirection = candidate.H4BbDirection,
                 H4BbRegime = candidate.H4BbRegime,
                 IsFromWishlist = candidate.IsFromWishlist,
-                StrategyVersion = 7,
+                StrategyVersion = 8,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
                 ScanPrice = candidate.TradePlan.LiveReferencePrice,
@@ -537,7 +532,7 @@ namespace IbSwingTrader.Application.Evaluation
                 H4BbDirection = candidate.H4BbDirection,
                 H4BbRegime = candidate.H4BbRegime,
                 IsFromWishlist = candidate.IsFromWishlist,
-                StrategyVersion = 7,
+                StrategyVersion = 8,
                 CandidateScore = candidate.Score.Score,
                 EntryPrice = candidate.TradePlan.EntryPrice,
                 ScanPrice = candidate.TradePlan.LiveReferencePrice,
@@ -667,7 +662,7 @@ namespace IbSwingTrader.Application.Evaluation
 
         private static bool TouchesPrice(Candle candle, decimal price)
         {
-            return candle.Low <= price && candle.High >= price;
+            return TradeObservation.Touches(candle, price);
         }
 
         private static decimal CalcPct(decimal from, decimal to)

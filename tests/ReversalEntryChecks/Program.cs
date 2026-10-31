@@ -74,6 +74,48 @@ var sofiPlan = builder.Build(sofiH4, [], scanPriceOverride: sofiPrice,
 Check(sofiPlan.Entry == 14.43m && sofiPlan.Exit > sofiPlan.Entry &&
     sofiPlan.Stop > 0m && sofiPlan.Stop < sofiPlan.Entry && sofiPlan.StopLimit < sofiPlan.Stop,
     "SOFI's actual frozen completed H4 history builds a valid direct14.43 plan after anticipatory support");
+// Targets use the completed native Daily mid; legacy momentum floors/buffers cannot override it.
+foreach (var (mid, expected, profile) in new[] {
+    (102.157m, 102.15m, "reversal-daily-mid"),
+    (101m, 101m, "reversal-daily-mid"),
+    (110m, 110m, "reversal-daily-mid"),
+    (130m, 110m, "reversal-10pct-cap") })
+{
+    var targetPlan = builder.Build(History(100m), OldM15(100m), scanPriceOverride: 100m,
+        entryPatternFamily: TradeEntryPatternFamily.ReversalHook, useScanPriceEntry: true,
+        defaultProfitPctOverride: .08m, minProfitPctOverride: .05m, maxProfitPctOverride: .08m,
+        reversalDailyMid: mid);
+    Check(targetPlan.Exit == expected && targetPlan.ExitProfile == profile,
+        $"Daily mid {mid}: exact structural exit, ignoring old 5%/8% floor and momentum buffer");
+    Check(targetPlan.Stop < targetPlan.Entry && targetPlan.Stop > 0m,
+        "Stop is rebuilt with a positive entry-relative risk");
+}
+foreach (var mid in new[] { 0m, 99m, 100m, 100.001m })
+{
+    var rejected = false;
+    try { ReversalMidExit.Calculate(100m, mid); } catch (ArgumentException) { rejected = true; }
+    Check(rejected, "Reached/invalid/sub-cent mean cannot manufacture a 10% opportunity");
+}
+Check(ReversalMidExit.Calculate(9.1234m, 20m).Price == 10.03m,
+    "Fractional quote target rounds down and stays within 10%");
+
+var publicationAt = new DateTime(2026, 10, 30, 6, 0, 0);
+var freshPlan = new TradePlanInfo { LiveReferencePrice = 100m, EntryPrice = 100m,
+    ExitPrice = 102m, StopLoss = 99m, ReferencePriceTime = publicationAt.AddSeconds(-10),
+    ReferencePriceObservedAt = publicationAt.AddSeconds(-8), ReferencePriceSource = "M5PartialClose" };
+Check(PublicationPriceGuard.IsFresh(freshPlan, publicationAt, 60), "A current traded M5 reference is publishable");
+Check(!PublicationPriceGuard.IsFresh(freshPlan, publicationAt.AddMinutes(6), 60),
+    "The earliest plan cannot retain a stale price after sequential refresh");
+freshPlan.ReferencePriceSource = "BellUpScanPriceFallback";
+Check(!PublicationPriceGuard.IsFresh(freshPlan, publicationAt, 60), "Historical scan-price fallback is not fresh");
+freshPlan.ReferencePriceSource = "IBLiveAskObserved";
+Check(!PublicationPriceGuard.IsFresh(freshPlan, publicationAt.AddMinutes(1), 60), "Live quotes use their shorter expiry");
+var staleCandidate = new CandidateDetails { Ticker = "STALE", Scan = new(), TradePlan = freshPlan,
+    Score = new(), Context = new(), CandidateSource = "ReversalHook" };
+Check(PublicationPriceGuard.RejectIfStale(staleCandidate, publicationAt.AddMinutes(6), 60) &&
+    CandidateGroups.IsOther(staleCandidate) && staleCandidate.TradePlan.EntryPrice == 0m &&
+    staleCandidate.PatternVerdictReason.Contains("PublicationPriceExpired"),
+    "Writer converts an expired plan to a diagnostic Other before sorting and saving");
 Console.WriteLine($"Passed {checks} reversal entry checks.");
 
 sealed class SavedSettings(GetCandidatesSettings settings) : IGetCandidatesSettingsProvider

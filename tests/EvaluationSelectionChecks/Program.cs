@@ -20,4 +20,17 @@ foreach (var check in checks)
     if (actual != check.Expected)
         throw new InvalidOperationException($"{check.Name}: expected {check.Expected}, got {actual}");
 }
+foreach (var group in new[] { "BellUp", "ReversalHook" })
+{
+    if (!EvaluationScanPolicy.IsWaitingForEntry("NoEntry", group, true, false, now.AddDays(-3), now, 7) ||
+        !EvaluationScanPolicy.IsWaitingForEntry("IncompleteHistory", group, true, false, now.AddDays(-3), now, 7) ||
+        EvaluationScanPolicy.IsWaitingForEntry("NoEntry", group, true, false, now.AddDays(-7), now, 7) ||
+        EvaluationScanPolicy.IsWaitingForEntry("NoEntry", group, false, false, now.AddDays(-1), now, 7) ||
+        EvaluationScanPolicy.IsWaitingForEntry("NoEntry", group, true, true, now.AddDays(-1), now, 7) ||
+        EvaluationScanPolicy.IsWaitingForEntry("Loss", group, true, false, now.AddDays(-1), now, 7) ||
+        EvaluationScanPolicy.IsWaitingForEntry("Win", group, true, false, now.AddDays(-1), now, 7))
+        throw new InvalidOperationException("Pending plans retry only inside the original forward window; completed outcomes stay closed");
+}
+if (EvaluationScanPolicy.IsWaitingForEntry("NoEntry", "Other", true, false, now.AddDays(-1), now, 7))
+    throw new InvalidOperationException("Diagnostic Other is not a waiting playable plan");
 Console.WriteLine($"Passed {checks.Length} evaluation eligibility checks.");

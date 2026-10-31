@@ -81,6 +81,14 @@ EvaluationConfidenceMetrics.MeasureProgress(row, start.AddHours(1), null, [], []
 Check(row.TargetProgressPct == 100m && row.TradeMfePct == 10m && row.TargetProgressStatus == "FinalFromOutcome",
     "Saved target fill establishes Win progress even after cache eviction");
 
+row = Row();
+row.Outcome = "Open";
+var zeroEntry = Bar(start, 10m, 10m, 10m, 10m);
+zeroEntry.Volume = 0m;
+EvaluationConfidenceMetrics.MeasureProgress(row, start.AddMinutes(5), null, [zeroEntry], []);
+Check(row.TargetProgressPct == null && row.TargetProgressStatus == "EntryObservationUnconfirmed",
+    "A legacy zero-volume saved entry cannot establish target progress");
+
 var directory = Directory.CreateTempSubdirectory("confidence-checks-");
 try
 {
@@ -232,7 +240,7 @@ EvaluationDatasetRow Row() => new()
     DiagnosticsEstimatedHitRateModel = "saved-v1", DiagnosticsEstimatedHitRateScope = "WinGivenEntryAndResolution"
 };
 Candle Bar(DateTime time, decimal open, decimal high, decimal low, decimal close) =>
-    new() { Time = time, Open = open, High = high, Low = low, Close = close };
+    new() { Time = time, Open = open, High = high, Low = low, Close = close, Volume = 100 };
 void Check(bool condition, string message)
 {
     checks++;

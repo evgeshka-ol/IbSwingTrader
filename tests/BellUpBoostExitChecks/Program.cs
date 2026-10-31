@@ -27,7 +27,14 @@ Check(BellUpBoostExit.TryCalculate(oneBoost, Enumerable.Repeat(true, oneBoost.Co
       && result.EarlierBoost == null, "Use one qualifying boost when a second is unavailable");
 
 flags[2] = false;
-Check(!BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out _, out _), "Do not cross an episode boundary");
+Check(BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out result, out _) &&
+      result.BoostCount == 1 && result.LatestBoost == bars[3] && result.EarlierBoost == null &&
+      result.AverageBody == 0.16m && result.ExitPrice == 13.53m,
+      "Episode boundary excludes the old boost while retaining the current episode's single boost");
+flags[3] = false;
+Check(!BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out _, out _),
+      "No boost after the episode boundary means fallback; older boosts cannot be borrowed");
+flags[3] = true;
 flags[2] = true;
 flags[^1] = false;
 Check(!BellUpBoostExit.TryCalculate(bars, flags, 13.37m, out _, out _), "No current confirmed episode means fallback");
@@ -79,18 +86,21 @@ var late = Late((10m, 10.2m, 9.9m, 10.1m), (10m, 10.3m, 9.9m, 10.2m),
                 (11m, 11.3m, 10.9m, 11.2m), (11.2m, 12m, 11m, 12m));
 Check(BellUpLateEntryPenalty.Calculate(late.Select(x => x.Open).ToList(), late.Select(x => x.High).ToList(),
       late.Select(x => x.Low).ToList(), late.Select(x => x.Close).ToList()) == 1.5m, "Two comparable prior boosts penalize late peak");
-var one = late.Take(5).Append(new Candle { Open = 11.2m, High = 11.5m, Low = 11.1m, Close = 11.4m }).ToList();
+var one = Late((10m, 10.2m, 9.9m, 10.1m), (10m, 10.3m, 9.9m, 10.15m),
+               (10m, 10.4m, 9.9m, 10.1m), (10m, 11m, 9.9m, 11m),
+               (11m, 11.3m, 10.9m, 11.2m), (11.2m, 12m, 11.1m, 12m));
 Check(BellUpLateEntryPenalty.Calculate(one.Select(x => x.Open).ToList(), one.Select(x => x.High).ToList(),
       one.Select(x => x.Low).ToList(), one.Select(x => x.Close).ToList()) == 0.75m, "One prior boost uses softer penalty");
 var notPeak = one.Select(x => x).ToList(); notPeak[^1].Close = 11.25m;
 Check(BellUpLateEntryPenalty.Calculate(notPeak.Select(x => x.Open).ToList(), notPeak.Select(x => x.High).ToList(),
       notPeak.Select(x => x.Low).ToList(), notPeak.Select(x => x.Close).ToList()) == 0m, "No penalty away from candle high");
-var timingBars = Bodies(0.01m, 0.02m, 0.01m);
+var timingBars = Bodies(0.01m, 0.01m, 0.01m, 0.01m, 0.02m, 0.01m);
+timingBars[^2].High = 40m;
 Check(BellUpEntryTiming.IsReady([], timingBars, Timeframe.H4, timingBars[^1].Time.AddHours(4),
     out _, out _), "T-2 boost remains eligible after a subsequent consolidation candle");
-Check(!BellUpEntryTiming.IsReady([], timingBars.Take(2), Timeframe.H4, timingBars[^1].Time.AddHours(4),
-    out _, out timingLabel) && timingLabel == "Missing candles", "Missing history is not reported as a boost");
-var readyBars = Bodies(0.1m, 0.1m, 0.1m);
+Check(!BellUpEntryTiming.IsReady([], timingBars.Take(5), Timeframe.H4, timingBars[^1].Time.AddHours(4),
+    out _, out var timingLabel) && timingLabel == "Missing candles", "Missing history is not reported as a boost");
+var readyBars = Bodies(0.1m, 0.1m, 0.1m, 0.1m, 0.1m, 0.1m);
 Check(BellUpEntryTiming.IsReady([], readyBars, Timeframe.H4, readyBars[^1].Time.AddHours(4),
     out _, out timingLabel) && timingLabel == string.Empty, "Ready setups have no rejection label");
 Console.WriteLine($"Passed {assertions} BellUp exit, lower-band and late-entry checks.");

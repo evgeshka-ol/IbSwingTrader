@@ -12,6 +12,7 @@
     <Using Include="IbSwingTrader.Domain.Candidates" />
     <Using Include="IbSwingTrader.Application.Dataset" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalHookPhaseClassifier.cs" Link="ReversalHookPhaseClassifier.cs" />
+    <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalMidExit.cs" Link="ReversalMidExit.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalImpulseCompletion.cs" Link="ReversalImpulseCompletion.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4Momentum.cs" Link="ReversalH4Momentum.cs" />
     <Compile Include="../../IbSwingTrader/Application/Candidates/ReversalH4DailySupport.cs" Link="ReversalH4DailySupport.cs" />
@@ -24,6 +25,7 @@
     <Compile Include="../../IbSwingTrader/Application/Dataset/FeatureEngine.cs" Link="FeatureEngine.cs" />
     <Compile Include="../../IbSwingTrader/Abstractions/Dataset/IFeatureEngine.cs" Link="IFeatureEngine.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
+    <Compile Include="../../IbSwingTrader/Domain/Market/TradeObservation.cs" Link="TradeObservation.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Dataset/FeatureSet.cs" Link="FeatureSet.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Candidates/TradePlanInfo.cs" Link="TradePlanInfo.cs" />

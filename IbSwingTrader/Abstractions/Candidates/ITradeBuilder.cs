@@ -13,6 +13,7 @@ namespace IbSwingTrader.Abstractions.Candidates
             decimal? minProfitPctOverride = null,
             decimal? maxProfitPctOverride = null,
             decimal? maxLossPctOverride = null,
-            bool useScanPriceEntry = false);
+            bool useScanPriceEntry = false,
+            decimal? reversalDailyMid = null);
     }
 }

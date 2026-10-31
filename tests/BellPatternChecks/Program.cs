@@ -55,4 +55,13 @@ Check(
         macdLedLine, macdLedSignal, macdLedHistogram, out _),
     "An AEHR-like MACD-led price turn remains diagnostic even while the lower band falls");
 
+// A spike was formerly searched across the entire export window, blocking unrelated later episodes.
+var spikeUpper = new[] { 10m, 10.01m, 10.02m, 10.03m, 10.04m, 11m, 11.01m };
+var spikeLower = Enumerable.Repeat(8m, spikeUpper.Length).ToArray();
+var spikeRsi = Enumerable.Range(0, spikeUpper.Length).Select(i => 40m + i).ToArray();
+var spikeHist = Enumerable.Range(0, spikeUpper.Length).Select(i => .01m * i).ToArray();
+Check(BellPatternClassifier.IsVerticalSpikeExpansion(spikeUpper[..6], spikeLower[..6], spikeRsi[..6], spikeHist[..6]),
+    "A dominant spike in the latest completed transition still blocks immediate admission");
+Check(!BellPatternClassifier.IsVerticalSpikeExpansion(spikeUpper, spikeLower, spikeRsi, spikeHist),
+    "An older spike cannot block a later ordinary transition (PRCH/CDNA regression)");
 Console.WriteLine($"Passed {assertions} Bell pattern checks.");

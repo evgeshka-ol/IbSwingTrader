@@ -9,6 +9,7 @@
     <Compile Include="../../IbSwingTrader/Application/Candidates/ExecutionPriceSnapshot.cs" Link="ExecutionPriceSnapshot.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Candidates/TradePlanInfo.cs" Link="TradePlanInfo.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
+    <Compile Include="../../IbSwingTrader/Domain/Market/TradeObservation.cs" Link="TradeObservation.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
   </ItemGroup>
 </Project>

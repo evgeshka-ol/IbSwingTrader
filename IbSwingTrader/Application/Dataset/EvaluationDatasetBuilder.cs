@@ -392,7 +392,8 @@ namespace IbSwingTrader.Application.Dataset
                         // first stop-touch boundary from cache, never use a later market maximum.
                         var upperBound = row.ExitTime ?? observationEnd;
                         var stopBar = m5?.Where(x => x.Time.AddMinutes(5) > row.EntryTime.Value &&
-                                x.Time <= upperBound && x.Time <= observationEnd && x.Low <= row.StopLoss)
+                                x.Time <= upperBound && x.Time <= observationEnd &&
+                                TradeObservation.Touches(x, row.StopLoss))
                             .OrderBy(x => x.Time).FirstOrDefault();
                         if (stopBar != null)
                             stopTime = stopBar.Time < row.EntryTime.Value ? row.EntryTime : stopBar.Time;
@@ -757,6 +758,9 @@ namespace IbSwingTrader.Application.Dataset
 
             var ordered = cached
                 .Where(x => x.Time >= evaluation.ScanTime && x.Time <= evaluationEnd)
+                .Where(x => evaluation.StrategyVersion < 8 ||
+                    (x.Time >= (evaluation.EvaluationStartTime ?? evaluation.ScanTime) &&
+                     x.Time.AddMinutes(5) <= evaluationEnd && TradeObservation.IsTrade(x)))
                 .OrderBy(x => x.Time)
                 .ToList();
 

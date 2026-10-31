@@ -10,5 +10,6 @@
     <Compile Include="../../IbSwingTrader/Application/Candidates/SessionAlignedH4Builder.cs" Link="SessionAlignedH4Builder.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Candle.cs" Link="Candle.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
+    <None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

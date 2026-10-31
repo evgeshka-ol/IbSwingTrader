@@ -75,6 +75,11 @@ namespace IbSwingTrader.Application.Evaluation
             if (parents.Count == 0 || parents[0].Time > entry ||
                 (isLoss && parents[^1].Time.AddMinutes(5) <= end.Value))
                 return;
+            if (!TradeObservation.Touches(parents[0], row.EntryPrice))
+            {
+                row.TargetProgressStatus = "EntryObservationUnconfirmed";
+                return;
+            }
 
             var minutes = m1.Where(x => x.Time >= parents[0].Time && x.Time < parents[^1].Time.AddMinutes(5))
                 .GroupBy(x => x.Time).ToDictionary(x => x.Key, x => x.Last());
@@ -93,15 +98,18 @@ namespace IbSwingTrader.Application.Evaluation
                     .Select(i => minutes.GetValueOrDefault(parent.Time.AddMinutes(i))).ToList();
                 if (boundary && sub.All(x => x != null && Valid(x)))
                 {
-                    if (terminal && !sub.Any(x => x!.Time >= entry && x.Low <= row.StopLoss))
+                    if (terminal && !sub.Any(x => x!.Time >= entry && TradeObservation.Touches(x, row.StopLoss)))
                     {
-                        SetProgress(row, Math.Max(peak, first ? row.EntryPrice : parent.Open), "FinalConservative");
+                        SetProgress(row, Math.Max(peak, first || !TradeObservation.IsTrade(parent)
+                            ? row.EntryPrice : parent.Open), "FinalConservative");
                         return;
                     }
                     var activated = !first;
                     foreach (var minute in sub)
                     {
                         var bar = minute!;
+                        if (!TradeObservation.IsTrade(bar))
+                            continue;
                         if (bar.Time < entry || (!isLoss && bar.Time.AddMinutes(1) > observationEnd))
                             continue;
                         var entryMinute = false;
@@ -136,6 +144,11 @@ namespace IbSwingTrader.Application.Evaluation
                 {
                     if (!Valid(parent))
                         return;
+                    if (!TradeObservation.IsTrade(parent))
+                    {
+                        conservative = true;
+                        continue;
+                    }
                     if (first && (parent.Low > row.EntryPrice || parent.High < row.EntryPrice))
                         return;
                     if (terminal || parent.Low <= row.StopLoss)

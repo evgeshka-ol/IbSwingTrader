@@ -12,12 +12,20 @@ Check(snapshot.ProjectedEntryPrice == 163.18m, "User's MSTR formula uses current
 Check(snapshot.PriceTime == now && snapshot.ObservedAt == now.AddSeconds(2), "Request and receipt timestamps remain distinct");
 Check(snapshot.Source == "M5PartialClose", "Partial source is explicit");
 current.Close = 170m;
+current.High = 170m;
 Check(snapshot.ProjectedEntryPrice == 163.18m, "Forecast does not use the forming close");
 var completedOnly = ExecutionPriceSnapshot.FromM5([previous], now, now)!;
 Check(completedOnly.Price == 162.95m && completedOnly.PriceTime == now.Date.AddHours(5), "Completed fallback carries actual close time");
 Check(completedOnly.ProjectedEntryPrice == null, "Never invent the current opening price");
 Check(ExecutionPriceSnapshot.FromM5([Bar(now.AddDays(-1), 100m, 100m)], now, now) == null, "Old session cannot supply a fresh quote");
 Check(ExecutionPriceSnapshot.FromM5([future], now, now) == null, "Future bars are excluded");
+var carry = Bar(now.Date.AddHours(5), 163m, 163m);
+carry.Volume = 0m;
+Check(ExecutionPriceSnapshot.FromM5([carry], now, now) == null,
+    "UNIT/CNH-like zero-volume carry cannot supply a fresh execution quote");
+Check(ExecutionPriceSnapshot.FromM5([previous, carry], now, now)!.Source == "M5CompletedClose",
+    "A zero-volume current bucket can fall back only to a genuinely traded adjacent bucket");
+Check(!TradeObservation.Touches(carry, 163m), "Zero-volume equality does not confirm entry, target or stop");
 Check(ExecutionPriceSnapshot.FromM5([current], now, now)!.ProjectedEntryPrice == null, "Missing previous bar cannot supply a forecast");
 previous.Close = 162m;
 Check(ExecutionPriceSnapshot.FromM5([previous, current], now, now)!.ProjectedEntryPrice == null, "Red body is not an upward impulse forecast");
@@ -29,7 +37,7 @@ Console.WriteLine("Execution timing checks passed.");
 static Candle Bar(DateTime time, decimal open, decimal close) => new()
 {
     Timeframe = Timeframe.M5, Time = time, Open = open, Close = close,
-    High = Math.Max(open, close), Low = Math.Min(open, close)
+    High = Math.Max(open, close), Low = Math.Min(open, close), Volume = 100
 };
 static void Check(bool passed, string message)
 {
