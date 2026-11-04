@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.Application.Candidates
 {
     public readonly record struct ReversalMidExitTarget(decimal Price, string Profile);
@@ -18,11 +19,11 @@ namespace IbSwingTrader.Application.Candidates
         // A fresh EMA bend can lag the actual return-to-mid price leg (AMD).
         // A seed's close is known at confirmation; a same-bar high may predate it.
         public static string? FindCompletedReturn(string timeframe, DateTime? signalBar,
-            IReadOnlyList<Candle> completedDaily, DateTime decisionAt)
+            IReadOnlyList<Candle> completedDaily, DateTime decisionAt, NativeH4Clock? h4Clock = null)
         {
             if (!signalBar.HasValue || timeframe is not ("D1" or "Daily" or "H4") || completedDaily.Count < 20)
                 return null;
-            var confirmedAt = timeframe == "H4" ? signalBar.Value.AddHours(4)
+            var confirmedAt = timeframe == "H4" ? (h4Clock ?? NativeH4Clock.From()).End(signalBar.Value)
                 : signalBar.Value.Date.AddHours(16);
             if (completedDaily.Any(x => x.Close <= 0m || x.Time.Date.AddHours(16) > decisionAt) ||
                 completedDaily.Zip(completedDaily.Skip(1), (a,b) => b.Time <= a.Time).Any(x => x))

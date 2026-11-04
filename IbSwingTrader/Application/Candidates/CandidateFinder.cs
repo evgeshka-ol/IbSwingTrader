@@ -51,6 +51,7 @@ namespace IbSwingTrader.Application.Candidates
         private readonly Dictionary<List<Candle>, RecentFeatureSeries> _recentSeriesForRun = new();
         private readonly Dictionary<(List<Candle> Candles, int Count), FeatureSet> _featuresForRun = new();
         private readonly Dictionary<(List<Candle> Source, Timeframe Frame, DateTime Cutoff), List<Candle>> _completedForRun = new();
+        private readonly Dictionary<(List<Candle> Source, DateTime Day, int Count), NativeH4Clock> _nativeClocksForRun = new();
         private readonly Dictionary<string, (DateTime Bucket, ExecutionPriceSnapshot? Quote, List<Candle> Bars)> _bridgeForRun =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, (DateTime DecisionAt, List<Candle> Bars)> _bellUpTimingForRun =
@@ -70,6 +71,7 @@ namespace IbSwingTrader.Application.Candidates
             _recentSeriesForRun.Clear();
             _featuresForRun.Clear();
             _completedForRun.Clear();
+            _nativeClocksForRun.Clear();
             _bridgeForRun.Clear();
             _bellUpTimingForRun.Clear();
             _bridgeFailedForRun.Clear();
@@ -159,7 +161,6 @@ namespace IbSwingTrader.Application.Candidates
                         List<Candle>? dailyCandles = null;
                         CandidateSignalSnapshot snapshot;
                         var preparationTime = MarketTime.Now();
-                        var preparationBucket = preparationTime.AddTicks(-(preparationTime.Ticks % TimeSpan.FromHours(4).Ticks));
                         if (preparedForRun.TryGetValue(stock.Ticker, out var prepared) && preparationTime < prepared.ValidUntil)
                         {
                             contract = prepared.Contract;
@@ -269,8 +270,14 @@ namespace IbSwingTrader.Application.Candidates
                                 continue;
                             }
 
-                            var validUntil = candles!.Select(x => x.Time.AddHours(4))
-                                .Where(x => x > preparationTime).Append(preparationBucket.AddHours(4)).Min();
+                            var preparationClock = GetH4Clock(candles!, preparationTime);
+                            var currentPreparationBar = preparationClock.CurrentStart(preparationTime);
+                            var nextPreparationBoundary = currentPreparationBar.HasValue
+                                ? preparationClock.End(currentPreparationBar.Value)
+                                : preparationTime < preparationTime.Date.AddHours(4)
+                                    ? preparationTime.Date.AddHours(4) : preparationTime.Date.AddDays(1).AddHours(4);
+                            var validUntil = candles!.Select(x => preparationClock.End(x.Time))
+                                .Where(x => x > preparationTime).Append(nextPreparationBoundary).Min();
                             preparedForRun[stock.Ticker] = new PreparedTickerData(contract, candles, dailyCandles, snapshot, validUntil);
                         }
 
@@ -562,7 +569,7 @@ namespace IbSwingTrader.Application.Candidates
                 return;
             _reversalWatchList.InspectHistory(ticker,
                 GetCompletedCandlesForRun(daily ?? [], Timeframe.D1, now),
-                GetCompletedCandlesForRun(h4 ?? [], Timeframe.H4, now));
+                GetCompletedCandlesForRun(h4 ?? [], Timeframe.H4, now), GetH4Clock(h4 ?? [], now));
         }
 
         private (bool Open, DateTime RetryAt, DateTime ExpiresAt)? ResolveWatchRetryWindow(DateTime now)
@@ -794,7 +801,7 @@ namespace IbSwingTrader.Application.Candidates
                 candidate.TradePlan.EntryPriceSource = "ReversalDiagnosis" + quote.Source;
                 var episode = BuildReversalPhaseDiagnosis(ctx, quote);
                 candidate.PatternVerdictReason = episode.Reason;
-                var completedH4 = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, MarketTime.Now());
+                var completedH4 = GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, MarketTime.Now());
                 var series = BuildRecentFeatureSeries(completedH4);
                 var recoveryH4Features = Enumerable.Range(Math.Max(1, completedH4.Count - 2),
                     Math.Min(3, completedH4.Count)).Select(count => CalculateRunFeature(completedH4, count)).ToList();
@@ -885,7 +892,7 @@ namespace IbSwingTrader.Application.Candidates
                         return;
                     }
                     var completedReturn = ReversalMidExit.FindCompletedReturn(episode.Timeframe, episode.SignalBar,
-                        nativeCompletedDaily, MarketTime.Now());
+                        nativeCompletedDaily, MarketTime.Now(), GetH4Clock(ctx.Candles, MarketTime.Now()));
                     if (completedReturn != null)
                     {
                         Reject($"Phase=Completed; CompletionRule=ReversalDailyMidExitAlreadyReached; {completedReturn}");
@@ -919,7 +926,7 @@ namespace IbSwingTrader.Application.Candidates
                         decisionAt, out var evidence))
                     {
                         gentleWeeklySupport = evidence +
-                            $"; WeeklySource=CompletedNativeH4Prefixes; WeeklyObservationConfirmedAt={completedH4[^1].Time.AddHours(4):O}";
+                            $"; WeeklySource=CompletedNativeH4Prefixes; WeeklyObservationConfirmedAt={GetH4Clock(ctx.Candles, MarketTime.Now()).End(completedH4[^1].Time):O}";
                         _logger.Info($"Reversal gentle weekly support: {candidate.Ticker}. {gentleWeeklySupport}");
                     }
                     else
@@ -1007,7 +1014,7 @@ namespace IbSwingTrader.Application.Candidates
                     throw new InvalidOperationException("Contract unavailable for fresh price");
 
                 var requestedAt = MarketTime.Now();
-                var start = BellUpTimingRangeStart(requestedAt) ?? requestedAt.AddMinutes(-15);
+                var start = BellUpTimingRangeStart(requestedAt, ctx.Candles) ?? requestedAt.AddMinutes(-15);
                 var bars = await _historicalData.GetFreshM5Snapshot(
                     candidate.Ticker, ctx.Contract, start, requestedAt);
                 var quote = ExecutionPriceSnapshot.FromM5(bars, requestedAt, MarketTime.Now());
@@ -2440,17 +2447,17 @@ namespace IbSwingTrader.Application.Candidates
             return BellPatternClassifier.IsVerticalSpikeExpansion(upper, lower, rsi, macdHistogram);
         }
 
-        private static DateTime? BellUpTimingRangeStart(DateTime at)
+        private DateTime? BellUpTimingRangeStart(DateTime at, List<Candle> source)
         {
-            var h4 = BellUpEntryTiming.CurrentStart(Timeframe.H4, at);
+            var h4 = GetH4Clock(source, at).CurrentStart(at);
             var daily = BellUpEntryTiming.CurrentStart(Timeframe.D1, at);
             return h4.HasValue && daily.HasValue ? (h4.Value < daily.Value ? h4 : daily) : h4 ?? daily;
         }
 
-        private static void ApplyBellUpTimingObservation(WishListContext ctx, List<Candle> bars, DateTime at)
+        private void ApplyBellUpTimingObservation(WishListContext ctx, List<Candle> bars, DateTime at)
         {
             ctx.BellUpTimingAt = at;
-            ctx.BellUpCurrentH4 = BellUpEntryTiming.BuildCurrentFromM5(bars, Timeframe.H4, at);
+            ctx.BellUpCurrentH4 = BellUpEntryTiming.BuildCurrentFromM5(bars, Timeframe.H4, at, GetH4Clock(ctx.Candles, at));
             ctx.BellUpCurrentDaily = BellUpEntryTiming.BuildCurrentFromM5(bars, Timeframe.D1, at);
             ctx.BellUpTimingEvidence = string.Empty;
         }
@@ -2458,7 +2465,7 @@ namespace IbSwingTrader.Application.Candidates
         private async Task LoadBellUpTimingObservation(WishListContext ctx)
         {
             var at = MarketTime.Now();
-            var start = BellUpTimingRangeStart(at);
+            var start = BellUpTimingRangeStart(at, ctx.Candles);
             if (ctx.Contract == null || !start.HasValue)
                 return;
             if (_bellUpTimingForRun.TryGetValue(ctx.Stock.Ticker, out var cached) &&
@@ -2488,11 +2495,11 @@ namespace IbSwingTrader.Application.Candidates
             // A cached final/forming native candle must not become hindsight evidence.
             var daily = BellUpEntryTiming.GetCompletedCandles(ctx.DailyCandles ?? BuildDailyBars(ctx.Candles),
                 Timeframe.D1, ctx.ScanTimeMarket);
-            var h4 = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, ctx.ScanTimeMarket);
+            var h4 = GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, ctx.ScanTimeMarket);
             var current = timeframe == Timeframe.D1 ? ctx.BellUpCurrentDaily : ctx.BellUpCurrentH4;
-            if (timeframe == Timeframe.H4 && current != null && h4.Count > 0 &&
-                h4[^1].Time.AddHours(4) < current.Bar.Time &&
-                !(current.Bar.Time.Hour == 4 && h4[^1].Time.Hour == 16))
+            var clock = current?.Clock ?? GetH4Clock(ctx.Candles, ctx.BellUpTimingAt ?? ctx.ScanTimeMarket);
+            if (timeframe == Timeframe.H4 && current != null &&
+                (h4.Count == 0 || h4[^1].Time != clock.LastClosedStart(clock.TradingDates, current.Bar.Time)))
             {
                 reason = "Native H4 history needs refresh before using a later forming interval";
                 shortReason = "Missing candles";
@@ -2501,7 +2508,7 @@ namespace IbSwingTrader.Application.Candidates
             var ready = BellUpEntryTiming.IsReady(daily, h4, timeframe,
                 ctx.BellUpTimingAt ?? ctx.ScanTimeMarket, out reason, out shortReason,
                 _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeLookbackBars,
-                _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeMultiplier, current);
+                _getCandidatesSettingsProvider.Get().TradePlan.BellUpRecentBoostRangeMultiplier, current, clock);
             if (current != null)
                 ctx.BellUpTimingEvidence = reason;
             return ready;
@@ -4080,10 +4087,9 @@ namespace IbSwingTrader.Application.Candidates
             BellPatternSignal pattern)
         {
             var isDaily = pattern.Timeframe == BellPatternTimeframe.Daily;
-            var completed = BellUpEntryTiming.GetCompletedCandles(
+            var completed = GetCompletedCandlesForRun(
                 isDaily ? ctx.DailyCandles ?? BuildDailyBars(ctx.Candles) : ctx.Candles,
-                isDaily ? Timeframe.D1 : Timeframe.H4,
-                ctx.ScanTimeMarket);
+                isDaily ? Timeframe.D1 : Timeframe.H4, ctx.ScanTimeMarket);
             var upper = new List<decimal>();
             var mid = new List<decimal>();
             var lower = new List<decimal>();
@@ -5532,14 +5538,29 @@ namespace IbSwingTrader.Application.Candidates
             return result;
         }
 
+        private NativeH4Clock GetH4Clock(List<Candle> source, DateTime at)
+        {
+            var key = (source, at.Date, source.Count(x => x.Time <= at));
+            if (_nativeClocksForRun.TryGetValue(key, out var cached)) return cached;
+            var calendarStart = source.Count > 0 ? source.Min(x => x.Time.Date) : at.Date;
+            if (calendarStart > at.Date.AddDays(-14)) calendarStart = at.Date.AddDays(-14);
+            var schedule = _localMarketScheduleProvider.BuildSchedule(
+                MarketTime.ToUtc(calendarStart), MarketTime.ToUtc(at.Date.AddDays(2)));
+            var closes = schedule.Days.Where(x => x.IsTradingDay && x.Sessions.Count > 0)
+                .ToDictionary(x => x.Date.ToDateTime(TimeOnly.MinValue),
+                    x => MarketTime.FromUtc(x.Sessions.Max(y => y.EndUtc)));
+            return _nativeClocksForRun[key] = NativeH4Clock.From(source, at, closes);
+        }
+
         private List<Candle> GetCompletedCandlesForRun(List<Candle> source, Timeframe frame, DateTime time)
         {
-            var cutoff = source.Select(x => frame == Timeframe.D1 ? x.Time.Date.AddHours(16) : x.Time.AddHours(4))
+            var clock = GetH4Clock(source, time);
+            var cutoff = source.Select(x => frame == Timeframe.D1 ? x.Time.Date.AddHours(16) : clock.End(x.Time))
                 .Where(x => x <= time).DefaultIfEmpty(DateTime.MinValue).Max();
             var key = (source, frame, cutoff);
             if (_completedForRun.TryGetValue(key, out var completed))
                 return completed;
-            completed = BellUpEntryTiming.GetCompletedCandles(source, frame, time);
+            completed = BellUpEntryTiming.GetCompletedCandles(source, frame, time, clock);
             _completedForRun[key] = completed;
             return completed;
         }
@@ -5551,6 +5572,8 @@ namespace IbSwingTrader.Application.Candidates
                 _featuresForRun.Remove(key);
             foreach (var key in _completedForRun.Keys.Where(x => ReferenceEquals(x.Source, candles)).ToList())
                 _completedForRun.Remove(key);
+            foreach (var key in _nativeClocksForRun.Keys.Where(x => ReferenceEquals(x.Source, candles)).ToList())
+                _nativeClocksForRun.Remove(key);
         }
 
         private RecentFeatureSeries BuildRecentFeatureSeries(List<Candle> candles)
@@ -5624,10 +5647,10 @@ namespace IbSwingTrader.Application.Candidates
             try
             {
                 var now = MarketTime.Now();
-                var completed = BellUpEntryTiming.GetCompletedCandles(ctx.Candles, Timeframe.H4, now);
+                var completed = GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now);
                 if (completed.Count == 0)
                     return null;
-                var start = completed[^1].Time.AddHours(4);
+                var start = GetH4Clock(ctx.Candles, now).End(completed[^1].Time);
                 if (start >= now)
                     return null;
                 var settings = _getCandidatesSettingsProvider.Get().Finder;
@@ -5682,11 +5705,11 @@ namespace IbSwingTrader.Application.Candidates
             var schedule = _localMarketScheduleProvider.BuildSchedule(
                 DateTime.SpecifyKind(now.Date.AddDays(-14), DateTimeKind.Utc),
                 DateTime.SpecifyKind(now.Date.AddDays(2), DateTimeKind.Utc));
-            var expectedLastClosedH4 = schedule.Days.Where(x => x.IsTradingDay)
-                .SelectMany(x => new[] { 4, 8, 12, 16 }.Select(hour => x.Date.ToDateTime(new TimeOnly(hour, 0))))
-                .Where(x => x.AddHours(4) <= now).DefaultIfEmpty(DateTime.MinValue).Max();
+            var h4Clock = GetH4Clock(ctx.Candles, now);
+            var expectedLastClosedH4 = h4Clock.LastClosedStart(
+                schedule.Days.Where(x => x.IsTradingDay).Select(x => x.Date.ToDateTime(TimeOnly.MinValue)), now);
             var h4Momentum = ReversalH4Momentum.Evaluate(
-                GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now), quote, now, expectedLastClosedH4);
+                GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now), quote, now, expectedLastClosedH4, h4Clock);
             ReversalFrameEpisode Analyze(List<Candle> source, Timeframe timeframe)
             {
                 var completed = GetCompletedCandlesForRun(source, timeframe, now);
@@ -5717,7 +5740,7 @@ namespace IbSwingTrader.Application.Candidates
                 var label = timeframe == Timeframe.D1 ? "D1" : "H4";
                 var completion = touch.HasValue && signalBar.HasValue
                     ? ReversalImpulseCompletion.FromClosedBar(label, signalBar.Value,
-                        completed[completed.Count - 1 - touch.Value.BarsAgo].Time, touch.Value, now) : null;
+                        completed[completed.Count - 1 - touch.Value.BarsAgo].Time, touch.Value, now, h4Clock) : null;
                 var name = phase.Name;
                 // The historical strict hook can precede the discrete middle-band bend.
                 if (recognized && phase.BarsSinceBend < 0 && series.DailyCloseSeries.Count >= 3)
@@ -5738,7 +5761,7 @@ namespace IbSwingTrader.Application.Candidates
                     {
                         candleContext = "; " + ReversalLowerBandBodyDiagnostics.Describe(
                             completed.TakeLast(series.DailyBbLowerBandSeries.Count).ToList(),
-                            series.DailyBbLowerBandSeries, timeframe, now);
+                            series.DailyBbLowerBandSeries, timeframe, now, h4Clock);
                     }
                     catch (Exception ex)
                     {
@@ -5768,7 +5791,7 @@ namespace IbSwingTrader.Application.Candidates
                 {
                     var supplemental = ReversalSupplementalDiagnostics.Describe(
                         GetCompletedCandlesForRun(ctx.Candles, Timeframe.H4, now),
-                        ctx.ReversalBridgeBars, now, CalculateRunFeature);
+                        ctx.ReversalBridgeBars, now, CalculateRunFeature, h4Clock);
                     reason += $"; {supplemental}";
                 }
                 catch (Exception ex)
@@ -5990,7 +6013,7 @@ namespace IbSwingTrader.Application.Candidates
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var bucket = StartOfH4Bucket(candles[i].Time);
+                var bucket = candles[i].Time;
                 if (!usedBuckets.Add(bucket))
                     continue;
 
@@ -6013,7 +6036,7 @@ namespace IbSwingTrader.Application.Candidates
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var bucket = StartOfH4Bucket(candles[i].Time);
+                var bucket = candles[i].Time;
                 if (!usedBuckets.Add(bucket))
                     continue;
 
@@ -7962,18 +7985,6 @@ namespace IbSwingTrader.Application.Candidates
         {
             var diff = (7 + (value.DayOfWeek - DayOfWeek.Monday)) % 7;
             return value.AddDays(-diff).Date;
-        }
-
-        private static DateTime StartOfH4Bucket(DateTime value)
-        {
-            return new DateTime(
-                value.Year,
-                value.Month,
-                value.Day,
-                (value.Hour / 4) * 4,
-                0,
-                0,
-                value.Kind);
         }
 
         private static List<MacdPoint> BuildMacdSeries(List<decimal> closes)

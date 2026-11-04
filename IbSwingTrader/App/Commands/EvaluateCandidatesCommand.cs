@@ -307,10 +307,15 @@ namespace IbSwingTrader.App.Commands
             string sourceFileName,
             List<CandidateEvaluationResult> results)
         {
-            var wins = results.Count(x => x.Outcome == "Win");
-            var losses = results.Count(x => x.Outcome == "Loss");
-            var open = results.Count(x => x.Outcome == "Open");
-            var noEntry = results.Count(x => x.Outcome == "NoEntry");
+            var plans = results.Where(x => x.EntryPrice > 0m && x.ExitPrice > x.EntryPrice &&
+                x.StopLoss > 0m && x.StopLoss < x.EntryPrice &&
+                !string.Equals(x.CandidateSource, "Other", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(x.CandidateSource, "DiagnosticRejected", StringComparison.OrdinalIgnoreCase)).ToList();
+            var wins = plans.Count(x => x.Outcome == "Win");
+            var losses = plans.Count(x => x.Outcome == "Loss");
+            var open = plans.Count(x => x.Outcome == "Open");
+            var noEntry = plans.Count(x => x.Outcome == "NoEntry");
+            var diagnosticNoEntry = results.Count(x => x.Outcome == "NoEntry") - noEntry;
             var incomplete = results.Count(x => x.Outcome == "IncompleteHistory");
             var noData = results.Count(x =>
                 x.Outcome == "NoData" ||
@@ -320,7 +325,9 @@ namespace IbSwingTrader.App.Commands
                 x.Outcome.StartsWith("Error:", StringComparison.OrdinalIgnoreCase));
 
             _logger.Info(
-                $"Done {sourceFileName} | Total={results.Count} Win={wins} Loss={losses} Open={open} NoEntry={noEntry} IncompleteHistory={incomplete} NoData={noData} Errors={errors}");
+                $"Done {sourceFileName} | Total={results.Count} Plans={plans.Count} Entered={plans.Count(x => x.EntryTime.HasValue)} " +
+                $"Win={wins} Loss={losses} Open={open} NoEntry={noEntry} DiagnosticNoEntry={diagnosticNoEntry} " +
+                $"IncompleteHistory={incomplete} NoData={noData} Errors={errors}");
         }
 
         private static bool ShouldSkipDatasetMergeDueToDataFailures(

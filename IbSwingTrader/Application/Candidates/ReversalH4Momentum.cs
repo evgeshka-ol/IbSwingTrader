@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 using System.Globalization;
 
 namespace IbSwingTrader.Application.Candidates
@@ -5,22 +6,24 @@ namespace IbSwingTrader.Application.Candidates
     public static class ReversalH4Momentum
     {
         public static ReversalRecoveryMomentum Evaluate(IReadOnlyList<Candle> completed,
-            ExecutionPriceSnapshot? quote, DateTime decisionAt, DateTime expectedLastClosedStart)
+            ExecutionPriceSnapshot? quote, DateTime decisionAt, DateTime expectedLastClosedStart, NativeH4Clock? h4Clock = null)
         {
             ReversalRecoveryMomentum Unavailable(string reason) => new(false,
                 $"RecoveryMomentum(Source=Unavailable, Reason={reason})");
             if (quote == null || quote.Price <= 0m)
                 return Unavailable("no-fresh-price");
-            var currentStart = decisionAt.AddTicks(-(decisionAt.Ticks % TimeSpan.FromHours(4).Ticks));
-            if (currentStart.Hour is not (4 or 8 or 12 or 16))
+            var clock = h4Clock ?? NativeH4Clock.From(completed, decisionAt);
+            var current = clock.CurrentStart(decisionAt);
+            if (!current.HasValue)
                 return Unavailable("outside-native-H4-session");
+            var currentStart = current.Value;
             if (quote.PriceTime <= currentStart || quote.PriceTime > decisionAt.AddSeconds(2) ||
                 quote.ObservedAt > decisionAt.AddSeconds(2) || quote.ObservedAt < quote.PriceTime.AddSeconds(-2) ||
                 decisionAt - quote.PriceTime > TimeSpan.FromMinutes(10) ||
                 decisionAt - quote.ObservedAt > TimeSpan.FromMinutes(10))
                 return Unavailable("stale-or-misaligned-price");
             if (completed.Count < 2 || completed[^1].Time != expectedLastClosedStart ||
-                completed.Any(x => x.Time.AddHours(4) > currentStart) ||
+                completed.Any(x => clock.End(x.Time) > currentStart) ||
                 completed.Zip(completed.Skip(1), (a, b) => b.Time <= a.Time).Any(x => x))
                 return Unavailable("missing-or-unaligned-closed-H4");
             var macd = FeatureEngine.CalculateMacdWithCurrentPrice(

@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 using System.Globalization;
 
 namespace IbSwingTrader.Application.Candidates
@@ -6,15 +7,16 @@ namespace IbSwingTrader.Application.Candidates
     public static class ReversalLowerBandBodyDiagnostics
     {
         public static string Describe(IReadOnlyList<Candle> candles, IReadOnlyList<decimal> lower,
-            Timeframe timeframe, DateTime decisionAt)
+            Timeframe timeframe, DateTime decisionAt, NativeH4Clock? h4Clock = null)
         {
             var prefix = FormattableString.Invariant(
                 $"ReversalLowerBandBody(DiagnosticOnly=True, Timeframe={timeframe}, DecisionAt={decisionAt:O}");
             if (candles.Count != lower.Count || timeframe is not (Timeframe.H4 or Timeframe.D1))
                 return prefix + ", Status=InvalidInput)";
 
+            var clock = h4Clock ?? NativeH4Clock.From(candles, decisionAt);
             var closed = Enumerable.Range(0, candles.Count).Where(i =>
-                (timeframe == Timeframe.D1 ? candles[i].Time.Date.AddHours(16) : candles[i].Time.AddHours(4)) <= decisionAt)
+                (timeframe == Timeframe.D1 ? candles[i].Time.Date.AddHours(16) : clock.End(candles[i].Time)) <= decisionAt)
                 .ToList();
             if (closed.Count == 0)
                 return prefix + ", Status=NoCompletedBars)";

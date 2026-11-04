@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.Application.Candidates
 {
     public readonly record struct ReversalUpperTouch(int BarsAgo, decimal High, decimal Upper, string Source)
@@ -41,12 +42,12 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         public static ReversalCompletedImpulse? FromClosedBar(string timeframe, DateTime signalBar,
-            DateTime touchBar, ReversalUpperTouch touch, DateTime decisionAt)
+            DateTime touchBar, ReversalUpperTouch touch, DateTime decisionAt, NativeH4Clock? h4Clock = null)
         {
             if (timeframe is not ("D1" or "H4") || touch.Source is not ("CompletedHigh" or "CompletedClose") ||
                 touch.Upper <= 0m || touch.High < touch.Upper) return null;
             var end = timeframe == "D1" ? touchBar.Date.AddHours(16)
-                : timeframe == "H4" ? touchBar.AddHours(4) : DateTime.MaxValue;
+                : timeframe == "H4" ? (h4Clock ?? NativeH4Clock.From()).End(touchBar) : DateTime.MaxValue;
             if (touchBar < signalBar || end > decisionAt) return null;
             return new(timeframe, signalBar, touchBar, end, touch.High, touch.Upper, touch.Source);
         }

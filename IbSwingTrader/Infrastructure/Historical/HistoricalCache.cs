@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using IbSwingTrader.Common.Time;
 
@@ -306,7 +306,7 @@ namespace IbSwingTrader.Infrastructure.Historical
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var bucket = StartOfH4Bucket(candles[i].Time);
+                var bucket = candles[i].Time;
                 if (!usedBuckets.Add(bucket))
                     continue;
 
@@ -325,9 +325,6 @@ namespace IbSwingTrader.Infrastructure.Historical
             var delta = day == 0 ? 6 : day - 1;
             return time.Date.AddDays(-delta);
         }
-
-        private static DateTime StartOfH4Bucket(DateTime time)
-            => new(time.Year, time.Month, time.Day, (time.Hour / 4) * 4, 0, 0, time.Kind);
 
         private static decimal CalculateSlope(List<decimal> series)
             => series.Count >= 2 ? decimal.Round(series[^1] - series[0], 2, MidpointRounding.AwayFromZero) : 0m;

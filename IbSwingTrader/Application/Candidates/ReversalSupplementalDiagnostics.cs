@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 using System.Globalization;
 
 namespace IbSwingTrader.Application.Candidates
@@ -36,9 +37,13 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         public static string Describe(List<Candle> completed, IEnumerable<Candle> bridge,
-            DateTime decisionAt, Func<List<Candle>, int, FeatureSet> calculate)
+            DateTime decisionAt, Func<List<Candle>, int, FeatureSet> calculate, NativeH4Clock? h4Clock = null)
         {
-            var currentStart = decisionAt.AddTicks(-(decisionAt.Ticks % TimeSpan.FromHours(4).Ticks));
+            var clock = h4Clock ?? NativeH4Clock.From(completed, decisionAt);
+            var current = clock.CurrentStart(decisionAt);
+            if (!current.HasValue)
+                return $"ReversalSupplemental(DiagnosticOnly=True, Status=OutsideNativeSession, DecisionAt={decisionAt:O})";
+            var currentStart = current.Value;
             var prefix = $"ReversalSupplemental(DiagnosticOnly=True, DecisionAt={decisionAt:O}";
             if (completed.Count < 20)
                 return prefix + ", Status=InsufficientH4History)";

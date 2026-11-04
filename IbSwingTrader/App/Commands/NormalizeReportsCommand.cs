@@ -196,7 +196,7 @@ namespace IbSwingTrader.App.Commands
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var bucket = StartOfH4Bucket(candles[i].Time);
+                var bucket = candles[i].Time;
                 if (!usedBuckets.Add(bucket))
                     continue;
 
@@ -215,9 +215,6 @@ namespace IbSwingTrader.App.Commands
             var delta = day == 0 ? 6 : day - 1;
             return time.Date.AddDays(-delta);
         }
-
-        private static DateTime StartOfH4Bucket(DateTime time)
-            => new(time.Year, time.Month, time.Day, (time.Hour / 4) * 4, 0, 0, time.Kind);
 
         private static decimal Round(decimal value)
             => decimal.Round(value, 2, MidpointRounding.AwayFromZero);

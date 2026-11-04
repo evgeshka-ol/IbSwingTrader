@@ -29,5 +29,7 @@
     <Compile Include="../../IbSwingTrader/Domain/Market/Timeframe.cs" Link="Timeframe.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Dataset/FeatureSet.cs" Link="FeatureSet.cs" />
     <Compile Include="../../IbSwingTrader/Domain/Candidates/TradePlanInfo.cs" Link="TradePlanInfo.cs" />
+    <Compile Include="../../IbSwingTrader/Common/Time/NativeH4Clock.cs" Link="NativeH4Clock.cs" />
+    <Compile Include="../../IbSwingTrader/Common/Time/MarketTime.cs" Link="MarketTime.cs" />
   </ItemGroup>
 </Project>

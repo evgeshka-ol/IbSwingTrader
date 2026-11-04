@@ -1,3 +1,4 @@
+using IbSwingTrader.Common.Time;
 using System.Text.Json;
 
 namespace IbSwingTrader.Application.WishList
@@ -165,7 +166,7 @@ namespace IbSwingTrader.Application.WishList
             }
         }
 
-        public void InspectHistory(string ticker, List<Candle> daily, List<Candle> h4)
+        public void InspectHistory(string ticker, List<Candle> daily, List<Candle> h4, NativeH4Clock? h4Clock = null)
         {
             var state = State(ticker);
             var hadItem = _items.TryGetValue(ticker, out var item);
@@ -177,6 +178,7 @@ namespace IbSwingTrader.Application.WishList
                 if (first < 0 || source.Count < 20)
                     return;
                 first = Math.Max(19, first);
+                var clock = h4Clock ?? NativeH4Clock.From(source);
                 var features = FeatureEngine.CalculateNativeReversalHistory(source);
                 var close = new List<decimal>(); var upper = new List<decimal>();
                 var mid = new List<decimal>(); var lower = new List<decimal>();
@@ -205,7 +207,7 @@ namespace IbSwingTrader.Application.WishList
                     if (found)
                     {
                         var bar = source[i - age];
-                        var at = isDaily ? bar.Time.Date.AddHours(16) : bar.Time.AddHours(4);
+                        var at = isDaily ? bar.Time.Date.AddHours(16) : clock.End(bar.Time);
                         events.Add((at, true, false, isDaily ? "D1" : "H4"));
                         if (i == source.Count - 1) recentSignal = true;
                     }

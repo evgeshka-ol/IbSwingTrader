@@ -1,6 +1,7 @@
+using IbSwingTrader.Common.Time;
 namespace IbSwingTrader.Application.Candidates
 {
-    public sealed record BellUpTimingObservation(Candle Bar, DateTime DecisionAt, DateTime CoveredThrough);
+    public sealed record BellUpTimingObservation(Candle Bar, DateTime DecisionAt, DateTime CoveredThrough, NativeH4Clock? Clock = null);
 
     public static class BellUpEntryTiming
     {
@@ -13,13 +14,16 @@ namespace IbSwingTrader.Application.Candidates
             return body > 0m && body >= BurstBodyMultiplier * Math.Abs(preceding.Close - preceding.Open);
         }
 
-        public static List<Candle> GetCompletedCandles(IEnumerable<Candle> candles, Timeframe timeframe, DateTime scanTime)
+        public static List<Candle> GetCompletedCandles(IEnumerable<Candle> candles, Timeframe timeframe, DateTime scanTime, NativeH4Clock? h4Clock = null)
         {
             if (timeframe is not (Timeframe.D1 or Timeframe.H4))
                 return [];
 
-            return candles
-                .Where(x => (timeframe == Timeframe.D1 ? x.Time.Date.AddHours(16) : x.Time.AddHours(4)) <= scanTime)
+            var source = candles.ToList();
+            var clock = h4Clock ?? NativeH4Clock.From(source, scanTime);
+            return source
+                .Where(x => x.Time <= scanTime &&
+                    (timeframe == Timeframe.D1 ? x.Time.Date.AddHours(16) : clock.End(x.Time)) <= scanTime)
                 .OrderBy(x => x.Time)
                 .ToList();
         }
@@ -31,9 +35,9 @@ namespace IbSwingTrader.Application.Candidates
             DateTime scanTime,
             out string reason,
             int rangeLookbackBars = 5,
-            decimal rangeMultiplier = 2m, BellUpTimingObservation? current = null)
+            decimal rangeMultiplier = 2m, BellUpTimingObservation? current = null, NativeH4Clock? h4Clock = null)
             => IsReady(dailyCandles, h4Candles, patternTimeframe, scanTime, out reason, out _,
-                rangeLookbackBars, rangeMultiplier, current);
+                rangeLookbackBars, rangeMultiplier, current, h4Clock);
 
         public static bool IsReady(
             IEnumerable<Candle> dailyCandles,
@@ -43,7 +47,7 @@ namespace IbSwingTrader.Application.Candidates
             out string reason,
             out string shortReason,
             int rangeLookbackBars = 5,
-            decimal rangeMultiplier = 2m, BellUpTimingObservation? current = null)
+            decimal rangeMultiplier = 2m, BellUpTimingObservation? current = null, NativeH4Clock? h4Clock = null)
         {
             if (patternTimeframe is not (Timeframe.D1 or Timeframe.H4))
             {
@@ -59,10 +63,11 @@ namespace IbSwingTrader.Application.Candidates
                 reason = "BellUp range lookback and multiplier must be positive";
                 return false;
             }
-            var completed = GetCompletedCandles(isDaily ? dailyCandles : h4Candles, patternTimeframe, scanTime);
+            var clock = h4Clock ?? current?.Clock;
+            var completed = GetCompletedCandles(isDaily ? dailyCandles : h4Candles, patternTimeframe, scanTime, clock);
             if (current != null)
             {
-                var start = CurrentStart(patternTimeframe, scanTime);
+                var start = CurrentStart(patternTimeframe, scanTime, clock);
                 if (start == null || current.Bar.Time != start.Value || current.Bar.Timeframe != patternTimeframe ||
                     current.DecisionAt != scanTime || current.CoveredThrough !=
                         scanTime.AddTicks(-(scanTime.Ticks % TimeSpan.FromMinutes(5).Ticks)) ||
@@ -83,12 +88,11 @@ namespace IbSwingTrader.Application.Candidates
             return ready;
         }
 
-        public static DateTime? CurrentStart(Timeframe timeframe, DateTime decisionAt)
+        public static DateTime? CurrentStart(Timeframe timeframe, DateTime decisionAt, NativeH4Clock? h4Clock = null)
         {
             if (timeframe == Timeframe.H4)
             {
-                var start = decisionAt.AddTicks(-(decisionAt.Ticks % TimeSpan.FromHours(4).Ticks));
-                return start.Hour is 4 or 8 or 12 or 16 ? start : null;
+                return (h4Clock ?? NativeH4Clock.From()).CurrentStart(decisionAt);
             }
             // Native Daily is the regular session; pre/aftermarket belongs to H4 only.
             return timeframe == Timeframe.D1 && decisionAt.TimeOfDay >= TimeSpan.FromHours(9.5) &&
@@ -96,9 +100,9 @@ namespace IbSwingTrader.Application.Candidates
         }
 
         public static BellUpTimingObservation? BuildCurrentFromM5(IEnumerable<Candle> m5,
-            Timeframe timeframe, DateTime decisionAt)
+            Timeframe timeframe, DateTime decisionAt, NativeH4Clock? h4Clock = null)
         {
-            var start = CurrentStart(timeframe, decisionAt);
+            var start = CurrentStart(timeframe, decisionAt, h4Clock);
             if (!start.HasValue)
                 return null;
             var through = decisionAt.AddTicks(-(decisionAt.Ticks % TimeSpan.FromMinutes(5).Ticks));
@@ -114,7 +118,7 @@ namespace IbSwingTrader.Application.Candidates
                 return null;
             return new(new Candle { Timeframe = timeframe, Time = start.Value,
                 Open = traded[0].Open, High = traded.Max(x => x.High), Low = traded.Min(x => x.Low),
-                Close = traded[^1].Close, Volume = traded.Sum(x => x.Volume) }, decisionAt, through);
+                Close = traded[^1].Close, Volume = traded.Sum(x => x.Volume) }, decisionAt, through, h4Clock);
         }
 
         private static bool Valid(Candle bar) => bar.Open > 0m && bar.Close > 0m && bar.Low > 0m &&

@@ -1,4 +1,4 @@
-﻿using IBApi;
+using IBApi;
 using IbSwingTrader.Common.Time;
 
 namespace IbSwingTrader.Application.Market
@@ -484,7 +484,9 @@ namespace IbSwingTrader.Application.Market
         {
             return timeframe switch
             {
-                Timeframe.H4 => RoundDown(value, TimeSpan.FromHours(4)),
+                // A bounded overlap includes the native bar covering start even
+                // before this request has observed the broker's phase.
+                Timeframe.H4 => value > DateTime.MinValue.AddHours(4) ? value.AddHours(-4) : DateTime.MinValue,
                 Timeframe.H1 => RoundDown(value, TimeSpan.FromHours(1)),
                 Timeframe.M30 => RoundDown(value, TimeSpan.FromMinutes(30)),
                 Timeframe.M15 => RoundDown(value, TimeSpan.FromMinutes(15)),
@@ -500,7 +502,7 @@ namespace IbSwingTrader.Application.Market
         {
             return timeframe switch
             {
-                Timeframe.H4 => RoundDown(value, TimeSpan.FromHours(4)),
+                Timeframe.H4 => value,
                 Timeframe.H1 => RoundDown(value, TimeSpan.FromHours(1)),
                 Timeframe.M30 => RoundDown(value, TimeSpan.FromMinutes(30)),
                 Timeframe.M15 => RoundDown(value, TimeSpan.FromMinutes(15)),

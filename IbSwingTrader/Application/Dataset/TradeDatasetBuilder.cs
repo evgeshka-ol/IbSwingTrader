@@ -187,7 +187,7 @@ namespace IbSwingTrader.Application.Dataset
 
             for (var i = scanIndex; i >= 0; i--)
             {
-                var bucket = StartOfH4Bucket(candles[i].Time);
+                var bucket = candles[i].Time;
                 if (!usedBuckets.Add(bucket))
                     continue;
 
@@ -198,12 +198,6 @@ namespace IbSwingTrader.Application.Dataset
 
             indexes.Reverse();
             return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
-        }
-
-        private static DateTime StartOfH4Bucket(DateTime time)
-        {
-            var hour = time.Hour - (time.Hour % 4);
-            return new DateTime(time.Year, time.Month, time.Day, hour, 0, 0, time.Kind);
         }
 
         private static DateTime GetWeekStart(DateTime time)
