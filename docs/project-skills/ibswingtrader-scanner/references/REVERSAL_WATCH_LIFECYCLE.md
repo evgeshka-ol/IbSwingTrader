@@ -73,7 +73,8 @@ entries are not themselves a pending enrollment universe.
 
 Use the existing shared ReversalHook classifier on completed native D1/H4
 prefixes. It exposes the actual seed's age: the hook timestamp is the seed's
-completion time (D1 16:00; H4 start+4h), not the later diagnosis time.
+completion time (D1 16:00; resolved native H4 end since2026-11-04), not the
+later diagnosis time. See [native clock](NATIVE_H4_CLOCK.md) for DST/session-edge bars.
 Either a middle-band seed or the existing historical strict hook route counts.
 Recognition consumes the watch cycle even when the seed is now Stalled or
 Completed, the current plan is Other, or price/support checks prevent entry.

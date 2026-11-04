@@ -96,7 +96,8 @@ MACD requires closes, not OHLC. Reuse the completed native H4 close prefix
 and append the current fresh quote price to calculate a single provisional
 MACD point with the SAME MACD primitive as the feature engine. No candle is
 fabricated, no future completed H4 value is read and no extra request is made.
-The observation applies to the current native04/08/12/16 interval only.
+Since2026-11-04 the observation applies to the current resolved native interval
+from [NativeH4Clock](NATIVE_H4_CLOCK.md), including winter04/07/11/15/19.
 Require the last expected closed native H4 from the local trading schedule,
 chronological completed inputs and a price timestamp inside the current H4,
 no older than10 minutes. Future price/receipt times beyond2 seconds fail.

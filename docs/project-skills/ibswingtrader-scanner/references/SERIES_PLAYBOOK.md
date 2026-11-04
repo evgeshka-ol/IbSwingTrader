@@ -260,7 +260,7 @@ candles. ReferenceBars makes short baselines explicit; zero/missing medians
 produce n/a. Last/previous positions and PositionChangedIntoBodyFromAbove
 describe relative states, not proof the line itself caused a crossing.
 Decision time and each bar start are retained; forming H4/D1 are excluded
-using existing start+4h / 16:00 conventions. No future rebound is an input.
+using resolved native H4 ends / the existing Daily16:00 convention. No future rebound is an input.
 
 No numeric sharp-drop or short-pause thresholds have been validated here;
 the four-point reporting window and five-point baseline are descriptive
@@ -598,7 +598,14 @@ at the right moment before the boost. Recognizing the BellUp shape and
 deciding whether entry is already late are separate checks. Setups matching
 neither playable family belong in `Other`.
 
-### Current timing rule (updated2026-10-31)
+### Current timing rule (updated2026-11-04)
+
+The November4 native-grid defect is fixed through shared
+[NativeH4Clock](NATIVE_H4_CLOCK.md). Observed per-date starts and the exchange
+UTC offset replace fixed04/08/12/16 and universal start+4h assumptions, including
+winter04/07/11/15/19, a04–07 opening stub and19–20 trailing stub. The
+[dated audit](../../../investigations/2026-11/investigation-2026-11-04-admission-open-and-h4-grid.md)
+retains the original rejection counts; they are not replayed post-fix results.
 
 The user clarified that a forming current candle must shift a previous completed
 boost back into history for this timing check. The implementation now checks
@@ -614,7 +621,7 @@ preceding closed candle was a boost. This does not classify every forming boost
 as exhausted or capture every intrabar profit opportunity; it preserves the
 existing boost threshold while changing the observation being checked.
 
-Current H4 is built on the native04/08/12/16 grid. Current Daily uses RTH09:30
+Current H4 uses the resolved native interval; see NATIVE_H4_CLOCK.md. Current Daily uses RTH09:30
 through16:00; pre/aftermarket does not invent a native current Daily. Only M5
 completed by decision time are included, so this observation can lag the latest
 tick by up to five minutes. Require valid OHLC, complete aligned M5 slots from
@@ -700,9 +707,10 @@ or claim SECZ is fixed solely from the timeframe correction.
 
 The scanner now keeps two explicitly different intraday views:
 
-- **Canonical H4:** bars returned by IB/TWS (`04:00`, `08:00`, `12:00`,
+- **Canonical H4:** bars returned by IB/TWS (summer examples `04:00`, `08:00`, `12:00`,
   `16:00` in the SECZ cache). Bollinger, MACD, RSI and BellUp classification
-  continue to use this complete, sequential four-hour series.
+  continue to use this complete, sequential native H4 series, including
+  shortened session-edge intervals; see NATIVE_H4_CLOCK.md.
 - **ChartH4:** a secondary experimental view built from cached M15 bars with
   session anchors `08:00–09:30`, `09:30–13:30`, and `13:30–16:00`. It is
   retained only for comparison and diagnostics. It does not affect admission

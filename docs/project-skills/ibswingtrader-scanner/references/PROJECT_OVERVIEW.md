@@ -42,8 +42,9 @@
 ## Main artifacts
 
 For user-installed automatic runs on Windows, see `docs/guides/scanner-schedule.md`
-and `tools/Register-ScannerSchedule.ps1`. Schedule times are local Windows
-wall-clock values, not ET. Scheduling invokes the existing get-candidates
+and `tools/Register-ScannerSchedule.ps1`. Since2026-11-04 schedule times are America/New_York
+wall-clock values (default04:15/16:15 ET), independent of Windows timezone;
+old local tasks must be re-registered. Scheduling invokes the existing get-candidates
 command, with no separate pattern-specific scan mode. The signed-in user's
 TWS/Gateway session must already be available. Registration/runs are user-owned.
 

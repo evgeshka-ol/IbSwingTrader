@@ -21,6 +21,7 @@ Scripts reproduce the original studies, not the new project success criteria.
 | SOFI Stalled before October27 boost | [analysis-2026-10-29-sofi-reversal-rejection.json](analysis-2026-10-29-sofi-reversal-rejection.json) |
 | October26 Other / gentle weekly-mid slope | [analysis-2026-10-29-other-weekly-slope.json](analysis-2026-10-29-other-weekly-slope.json), [analysis-2026-10-29-other-weekly-slope.csv.gz](analysis-2026-10-29-other-weekly-slope.csv.gz) |
 | CDNA repeat boost / TMUS near exit | [analysis-2026-10-31-cdna-continuation-tmus-near-exit.json](analysis-2026-10-31-cdna-continuation-tmus-near-exit.json) |
+| November4 admission / Open / H4-grid audit | [analysis-2026-11-04-admission-open-and-h4-grid.json](analysis-2026-11-04-admission-open-and-h4-grid.json) |
 | Frozen BellUp Win model v1 | [model-2026-10-05-bellup-win.json](model-2026-10-05-bellup-win.json) |
 
 For study methods and limitations, use the [documentation map](../README.md).

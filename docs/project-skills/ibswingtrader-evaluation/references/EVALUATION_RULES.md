@@ -89,6 +89,19 @@ outcomes are not automatically replayed or assigned the new scanner targets.
 The [original audit](../../../investigations/2026-10/investigation-2026-10-30-exits-readiness-and-data.md)
 records the prior zero-volume/coverage defects and remains historical evidence.
 
+### Plan/diagnostic summary and native H4 exports (2026-11-04)
+
+LogCandidateSummary now reports Plans, Entered and plan-only Win/Loss/Open/NoEntry.
+DiagnosticNoEntry separately counts unfilled zero/invalid/diagnostic rows; those
+remain preserved in the dataset. Total, data failures and incomplete-history
+counts retain their all-row scope. No outcome, profit, entry rule or CSV schema
+is changed by this presentation fix.
+
+H4 fallback/cache/normalizer series deduplicate exact native timestamps. The
+winter04:00 opening stub and07:00 full bar are distinct rows, rather than one
+local04:00 bucket. Saved nonempty candidate series/outcomes are not automatically
+rewritten. See scanner [native clock](../../ibswingtrader-scanner/references/NATIVE_H4_CLOCK.md).
+
 ### Report group ordering (2026-10-22)
 
 BuildEvaluationDataset.SortColumns in agentsettings.json explicitly orders

@@ -73,6 +73,11 @@ freshness and migration rules in
   after a pullback. A completed H4 seeded inside the current D1 episode blocks
   readmission through that D1 signal. See REVERSAL_IMPULSE_COMPLETION.md for
   exact boundaries, saved evidence and independent-signal exceptions.
+- Since2026-11-04 shared NativeH4Clock resolves observed native starts and
+  date-specific exchange offsets, including winter04/07/11/15/19 and short
+  opening/trailing intervals. Completion, current timing, fresh momentum,
+  expected previous bars and watch events use these boundaries. H4 exports
+  preserve distinct native timestamps. See [native clock](references/NATIVE_H4_CLOCK.md).
 - TWS-native completed bars are canonical. Never substitute a chart's
   session grid, final forming-bar values or future outcomes for scan-time data.
   Weekly supplies context; confirmed Bell patterns use H4/Daily.

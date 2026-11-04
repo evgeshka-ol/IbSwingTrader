@@ -12,7 +12,7 @@ recognized episode whose first Daily-mid return is already proven by completed
 native D1 history. This supersedes the former permission for DeepDeclineRecovery
 to publish a continuation beyond mid. It does not remove diagnostic recognition.
 
-Starting at the selected seed's confirmation (D1 date16:00; H4 start+4h), compare
+Starting at the selected seed's confirmation (D1 date16:00; the resolved native H4 end), compare
 each completed Daily bar with its own full-precision EMA20. A close at/above mid
 proves return after confirmation, including a D1 seed's own close (AMD October28).
 A high at/above mid is accepted only when the entire Daily bar starts at/after
@@ -90,7 +90,8 @@ higher-timeframe support, price freshness and plan validity still apply.
 - `NotReady=H4-impulse-already-completed-in-D1-episode` when that evidence
   blocks Daily readmission, retaining its original local phase as context.
 
-Confirmation time is native H4 start+4h or D1 date16:00. It is bar confirmation,
+Since2026-11-04 confirmation time is the resolved native H4 end
+(including short session-edge bars) or D1 date16:00. See [native clock](NATIVE_H4_CLOCK.md). It is bar confirmation,
 not an invented intrabar tick time. Completed sources are CompletedHigh or
 CompletedClose. The evidence remains in Other and follows existing reason
 preservation through evaluations and evaluation datasets. No new probability
