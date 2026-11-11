@@ -345,7 +345,15 @@ the user's subsequent explicit choice.
 
 ### Experimental Win estimate (2026-10-05)
 
-`DiagnosticsEstimatedHitRatePct` now estimates Win instead of amplitude.
+Retired for publication since2026-11-10 after the saved-outcome audit found
+material overconfidence. New signals have null percent and blank model/scope;
+Win~ displays n/a. Existing display tie-breakers apply when forecasts are absent.
+The original formula remains `EstimateUncalibratedForResearch`; the production
+`Estimate` returns null. No new coefficients or probability cap were fitted.
+Historical saved predictions remain available for feedback. The following
+describes the frozen historical model, not current publication behavior.
+
+`DiagnosticsEstimatedHitRatePct` estimated Win instead of amplitude.
 `BellUpWinProbability` uses final target profit, stop distance, relative volume
 and three-interval H4 RSI change. It applies only to playable BellUp with
 valid prices and RSI history; other groups receive null. Ranking is unchanged.
@@ -388,9 +396,21 @@ Performance lever for research generation.
 
 ## Evaluation dataset settings
 
+### `BuildEvaluationDataset.KeepRecentScanRuns`
+
+Default30. Retains complete latest distinct ScanTime batches and actionable
+unresolved playable plans in the working CSV. Supersedes legacy date/amplitude
+filters when positive; null/zero enables legacy behavior. Complete history,
+including forecasts and current rows, is written to
+datasets/evaluation-dataset-archive.csv before replacing the reduced report.
+Entered Open persist regardless of age; unfilled plans outside the window
+persist only within CandidateEvaluation.ForwardEvaluationDays. Expired rows
+are archived, not relabeled. Sort-only does not load or truncate the archive.
+See evaluation CONFIDENCE_FEEDBACK.md for recovery and calibration rules.
+
 ### `BuildEvaluationDataset.RecentScanDays`
 
-Limits active rebuild window, applied in `EvaluationDatasetBuilder.UpsertAsync`
+Legacy mode only (KeepRecentScanRuns null/zero). Limits active rebuild window, applied in `EvaluationDatasetBuilder.UpsertAsync`
 (the path used by `evaluate-candidates`).
 
 Since 2026-08-11 the cutoff is anchored to the latest `ScanTime` already

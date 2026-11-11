@@ -1,6 +1,6 @@
 # Confidence and target-progress feedback
 
-Current contract, 2026-10-17. Feedback columns in `evaluation-dataset.csv`
+Current contract, updated2026-11-10. Feedback columns in `evaluation-dataset.csv`
 immediately follow `PlannedLossPct`, in this order:
 
 1. `DiagnosticsEstimatedHitRatePct`
@@ -13,6 +13,12 @@ immediately follow `PlannedLossPct`, in this order:
 8. `TargetProgressStatus`
 
 ## Saved forecast and probability error
+
+Since2026-11-10 the experimental BellUp ridge is retired for new publication:
+new percent is null, model/scope empty, console Win~ n/a. This does not replace
+historical forecasts, refit coefficients or assert a new probability calibration.
+Original saved forecasts and their compatible Win/Loss feedback remain valid
+audit inputs, including when retained only in the complete report archive.
 
 Restore the forecast and its metadata together from the exact candidate key
 `Ticker + PresetScanCode + ScanTime` (seconds), falling back to saved evaluation
@@ -88,23 +94,50 @@ Win. It measures proximity to this particular plan's target.
 ## Historical population and refresh
 
 Both full dataset rebuild and incremental evaluation merge refresh feedback
-on reused rows, including dataset-only historical results. An existing saved
-forecast exempts its evaluated row from `RecentScanDays`, `MinScanTime`, and
-`MinAmplitudePct` pruning: keep all available forecast dates and avoid selecting
-calibration examples by their later amplitude. Other rows retain normal filters.
-Candidates without an evaluation do not acquire invented outcomes.
+on reused rows, including dataset-only historical results. With
+`BuildEvaluationDataset.KeepRecentScanRuns=30`, run retention replaces legacy
+RecentScanDays/MinScanTime/MinAmplitudePct report filters. Keep complete batches
+by distinct ScanTime, not dates, presets or rows. Forecast presence does not
+exempt a row from the working window; its evidence remains in
+`datasets/evaluation-dataset-archive.csv`. This archive is a complete canonical
+history, including working rows, not just the removed tail. It preserves all
+forecast dates regardless of amplitude and also nonforecast/rejected evidence.
+
+Positive valid playable plans with entered Open stay in the working report
+regardless of age. Other/DiagnosticRejected are not playable even when legacy
+rows have positive price fields. Other unresolved playable plans are retained
+outside the window only while their configured ForwardEvaluationDays period
+has not expired. Expiry archives the row without rewriting its outcome.
+Thus working rows may exceed the requested number of batches due to older
+actionable plans. Long-stale entered Open remain explicit; retention is not an
+automatic closure/re-evaluation rule.
+
+History and working rows merge by Ticker/PresetScanCode/ScanTime with the latest
+EvaluatedAt winning; current wins ties. Updates can resolve historical plans;
+increasing the window can restore archived batches. Archive is replaced via
+a same-directory temporary file before the reduced working report, so failed
+writes leave recoverable history. Writes assume the existing single-writer
+workflow; no cross-process locking is introduced.
+
+Null/zero KeepRecentScanRuns opts into legacy date/amplitude filtering and the
+historical forecast exemption; it does not automatically load the report archive.
+Negative values are rejected on save. Candidates without an evaluation do not
+acquire invented outcomes. Independent calibration reads the complete archive
+or the key-deduplicated union with the working CSV, never only the recent view.
 
 The update preserves saved outcomes and forecasts. It does not rerun closed
 trades, fetch broker history, retrain, or calibrate the current model. Missing
 history remains explicit. The dedicated offline command refreshes feedback for
-every existing dataset row, without report filters or a TWS connection:
+every existing report/history row without a TWS connection:
 
 ```powershell
 dotnet run --project IbSwingTrader -- refresh-evaluation-feedback
 ```
 
-This command preserves row order and existing trade/outcome values; it updates
-the feedback columns using saved candidates, evaluations and cache. The normal
+In run-retention mode this command reapplies the working window and configured
+sort order after feedback; retained outcomes and original forecasts remain.
+In legacy mode it applies no report date/amplitude filtering. It updates
+feedback using saved candidates, evaluations and cache. The normal
 evaluation merge and full dataset rebuild also refresh feedback. Merely opening
 an old CSV cannot populate new columns.
 

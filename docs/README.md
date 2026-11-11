@@ -58,6 +58,8 @@ in older notes are historical. Follow current skills and success criteria.
 
 ### 2026-11
 
+- [Объём оценочного отчёта, компактные копии и проверка Win/прогнозов](investigations/2026-11/investigation-2026-11-10-report-size-and-feedback.md)
+- [ReversalHook NoEntry: опубликованные планы, редкие сделки и граница публикации](investigations/2026-11/investigation-2026-11-05-reversal-noentry.md)
 - [Пустые допуски, Open и несовпадение native H4 после перевода часов](investigations/2026-11/investigation-2026-11-04-admission-open-and-h4-grid.md)
 
 ### 2026-10
@@ -98,6 +100,7 @@ These describe changes at their recorded date. Later behavior is maintained
 in project references, including subsequent overrides.
 
 - [Native H4 boundaries and exchange-time scheduling](implementation/implementation-2026-11-04-native-h4-and-exchange-schedule.md)
+- [Run-based report retention and retirement of misleading Win estimates](implementation/implementation-2026-11-10-report-retention-and-confidence.md)
 - [BellUp timing includes an observed forming candle](implementation/implementation-2026-10-31-bellup-current-candle-timing.md)
 - [Reversal Daily-mid exits, traded observations and coverage](implementation/implementation-2026-10-30-reversal-mid-exits-and-traded-observations.md)
 - [Gentle weekly support and anticipatory D1 admission](implementation/implementation-2026-10-29-gentle-weekly-anticipatory-reversal.md)

@@ -95,12 +95,15 @@ freshness and migration rules in
 - Final BellUp profit targets >=10% are divided by two by default, preserving
   the existing 1.5% floor. This is execution policy, not a success requirement
   to capture >10%. See SETTINGS_MAP.md for exact rounding and controls.
-- DiagnosticsEstimatedHitRatePct uses experimental BellUp model
-  bellup-win-ridge-2026-10-05-v1 after publication pricing; scope is
-  WinGivenEntryAndResolution. Console uses Win~. Unsupported plans show n/a.
+- Since2026-11-10 new signals do not publish the overconfident experimental
+  bellup-win-ridge-2026-10-05-v1 estimate: Win~ is n/a, with empty model/scope.
+  Saved historical forecasts remain unchanged for calibration. The original
+  research formula remains explicitly research-only; no replacement probability
+  or confidence threshold is inferred from the small resolved cohort.
   Since 2026-10-20 report order is ScanTime descending, then group
   BellUp/ReversalHook/Other, then saved confidence descending inside the group
-  (missing last). DisplayRank, console and dataset rank reconstruction follow
+  (missing last). With no new published probabilities, existing rank tie-breakers
+  determine new display order. DisplayRank, console and dataset rank reconstruction follow
   that order; internal quality scores remain tie-breakers, not recalibrated
   probabilities or a guaranteed win.
 - Wishlist exists only to catch ReversalHook after a meaningful drop. Loser

@@ -15,6 +15,14 @@ The user runs builds, the application, scanner/research/evaluation commands, and
 
 ## Core intent
 
+Since2026-11-10 `BuildEvaluationDataset.KeepRecentScanRuns=30` keeps the latest
+distinct ScanTime batches plus actionable unresolved plans in the working CSV.
+The complete keyed history is written first to datasets/evaluation-dataset-archive.csv,
+including saved forecasts. Merge, full rebuild and feedback refresh share this
+policy; sort-only touches only the working report. See CONFIDENCE_FEEDBACK.md.
+The old BellUp ridge estimate is retired for new publication (n/a); historical
+forecast scoring remains unchanged.
+
 Evaluate the published candidate and its saved plan against the canonical
 [success criteria](../../guides/success-criteria.md), confirmed 2026-10-17:
 
@@ -126,7 +134,7 @@ minutes; do not infer intraminute order from candle color. Incomplete minute
 coverage cannot confirm that parent's target; continue with later M5 using
 conservative post-entry bounds. See EVALUATION_RULES.md for replay and retry scope.
 
-Since 2026-10-05, new scanner `DiagnosticsEstimatedHitRatePct` values use
+From2026-10-05 until its retirement on2026-11-10, scanner `DiagnosticsEstimatedHitRatePct` values used
 the experimental model `bellup-win-ridge-2026-10-05-v1`, scope
 `WinGivenEntryAndResolution`. Historical percentages remain amplitude
 estimates. Compare by model/scope metadata; the conditional estimate is

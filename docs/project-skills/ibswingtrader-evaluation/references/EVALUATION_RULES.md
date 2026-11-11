@@ -2,6 +2,14 @@
 
 Main artifact:
 
+Since2026-11-10 working-report retention defaults to the latest30 distinct
+ScanTime batches plus actionable unresolved playable plans. Complete history
+is saved first to datasets/evaluation-dataset-archive.csv. This supersedes
+legacy report date/amplitude filters, not outcome windows. Saved confidence
+history moves to the archive instead of bypassing the working limit. See
+[confidence history](CONFIDENCE_FEEDBACK.md). New BellUp ridge probabilities
+are retired (n/a); historical percentages/outcomes remain unchanged.
+
 Since 2026-10-17, the evaluation dataset includes saved probability/model/scope,
 BrierLoss and trade-bounded target progress immediately after PlannedLossPct.
 Full rebuild and incremental merge refresh historical forecast rows as well as
