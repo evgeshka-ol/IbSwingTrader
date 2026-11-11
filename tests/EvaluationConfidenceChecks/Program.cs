@@ -3,6 +3,7 @@ using IbSwingTrader.Abstractions.Logging;
 using IbSwingTrader.Abstractions.Market;
 using IbSwingTrader.Abstractions.Settings;
 using IbSwingTrader.Application.Dataset;
+using IbSwingTrader.Application.Candidates;
 using IbSwingTrader.Application.Evaluation;
 using IbSwingTrader.Domain.Candidates;
 using IbSwingTrader.Domain.Dataset;
@@ -228,6 +229,98 @@ try
         x.BrierLoss == 0.123456789m && x.Outcome == "Win" &&
         x.PatternVerdictReason == "PostBellUpRecovery; ReversalHook confirmed on H4"),
         "Sort-only command ignores report filters and retains metrics, outcomes and subtype prefixes");
+
+    candidate.RecentH4RsiSeries = [20m, 30m, 40m, 50m];
+    candidate.Diagnostics!.VolumeRatio20 = 3m;
+    Check(BellUpWinProbability.EstimateUncalibratedForResearch(candidate) > 0m &&
+        BellUpWinProbability.Estimate(candidate) == null,
+        "Retired ridge remains reproducible for research but cannot publish a misleading probability");
+
+    EvaluationDatasetRow Seed(string ticker, DateTime scan, string outcome = "Win")
+    {
+        var item = Row(); item.Ticker = ticker; item.ScanTime = scan;
+        item.Outcome = outcome; item.EntryTime = outcome == "NoEntry" ? null : scan.AddMinutes(5);
+        item.EvaluatedAt = scan.AddHours(1);
+        return item;
+    }
+    var oldForecast = Seed("OLD_FORECAST", start.AddDays(-4));
+    var oldOpen = Seed("OLD_OPEN", start.AddDays(-3), "Open");
+    var oldOther = Seed("OLD_OTHER", start.AddDays(-2), "NoEntry");
+    oldOther.CandidateGroup = oldOther.CandidateSource = "Other";
+    oldOther.EntryPrice = oldOther.ExitPrice = oldOther.StopLoss = 0m;
+    oldOther.DiagnosticsEstimatedHitRatePct = null;
+    var sameDayA = Seed("RECENT_A", start);
+    var sameDayB = Seed("RECENT_B", start);
+    sameDayB.PresetScanCode = "OTHER_CODE";
+    var newest = Seed("NEWEST", start.AddMinutes(5));
+    var history = new List<EvaluationDatasetRow> { oldForecast, oldOpen, oldOther, sameDayA, sameDayB, newest };
+    var split = EvaluationReportRetention.Partition(history, 2, start.AddDays(20), 10);
+    Check(split.Current.Count == 4 && split.Archive.Count == 2 && split.Current.Contains(oldOpen),
+        "Keep complete latest runs plus old unresolved plans, archive old forecasts and zero-plan Other");
+    Check(split.Current.Contains(sameDayA) && split.Current.Contains(sameDayB),
+        "Runs are distinct ScanTime values, not days, rows, tickers or presets");
+    var waiting = Seed("WAITING", start.AddDays(-1), "NoEntry");
+    Check(EvaluationReportRetention.IsUnresolvedPlan(waiting, start, 10) &&
+        !EvaluationReportRetention.IsUnresolvedPlan(waiting, start.AddDays(10), 10),
+        "Unfilled plans remain actionable only within the configured forward evaluation window");
+    var diagnostic = Seed("DIAGNOSTIC", start.AddDays(-20), "Open");
+    diagnostic.CandidateGroup = "Other";
+    Check(!EvaluationReportRetention.IsUnresolvedPlan(diagnostic, start, 10),
+        "Legacy diagnostic Other with positive prices is not a playable unresolved position");
+    Check(new BuildEvaluationDatasetSettings().KeepRecentScanRuns == 30,
+        "Default rolling report keeps thirty scan runs");
+    var rollingSettings = new BuildEvaluationDatasetSettings
+        { KeepRecentScanRuns = 2, MinScanTime = new DateTime(2099, 1, 1), MinAmplitudePct = 999m, RecentScanDays = 1 };
+    var rolling = new EvaluationDatasetBuilder(new EmptyEvaluations(), csv, new SavedCandidates(candidate),
+        new EmptyCache(), null!, paths, new ReportSortSettings(rollingSettings), new Verdict(), new SilentLogger());
+    var archivePath = Path.Combine(directory.FullName, "datasets", "evaluation-dataset-archive.csv");
+    await csv.WriteAsync(output, history);
+    await rolling.UpsertAsync([]);
+    Check((await csv.ReadAsync(output)).Count == 4 && (await csv.ReadAsync(archivePath)).Count == 6,
+        "Incremental update trims current report but stores complete canonical history first");
+    var archivedForecast = (await csv.ReadAsync(archivePath)).Single(x => x.Ticker == "OLD_FORECAST");
+    Check(archivedForecast.DiagnosticsEstimatedHitRatePct == oldForecast.DiagnosticsEstimatedHitRatePct &&
+        archivedForecast.DiagnosticsEstimatedHitRateModel == oldForecast.DiagnosticsEstimatedHitRateModel &&
+        archivedForecast.BrierLoss == 0.04m && archivedForecast.Outcome == "Win",
+        "Archived saved forecast/outcome remains available for all-date calibration");
+    await rolling.RunAsync();
+    await rolling.RefreshFeedbackAsync();
+    Check((await csv.ReadAsync(output)).Count == 4 && (await csv.ReadAsync(archivePath)).Count == 6,
+        "Full rebuild and feedback refresh retain the same run window without resurrecting archived rows");
+    await rolling.SortReportAsync();
+    Check((await csv.ReadAsync(output)).Count == 4,
+        "Sort-only command does not restore the archive into the working report");
+    rollingSettings.KeepRecentScanRuns = 3;
+    await rolling.UpsertAsync([]);
+    Check((await csv.ReadAsync(output)).Any(x => x.Ticker == "OLD_OTHER") &&
+        (await csv.ReadAsync(archivePath)).Count == 6,
+        "Increasing the run window restores rows from preserved history without duplication");
+    rollingSettings.KeepRecentScanRuns = 2;
+    var corrected = await csv.ReadAsync(output);
+    var resolved = corrected.Single(x => x.Ticker == "OLD_OPEN");
+    resolved.Outcome = "Win"; resolved.EvaluatedAt = start.AddDays(1);
+    await csv.WriteAsync(output, corrected);
+    await rolling.UpsertAsync([]);
+    Check(!(await csv.ReadAsync(output)).Any(x => x.Ticker == "OLD_OPEN") &&
+        (await csv.ReadAsync(archivePath)).Single(x => x.Ticker == "OLD_OPEN").Outcome == "Win",
+        "A newly resolved old plan leaves the report and updates its archived canonical outcome");
+    foreach (var failArchive in new[] { true, false })
+    {
+        var before = await File.ReadAllBytesAsync(output);
+        var failing = new EvaluationDatasetBuilder(new EmptyEvaluations(), new FailingReportCsv(csv, failArchive),
+            new SavedCandidates(candidate), new EmptyCache(), null!, paths,
+            new ReportSortSettings(rollingSettings), new Verdict(), new SilentLogger());
+        var failed = false;
+        try { await failing.UpsertAsync([]); } catch (IOException) { failed = true; }
+        Check(failed && before.SequenceEqual(await File.ReadAllBytesAsync(output)),
+            "Archive/current write failure leaves the original current report intact");
+        Check((await csv.ReadAsync(archivePath)).Count == 6 &&
+            !Directory.GetFiles(Path.GetDirectoryName(output)!, "*.tmp").Any(),
+            "Failed write preserves complete history and cleans temporary files");
+    }
+    await rolling.UpsertAsync([]);
+    Check((await csv.ReadAsync(output)).Count == 3 && (await csv.ReadAsync(archivePath)).Count == 6,
+        "Retry after interrupted save is idempotent and does not lose canonical rows");
 }
 finally { directory.Delete(true); }
 Console.WriteLine($"Passed {checks} evaluation confidence checks.");
@@ -254,7 +347,7 @@ sealed class AgentSettingsProvider(string root) : IAgentSettingsProvider
 sealed class Settings : IBuildEvaluationDatasetSettingsProvider
 {
     public BuildEvaluationDatasetSettings Get() => new()
-        { MinScanTime = new DateTime(2099, 1, 1), RecentScanDays = 1, MinAmplitudePct = 99 };
+        { KeepRecentScanRuns = 0, MinScanTime = new DateTime(2099, 1, 1), RecentScanDays = 1, MinAmplitudePct = 99 };
 }
 sealed class ReportSortSettings(BuildEvaluationDatasetSettings settings) : IBuildEvaluationDatasetSettingsProvider
 {
@@ -264,6 +357,17 @@ sealed class EmptyEvaluations : ICandidateEvaluationCsvService
 {
     public Task<List<CandidateEvaluationResult>> ReadAsync(string path) => Task.FromResult(new List<CandidateEvaluationResult>());
     public Task WriteAsync(string path, List<CandidateEvaluationResult> results) => throw new NotSupportedException();
+}
+sealed class FailingReportCsv(IbSwingTrader.Abstractions.Dataset.IEvaluationDatasetCsvService inner, bool failArchive)
+    : IbSwingTrader.Abstractions.Dataset.IEvaluationDatasetCsvService
+{
+    public Task<List<EvaluationDatasetRow>> ReadAsync(string path) => inner.ReadAsync(path);
+    public Task WriteAsync(string path, List<EvaluationDatasetRow> rows)
+    {
+        if (path.Contains("evaluation-dataset-archive", StringComparison.Ordinal) == failArchive)
+            throw new IOException("Injected report write failure");
+        return inner.WriteAsync(path, rows);
+    }
 }
 sealed class SavedCandidates(CandidateDetails candidate) : ICandidateFileService
 {

@@ -5,10 +5,15 @@ namespace IbSwingTrader.Application.Candidates
         public const string ModelVersion = "bellup-win-ridge-2026-10-05-v1";
         public const string Scope = "WinGivenEntryAndResolution";
 
+        // Retired for publication on 2026-11-10: saved outcomes show material
+        // overconfidence after policy changes. Preserve the original model ID
+        // and research calculation; never manufacture replacement historical forecasts.
+        public static decimal? Estimate(CandidateDetails candidate) => null;
+
         // Exploratory ridge logistic model: 46 resolved replay plans / 28 tickers.
         // Labels use the reduced-target policy. Each ticker has total training weight 1.
         // L2=4; intercept has a symmetric two-observation prior. Not holdout calibrated.
-        public static decimal? Estimate(CandidateDetails candidate)
+        public static decimal? EstimateUncalibratedForResearch(CandidateDetails candidate)
         {
             var plan = candidate.TradePlan;
             var diagnostics = candidate.Diagnostics;

@@ -2,6 +2,10 @@ namespace IbSwingTrader.Domain.Settings
 {
     public class BuildEvaluationDatasetSettings
     {
+        // Positive: run-based retention replaces legacy report date/amplitude filters.
+        // Null/zero: retain the legacy filter behavior.
+        public int? KeepRecentScanRuns { get; set; } = 30;
+
         public DateTime? MinScanTime { get; set; }
 
         public int? RecentScanDays { get; set; }

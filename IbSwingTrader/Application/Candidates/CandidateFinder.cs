@@ -543,7 +543,8 @@ namespace IbSwingTrader.Application.Candidates
                     await RefreshBellUpForPublication(candidate, ctx);
             }
 
-            // Estimate only after publication refresh finalized entry, exit and stop.
+            // Assign only after publication refresh finalized the plan. The old
+            // uncalibrated ridge is retired; null also clears any reused estimate.
             foreach (var candidate in finalCandidates.Concat(sameDayCandidates))
             {
                 if (candidate.Diagnostics == null)

@@ -125,6 +125,7 @@
     },
 
     "BuildEvaluationDataset": {
+        "KeepRecentScanRuns": 30,
         "MinScanTime": "2026-04-01",
         "RecentScanDays": 60,
         "BackfillLegacyNoEntryZeroAmplitudeDays": 2,

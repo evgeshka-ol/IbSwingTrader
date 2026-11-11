@@ -12,7 +12,8 @@ namespace IbSwingTrader.Application.Dataset
         IAgentPathService pathService,
         IBuildEvaluationDatasetSettingsProvider buildEvaluationDatasetSettingsProvider,
         ICandidatePatternVerdictService patternVerdictService,
-        ITextLogger logger) : IEvaluationDatasetBuilder
+        ITextLogger logger,
+        ICandidateEvaluationSettingsProvider? evaluationSettingsProvider = null) : IEvaluationDatasetBuilder
     {
         private const decimal MinInterestingAmplitudePct = 5m;
         private const int MaxTradeDaysToMaxUpFromScan = 1;
@@ -46,7 +47,7 @@ namespace IbSwingTrader.Application.Dataset
         public async Task RefreshFeedbackAsync()
         {
             var path = Path.GetFullPath(Path.Combine(_pathService.GetDataRoot(), "datasets", "evaluation-dataset.csv"));
-            var rows = await _evaluationDatasetCsvService.ReadAsync(path);
+            var rows = await ReadHistoryAsync();
             if (rows.Count == 0)
             {
                 _logger.Info("No evaluation dataset rows available for confidence feedback.");
@@ -58,8 +59,8 @@ namespace IbSwingTrader.Application.Dataset
             RefreshFeedback(rows, candidateIndex, await LoadFeedbackEvaluationsAsync([]));
             foreach (var row in rows)
                 NormalizeAmplitude(row);
-            await _evaluationDatasetCsvService.WriteAsync(path, rows);
-            _logger.Info($"Evaluation confidence feedback saved: {path}; rows={rows.Count}. Amplitude and group labels refreshed. No report date filters applied.");
+            await SaveReportAsync(path, rows, _buildEvaluationDatasetSettingsProvider.Get());
+            _logger.Info($"Evaluation confidence feedback saved: {path}; rows={rows.Count}. Amplitude and group labels refreshed; forecast history retained in report/archive.");
         }
 
         public async Task<List<EvaluationDatasetRow>> ReadCurrentAsync()
@@ -97,7 +98,7 @@ namespace IbSwingTrader.Application.Dataset
                         .First(),
                     StringComparer.OrdinalIgnoreCase);
 
-            var existingRows = await ReadCurrentAsync();
+            var existingRows = await ReadHistoryAsync();
             var rebuiltRows = evaluations
                 .GroupBy(BuildEvaluationKey, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x
@@ -134,7 +135,7 @@ namespace IbSwingTrader.Application.Dataset
             var feedbackEvaluations = await LoadFeedbackEvaluationsAsync(evaluations);
             RefreshFeedback(mergedRows, candidateIndex, feedbackEvaluations);
 
-            if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
             {
                 // Anchor the rolling window to the dataset's own prior coverage, not wall-clock
                 // "now". A long gap between runs must not retroactively prune history that was
@@ -147,19 +148,19 @@ namespace IbSwingTrader.Application.Dataset
                 mergedRows = [.. mergedRows.Where(x => x.ScanTime >= recentCutoff || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
-            if (settings.MinScanTime.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinScanTime.HasValue)
             {
                 mergedRows = [.. mergedRows.Where(x => x.ScanTime >= settings.MinScanTime.Value || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
-            if (settings.MinAmplitudePct.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinAmplitudePct.HasValue)
             {
                 mergedRows = [.. mergedRows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value || x.DiagnosticsEstimatedHitRatePct.HasValue)];
             }
 
             EnsureDerivedFields(mergedRows);
             mergedRows.Sort((left, right) => CompareRows(left, right, settings));
-            await _evaluationDatasetCsvService.WriteAsync(outputPath, mergedRows);
+            await SaveReportAsync(outputPath, mergedRows, settings);
         }
 
         public async Task RunAsync()
@@ -188,7 +189,7 @@ namespace IbSwingTrader.Application.Dataset
 
             var feedbackEvaluations = evaluations.ToList();
             var activeCandidates = await LoadCurrentCandidatesAsync();
-            var existingRows = await ReadCurrentAsync();
+            var existingRows = await ReadHistoryAsync();
             var confidenceHistoryKeys = activeCandidates
                 .Where(x => x.Candidate.Diagnostics?.EstimatedHitRatePct.HasValue == true)
                 .Select(x => BuildCandidateKey(x.Candidate))
@@ -196,7 +197,7 @@ namespace IbSwingTrader.Application.Dataset
                 .Concat(existingRows.Where(x => x.DiagnosticsEstimatedHitRatePct.HasValue).Select(BuildDatasetKey))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            if (settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.RecentScanDays.HasValue && settings.RecentScanDays.Value > 0)
             {
                 var recentCutoff = MarketTime.Now().Date.AddDays(-settings.RecentScanDays.Value);
                 evaluations = evaluations
@@ -204,14 +205,15 @@ namespace IbSwingTrader.Application.Dataset
                     .ToList();
             }
 
-            if (settings.MinScanTime.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinScanTime.HasValue)
             {
                 evaluations = evaluations
                     .Where(x => x.ScanTime >= settings.MinScanTime.Value || confidenceHistoryKeys.Contains(BuildEvaluationKey(x)))
                     .ToList();
             }
 
-            if (evaluations.Count == 0 && !existingRows.Any(x => confidenceHistoryKeys.Contains(BuildDatasetKey(x))))
+            if (evaluations.Count == 0 && !(settings.KeepRecentScanRuns > 0 && existingRows.Count > 0) &&
+                !existingRows.Any(x => confidenceHistoryKeys.Contains(BuildDatasetKey(x))))
             {
                 _logger.Error(
                     $"No evaluations found. " +
@@ -220,13 +222,13 @@ namespace IbSwingTrader.Application.Dataset
             }
 
             _logger.Info($"Evaluations loaded: {evaluations.Count}");
-            if (settings.RecentScanDays.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.RecentScanDays.HasValue)
                 _logger.Info($"RecentScanDays filter: {settings.RecentScanDays.Value}");
             if (settings.BackfillLegacyNoEntryZeroAmplitudeDays.HasValue)
                 _logger.Info($"BackfillLegacyNoEntryZeroAmplitudeDays: {settings.BackfillLegacyNoEntryZeroAmplitudeDays.Value}");
-            if (settings.MinScanTime.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinScanTime.HasValue)
                 _logger.Info($"MinScanTime filter: {settings.MinScanTime.Value:yyyy-MM-dd HH:mm:ss}");
-            if (settings.MinAmplitudePct.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinAmplitudePct.HasValue)
                 _logger.Info($"MinAmplitudePct filter: {settings.MinAmplitudePct.Value:0.##}");
 
             var candidateIndex = activeCandidates
@@ -276,7 +278,7 @@ namespace IbSwingTrader.Application.Dataset
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var rows = existingRows
-                .Where(x => (evaluationKeys.Contains(BuildDatasetKey(x)) ||
+                .Where(x => (settings.KeepRecentScanRuns > 0 || evaluationKeys.Contains(BuildDatasetKey(x)) ||
                              confidenceHistoryKeys.Contains(BuildDatasetKey(x))) &&
                             !rebuildKeys.Contains(BuildDatasetKey(x)))
                 .ToList();
@@ -309,7 +311,7 @@ namespace IbSwingTrader.Application.Dataset
 
             RefreshFeedback(rows, candidateIndex, feedbackEvaluations);
 
-            if (settings.MinAmplitudePct.HasValue)
+            if (settings.KeepRecentScanRuns is not > 0 && settings.MinAmplitudePct.HasValue)
             {
                 rows = [.. rows.Where(x => Math.Abs(x.AmplitudePct) >= settings.MinAmplitudePct.Value ||
                     x.DiagnosticsEstimatedHitRatePct.HasValue)];
@@ -318,7 +320,7 @@ namespace IbSwingTrader.Application.Dataset
             EnsureDerivedFields(rows);
             rows.Sort((left, right) => CompareRows(left, right, settings));
 
-            await _evaluationDatasetCsvService.WriteAsync(outputPath, rows);
+            await SaveReportAsync(outputPath, rows, settings);
 
             _logger.Info($"Evaluation rows: {evaluations.Count}");
             _logger.Info($"Rows with active candidate snapshot: {rows.Count(x => x.HasActiveCandidateSnapshot)}");
@@ -331,6 +333,62 @@ namespace IbSwingTrader.Application.Dataset
                 $"Evaluations={evaluations.Count}, " +
                 $"Rows={rows.Count}, " +
                 $"Elapsed={ElapsedTimeFormatter.Format(stopwatch.Elapsed)}");
+        }
+
+        private string ReportArchivePath => Path.GetFullPath(Path.Combine(
+            _pathService.GetDataRoot(), "datasets", "evaluation-dataset-archive.csv"));
+
+        private async Task<List<EvaluationDatasetRow>> ReadHistoryAsync()
+        {
+            var current = await ReadCurrentAsync();
+            if (_buildEvaluationDatasetSettingsProvider.Get().KeepRecentScanRuns is not > 0)
+                return current;
+            var archived = await _evaluationDatasetCsvService.ReadAsync(ReportArchivePath);
+            // Current wins timestamp ties (e.g. a corrected saved row). Latest
+            // evaluations can replace an archived NoEntry/Open on a later run.
+            return [.. current.Concat(archived)
+                .GroupBy(BuildDatasetKey, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.OrderByDescending(r => r.EvaluatedAt).First())];
+        }
+
+        private async Task SaveReportAsync(string path, List<EvaluationDatasetRow> rows,
+            BuildEvaluationDatasetSettings settings)
+        {
+            if (settings.KeepRecentScanRuns < 0)
+                throw new InvalidOperationException("KeepRecentScanRuns must be null, zero or positive.");
+            if (settings.KeepRecentScanRuns is not > 0)
+            {
+                await WriteReportFileAsync(path, rows);
+                return;
+            }
+            var asOf = MarketTime.Now();
+            var forwardDays = evaluationSettingsProvider?.Get().ForwardEvaluationDays ?? new CandidateEvaluationSettings().ForwardEvaluationDays;
+            var (current, archived) = EvaluationReportRetention.Partition(rows, settings.KeepRecentScanRuns.Value, asOf, forwardDays);
+            current.Sort((left, right) => CompareRows(left, right, settings));
+            archived.Sort((left, right) => CompareRows(left, right, settings));
+            // Keep a complete history, including rows retained in the report.
+            // Persist it first so a crash between the two replacements cannot
+            // lose a row moving back from archive to the current report.
+            rows.Sort((left, right) => CompareRows(left, right, settings));
+            await WriteReportFileAsync(ReportArchivePath, rows);
+            await WriteReportFileAsync(path, current);
+            _logger.Info($"Evaluation report retention: KeepRecentScanRuns={settings.KeepRecentScanRuns}, " +
+                $"CurrentRows={current.Count}, TrimmedRows={archived.Count}, HistoryRows={rows.Count}, " +
+                $"UnresolvedPlans={current.Count(x => EvaluationReportRetention.IsUnresolvedPlan(x, asOf, forwardDays))}, Archive={ReportArchivePath}");
+        }
+
+        private async Task WriteReportFileAsync(string path, List<EvaluationDatasetRow> rows)
+        {
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await _evaluationDatasetCsvService.WriteAsync(temporary, rows);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
 
         private async Task<List<CandidateEvaluationResult>> LoadFeedbackEvaluationsAsync(
