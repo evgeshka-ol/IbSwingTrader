@@ -3,10 +3,14 @@
 Historical study outputs and the frozen experimental BellUp Win model.
 Payloads were preserved during the 2026-10-17 documentation reorganization;
 embedded provenance may contain the former docs-root paths.
-Scripts reproduce the original studies, not the new project success criteria.
+Older scripts reproduce their original study targets. Current dated audits
+state their Win/profit objective and limitations in the matching investigation.
 
 | Study / model | Files |
 | --- | --- |
+| November18 probability/ranking readiness (research only) | [summary.json](probability-readiness-2026-11-18/summary.json), [frozen inputs](probability-readiness-2026-11-18/frozen-inputs.json), [frozen challengers](probability-readiness-2026-11-18/challengers.json) |
+| November18 runtime / outcome follow-up | [summary.json](followup-2026-11-18/summary.json) |
+| November17 BellUp ranking / empty scan | [summary.json](bellup-rank-empty-2026-11-17/summary.json), [frozen candidates](bellup-rank-empty-2026-11-17/frozen-candidates.json), [H4 parity fixtures](bellup-rank-empty-2026-11-17/h4-fixtures.json) |
 | October30 exit/readiness/data audit | [analysis-2026-10-30-exit-report.json](analysis-2026-10-30-exit-report.json) |
 | Half-profit targets | [analysis-2026-10-05-half-profit-targets.json](analysis-2026-10-05-half-profit-targets.json) |
 | Win features | [analysis-2026-10-05-win-features.json](analysis-2026-10-05-win-features.json) |

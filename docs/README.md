@@ -58,6 +58,10 @@ in older notes are historical. Follow current skills and success criteria.
 
 ### 2026-11
 
+- [Вероятность Win и порядок внутри запуска: исследовательские модели](investigations/2026-11/investigation-2026-11-18-probability-and-ranking-readiness.md)
+- [Первый скан после оптимизации snapshot: скорость и новые исходы](investigations/2026-11/investigation-2026-11-18-snapshot-speed-followup.md)
+- [BellUp: проигравшие первые места, победители ниже и пустой скан](investigations/2026-11/investigation-2026-11-17-bellup-ranking-and-empty-scan.md)
+- [Утренний и вечерний скан: самостоятельная польза и спад победителей](investigations/2026-11/investigation-2026-11-17-morning-evening-and-winner-decline.md)
 - [Объём оценочного отчёта, компактные копии и проверка Win/прогнозов](investigations/2026-11/investigation-2026-11-10-report-size-and-feedback.md)
 - [ReversalHook NoEntry: опубликованные планы, редкие сделки и граница публикации](investigations/2026-11/investigation-2026-11-05-reversal-noentry.md)
 - [Пустые допуски, Open и несовпадение native H4 после перевода часов](investigations/2026-11/investigation-2026-11-04-admission-open-and-h4-grid.md)

@@ -143,6 +143,13 @@ an old CSV cannot populate new columns.
 
 ## Assessing improvement
 
+The [November18 research comparison](../../../investigations/2026-11/investigation-2026-11-18-probability-and-ranking-readiness.md)
+freezes two BellUp plan/quality challengers for offline scoring of scans from
+November19. Their research ranks/probabilities are not scanner forecasts;
+publication remains disabled. Later scoring must preserve the original saved
+DisplayRank/forecast and use all eligible plans, including unavailable-feature
+and unresolved cases. No production ranking or Win~ change was adopted.
+
 Use only compatible models/scopes and plan policies. Report mean Brier loss,
 sample count, and confidence buckets with mean forecast, observed Win/(Win+Loss),
 and their gap in percentage points. Brier measures overall probability quality;

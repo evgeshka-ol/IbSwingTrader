@@ -199,6 +199,20 @@ Performance guards since 2026-10-09:
   M5 bridge results are reused only within the same five-minute bucket.
   Failed H4 preparations and failed M5 bridges are not retried for every
   preset in the same run. All run caches reset at the next FindAsync.
+- Since2026-11-17 `HistoricalCache.BuildPatternSnapshot` reuses each H4-prefix
+  FeatureSet across its21 Daily/Weekly/H4 output series within that one snapshot.
+  The cache is local to the call; it does not survive a changed history or a
+  subsequent save. Sampling, nullable Weekly filtering, EMA prefixes and rounding
+  are unchanged. This removes repeated calculations, not price freshness checks
+  or broker requests. See the [dated diagnosis](../../../investigations/2026-11/investigation-2026-11-17-bellup-ranking-and-empty-scan.md)
+  and user-run HistoricalSnapshotChecks for output parity and timing validation.
+  On2026-11-18 the user supplied a passing16-check run: all21 series matched,
+  including changed/short/empty histories. Initial full-prefix snapshot timings
+  improved about7.8–9.9x. The first user-run follow-up scan on November18 took
+  1:04:25 versus November17's2:21:21, with155 versus159 unique tickers and
+  more HistLoads. This is an observational result across different days/cache
+  states, not an isolated causal benchmark; see the
+  [follow-up](../../../investigations/2026-11/investigation-2026-11-18-snapshot-speed-followup.md).
 
 Logs contain `In-run reuse summary`, `Historical empty-chunk streak`, and
 explicit stale/failed bridge reasons. Final fresh publication pricing remains
