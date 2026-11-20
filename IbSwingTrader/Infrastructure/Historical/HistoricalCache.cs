@@ -197,28 +197,40 @@ namespace IbSwingTrader.Infrastructure.Historical
         private CachedPatternSnapshot BuildPatternSnapshot(List<Candle> candles)
         {
             var scanIndex = candles.Count - 1;
+            // Every series selects from the same immutable H4 prefixes. Reuse the
+            // full feature result across fields/timeframes for this snapshot only.
+            var features = new Dictionary<int, FeatureSet>();
+            FeatureSet GetFeature(int count)
+            {
+                if (!features.TryGetValue(count, out var feature))
+                {
+                    feature = _featureEngine.Calculate(candles, count);
+                    features.Add(count, feature);
+                }
+                return feature;
+            }
 
-            var dailyBbUpperBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerUpperBand);
-            var dailyBbMidBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerMidBand);
-            var dailyBbLowerBand = BuildRecentDailySeries(candles, scanIndex, x => x.DailyBollingerLowerBand);
-            var dailyRsi = BuildRecentDailySeries(candles, scanIndex, x => x.DailyRSI14);
-            var dailyMacdLine = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDLine);
-            var dailyMacdSignal = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDSignal);
-            var dailyMacdHistogram = BuildRecentDailySeries(candles, scanIndex, x => x.DailyMACDHistogram);
-            var weeklyBbUpperBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerUpperBand);
-            var weeklyBbMidBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerMidBand);
-            var weeklyBbLowerBand = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyBollingerLowerBand);
-            var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyRSI14);
-            var weeklyMacdLine = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDLine);
-            var weeklyMacdSignal = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDSignal);
-            var weeklyMacdHistogram = BuildRecentWeeklySeries(candles, scanIndex, x => x.WeeklyMACDHistogram);
-            var h4BbUpperBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerUpperBand);
-            var h4BbMidBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerMidBand);
-            var h4BbLowerBand = BuildRecentH4Series(candles, scanIndex, x => x.H4BollingerLowerBand);
-            var h4Rsi = BuildRecentH4Series(candles, scanIndex, x => x.RSI14);
-            var h4MacdLine = BuildRecentH4Series(candles, scanIndex, x => x.MACDLine);
-            var h4MacdSignal = BuildRecentH4Series(candles, scanIndex, x => x.MACDSignal);
-            var h4MacdHistogram = BuildRecentH4Series(candles, scanIndex, x => x.MACDHistogram);
+            var dailyBbUpperBand = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyBollingerUpperBand);
+            var dailyBbMidBand = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyBollingerMidBand);
+            var dailyBbLowerBand = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyBollingerLowerBand);
+            var dailyRsi = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyRSI14);
+            var dailyMacdLine = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyMACDLine);
+            var dailyMacdSignal = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyMACDSignal);
+            var dailyMacdHistogram = BuildRecentDailySeries(candles, scanIndex, GetFeature, x => x.DailyMACDHistogram);
+            var weeklyBbUpperBand = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyBollingerUpperBand);
+            var weeklyBbMidBand = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyBollingerMidBand);
+            var weeklyBbLowerBand = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyBollingerLowerBand);
+            var weeklyRsi = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyRSI14);
+            var weeklyMacdLine = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyMACDLine);
+            var weeklyMacdSignal = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyMACDSignal);
+            var weeklyMacdHistogram = BuildRecentWeeklySeries(candles, scanIndex, GetFeature, x => x.WeeklyMACDHistogram);
+            var h4BbUpperBand = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.H4BollingerUpperBand);
+            var h4BbMidBand = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.H4BollingerMidBand);
+            var h4BbLowerBand = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.H4BollingerLowerBand);
+            var h4Rsi = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.RSI14);
+            var h4MacdLine = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.MACDLine);
+            var h4MacdSignal = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.MACDSignal);
+            var h4MacdHistogram = BuildRecentH4Series(candles, scanIndex, GetFeature, x => x.MACDHistogram);
 
             return new CachedPatternSnapshot
             {
@@ -250,6 +262,7 @@ namespace IbSwingTrader.Infrastructure.Historical
         private List<decimal> BuildRecentDailySeries(
             List<Candle> candles,
             int scanIndex,
+            Func<int, FeatureSet> calculateFeature,
             Func<FeatureSet, decimal> selector)
         {
             var indexes = new List<int>();
@@ -267,12 +280,13 @@ namespace IbSwingTrader.Infrastructure.Historical
             }
 
             indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+            return [.. indexes.Select(i => decimal.Round(selector(calculateFeature(i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
 
         private List<decimal> BuildRecentWeeklySeries(
             List<Candle> candles,
             int scanIndex,
+            Func<int, FeatureSet> calculateFeature,
             Func<FeatureSet, decimal?> selector)
         {
             var indexes = new List<int>();
@@ -291,7 +305,7 @@ namespace IbSwingTrader.Infrastructure.Historical
 
             indexes.Reverse();
             return [.. indexes
-                .Select(i => selector(_featureEngine.Calculate(candles, i + 1)))
+                .Select(i => selector(calculateFeature(i + 1)))
                 .Where(x => x.HasValue)
                 .Select(x => decimal.Round(x!.Value, 2, MidpointRounding.AwayFromZero))];
         }
@@ -299,6 +313,7 @@ namespace IbSwingTrader.Infrastructure.Historical
         private List<decimal> BuildRecentH4Series(
             List<Candle> candles,
             int scanIndex,
+            Func<int, FeatureSet> calculateFeature,
             Func<FeatureSet, decimal> selector)
         {
             var indexes = new List<int>();
@@ -316,7 +331,7 @@ namespace IbSwingTrader.Infrastructure.Historical
             }
 
             indexes.Reverse();
-            return [.. indexes.Select(i => decimal.Round(selector(_featureEngine.Calculate(candles, i + 1)), 2, MidpointRounding.AwayFromZero))];
+            return [.. indexes.Select(i => decimal.Round(selector(calculateFeature(i + 1)), 2, MidpointRounding.AwayFromZero))];
         }
 
         private static DateTime StartOfWeek(DateTime time)
